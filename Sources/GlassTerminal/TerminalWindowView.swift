@@ -120,6 +120,7 @@ struct TerminalWindowView: View {
     /// W22: the settings of the window this terminal is in, which it draws and behaves with.
     @Environment(\.glassWindowOverrides) private var windowSettings
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var find = TerminalFindController()
     /// A link to a 3D model, opened in 3D here (D78).
@@ -204,6 +205,7 @@ struct TerminalWindowView: View {
                 onTerminalContextChange?(terminalHostModel.terminalTitle, directory)
             }
             .onAppear {
+                terminalHostModel.pasteRewrite = TerminalWrappedPaste.rewrite(settings: settingsManager)
                 guard let onTerminalContextChange else { return }
                 terminalHostModel.onTerminalTitleChange = { [weak terminalHostModel] title in
                     onTerminalContextChange(title, terminalHostModel?.currentDirectory)
@@ -913,12 +915,20 @@ struct TerminalWindowView: View {
 
     private var swiftTermTheme: SwiftTermTheme {
         var theme = windowTheme.swiftTermTheme
-        theme.fontSize = terminalHostModel.resolvedFontSize(defaultSize: theme.fontSize)
+        theme.fontSize = terminalHostModel.resolvedFontSize(defaultSize: defaultFontSize)
         return theme
     }
 
+    /// The theme's size, or this window's, at the system's text size unless Settings says not to
+    /// (`GlassSystemTextSize`). ⌘+ and ⌘− step from it, and Reset returns to it.
+    private var defaultFontSize: CGFloat {
+        let size = windowTheme.swiftTermTheme.fontSize
+        guard settingsManager.fontFollowsSystemTextSize else { return size }
+        return GlassSystemTextSize.scaled(size, for: dynamicTypeSize, within: SwiftTermHostModel.zoomRange)
+    }
+
     private var fontActions: TerminalFontActions {
-        let defaultSize = windowTheme.swiftTermTheme.fontSize
+        let defaultSize = defaultFontSize
         let model = terminalHostModel
         // Under Scale (D75) the text's size is the window's: these size the window, a step at a
         // time, or back to where the text is at its font's own size. Where a window can't be sized
@@ -1992,77 +2002,6 @@ struct TerminalSettingsSheet: View {
         }
     }
 }
-
-private struct TerminalPasteReviewSheet: View {
-    let request: SwiftTermPasteReview
-    let onCancel: () -> Void
-    let onPaste: (String) -> Void
-    @State private var editedText: String
-
-    init(
-        request: SwiftTermPasteReview,
-        onCancel: @escaping () -> Void,
-        onPaste: @escaping (String) -> Void
-    ) {
-        self.request = request
-        self.onCancel = onCancel
-        self.onPaste = onPaste
-        _editedText = State(initialValue: request.content)
-    }
-
-    private var editedByteCount: Int { editedText.utf8.count }
-    private var canPaste: Bool {
-        !request.exceedsMaximumSize && SwiftTermPastePolicy.isAllowed(editedText)
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(request.bracketedPasteMode
-                    ? "The remote program requested bracketed paste. Review the content before it is sent."
-                    : "Multiline or large pasted content can execute multiple shell commands. Review it before sending.")
-                    .foregroundStyle(.secondary)
-
-                LabeledContent("Original size", value: "\(request.byteCount) bytes, \(request.lineCount) lines")
-
-                if request.exceedsMaximumSize {
-                    ContentUnavailableView(
-                        "Paste Too Large",
-                        systemImage: "doc.badge.ellipsis",
-                        description: Text("The clipboard exceeds the \(SwiftTermPastePolicy.maximumPayloadBytes)-byte terminal paste limit. Nothing was sent.")
-                    )
-                } else {
-                    TextEditor(text: $editedText)
-                        .font(.system(.body, design: .monospaced))
-                        .terminalTextInputDefaults()
-                        .accessibilityLabel("Editable terminal paste content")
-                    Text("\(editedByteCount) of \(SwiftTermPastePolicy.maximumPayloadBytes) bytes")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(editedByteCount > SwiftTermPastePolicy.maximumPayloadBytes ? .red : .secondary)
-                }
-            }
-            .padding()
-            .navigationTitle("Review Terminal Paste")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                }
-                if !request.exceedsMaximumSize {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Paste") { onPaste(editedText) }
-                            // ⌘↩ sends it: Return is the text's own, a new line in what is pasted
-                            // (the owner, 2026-10-14: "should allow a command return to submit").
-                            .keyboardShortcut(.return, modifiers: .command)
-                            .disabled(!canPaste)
-                    }
-                }
-            }
-        }
-        .frame(minWidth: 560, minHeight: 420)
-        .interactiveDismissDisabled()
-    }
-}
-
 
 /// The sections of a terminal's Settings, the window's own first. Named for what they change: the
 /// owner, on the Vision Pro, changed transparency and tint on the first section, then called

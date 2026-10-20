@@ -10,8 +10,10 @@
 
 import Foundation
 import Testing
+import SwiftTerm
 import GlassSSHTransport
 @testable import GlassTerminal
+@testable import GlassTerminalEmulator
 
 @Suite("tmux against a real host (gated)", .serialized)
 struct LiveTmuxTests {
@@ -141,5 +143,133 @@ struct LiveTmuxTests {
         print("claimed: \(fromClaim)\ntyped:   \(fromTyped)")
         #expect(!fromTyped.isEmpty, "the typed session's shell answered")
         #expect(fromClaim == fromTyped, "PATH and locale inside a claimed session match a typed one")
+    }
+
+    /// What a shell sends, as it arrives.
+    private final class Collected: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+        func append(_ more: Data) { lock.withLock { data.append(more) } }
+        var bytes: Data { lock.withLock { data } }
+    }
+
+    private final class Delegate: TerminalDelegate {
+        func send(source: Terminal, data: ArraySlice<UInt8>) {}
+    }
+
+    /// One control-mode attach over a real SSH shell, as a terminal tab has it: the app's attach
+    /// line typed at the shell, `TmuxControlClient` between tmux and a SwiftTerm terminal.
+    private final class ControlTab {
+        let shell: SSHShellChannel
+        var client: TmuxControlClient
+        let terminal: Terminal
+        private let delegate = Delegate()
+        private let output = Collected()
+        private var read = 0
+        private var reader: Task<Void, Never>?
+        var live = false, exited = false
+
+        init(_ shell: SSHShellChannel, columns: Int, rows: Int) {
+            self.shell = shell
+            client = TmuxControlClient(columns: columns, rows: rows)
+            terminal = Terminal(delegate: delegate, options: TerminalOptions(cols: columns, rows: rows, scrollback: 10_000))
+            let output = output
+            reader = Task { for await chunk in shell.output { if case .stdout(let data) = chunk { output.append(data) } } }
+        }
+
+        func apply(_ actions: [TmuxControlAction]) async throws {
+            for action in actions {
+                switch action {
+                case .terminal(let data): terminal.feed(byteArray: Array(data))
+                case .transport(let data): try await shell.write(data)
+                case .live: live = true
+                case .exited: exited = true
+                }
+            }
+        }
+
+        /// Reads and draws until `done` holds and output has been quiet a moment, or time runs out.
+        @discardableResult
+        func pump(seconds: Double = 15, until done: () -> Bool) async throws -> Bool {
+            let deadline = Date().addingTimeInterval(seconds)
+            var quietSince = Date()
+            while Date() < deadline {
+                let bytes = output.bytes
+                if bytes.count > read {
+                    let new = bytes[read...]
+                    read = bytes.count
+                    try await apply(client.receive(Data(new)))
+                    quietSince = Date()
+                } else if done(), Date().timeIntervalSince(quietSince) > 0.5 {
+                    return true
+                } else {
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+            }
+            return done()
+        }
+
+        func type(_ text: String) async throws { try await apply(client.input(Data(text.utf8))) }
+
+        var lines: [String] {
+            var lines: [String] = []
+            var row = 0
+            while let line = terminal.getScrollInvariantLine(row: row) {
+                lines.append(line.translateToString(trimRight: true))
+                row += 1
+            }
+            return lines
+        }
+
+        var screen: [String] { (0..<terminal.rows).compactMap { terminal.getLine(row: $0)?.translateToString(trimRight: true) } }
+
+        func detach() async throws {
+            // A blank line detaches a control client; the shell was replaced by tmux, so it ends.
+            try await shell.write(Data("\n".utf8))
+            try await pump(seconds: 5) { exited }
+            reader?.cancel()
+            await shell.close()
+        }
+    }
+
+    /// The terminal keeps every line in tmux (D83, control mode): what the session holds is read in as
+    /// the app attaches, and every byte printed after reaches the terminal — where tmux attached the
+    /// ordinary way skipped what it couldn't draw (route A: 32 of 60 lines printed at once lost).
+    @Test func controlModeKeepsEveryLine() async throws {
+        guard let transport = try await transport() else { return }
+        defer { Task { await transport.close() } }
+        guard case .sessions = try await sessions(transport) else {
+            print("tmux is not installed on the test host: nothing to keep")
+            return
+        }
+        let version = try await transport.execute(TerminalTmux.versionCommand)
+        guard TmuxControlClient.supports(version: version) else {
+            print("\(version.trimmingCharacters(in: .whitespacesAndNewlines)) predates control mode's needs: attaches the ordinary way")
+            return
+        }
+        let name = "gpt-live-\(UUID().uuidString.prefix(8))"
+        let attach = TerminalTmux.attachLine(name: name, takeOver: false, control: true) + "\n"
+        defer { Task { _ = try? await transport.execute(TerminalTmux.killCommand(name: name)) } }
+
+        // A session with a history, then left.
+        let first = ControlTab(try await transport.openShell(pty: SSHPTYRequest(columns: 100, rows: 30)), columns: 100, rows: 30)
+        try await first.shell.write(Data(attach.utf8))
+        #expect(try await first.pump { first.live }, "attached as a control-mode client")
+        try await first.type("PS1='$ '; seq 1 150\r")
+        try await first.pump { first.screen.contains("150") }
+        try await first.detach()
+        #expect(first.exited, "tmux said %exit")
+
+        // Back again: read in, then a burst far faster than tmux would draw it.
+        let second = ControlTab(try await transport.openShell(pty: SSHPTYRequest(columns: 100, rows: 30)), columns: 100, rows: 30)
+        try await second.shell.write(Data(attach.utf8))
+        #expect(try await second.pump { second.live }, "attached again")
+        try await second.type("seq 1001 3000\r")
+        try await second.pump(seconds: 30) { second.screen.contains("3000") }
+        let numbers = second.lines.compactMap { Int($0) }
+        let expected = Array(1...150) + Array(1001...3000)
+        #expect(!second.terminal.isCurrentBufferAlternate, "a shell, on the normal screen")
+        #expect(numbers == expected, "every line, in order, once: \(numbers.count) of \(expected.count); missing \(Set(expected).subtracting(numbers).sorted().prefix(10))")
+        try await second.detach()
     }
 }

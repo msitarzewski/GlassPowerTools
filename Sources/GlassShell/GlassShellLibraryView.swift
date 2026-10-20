@@ -26,6 +26,9 @@ public struct GlassShellLibraryView: View {
     @AppStorage(GlassAvailabilityMonitor.settingKey, store: GlassUITestRun.settingsDefaults) private var showsAvailability = false
     @State private var availabilityMonitor = GlassAvailabilityMonitor()
     @Environment(\.scenePhase) private var scenePhase
+    /// The column a service's or tool's icon sits in. It grows with the text: at a fixed 20 points
+    /// the icon, which grows, ran under the name at the largest sizes (2026-10-19).
+    @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 20
 
     public init(model: GlassShellModel) { self.model = model }
 
@@ -429,11 +432,11 @@ public struct GlassShellLibraryView: View {
         HStack(spacing: 10) {
             Image(systemName: tool.symbolName)
                 .foregroundStyle(.secondary)
-                .frame(width: 20)
+                .frame(width: iconColumn)
             VStack(alignment: .leading, spacing: 2) {
-                Text(tool.title).lineLimit(1)
+                Text(tool.title).glassLargeTextWraps()
                 if let subtitle = tool.subtitle {
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary).glassLargeTextWraps()
                 }
             }
             Spacer(minLength: 8)
@@ -477,11 +480,14 @@ public struct GlassShellLibraryView: View {
                 .overlay(alignment: .bottomTrailing) {
                     GlassServiceStatusDot(isConnected: isConnected, availability: availability)
                 }
+                // Labelled as the library row's icons are: the drawn database icon has no name of
+                // its own, so VoiceOver read only its status (2026-10-18, AccessibilityAuditUITests).
+                .accessibilityLabel(GlassServicePresentation.displayName(for: service.kind))
                 .accessibilityValue(GlassServiceStatusDot.description(isConnected: isConnected, availability: availability))
-                .frame(width: 20)
+                .frame(width: iconColumn)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(service.displayName).lineLimit(1).truncationMode(.tail)
+                    Text(service.displayName).glassLargeTextWraps().truncationMode(.tail)
                     // After the name, as a favourite machine's star is.
                     if model.isFavorite(.service(service.endpointID)) {
                         Image(systemName: "star.fill").font(GlassSpatialMetrics.rowSubtitleFont)
@@ -496,7 +502,7 @@ public struct GlassShellLibraryView: View {
                 Text(subtitle(for: service, isBuiltIn: isBuiltIn))
                     .font(.footnote)
                     .foregroundStyle(isUnconfigured(service, host: host) ? .orange : .secondary)
-                    .lineLimit(1)
+                    .glassLargeTextWraps()
             }
         }
         .layoutPriority(0)
@@ -526,39 +532,53 @@ public struct GlassShellLibraryView: View {
             }
         }
         let owner = host.record(owning: service.endpointID)
-        return ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
-                identity
-                Spacer(minLength: 8)
-                HStack(spacing: 8) {
-                    connect
-                    edit
-                    if let owner { model.registry.serviceDetailActions(service: service, host: owner) }
+        let more = Group {
+            if let owner {
+                Menu {
+                    model.registry.serviceDetailActions(service: service, host: owner)
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
                 }
+                .labelStyle(.iconOnly)
+                .menuIndicator(.hidden)
                 .fixedSize()
-                .layoutPriority(1)
+                .accessibilityIdentifier("host-service-more-\(service.kind.rawValue)\(suffix)")
             }
-            HStack(spacing: 12) {
-                identity
-                Spacer(minLength: 8)
-                HStack(spacing: 8) {
-                    connect
-                    edit
-                    if let owner {
-                        Menu {
-                            model.registry.serviceDetailActions(service: service, host: owner)
-                        } label: {
-                            Label("More", systemImage: "ellipsis.circle")
-                        }
-                        .labelStyle(.iconOnly)
-                        .menuIndicator(.hidden)
-                        .fixedSize()
-                        .accessibilityIdentifier("host-service-more-\(service.kind.rawValue)\(suffix)")
+        }
+        // At an accessibility text size the name and kind take the row's width, whole, and the
+        // buttons go under them, the capability's actions behind More (2026-10-19: "T…" beside
+        // buttons that kept their width).
+        return GlassLargeTextRow {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    identity
+                    Spacer(minLength: 8)
+                    HStack(spacing: 8) {
+                        connect
+                        edit
+                        if let owner { model.registry.serviceDetailActions(service: service, host: owner) }
                     }
+                    .fixedSize()
+                    .layoutPriority(1)
                 }
-                .fixedSize()
-                .layoutPriority(1)
+                HStack(spacing: 12) {
+                    identity
+                    Spacer(minLength: 8)
+                    HStack(spacing: 8) {
+                        connect
+                        edit
+                        more
+                    }
+                    .fixedSize()
+                    .layoutPriority(1)
+                }
             }
+        } identity: {
+            identity
+        } actions: {
+            connect
+            edit
+            more
         }
     }
 

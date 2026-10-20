@@ -6,6 +6,10 @@ public enum GlassLibraryColumnLayout {
     public static let navigationMinimum: CGFloat = 240
     public static let navigationIdeal: CGFloat = 340
     public static let navigationMaximum: CGFloat = 480
+    /// At an accessibility text size (`glassNavigationColumnWidth()`).
+    public static let accessibilityNavigationMinimum: CGFloat = 360
+    public static let accessibilityNavigationIdeal: CGFloat = 480
+    public static let accessibilityNavigationMaximum: CGFloat = 600
     public static let resultsMinimum: CGFloat = 320
     public static let resultsIdeal: CGFloat = 510
     public static let resultsMaximum: CGFloat = 760

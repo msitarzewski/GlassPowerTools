@@ -210,4 +210,67 @@ struct PortableSettingsSyncTests {
         let olderData = try JSONSerialization.data(withJSONObject: older)
         #expect(try JSONDecoder().decode(ICloudPortableTerminalPreferences.self, from: olderData).whenResized == nil)
     }
+
+    /// The accessibility audit's P3 (the owner, 2026-10-19): the largest font size is 28 points,
+    /// twice the 14-point default. A theme syncs at 28 and is refused past it.
+    @Test("a theme's font syncs at up to 28 points")
+    func largestFontSize() throws {
+        var theme = TerminalTheme.default
+        theme.fontSize = 28
+        #expect(theme.isValidForPersistence)
+        try cloud(theme).validate()
+        theme.fontSize = 29
+        #expect(!theme.isValidForPersistence)
+        #expect(throws: (any Error).self) { try cloud(theme).validate() }
+    }
+
+    /// Scale with System Text Size (2026-10-19): on by default, kept on this device, and not among
+    /// what travels, since each device has its own text size.
+    @Test("Scale with System Text Size is on, kept on this device, and stays here")
+    func followsSystemTextSizeStaysOnThisDevice() throws {
+        let suite = "FollowsTextSize.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsManager(
+            loadImmediately: false, settingsDefaults: defaults, sshKeyDefaults: defaults,
+            iCloudSettingsSyncService: ICloudSettingsSyncService(store: Store(), writerID: UUID()),
+            workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: Store()))
+        #expect(settings.fontFollowsSystemTextSize, "on by default")
+        settings.fontFollowsSystemTextSize = false
+        settings.saveSettings()
+        let reopened = SettingsManager(
+            settingsDefaults: defaults, sshKeyDefaults: defaults,
+            iCloudSettingsSyncService: ICloudSettingsSyncService(store: Store(), writerID: UUID()),
+            workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: Store()))
+        #expect(!reopened.fontFollowsSystemTextSize)
+
+        let carried = try JSONEncoder().encode(preferences(cursorStyle: "Block"))
+        let keys = try #require(try JSONSerialization.jsonObject(with: carried) as? [String: Any]).keys
+        #expect(!keys.contains { $0.localizedCaseInsensitiveContains("TextSize") })
+    }
+
+    /// The paste review's Join Wrapped Lines (2026-10-19): on until someone turns it off there,
+    /// remembered, and kept on this device.
+    @Test("Join Wrapped Lines is on, remembered, and stays on this device")
+    func joinsWrappedPastesStaysOnThisDevice() throws {
+        let suite = "JoinsWrapped.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsManager(
+            loadImmediately: false, settingsDefaults: defaults, sshKeyDefaults: defaults,
+            iCloudSettingsSyncService: ICloudSettingsSyncService(store: Store(), writerID: UUID()),
+            workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: Store()))
+        #expect(settings.joinsWrappedPastes, "on by default")
+        settings.joinsWrappedPastes = false
+        settings.saveSettings()
+        let reopened = SettingsManager(
+            settingsDefaults: defaults, sshKeyDefaults: defaults,
+            iCloudSettingsSyncService: ICloudSettingsSyncService(store: Store(), writerID: UUID()),
+            workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: Store()))
+        #expect(!reopened.joinsWrappedPastes)
+
+        let carried = try JSONEncoder().encode(preferences(cursorStyle: "Block"))
+        let keys = try #require(try JSONSerialization.jsonObject(with: carried) as? [String: Any]).keys
+        #expect(!keys.contains { $0.localizedCaseInsensitiveContains("wrapped") })
+    }
 }

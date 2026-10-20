@@ -1431,7 +1431,8 @@ final class GlassDatabaseUITests: XCTestCase {
         // Open it again on the same service, which is the same connection identity the drafts
         // were keyed by.
         guard connectToDatabase(fixture) else { return }
-        let restoredTab = app.windows.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "SQL editor")).firstMatch
+        // A SQL tab is labelled with its title, made from its text; its identifier says what it is.
+        let restoredTab = app.windows.buttons.matching(identifier: "db-workspace-tab-query").firstMatch
         if !restoredTab.waitForExistence(timeout: 20) {
             snap("31-draft-not-restored")
             dumpTree("draft-not-restored")

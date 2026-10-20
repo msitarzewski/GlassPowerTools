@@ -99,6 +99,9 @@ struct GlassLibraryOverview: View {
     let onSelectHost: (HostID) -> Void
     /// The device whose connections are shown; nil for all of them, added up.
     @State private var chosenDevice: String?
+    /// Where a tile's word starts, past its symbol. It grows with the text, as the symbol does: at
+    /// a fixed 24 points the symbol lay over the word at the largest sizes (2026-10-19).
+    @ScaledMetric(relativeTo: .subheadline) private var metricSymbolColumn: CGFloat = 24
 
     /// The devices to choose from: this one, and each other with connections in the last 30 days.
     private var listed: [GlassDeviceUsage] {
@@ -124,17 +127,11 @@ struct GlassLibraryOverview: View {
                 #endif
                 metrics(statistics)
                 if !statistics.servicesByKind.isEmpty {
-                    HStack(spacing: 20) {
-                        ForEach(HostServiceKind.allCases, id: \.self) { kind in
-                            if let count = statistics.servicesByKind[kind] {
-                                Label {
-                                    Text("\(count) \(GlassServicePresentation.displayName(for: kind))")
-                                } icon: {
-                                    GlassServiceIcon(GlassServicePresentation.symbol(for: kind))
-                                }
-                                .foregroundStyle(.secondary)
-                            }
-                        }
+                    // In a line, or one under another where they do not fit: at the largest text
+                    // sizes a line of three broke "Desktop" a letter or two to a line (2026-10-19).
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 20) { serviceCounts(statistics) }
+                        VStack(alignment: .leading, spacing: 8) { serviceCounts(statistics) }
                     }
                 }
                 connectionsSection(statistics)
@@ -152,9 +149,24 @@ struct GlassLibraryOverview: View {
         .glassSpatialColumn("Your Library")
     }
 
+    @ViewBuilder private func serviceCounts(_ statistics: GlassLibraryStatistics) -> some View {
+        ForEach(HostServiceKind.allCases, id: \.self) { kind in
+            if let count = statistics.servicesByKind[kind] {
+                Label {
+                    Text("\(count) \(GlassServicePresentation.displayName(for: kind))")
+                } icon: {
+                    GlassServiceIcon(GlassServicePresentation.symbol(for: kind))
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     /// The four figures, in one even row, or two even rows of two where the column is narrow:
     /// every tile the same width, so their edges line up with the chart and the list below. An
-    /// adaptive grid left three on one row and one under it, short of the right-hand edge.
+    /// adaptive grid left three on one row and one under it, short of the right-hand edge. Where
+    /// two do not fit side by side, at the largest text sizes, one to a row: two to a row broke
+    /// "Ma-chines" and "Collec-tions" (2026-10-19).
     private func metrics(_ statistics: GlassLibraryStatistics) -> some View {
         let machines = metric("Machines", statistics.machines, "server.rack")
         let services = metric("Services", statistics.services, "square.stack.3d.up")
@@ -168,6 +180,9 @@ struct GlassLibraryOverview: View {
                 GlassEqualWidthRow(spacing: 12) { machines; services }
                 GlassEqualWidthRow(spacing: 12) { favorites; collections }
             }
+            VStack(spacing: 12) {
+                machines; services; favorites; collections
+            }
         }
     }
 
@@ -176,7 +191,7 @@ struct GlassLibraryOverview: View {
             // The words set the line's height and the symbol sits over its start: the four symbols
             // differ in height, and side by side they set each tile's label a little lower or higher.
             Text(title)
-                .padding(.leading, 24)
+                .padding(.leading, metricSymbolColumn)
                 .overlay(alignment: .leading) { Image(systemName: symbol) }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

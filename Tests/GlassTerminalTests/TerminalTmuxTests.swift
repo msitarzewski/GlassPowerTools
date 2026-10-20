@@ -281,7 +281,11 @@ struct TerminalTmuxTests {
         let writes = Writes()
         let session = TerminalSession(server: server(tmux: true), terminalWriteSink: { writes.receive($0) })
         var asked = 0
-        session.tmuxCommandRunner = { _ in asked += 1; throw SSHError.notConnected }
+        // `tmux -V`, for control mode (D83), is asked as well; not counted here.
+        session.tmuxCommandRunner = { command in
+            if command != TerminalTmux.versionCommand { asked += 1 }
+            throw SSHError.notConnected
+        }
         session.state = .connected
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
@@ -293,8 +297,10 @@ struct TerminalTmuxTests {
     @Test("a reconnect attaches to the same session without asking the host again")
     func reconnect() async {
         let writes = Writes()
-        var asked = 0
-        let session = session(server(tmux: true), writes: writes, listing: "", commands: { _ in asked += 1 })
+        var asked = 0, versions = 0
+        let session = session(server(tmux: true), writes: writes, listing: "", commands: { command in
+            if command == TerminalTmux.versionCommand { versions += 1 } else { asked += 1 }
+        })
         session.state = .connected
         await session.waitForTmuxAttach()
         session.state = .reconnecting
@@ -302,6 +308,7 @@ struct TerminalTmuxTests {
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
         #expect(asked == 2, "the list and the claim, once")
+        #expect(versions == 1, "tmux's version, once a session (control mode, D83)")
         #expect(writes.lines.count == 2 && writes.lines[0] == writes.lines[1])
         #expect(writes.lines[0].contains("-s 'glass-1'"))
     }
@@ -489,7 +496,7 @@ struct TerminalTmuxTests {
         active.state = .connected
         await active.waitForTmuxAttach()
         await active.waitUntilTerminalWritesComplete()
-        #expect(asked.isEmpty, "Active's choice is not claimed")
+        #expect(asked.filter { $0 != TerminalTmux.versionCommand }.isEmpty, "Active's choice is not claimed")
         #expect(writes.lines == [attach, attach], "the attach line alone, then again on reconnecting")
         #expect(!active.hasPendingStartupCommand)
 

@@ -163,6 +163,19 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         #endif
     }
 
+    /// A panel's list, under the panel's name. Workgroups and Active named theirs; SSH Keys and
+    /// Projects did not, so pushed on a compact stack (an iPhone, the folded iPhone Duo) they had no
+    /// title at all (2026-10-18). A title the panel sets itself is nearer, and still wins. iOS only,
+    /// where it was missing: the Mac's window title and the headset's tabs are left as they are.
+    @ViewBuilder
+    private func panelResults(_ panel: GlassLibraryPanel) -> some View {
+        #if os(iOS)
+        panel.results().navigationTitle(panel.title)
+        #else
+        panel.results()
+        #endif
+    }
+
     private func panelRow(_ panel: GlassLibraryPanel) -> some View {
         HStack {
             Label(panel.title, systemImage: panel.symbolName)
@@ -325,7 +338,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                 // A panel owns both columns while it is open, the way `libraryResults` switched on
                 // `selectedMode` in glas.sh. The host list is not filtered away — it is simply not
                 // what the library is showing.
-                if let openPanel { openPanel.results() } else { results }
+                if let openPanel { panelResults(openPanel) } else { results }
             }
             .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.resultsMinimum,
                                              ideal: GlassLibraryColumnLayout.resultsIdeal,
@@ -369,7 +382,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                 // the sidebar, its detail the push from there.
                 case .results:
                     if let openPanel {
-                        withLibraryToolbar(openPanel.results(), active: compactPath.last == .results)
+                        withLibraryToolbar(panelResults(openPanel), active: compactPath.last == .results)
                     } else {
                         withLibraryToolbar(results, active: compactPath.last == .results && selection == nil)
                     }
@@ -406,7 +419,8 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                             selection: $selection, searchText: $searchText,
                             onActivate: onActivate, row: row,
                             backgroundActions: listActions, onRefresh: refreshAction,
-                            extraSections: scope == .favorites ? favoriteSections : nil)
+                            extraSections: scope == .favorites ? favoriteSections : nil,
+                            emptyState: .of(scope, libraryIsEmpty: projection.items.isEmpty))
     }
 
     #if os(visionOS)

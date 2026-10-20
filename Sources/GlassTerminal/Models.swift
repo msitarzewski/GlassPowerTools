@@ -375,6 +375,8 @@ class TerminalSession: Identifiable, Hashable {
             if oldValue != .connected, state == .connected {
                 if usesTmux { attachTmux() } else { dispatchStartupCommandIfNeeded(); checkTmuxAvailability() }
             }
+            // A connection's control-mode client ends with it; the next one reads the pane afresh.
+            if oldValue == .connected, state != .connected { endTmuxControl() }
         }
     }
     var output: [TerminalLine] = []
@@ -640,7 +642,8 @@ class TerminalSession: Identifiable, Hashable {
     private var tmuxScrollInFlight = false
 
     func scrollTmux(deltaY: CGFloat, precise: Bool) -> Bool {
-        guard survivesClose, state == .connected else { return false }
+        // A control-mode client keeps the history: a scroll on a program's own screen is the program's.
+        guard survivesClose, state == .connected, !terminalHostModel.keepsHistoryUnderTmux else { return false }
         // A trackpad reports points, a mouse wheel lines; a terminal line is about 16 points.
         pendingTmuxScroll += precise ? Double(deltaY) / 16 : Double(deltaY)
         sendTmuxScroll()
@@ -649,7 +652,7 @@ class TerminalSession: Identifiable, Hashable {
 
     /// The tmux session's history and screen, for Select All (2026-10-11); nil outside tmux.
     func tmuxHistory() async -> String? {
-        guard survivesClose, state == .connected, let name = tmuxSessionName,
+        guard survivesClose, state == .connected, !terminalHostModel.keepsHistoryUnderTmux, let name = tmuxSessionName,
               let captured = try? await runTmuxCommand(TerminalTmux.historyCommand(name: name),
                                                        maxResponseBytes: Self.historyResponseLimit) else { return nil }
         return TerminalTmux.historyText(captured)
@@ -1006,7 +1009,7 @@ class TerminalSession: Identifiable, Hashable {
         // Generated commands, suggested fixes, and snippets share the exact
         // same consented input-recording path as keyboard bytes.
         recorder?.recordInput(data)
-        enqueueTerminalWrite(data, presentsFailure: true)
+        writeInput(data, presentsFailure: true)
     }
 
     var usesTmux: Bool {
@@ -1028,7 +1031,13 @@ class TerminalSession: Identifiable, Hashable {
                 guard await claimGivenTmuxSession(given) else { return }
             }
             guard state == .connected, !Task.isCancelled, let name = tmuxSessionName else { return }
-            let data = Data((TerminalTmux.attachLine(name: name, takeOver: tmuxTakesOver) + "\n").utf8)
+            // As a control-mode client where the host's tmux can have one (D83): tmux hands over every
+            // byte, so the history, the selection through it and the program's own screen are the
+            // terminal's. The client is in place before the line is typed: what comes back is tmux's.
+            let control = await tmuxControlModeAvailable()
+            guard state == .connected, !Task.isCancelled else { return }
+            if control { beginTmuxControl() }
+            let data = Data((TerminalTmux.attachLine(name: name, takeOver: tmuxTakesOver, control: control) + "\n").utf8)
             tmuxTakesOver = false
             recorder?.recordInput(data)
             enqueueTerminalWrite(data, presentsFailure: true)
@@ -1199,7 +1208,7 @@ class TerminalSession: Identifiable, Hashable {
         startupCommandTicket = nil
         let data = Data((ticket.command + "\n").utf8)
         recorder?.recordInput(data)
-        enqueueTerminalWrite(data, presentsFailure: true)
+        writeInput(data, presentsFailure: true)
     }
     
     func sendTerminalData(_ data: Data) {
@@ -1208,7 +1217,7 @@ class TerminalSession: Identifiable, Hashable {
             return
         }
         recorder?.recordInput(data)
-        enqueueTerminalWrite(data, presentsFailure: false)
+        writeInput(data, presentsFailure: false)
     }
 
     func handleCleanRemoteExit() {
@@ -1265,9 +1274,78 @@ class TerminalSession: Identifiable, Hashable {
     }
     
     func feedTerminalData(_ data: Data) {
+        if let actions = tmuxControl?.receive(data) {
+            applyTmuxControl(actions)
+            return
+        }
         pendingTerminalOutput.append(data)
         recorder?.recordOutput(data)
         scheduleTerminalFlush()
+    }
+
+    // MARK: tmux's control mode (D83)
+
+    /// Between this terminal and tmux while it is a control-mode client of its session; nil otherwise.
+    @ObservationIgnored private var tmuxControl: TmuxControlClient?
+    /// Whether the host's tmux can have one (3.2 or later), asked once per session.
+    @ObservationIgnored private var tmuxSupportsControl: Bool?
+    @ObservationIgnored private var tmuxControlStartTask: Task<Void, Never>?
+
+    private func tmuxControlModeAvailable() async -> Bool {
+        guard TerminalTmux.controlModeEnabled else { return false }
+        if let known = tmuxSupportsControl { return known }
+        let version = (try? await runTmuxCommand(TerminalTmux.versionCommand)) ?? ""
+        let supported = TmuxControlClient.supports(version: version)
+        tmuxSupportsControl = supported
+        return supported
+    }
+
+    private func beginTmuxControl() {
+        tmuxControl = TmuxControlClient(columns: latestTerminalColumns, rows: latestTerminalRows)
+        terminalHostModel.isTmuxControlClient = true
+        // tmux that never starts — the line failed at the shell — must not keep what is typed.
+        tmuxControlStartTask?.cancel()
+        tmuxControlStartTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            guard let self, !Task.isCancelled, tmuxControl?.phase == .shell else { return }
+            let held = tmuxControl?.abandon() ?? Data()
+            endTmuxControl()
+            if !held.isEmpty { enqueueTerminalWrite(held, presentsFailure: false) }
+        }
+    }
+
+    private func endTmuxControl() {
+        tmuxControlStartTask?.cancel()
+        tmuxControlStartTask = nil
+        tmuxControl = nil
+        terminalHostModel.isTmuxControlClient = false
+    }
+
+    private func applyTmuxControl(_ actions: [TmuxControlAction]) {
+        for action in actions {
+            switch action {
+            case .terminal(let data):
+                pendingTerminalOutput.append(data)
+                recorder?.recordOutput(data)
+                scheduleTerminalFlush()
+            case .transport(let data):
+                enqueueTerminalWrite(data, presentsFailure: false)
+            case .live:
+                tmuxControlStartTask?.cancel()
+            case .exited:
+                terminalHostModel.isTmuxControlClient = false
+            }
+        }
+    }
+
+    /// What the terminal, a snippet or the startup command types: through tmux's client while there
+    /// is one, else straight to the shell.
+    private func writeInput(_ data: Data, presentsFailure: Bool) {
+        if let actions = tmuxControl?.input(data) {
+            applyTmuxControl(actions)
+        } else {
+            enqueueTerminalWrite(data, presentsFailure: presentsFailure)
+        }
     }
     
     func updateTerminalGeometry(rows: Int, columns: Int) {
@@ -1284,6 +1362,8 @@ class TerminalSession: Identifiable, Hashable {
         recorder?.recordResize(width: clampedColumns, height: clampedRows)
 
         sshConnection?.setPreferredTerminalSize(rows: clampedRows, columns: clampedColumns)
+        // A control-mode client sizes tmux's window itself; the PTY's size is tmux's client's, unseen.
+        if let actions = tmuxControl?.resize(columns: clampedColumns, rows: clampedRows) { applyTmuxControl(actions) }
 
         guard state == .connected else { return }
         pendingTerminalResize = (rows: clampedRows, columns: clampedColumns)
@@ -1762,7 +1842,10 @@ struct TerminalTheme: Identifiable, Codable, Equatable {
     nonisolated static let maximumNameLength = 128
     nonisolated static let maximumFontNameLength = 128
     nonisolated static let minimumFontSize: CGFloat = 10
-    nonisolated static let maximumFontSize: CGFloat = 24
+    /// 28 since 2026-10-19 (the owner, from the accessibility audit's P3): twice the 14-point
+    /// default, as Larger Text asks of a page's main content. It was 24. An earlier build refuses a
+    /// synced theme over 24 points and keeps its own (`ICloudTerminalTheme.validate`).
+    nonisolated static let maximumFontSize: CGFloat = 28
     let id: UUID
     var name: String
     var background: CodableColor

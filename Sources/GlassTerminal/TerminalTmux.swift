@@ -429,9 +429,20 @@ enum TerminalTmux {
     /// the terminal cleanly instead of leaving a bare prompt.
     /// The leading space keeps it out of shell history where `ignorespace` is set. Without tmux
     /// the line does nothing and the shell stays.
-    static func attachLine(name: String, takeOver: Bool) -> String {
-        " command -v tmux >/dev/null && exec tmux -u new-session -A\(takeOver ? " -D" : "") -s \(quoted(name))"
+    static func attachLine(name: String, takeOver: Bool, control: Bool = false) -> String {
+        " command -v tmux >/dev/null && exec tmux -u\(control ? " -CC" : "") new-session -A\(takeOver ? " -D" : "") -s \(quoted(name))"
     }
+
+    /// A terminal kept in tmux attaches as a control-mode client (`TmuxControlClient`, D83), so tmux
+    /// hands it every byte and the history is its own. On unless `terminalTmuxControlMode` is set off
+    /// (`defaults write com.glasspowertools terminalTmuxControlMode -bool NO`): the way back to
+    /// tmux drawing its own screen, should a host's tmux misbehave.
+    nonisolated static var controlModeEnabled: Bool {
+        UserDefaults.standard.object(forKey: "terminalTmuxControlMode") as? Bool ?? true
+    }
+
+    /// `tmux -V`, for whether a control-mode client can attach (3.2 or later).
+    static let versionCommand = "sh -c \(quoted(searchPath + "tmux -V"))"
 
     /// The directory the session's active pane is in. tmux keeps the shell's OSC 7 reports to
     /// itself, so in tmux this is the only accurate answer to "where is this shell?". The target

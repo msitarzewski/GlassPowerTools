@@ -209,6 +209,7 @@ struct MacLocalTerminalPaneView: View {
         }
         .onAppear {
             aiAssistant.checkAvailability()
+            hostModel.pasteRewrite = TerminalWrappedPaste.rewrite(settings: settingsManager)
             hostModel.setFocusOwnershipAllowed(isFocused)
             if isFocused { processState.focus() }
         }
@@ -301,7 +302,7 @@ struct MacLocalTerminalPaneView: View {
             Text(problem.message)
         }
         .sheet(item: pendingPasteBinding) { request in
-            MacTerminalPasteReviewSheet(
+            TerminalPasteReviewSheet(
                 request: request,
                 onCancel: { hostModel.resolvePendingPaste(approvedText: nil) },
                 onPaste: { hostModel.resolvePendingPaste(approvedText: $0) }
@@ -513,7 +514,10 @@ struct MacLocalTerminalPaneView: View {
     /// otherwise the shell's own buffer.
     private func configureFind() {
         let session = tmuxSession
-        find.configure(model: hostModel) { MacLocalTmux.findTarget(session: session) }
+        // The terminal's own history, where it keeps one in tmux (`TmuxControlClient`, D83).
+        find.configure(model: hostModel) {
+            hostModel.keepsHistoryUnderTmux ? nil : MacLocalTmux.findTarget(session: session)
+        }
     }
 
     private func presentAIAssistant() {
@@ -734,12 +738,17 @@ enum MacLocalTerminalConfiguration {
             // coalition: launchd starts it first (`MacTmuxService`). Not for a tmux the caller
             // names, which is not the server's.
             if !named { server.ensureRunning(tmux, launch.environmentVariables) }
+            // A control-mode client where this Mac's tmux can have one (D83); a tmux a caller names —
+            // a test's — attaches the ordinary way.
+            let control = !named && MacLocalTmux.supportsControlMode(tmux)
             return SwiftTermLocalProcessConfiguration(
                 executable: tmux,
-                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory) + launch.command,
+                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory, control: control)
+                    + launch.command,
                 environment: launch.environment,
                 currentDirectory: launch.directory,
-                fallbackDirectory: home
+                fallbackDirectory: home,
+                tmuxControl: control
             )
         }
         return SwiftTermLocalProcessConfiguration(
@@ -943,71 +952,6 @@ private struct MacLocalRecordingHistoryView: View {
     }
 }
 
-private struct MacTerminalPasteReviewSheet: View {
-    let request: SwiftTermPasteReview
-    let onCancel: () -> Void
-    let onPaste: (String) -> Void
-    @State private var editedText: String
-
-    init(
-        request: SwiftTermPasteReview,
-        onCancel: @escaping () -> Void,
-        onPaste: @escaping (String) -> Void
-    ) {
-        self.request = request
-        self.onCancel = onCancel
-        self.onPaste = onPaste
-        _editedText = State(initialValue: request.content)
-    }
-
-    private var canPaste: Bool {
-        !request.exceedsMaximumSize && SwiftTermPastePolicy.isAllowed(editedText)
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Multiline or large pasted content can execute multiple shell commands. Review it before sending.")
-                    .foregroundStyle(.secondary)
-                LabeledContent(
-                    "Original size",
-                    value: "\(request.byteCount) bytes, \(request.lineCount) lines"
-                )
-                if request.exceedsMaximumSize {
-                    ContentUnavailableView(
-                        "Paste Too Large",
-                        systemImage: "doc.badge.ellipsis",
-                        description: Text("Nothing was sent to the local shell.")
-                    )
-                } else {
-                    TextEditor(text: $editedText)
-                        .font(.system(.body, design: .monospaced))
-                        .accessibilityLabel("Editable terminal paste content")
-                    Text("\(editedText.utf8.count) of \(SwiftTermPastePolicy.maximumPayloadBytes) bytes")
-                        .font(.caption.monospacedDigit())
-                }
-            }
-            .padding()
-            .navigationTitle("Review Terminal Paste")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                }
-                if !request.exceedsMaximumSize {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Paste") { onPaste(editedText) }
-                            // ⌘↩ sends it: Return is the text's own, a new line in what is pasted
-                            // (the owner, 2026-10-14: "should allow a command return to submit").
-                            .keyboardShortcut(.return, modifiers: .command)
-                            .disabled(!canPaste)
-                    }
-                }
-            }
-        }
-        .frame(minWidth: 560, minHeight: 420)
-        .interactiveDismissDisabled()
-    }
-}
 #endif
 
 #endif

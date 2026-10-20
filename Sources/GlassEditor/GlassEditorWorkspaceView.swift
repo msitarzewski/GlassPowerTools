@@ -242,9 +242,8 @@ public struct GlassEditorWorkspaceView: View {
     private var splitLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
-                .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
-                                                ideal: GlassLibraryColumnLayout.navigationIdeal,
-                                                max: GlassLibraryColumnLayout.navigationMaximum)
+                // Wider at an accessibility text size, where a file's name broke mid-word.
+                .glassNavigationColumnWidth()
         } detail: {
             GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -605,7 +604,10 @@ public struct GlassEditorWorkspaceView: View {
                 } else {
                     // Text, its preview beside it, or the preview alone — VS Code's three states.
                     let kind = workspace.previewKind(for: document)
-                    let mode = kind == nil ? .text : (workspace.previewModes[document.id] ?? .text)
+                    // `shown`: "beside" without room for it (a Duo folded, a narrowed iPad window) is the
+                    // preview alone.
+                    let mode = kind == nil ? .text
+                        : (workspace.previewModes[document.id] ?? .text).shown(roomBeside: previewHasRoomBeside)
                     HStack(spacing: 0) {
                         if mode != .previewOnly {
                             GlassEditorView(model: document.model)
@@ -720,6 +722,7 @@ public struct GlassEditorWorkspaceView: View {
             }
             .buttonStyle(.plain)
             .help("Go to line")
+            .glassBarItem()
 
             Menu {
                 ForEach(LanguageID.allCases, id: \.self) { language in
@@ -730,8 +733,10 @@ public struct GlassEditorWorkspaceView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .glassBarItem()
 
             Text(document.model.snapshot.lineEndings.statusName).font(.caption)
+                .glassBarItem()
             if document.model.isHighlightingDegradedToPlaintext {
                 // Said out loud rather than left as a mystery: a very large file stops being
                 // highlighted, and a user who sees colour disappear deserves the reason.
@@ -755,6 +760,7 @@ public struct GlassEditorWorkspaceView: View {
             #endif
             if document.isDirty {
                 Text("Edited").font(.caption).foregroundStyle(.secondary)
+                    .glassBarItem()
             }
             #if os(iOS)
             // **Hide and show the keyboard**, as the terminal has always been able to. On a phone
@@ -770,6 +776,7 @@ public struct GlassEditorWorkspaceView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(keyboardIsUp ? "Hide Keyboard" : "Show Keyboard")
             .accessibilityIdentifier("editor-keyboard-toggle")
+            .glassBarItem()
             #endif
         }
         #if os(iOS)
@@ -785,6 +792,9 @@ public struct GlassEditorWorkspaceView: View {
         // window reads as a mistake before anyone works out why.
         .frame(height: GlassSpatialMetrics.footerHeight)
         .glassActionBarSurface()
+        // One line at any text size: at the largest, the bar's fixed height left "Line 1,…"
+        // (2026-10-19). Past xxxLarge a long press says what an item is (`glassBar`).
+        .glassBar()
     }
 
     // MARK: Toolbar
@@ -842,7 +852,9 @@ public struct GlassEditorWorkspaceView: View {
         // window's toolbar belongs to what this window is showing.
         // **Preview**, for text that has a picture: beside the text, then alone, then back.
         if let document = workspace.selectedDocument, workspace.previewKind(for: document) != nil {
-            let mode = workspace.previewModes[document.id] ?? .text
+            // The button names and steps from what is shown, so a folded Duo's "beside" — drawn alone — goes
+            // on to text, as "alone" would.
+            let mode = (workspace.previewModes[document.id] ?? .text).shown(roomBeside: previewHasRoomBeside)
             ToolbarItem(placement: .editorTrailing) {
                 Button(mode == .text ? "Show Preview" : (mode == .beside ? "Preview Only" : "Hide Preview"),
                        systemImage: mode == .text ? "eye" : (mode == .beside ? "rectangle.righthalf.filled" : "eye.slash")) {

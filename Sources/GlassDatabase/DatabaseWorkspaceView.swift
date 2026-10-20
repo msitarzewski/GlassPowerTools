@@ -1177,7 +1177,8 @@ struct DatabaseWorkspaceView: View {
                                       title: workspaceTitle(for: destination),
                                       symbolName: destination.systemImage,
                                       isClosable: destination.isClosable,
-                                      help: workspaceHelpText(for: destination))
+                                      help: workspaceHelpText(for: destination),
+                                      accessibilityIdentifier: workspaceTabIdentifier(for: destination))
             },
             selection: tabState.previewed == nil ? tabState.selected : nil,
             accessibilityLabel: "Open database workspaces",
@@ -1553,6 +1554,17 @@ struct DatabaseWorkspaceView: View {
     private func workspaceTitle(for destination: WorkspaceSelection) -> String {
         guard case .query(let id) = destination else { return destination.title }
         return queryDocuments[id]?.title ?? "Untitled SQL"
+    }
+
+    /// What a test finds a tab by: its kind, since the label is the tab's title, which for a SQL
+    /// document is made from its text.
+    private func workspaceTabIdentifier(for destination: WorkspaceSelection) -> String {
+        switch destination {
+        case .connection: "db-workspace-tab-connection"
+        case .database(let database): "db-workspace-tab-database-\(database)"
+        case .table(let database, let table): "db-workspace-tab-table-\(database).\(table)"
+        case .query: "db-workspace-tab-query"
+        }
     }
 
     private func workspaceHelpText(for destination: WorkspaceSelection) -> String {

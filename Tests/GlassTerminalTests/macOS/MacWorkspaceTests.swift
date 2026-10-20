@@ -94,6 +94,19 @@ struct MacWorkspaceTests {
                 "a window with no workgroup tabs excludes nothing")
     }
 
+    /// A terminal Connect opens on a Mac is in no workgroup, and its own window's overview listed
+    /// it again as open elsewhere: two tabs, "2 open elsewhere", the same two (the owner,
+    /// 2026-10-19). Its own terminals are left out; another window's stay.
+    @Test func overviewLeavesOutItsOwnTerminalsInNoWorkgroup() {
+        let staging = UUID(), production = UUID(), elsewhere = UUID()
+        let row: (String) -> GlassOpenSession = {
+            GlassOpenSession(id: $0, title: $0, symbolName: "circle", activate: {}, close: {})
+        }
+        let all = [staging, production, elsewhere].map { row(GlassTerminalCapability.sessionID(sessionID: $0)) }
+        let shown = MacOverviewSessions.others(all, excludingWorkgroups: [], sessions: [staging, production]).map(\.id)
+        #expect(shown == [GlassTerminalCapability.sessionID(sessionID: elsewhere)])
+    }
+
     @Test func overviewNavigationCrossesFromTabsIntoSessionsElsewhere() {
         // One row to browse: arrow keys walk off the last tab onto the first card, and stop at
         // the ends rather than wrapping — the same arithmetic the tabs always had.

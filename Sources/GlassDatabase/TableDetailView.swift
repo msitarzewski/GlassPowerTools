@@ -8,6 +8,7 @@
 
 import SwiftUI
 import GlassShell
+import GlassConnectionUI
 import UniformTypeIdentifiers
 import GlassDBKit
 import GlassEditorUI
@@ -1004,6 +1005,26 @@ struct GridPageWindow {
     }
 }
 
+/// The results grid's rows, header and row-number column, for its text size. At 13 points, the
+/// default, they are 30, 36 and 50 points, as they always were; past about 15 they grow with the text
+/// (2026-10-19). Fixed, a 32-point setting clipped its text, and the system's largest text size
+/// takes the grid past 40.
+enum DatabaseGridMetrics {
+    static func rowHeight(_ fontSize: CGFloat) -> CGFloat {
+        // A line of the system font is about 1.2 times its size, and a cell pads 6 above and below.
+        max(30, (fontSize * 1.2 + 12).rounded(.up))
+    }
+
+    static func headerHeight(_ fontSize: CGFloat) -> CGFloat {
+        max(36, rowHeight(fontSize) + 6)
+    }
+
+    static func rowNumberWidth(_ fontSize: CGFloat) -> CGFloat {
+        // Four digits of the row numbers' font, a point smaller than the cells', and their padding.
+        max(50, (fontSize * 2.6 + 16).rounded(.up))
+    }
+}
+
 struct GridColumnLayout: Codable, Equatable, Sendable {
     var order: [String] = []
     var hidden: Set<String> = []
@@ -1377,6 +1398,7 @@ struct DataTabView: View {
     /// This window's own settings (W24), over All Databases'.
     @Environment(\.glassWindowOverrides) private var windowSettings
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.editMode) private var editMode
@@ -1385,6 +1407,14 @@ struct DataTabView: View {
     /// What this grid and its editor draw with: the window's settings over All Databases' (W24).
     private var windowProfile: DatabaseWindowProfile {
         DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager)
+    }
+
+    /// The grid's text: the window's size, at the system's text size unless Settings says not to
+    /// (`GlassSystemTextSize`). Its rows and columns follow it (`DatabaseGridMetrics`).
+    private func gridFontSize(_ profile: DatabaseWindowProfile) -> CGFloat {
+        let size = CGFloat(profile.dataGridFontSize)
+        guard settingsManager.dataGridFollowsSystemTextSize else { return size }
+        return GlassSystemTextSize.scaled(size, for: dynamicTypeSize, within: 10...72)
     }
 
     @State private var tableQueryText = ""
@@ -1459,8 +1489,6 @@ struct DataTabView: View {
     @State private var autoRepeatTask: Task<Void, Never>?
     @State private var isAutoRepeating = false
 
-    private let rowNumWidth: CGFloat = 50
-    private let rowHeight: CGFloat = 30
     private let minEditorHeight: CGFloat = 60
     private let maxEditorHeight: CGFloat = 400
 
@@ -1828,11 +1856,24 @@ struct DataTabView: View {
             // Pager bar at bottom
             if let result {
                 Divider()
+                Group {
                 if usesCompactPager {
                     compactPager(result)
                 } else {
-                    fullPager(result)
+                    // The full bar where it fits, the phone's where it does not. The full bar is one
+                    // long row that cannot shrink, and in a column narrower than it — the unfolded
+                    // iPhone Duo beside its schema sidebar — the split view slid the whole workspace
+                    // under the sidebar to make room (2026-10-18). `ViewThatFits` asks no more width
+                    // than the compact bar needs.
+                    ViewThatFits(in: .horizontal) {
+                        fullPager(result)
+                        compactPager(result)
+                    }
                 }
+                }
+                // A bar, one line at any text size: at the largest, "Calculate Total…" broke
+                // a syllable to a line (2026-10-19, `glassBar`).
+                .glassBar()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -2433,6 +2474,7 @@ struct DataTabView: View {
             } label: {
                 Label(activeFilterCount == 0 ? "Filter" : "Filter \(activeFilterCount)", systemImage: "line.3.horizontal.decrease.circle")
             }
+            .glassBarItem()
             Menu("More", systemImage: "ellipsis.circle") {
                 Button("Choose Columns", systemImage: "rectangle.split.3x1") {
                     beginColumnManagement()
@@ -2460,9 +2502,13 @@ struct DataTabView: View {
                     }
                 }
             }
+            .glassBarItem()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        // One line at any text size; at the largest, Filter and More broke a letter or two to a
+        // line (2026-10-19). Past xxxLarge they show their icons, and a long press their names.
+        .glassBar()
     }
     #endif
 
@@ -2481,6 +2527,7 @@ struct DataTabView: View {
                     : "line.3.horizontal.decrease.circle.fill")
             }
             .accessibilityValue(activeFilterCount == 0 ? "" : "\(activeFilterCount) active")
+            .glassBarItem()
             .help(activeFilterCount == 0
                 ? (isTableContext
                     ? "Choose rows to show using a server query or the currently loaded page"
@@ -2504,6 +2551,7 @@ struct DataTabView: View {
             }
             .help("Format the selected SQL, or the whole query when nothing is selected")
             .disabled(queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .glassBarItem()
 
             Menu {
                 Menu("Group Columns") {
@@ -2537,6 +2585,7 @@ struct DataTabView: View {
             .help(isTableContext
                 ? "Group and aggregate this table through a bounded server query"
                 : "Server-backed analysis is available from a table tab")
+            .glassBarItem()
 
             Button {
                 beginColumnManagement()
@@ -2544,6 +2593,7 @@ struct DataTabView: View {
                 Label("Columns", systemImage: "rectangle.split.3x1")
             }
             .help("Choose visible and frozen columns")
+            .glassBarItem()
 
             Button {
                 copySelectedRange()
@@ -2552,6 +2602,7 @@ struct DataTabView: View {
             }
             .help("Copy the selected cells")
             .disabled(selectedRectangle == nil && selectedRowIndices.isEmpty)
+            .glassBarItem()
 
             Menu {
                 ForEach(GridExportFormat.allCases) { format in
@@ -2565,6 +2616,7 @@ struct DataTabView: View {
             }
             .disabled(exportResult?.rows.isEmpty != false)
             .help("Export the selected rows, or all displayed rows when nothing is selected")
+            .glassBarItem()
 
             Button(role: .destructive) {
                 requestDeleteSelectedRows()
@@ -2573,8 +2625,10 @@ struct DataTabView: View {
             }
             .disabled(!canDeleteSelectedRows)
             .help(deleteControlHelp)
+            .glassBarItem()
 
             moreGridControls
+                .glassBarItem()
         }
         .labelStyle(.iconOnly)
         .menuIndicator(.hidden)
@@ -2583,6 +2637,8 @@ struct DataTabView: View {
         #endif
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        // Icons in one line at any text size, their names in the Large Content Viewer.
+        .glassBar()
     }
 
     /// The tools used now and then, as menu items: comparing rows, nudging the selection, and
@@ -3026,21 +3082,25 @@ struct DataTabView: View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 let profile = windowProfile
+                let fontSize = gridFontSize(profile)
+                let rowHeight = DatabaseGridMetrics.rowHeight(fontSize)
+                let rowNumWidth = DatabaseGridMetrics.rowNumberWidth(fontSize)
+                let headerHeight = DatabaseGridMetrics.headerHeight(fontSize)
                 VStack(spacing: 0) {
                     HStack(spacing: 0) {
                         Text("#")
-                            .font(.system(size: profile.dataGridFontSize, weight: .semibold))
+                            .font(.system(size: fontSize, weight: .semibold))
                             .frame(width: rowNumWidth)
                         Spacer(minLength: 0)
                     }
-                    .frame(height: 36)
+                    .frame(height: headerHeight)
                     .databaseCanvasPinnedSurface(
                         opacity: profile.glass.opacity,
                         blur: profile.glass.blur
                     )
                     .accessibilityHidden(true)
                     VStack(spacing: 0) {
-                        ForEach(0..<max(0, Int(ceil((geometry.size.height - 36) / rowHeight))), id: \.self) { index in
+                        ForEach(0..<max(0, Int(ceil((geometry.size.height - headerHeight) / rowHeight))), id: \.self) { index in
                             HStack(spacing: 0) {
                                 Color.clear.frame(width: rowNumWidth)
                                     .databaseCanvasPinnedSurface(
@@ -3080,9 +3140,11 @@ struct DataTabView: View {
             GeometryReader { geometry in
                 // One read of the window's settings for the whole grid, not one per cell (W24).
                 let profile = windowProfile
-                let fontSize = profile.dataGridFontSize
+                let fontSize = gridFontSize(profile)
+                let rowHeight = DatabaseGridMetrics.rowHeight(fontSize)
+                let rowNumWidth = DatabaseGridMetrics.rowNumberWidth(fontSize)
                 let visibleIndices = gridVisibleColumnIndices(for: result)
-                let automaticWidths = columnWidths(columns: result.columns, rows: result.rows)
+                let automaticWidths = columnWidths(columns: result.columns, rows: result.rows, fontSize: fontSize)
                 let widths = visibleIndices.map { index in
                     CGFloat(columnLayout.widths[result.columns[index].name] ?? Double(automaticWidths[index]))
                 }
@@ -3093,7 +3155,7 @@ struct DataTabView: View {
                 let fillerWidth = max(0, geometry.size.width - totalDataWidth)
                 let displayedRows = displayedRowIndices(in: result)
                 let dataHeight = CGFloat(displayedRows.count) * rowHeight
-                let headerHeight: CGFloat = 36
+                let headerHeight = DatabaseGridMetrics.headerHeight(fontSize)
                 let fillerRowCount = max(0, Int((geometry.size.height - headerHeight - dataHeight) / rowHeight))
 
                 ScrollView([.horizontal, .vertical]) {
@@ -3306,6 +3368,17 @@ struct DataTabView: View {
                                                     .onChanged { value in resizeColumn(col.name, baseWidth: widths[visibleOffset], translation: value.translation.width) }
                                                     .onEnded { _ in finishResizingColumn(col.name) }
                                             )
+                                            // Without a drag: VoiceOver's swipe up or down widens or
+                                            // narrows the column. The handle had no name, so it was
+                                            // read as nothing (2026-10-18, AccessibilityAuditUITests).
+                                            .accessibilityElement()
+                                            .accessibilityLabel("Width of \(col.name)")
+                                            .accessibilityValue("\(Int(widths[visibleOffset])) points")
+                                            .accessibilityAdjustableAction { direction in
+                                                let step: CGFloat = direction == .increment ? 24 : -24
+                                                resizeColumn(col.name, baseWidth: widths[visibleOffset], translation: step)
+                                                finishResizingColumn(col.name)
+                                            }
                                     }
                                     .accessibilityAddTraits(.isHeader)
                                 }
@@ -3812,8 +3885,8 @@ struct DataTabView: View {
 
     // MARK: - Column Widths
 
-    private func columnWidths(columns: [ColumnInfo], rows: [[DatabaseValue]]) -> [CGFloat] {
-        let charWidth = windowProfile.dataGridFontSize * 0.65
+    private func columnWidths(columns: [ColumnInfo], rows: [[DatabaseValue]], fontSize: CGFloat) -> [CGFloat] {
+        let charWidth = fontSize * 0.65
         return columns.enumerated().map { colIndex, col in
             let headerLen = CGFloat(col.name.count)
             var maxDataLen: CGFloat = 0
@@ -3823,7 +3896,10 @@ struct DataTabView: View {
                 }
             }
             let computed = max(headerLen, maxDataLen) * charWidth + 24
-            return max(80, min(computed, 400))
+            // 80 to 400 points at the default 13-point text, and in proportion past it, so larger
+            // text shows as many characters a column, not fewer.
+            let scale = max(1, fontSize / 13)
+            return max(80 * scale, min(computed, 400 * scale))
         }
     }
 

@@ -332,8 +332,12 @@ public final class SwiftTermHostModel: ObservableObject {
         fontSizeOverride ?? defaultSize
     }
 
+    /// What ⌘+ and ⌘− reach, and what the system's text size can scale a terminal's to.
+    public static let zoomRange: ClosedRange<CGFloat> = 10...72
+
     public func adjustFontSize(by delta: CGFloat, defaultSize: CGFloat) {
-        fontSizeOverride = min(72, max(10, resolvedFontSize(defaultSize: defaultSize) + delta))
+        fontSizeOverride = min(Self.zoomRange.upperBound,
+                               max(Self.zoomRange.lowerBound, resolvedFontSize(defaultSize: defaultSize) + delta))
     }
 
     public func resetFontSize() {
@@ -439,6 +443,19 @@ public final class SwiftTermHostModel: ObservableObject {
     public var previewContent: (@MainActor (URL) -> AnyView)?
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
+    /// A paste rewritten before it is weighed, or nil to leave it: the terminal's settings join the
+    /// lines of text a program wrapped to its window (`TerminalWrappedPaste`). Rewritten to one line
+    /// it needs no review, and is typed (the owner, 2026-10-19: "skip the review when it joins to one
+    /// line"). Anything else is reviewed as it came, and the review offers the joining.
+    public var pasteRewrite: ((String) -> String?)?
+    /// A control-mode client of tmux (`TmuxControlClient`, D83): tmux hands the terminal every byte its
+    /// pane's program writes, so the history is the terminal's own; and tmux has already answered
+    /// every query the program sends, so the terminal's own answers are dropped. Set by the session,
+    /// or the local pane, while it is one.
+    public var isTmuxControlClient = false
+    /// The history is the terminal's own though it runs in tmux: Find, Select All and scrolling use it
+    /// rather than tmux's.
+    public var keepsHistoryUnderTmux: Bool { isTmuxControlClient }
     @Published public private(set) var pendingExternalLink: SwiftTermExternalLinkRequest?
     public private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     public private(set) var semanticEvents: [SwiftTermSemanticEvent] = []
@@ -824,6 +841,13 @@ public final class SwiftTermHostModel: ObservableObject {
             Self.pasteLogger.notice("event=paste-review-replaced waiting-bytes=\(stale.byteCount, privacy: .public)")
             pendingPasteReview = nil
         }
+        if let rewritten = pasteRewrite?(text), !SwiftTermPastePolicy.requiresReview(rewritten),
+           SwiftTermPastePolicy.isAllowed(rewritten) {
+            guard let engine = terminalEngine else { return .noTerminal }
+            Self.pasteLogger.notice("event=paste-joined bytes=\(text.utf8.count, privacy: .public)")
+            engine.commitPaste(rewritten, bracketed: bracketed)
+            return .typed
+        }
         if let review = SwiftTermPastePolicy.reviewRequest(for: text, bracketed: bracketed) {
             pendingPasteReview = review
             return .awaitingReview
@@ -1063,6 +1087,43 @@ private final class SwiftTermFindTracker {
                 characterProvider: { terminal.getCharacter(for: $0) }
             )
         }.joined()
+    }
+}
+
+/// A terminal's last lines, read from its end: the cost is the lines read, not the history behind
+/// them. A tab keeps up to 10,000 lines, and a tab in tmux keeps the pane's history from the start
+/// (D83). Read whole for the screen reader after every line output scrolled, a pane of 2,000 lines
+/// took 15 seconds to reattach, and 26 panes of 1,500 didn't in two minutes (2026-10-19, measured
+/// in a debug build; the Mac's 26 tabs held the app for seconds after 0.4.482 launched).
+@MainActor
+enum SwiftTermBufferText {
+    /// The last `count` lines with any text, oldest first: what `getBufferAsData` holds, as lines,
+    /// with the empty ones left out.
+    static func lastLines(_ count: Int, of terminal: Terminal) -> [String] {
+        guard count > 0 else { return [] }
+        let top = terminal.buffer.totalLinesTrimmed
+        // The buffer's last line: the screen's last row, further down when scrolled back.
+        var last = top + terminal.getTopVisibleRow() + terminal.rows - 1
+        while last >= top, terminal.getScrollInvariantLine(row: last) == nil { last -= 1 }
+        var step = 1
+        while terminal.getScrollInvariantLine(row: last + step) != nil {
+            last += step
+            step *= 2
+        }
+        while step > 1 {
+            step /= 2
+            if terminal.getScrollInvariantLine(row: last + step) != nil { last += step }
+        }
+        var lines: [String] = []
+        var row = last
+        while row >= top, lines.count < count {
+            if let text = terminal.getScrollInvariantLine(row: row)?.translateToString(trimRight: true),
+               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                lines.append(text)
+            }
+            row -= 1
+        }
+        return lines.reversed()
     }
 }
 
@@ -1330,6 +1391,8 @@ private protocol TerminalEngine: AnyObject {
     func configure(theme: SwiftTermTheme, runtimeSettings: SwiftTermRuntimeSettings)
     func updateDelegate(_ delegate: TerminalViewDelegate)
     func receive(_ data: Data)
+    /// True while output is being read: what the terminal sends then answers the program.
+    var isFeedingOutput: Bool { get }
     func recordInput(byteCount: Int)
     func focusIfActive() -> Bool
     func resignFocus()
@@ -2836,6 +2899,8 @@ private final class SwiftTermEngine: TerminalEngine {
     private var clearBlacks = TerminalClearBlacks()
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
 
+    private(set) var isFeedingOutput = false
+
     let terminalView: ReviewingTerminalView
     private let containerView: TerminalHardwareKeyContainerView
     private let onPasteData: (Data) -> Void
@@ -2959,7 +3024,9 @@ private final class SwiftTermEngine: TerminalEngine {
         #if os(visionOS)
         terminalView.isFeeding = true
         #endif
+        isFeedingOutput = true
         terminalView.feed(byteArray: clearBlacks.filter(ArraySlice(data)))
+        isFeedingOutput = false
         // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
         SwiftTermSelectionKeeper.restore(kept, in: terminalView)
@@ -3012,13 +3079,7 @@ private final class SwiftTermEngine: TerminalEngine {
     }
 
     func visibleText(lastNLines: Int) -> [String] {
-        let buffer = terminalView.getTerminal().getBufferAsData()
-        let fullText = String(data: buffer, encoding: .utf8) ?? ""
-        let allLines = fullText.components(separatedBy: "\n")
-        let nonEmpty = allLines.filter {
-            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-        return Array(nonEmpty.suffix(max(0, lastNLines)))
+        SwiftTermBufferText.lastLines(lastNLines, of: terminalView.getTerminal())
     }
 
     private let findTracker = SwiftTermFindTracker()
@@ -3557,12 +3618,17 @@ public struct SwiftTermHostView: UIViewRepresentable {
         }
 
         public func send(source: TerminalView, data: ArraySlice<UInt8>) {
+            // An answer to the program's query: tmux has answered it already (control mode, D83).
+            if let model, model.isTmuxControlClient, model.retainedRenderer()?.isFeedingOutput == true { return }
             model?.retainedRenderer()?.recordInput(byteCount: data.count)
             onSendData(Data(data))
         }
 
         public func scrolled(source: TerminalView, position: Double) {
-            model?.retainedRenderer()?.refreshAccessibilityViewport()
+            // Not at each line output scrolls: the engine refreshes once the chunk is read.
+            if let renderer = model?.retainedRenderer(), !renderer.isFeedingOutput {
+                renderer.refreshAccessibilityViewport()
+            }
             Task { @MainActor [weak model] in
                 model?.updateScrollPosition(position)
             }
@@ -3608,6 +3674,8 @@ private protocol TerminalEngine: AnyObject {
     func configure(theme: SwiftTermTheme, runtimeSettings: SwiftTermRuntimeSettings)
     func updateDelegate(_ delegate: TerminalViewDelegate)
     func receive(_ data: Data)
+    /// True while output is being read: what the terminal sends then answers the program.
+    var isFeedingOutput: Bool { get }
     func recordInput(byteCount: Int)
     func focusIfActive() -> Bool
     func resignFocus()
@@ -3776,6 +3844,8 @@ private final class MacSwiftTermEngine: TerminalEngine {
     private var clearBlacks = TerminalClearBlacks()
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
 
+    private(set) var isFeedingOutput = false
+
     let terminalView: ReviewingMacTerminalView
     private let onPasteData: (Data) -> Void
     private let onRendererDiagnostics: (SwiftTermRendererDiagnostics) -> Void
@@ -3853,7 +3923,9 @@ private final class MacSwiftTermEngine: TerminalEngine {
     func receive(_ data: Data) {
         let start = performanceClock.now
         let kept = SwiftTermSelectionKeeper.take(from: terminalView)
+        isFeedingOutput = true
         terminalView.feed(byteArray: clearBlacks.filter(ArraySlice(data)))
+        isFeedingOutput = false
         // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
         SwiftTermSelectionKeeper.restore(kept, in: terminalView)
@@ -3886,11 +3958,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
     }
 
     func visibleText(lastNLines: Int) -> [String] {
-        let data = terminalView.getTerminal().getBufferAsData()
-        let lines = (String(data: data, encoding: .utf8) ?? "")
-            .components(separatedBy: "\n")
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        return Array(lines.suffix(max(0, lastNLines)))
+        SwiftTermBufferText.lastLines(lastNLines, of: terminalView.getTerminal())
     }
 
     private let findTracker = SwiftTermFindTracker()
@@ -4183,12 +4251,17 @@ public struct SwiftTermHostView: NSViewRepresentable {
         }
 
         public func send(source: TerminalView, data: ArraySlice<UInt8>) {
+            // An answer to the program's query: tmux has answered it already (control mode, D83).
+            if let model, model.isTmuxControlClient, model.retainedRenderer()?.isFeedingOutput == true { return }
             model?.retainedRenderer()?.recordInput(byteCount: data.count)
             onSendData(Data(data))
         }
 
         public func scrolled(source: TerminalView, position: Double) {
-            model?.retainedRenderer()?.refreshAccessibilityViewport()
+            // Not at each line output scrolls: the engine refreshes once the chunk is read.
+            if let renderer = model?.retainedRenderer(), !renderer.isFeedingOutput {
+                renderer.refreshAccessibilityViewport()
+            }
             Task { @MainActor [weak model] in
                 await Task.yield()
                 model?.updateScrollPosition(position)
@@ -4227,6 +4300,9 @@ public struct SwiftTermLocalProcessConfiguration: Equatable, Sendable {
     /// starts: deleted since it was chosen, or on a volume since unmounted. Nil fails the launch,
     /// saying so.
     public var fallbackDirectory: String?
+    /// The process is tmux as a control-mode client on pipes (`-C`, D83; `TmuxControlPipe`): its
+    /// protocol is read and written by `TmuxControlClient`, and no PTY is opened.
+    public var tmuxControl: Bool
 
     public init(
         executable: String = "/bin/zsh",
@@ -4234,8 +4310,10 @@ public struct SwiftTermLocalProcessConfiguration: Equatable, Sendable {
         environment: [String]? = nil,
         executableName: String? = nil,
         currentDirectory: String? = nil,
-        fallbackDirectory: String? = nil
+        fallbackDirectory: String? = nil,
+        tmuxControl: Bool = false
     ) {
+        self.tmuxControl = tmuxControl
         self.executable = executable
         self.arguments = arguments
         self.environment = environment
@@ -4474,11 +4552,61 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
             ? self : super.validRequestor(forSendType: sendType, returnType: returnType)
     }
 
+    /// A pane kept in this Mac's tmux as a control-mode client (`TmuxControlClient`, D83), tmux on
+    /// pipes (`TmuxControlPipe`): its bytes come to `receiveTmuxBytes`, and the client's commands go
+    /// to `tmuxWriter`.
+    var tmuxControl: TmuxControlClient?
+    var tmuxWriter: ((Data) -> Void)?
+    /// True while the client's drawing is read: what the terminal answers then, tmux has answered.
+    private(set) var isFeedingControlOutput = false
+    /// True while output is read, the process's own or tmux's.
+    private(set) var isFeeding = false
+    var onTmuxControlEvent: ((TmuxControlAction) -> Void)?
+
+    func writeToTmux(_ data: Data) { tmuxWriter?(data) }
+
+    /// What tmux wrote, through the client: drawn, answered, or told on.
+    func receiveTmuxBytes(_ data: Data) {
+        guard let actions = tmuxControl?.receive(data) else { return }
+        let clock = ContinuousClock()
+        let start = clock.now
+        let kept = SwiftTermSelectionKeeper.take(from: self)
+        for action in actions {
+            switch action {
+            case .terminal(let bytes):
+                isFeedingControlOutput = true
+                isFeeding = true
+                super.dataReceived(slice: clearBlacks.filter(ArraySlice(bytes)))
+                isFeeding = false
+                isFeedingControlOutput = false
+                // After Find's hit, which `onProcessOutput` puts back.
+                onProcessOutput?(ArraySlice(bytes), start.duration(to: clock.now))
+            case .transport(let bytes):
+                writeToTmux(bytes)
+            case .live, .exited:
+                onTmuxControlEvent?(action)
+            }
+        }
+        SwiftTermSelectionKeeper.restore(kept, in: self)
+    }
+
+    /// SwiftTerm tells of a new size only while its own process runs; tmux on pipes is told here.
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        guard tmuxControl != nil else { return }
+        let terminal = getTerminal()
+        if let actions = tmuxControl?.resize(columns: terminal.cols, rows: terminal.rows) {
+            for case .transport(let bytes) in actions { writeToTmux(bytes) }
+        }
+    }
+
     override func dataReceived(slice: ArraySlice<UInt8>) {
         let clock = ContinuousClock()
         let start = clock.now
         let kept = SwiftTermSelectionKeeper.take(from: self)
+        isFeeding = true
         super.dataReceived(slice: clearBlacks.filter(slice))
+        isFeeding = false
         // After Find's hit, which `onProcessOutput` puts back.
         onProcessOutput?(slice, start.duration(to: clock.now))
         SwiftTermSelectionKeeper.restore(kept, in: self)
@@ -4551,7 +4679,8 @@ private final class MacLocalProcessDelegateProxy:
     }
 
     func scrolled(source: TerminalView, position: Double) {
-        engine?.refreshAccessibilityViewport()
+        // Not at each line output scrolls: the engine refreshes once the chunk is read.
+        if terminalView?.isFeeding != true { engine?.refreshAccessibilityViewport() }
         hostModel?.updateScrollPosition(position)
     }
 
@@ -4649,6 +4778,11 @@ private let localProcessLogger = Logger(subsystem: "sh.glas", category: "termina
 @MainActor
 private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcessControlling {
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
+
+    var isFeedingOutput: Bool { terminalView.isFeedingControlOutput }
+    /// tmux on pipes, for a pane kept in tmux (`TmuxControlPipe`); nil for a PTY's process.
+    private var controlPipe: TmuxControlPipe?
+    private var isProcessRunning: Bool { controlPipe?.isRunning ?? terminalView.process.running }
 
     static let maximumRecordingCallbackBytes = 64 * 1024
 
@@ -4819,8 +4953,12 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
             processState.failedToLaunch(failure)
             return
         }
-        guard !terminalView.process.running else { return }
+        guard !isProcessRunning else { return }
 
+        if configuration.tmuxControl {
+            startControlPipe(configuration, processState: processState)
+            return
+        }
         didReportTermination = false
         terminalView.startProcess(
             executable: configuration.executable,
@@ -4845,6 +4983,44 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         onProcessReady()
     }
 
+    /// tmux as a control-mode client on pipes, in place of a PTY's process (D83).
+    private func startControlPipe(_ configuration: SwiftTermLocalProcessConfiguration,
+                                  processState: SwiftTermLocalProcessState) {
+        guard let pipe = TmuxControlPipe(executable: configuration.executable, arguments: configuration.arguments,
+                                         environment: configuration.environment,
+                                         currentDirectory: configuration.currentDirectory) else {
+            processState.failedToLaunch("tmux could not be started.")
+            return
+        }
+        let terminal = terminalView.getTerminal()
+        terminalView.tmuxControl = TmuxControlClient(columns: terminal.cols, rows: terminal.rows, overPipe: true)
+        terminalView.tmuxWriter = { [weak pipe] data in pipe?.write(data) }
+        terminalView.onTmuxControlEvent = { [weak self] action in
+            guard case .exited = action else { return }
+            self?.delegateProxy.hostModel?.isTmuxControlClient = false
+        }
+        pipe.onOutput = { [weak self] data in self?.terminalView.receiveTmuxBytes(data) }
+        pipe.onExit = { [weak self] status in self?.controlPipeExited(status: status) }
+        controlPipe = pipe
+        delegateProxy.hostModel?.isTmuxControlClient = true
+        didReportTermination = false
+        processState.beganRunning(currentDirectory: configuration.currentDirectory)
+        launchedShell = configuration.executable
+        if let currentDirectory = configuration.currentDirectory {
+            delegateProxy.hostCurrentDirectoryUpdate(source: terminalView, directory: currentDirectory)
+        }
+        pipe.start()
+        onProcessReady()
+    }
+
+    private func controlPipeExited(status: Int32?) {
+        controlPipe = nil
+        terminalView.tmuxControl = nil
+        terminalView.tmuxWriter = nil
+        delegateProxy.hostModel?.isTmuxControlClient = false
+        reportProcessTermination(exitCode: status.map { MacLocalProcessDelegateProxy.normalizedForkPTYExitCode($0) } ?? nil)
+    }
+
     func receive(_ data: Data) {
         let clock = ContinuousClock()
         let start = clock.now
@@ -4865,11 +5041,23 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     }
 
     func sendUserInput(_ bytes: ArraySlice<UInt8>) {
-        guard terminalView.process.running, !bytes.isEmpty else { return }
+        guard isProcessRunning, !bytes.isEmpty else { return }
+        // An answer to the program's query, while tmux's drawing is read: tmux has answered it.
+        if terminalView.tmuxControl != nil, terminalView.isFeedingControlOutput { return }
         recordInput(byteCount: bytes.count)
         emitBounded(Data(bytes), to: onInputData)
-        terminalView.send(source: terminalView, data: bytes)
+        if let actions = terminalView.tmuxControl?.input(Data(bytes)) {
+            sendToTmux(actions)
+        } else {
+            terminalView.send(source: terminalView, data: bytes)
+        }
     }
+
+    /// What the control-mode client has for tmux, written to the PTY tmux runs on.
+    private func sendToTmux(_ actions: [TmuxControlAction]) {
+        for case .transport(let data) in actions { terminalView.writeToTmux(data) }
+    }
+
 
     func focusIfActive() -> Bool {
         guard let window = terminalView.window, window.isKeyWindow else { return false }
@@ -4884,7 +5072,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
 
     @discardableResult
     func sendLocalCommand(_ command: String) -> Bool {
-        guard terminalView.process.running,
+        guard isProcessRunning,
               !command.isEmpty,
               !command.utf8.contains(0),
               command.utf8.count <= SwiftTermPastePolicy.maximumPayloadBytes else {
@@ -4912,6 +5100,12 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     }
 
     func terminateLocalProcess() {
+        if let controlPipe {
+            // The client detaches as its input closes; tmux keeps the session.
+            controlPipe.terminate()
+            reportProcessTermination(exitCode: nil)
+            return
+        }
         let processID = terminalView.process.shellPid
         guard processID > 0 else {
             reportProcessTermination(exitCode: nil)
@@ -4981,11 +5175,11 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
 
     @discardableResult
     func restartLocalProcess(_ configuration: SwiftTermLocalProcessConfiguration) -> Bool {
-        guard !terminalView.process.running else { return false }
+        guard !isProcessRunning else { return false }
         terminalView.getTerminal().resetToInitialState()
         terminalView.needsDisplay = true
         start(configuration)
-        return terminalView.process.running
+        return isProcessRunning
     }
 
     fileprivate func processDidTerminate(waitStatus: Int32?) {
@@ -5039,11 +5233,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     }
 
     func visibleText(lastNLines: Int) -> [String] {
-        let data = terminalView.getTerminal().getBufferAsData()
-        let lines = (String(data: data, encoding: .utf8) ?? "")
-            .components(separatedBy: "\n")
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        return Array(lines.suffix(max(0, lastNLines)))
+        SwiftTermBufferText.lastLines(lastNLines, of: terminalView.getTerminal())
     }
 
     private let findTracker = SwiftTermFindTracker()

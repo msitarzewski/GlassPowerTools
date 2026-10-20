@@ -28,14 +28,26 @@ struct GlassEditorPreviewPane: View {
             if case .table = kind {
                 GlassEditorTableView(parsed: table)
             } else if let page {
-                WebView(page)
-                    #if os(visionOS)
-                    // The page asks for a transparent background so it sits on the window's own
-                    // surface; on Vision Pro the web view painted an opaque black slab behind it
-                    // anyway, a dark hole in a glass window (2026-10-09, simulator). This is the
-                    // web view's own switch for that.
-                    .webViewContentBackground(.hidden)
-                    #endif
+                // **None of the window's insets.** A web view whose edge lies on the safe area's edge
+                // inherits the inset beyond it, and WebKit lays the page out inside its insets. On
+                // the iPhone Duo, iOS keeps a column at the right of each display for the time and
+                // the toolbar, so a preview beside it was laid out 83 points narrower than its pane:
+                // the page clipped, the rest of the pane empty (2026-10-18, measured with the page's
+                // `innerWidth`: 179 in a 262-point pane). Ignoring the safe area and padding back
+                // brought the inset back with the edge; one point short of that edge, there is none
+                // (`innerWidth` 262). The point is the window's glass, as the page's background is.
+                GeometryReader { geometry in
+                    WebView(page)
+                        #if os(visionOS)
+                        // The page asks for a transparent background so it sits on the window's own
+                        // surface; on Vision Pro the web view painted an opaque black slab behind it
+                        // anyway, a dark hole in a glass window (2026-10-09, simulator). This is the
+                        // web view's own switch for that.
+                        .webViewContentBackground(.hidden)
+                        #endif
+                        .padding(.leading, geometry.safeAreaInsets.leading > 0 ? 1 : 0)
+                        .padding(.trailing, geometry.safeAreaInsets.trailing > 0 ? 1 : 0)
+                }
             } else {
                 ProgressView()
             }

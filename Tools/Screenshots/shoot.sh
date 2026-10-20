@@ -28,5 +28,6 @@ fi
 xcrun simctl launch "$SIM" com.glasspowertools --ui-testing "$(uuidgen)" \
   --ui-testing-seed-hosts "$HOSTS" --demo-open "$SURFACE" ${DEMO_ARGS:-} >/dev/null
 sleep "$SETTLE"
-xcrun simctl io "$SIM" screenshot "$OUT" >/dev/null 2>&1
+# SHOT_DISPLAY picks one display of a device with two, such as the iPhone Duo's outer ("1") or inner ("3").
+xcrun simctl io "$SIM" screenshot ${SHOT_DISPLAY:+--display="$SHOT_DISPLAY"} "$OUT" >/dev/null 2>&1
 echo "shoot: $SURFACE → $OUT"

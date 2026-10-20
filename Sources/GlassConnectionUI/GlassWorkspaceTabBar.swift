@@ -27,17 +27,23 @@ public struct GlassWorkspaceTabItem<ID: Hashable>: Identifiable {
     /// which is what every editor with this pattern does and what makes the difference legible
     /// without a second glyph in the strip.
     public let isProvisional: Bool
-    /// What the tooltip and the accessibility label say; the title when nil.
+    /// What the tooltip and the accessibility hint say; the title when nil. The accessibility label
+    /// is the title, the words on the tab: Voice Control acts on what it shows ("Tap orders"), and
+    /// the editor's help is the file's folder, which made every tab from one folder sound the same
+    /// to VoiceOver (2026-10-18, `AccessibilityAuditUITests`).
     public let help: String?
+    /// The tab's accessibility identifier, for a test to find a kind of tab whatever its title.
+    public let accessibilityIdentifier: String?
 
     public init(id: ID, title: String, symbolName: String, isClosable: Bool = true,
-                isProvisional: Bool = false, help: String? = nil) {
+                isProvisional: Bool = false, help: String? = nil, accessibilityIdentifier: String? = nil) {
         self.id = id
         self.title = title
         self.symbolName = symbolName
         self.isClosable = isClosable
         self.isProvisional = isProvisional
         self.help = help
+        self.accessibilityIdentifier = accessibilityIdentifier
     }
 
     var helpText: String { help ?? title }
@@ -62,6 +68,45 @@ public struct GlassWorkspaceTabBar<ID: Hashable>: View {
     }
 
     public var body: some View {
+        // **Tabs stay inside the safe area.** A scroll view whose edge lies on the safe area's edge
+        // reaches past it, taking the inset beyond as room to scroll into. Nothing sat there until
+        // the iPhone Duo: iOS puts the time, Wi-Fi and the toolbar's buttons in a column at the
+        // right of its displays, and the selected tab sat under the clock, where scrolling to it
+        // left it (2026-10-18). One point short of the edge the scroll view inherits no inset (the
+        // editor's preview had the same cause, `GlassEditorPreviewPane`); the material behind still
+        // spans the strip.
+        HStack(spacing: 0) {
+            // The selected tab in view, when the strip appears and whenever it changes: a workspace
+            // opened on its last tab began with that tab off the end. After a turn, once the tabs
+            // are laid out; asked at once, there is nothing yet to scroll to.
+            ScrollViewReader { proxy in
+                scroller
+                    .task(id: selection) {
+                        await Task.yield()
+                        guard let selection else { return }
+                        withAnimation(.snappy) { proxy.scrollTo(selection) }
+                    }
+            }
+        }
+        .padding(.horizontal, 1)
+        // **A strip is as tall as its tabs.**
+        //
+        // A `ScrollView` accepts whatever height it is offered — it has no opinion of its own —
+        // so in a column where everything else was flexible it took half the window and centred
+        // the tabs in the middle of the empty space (reported 2026-09-17, with two tabs open and
+        // the sidebar closed). `fixedSize` vertically is what asks it for its content's height
+        // instead.
+        .fixedSize(horizontal: false, vertical: true)
+        // Inside the content safe area: the strip belongs to the canvas below the title bar and
+        // must not extend upward over the window's own frost.
+        .background(.regularMaterial, ignoresSafeAreaEdges: [])
+        // **One line at any text size.** At the largest, tabs read "Ov…ew" (2026-10-19). A strip
+        // of tabs is a bar, and like Apple's it stops growing past xxxLarge; a long press on a tab
+        // shows its name whole in the Large Content Viewer.
+        .glassBar()
+    }
+
+    private var scroller: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 6) {
                 ForEach(tabs) { tab in
@@ -87,8 +132,14 @@ public struct GlassWorkspaceTabBar<ID: Hashable>: View {
                         }
                         .buttonStyle(.plain)
                         .glassWorkspaceTabControlTarget()
-                        .accessibilityLabel(tab.isProvisional ? "\(tab.helpText), previewing" : tab.helpText)
+                        .accessibilityLabel(tab.isProvisional ? "\(tab.title), previewing" : tab.title)
+                        .accessibilityHint(tab.helpText == tab.title ? "" : tab.helpText)
+                        .accessibilityIdentifier(tab.accessibilityIdentifier ?? "")
                         .accessibilityAddTraits(isSelected ? .isSelected : [])
+                        // Its name, not its icon alone: the icons say only what kind of tab it is.
+                        .accessibilityShowsLargeContentViewer {
+                            Label(tab.title, systemImage: tab.symbolName)
+                        }
 
                         if tab.isClosable {
                             Button {
@@ -102,10 +153,14 @@ public struct GlassWorkspaceTabBar<ID: Hashable>: View {
                             }
                             .buttonStyle(.borderless)
                             .glassWorkspaceTabControlTarget()
-                            .accessibilityLabel("Close \(tab.helpText)")
+                            .accessibilityLabel("Close \(tab.title)")
+                            .accessibilityShowsLargeContentViewer {
+                                Label("Close \(tab.title)", systemImage: "xmark")
+                            }
                         }
                     }
                     .fixedSize(horizontal: true, vertical: false)
+                    .id(tab.id)
                     .padding(.horizontal, 4)
                     // **The selected tab has to look selected.** `.regularMaterial` over a light
                     // window is very nearly the window, so on a Mac in Light mode there was no
@@ -134,16 +189,6 @@ public struct GlassWorkspaceTabBar<ID: Hashable>: View {
             .padding(.vertical, 6)
         }
         .scrollIndicators(.hidden)
-        // **A strip is as tall as its tabs.**
-        //
-        // A `ScrollView` accepts whatever height it is offered — it has no opinion of its own — so
-        // in a column where everything else was flexible it took half the window and centred the
-        // tabs in the middle of the empty space (reported 2026-09-17, with two tabs open and the
-        // sidebar closed). `fixedSize` vertically is what asks it for its content's height instead.
-        .fixedSize(horizontal: false, vertical: true)
-        // Inside the content safe area: the strip belongs to the canvas below the title bar and
-        // must not extend upward over the window's own frost.
-        .background(.regularMaterial, ignoresSafeAreaEdges: [])
         .accessibilityLabel(accessibilityLabel)
     }
 }

@@ -85,7 +85,8 @@ nonisolated struct ICloudTerminalTheme: Codable, Equatable, Identifiable, Sendab
         }
         guard fontSize.isFinite,
               (Double(TerminalTheme.minimumFontSize)...Double(TerminalTheme.maximumFontSize)).contains(fontSize) else {
-            throw ICloudSettingsSyncError.invalidPayload("Theme font sizes must be within 10...24 points.")
+            throw ICloudSettingsSyncError.invalidPayload(
+                "Theme font sizes must be within \(Int(TerminalTheme.minimumFontSize))...\(Int(TerminalTheme.maximumFontSize)) points.")
         }
         guard ansiColors.count == 16 else {
             throw ICloudSettingsSyncError.invalidPayload("Terminal themes require exactly 16 ANSI colors.")

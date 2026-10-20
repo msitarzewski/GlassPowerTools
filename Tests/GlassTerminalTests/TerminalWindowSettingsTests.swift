@@ -297,7 +297,7 @@ struct TerminalWindowSettingsTests {
         #expect(window.isEmpty)
         window[TerminalWindowSettings.fontSize] = 72
         window[TerminalWindowSettings.scrollbackLines] = 5_000_000
-        #expect(window[TerminalWindowSettings.fontSize] == 24 && window[TerminalWindowSettings.scrollbackLines] == 100_000)
+        #expect(window[TerminalWindowSettings.fontSize] == 28 && window[TerminalWindowSettings.scrollbackLines] == 100_000)
     }
 
     @Test("every tab in a workgroup's window uses the window's settings, and one moved in takes them")

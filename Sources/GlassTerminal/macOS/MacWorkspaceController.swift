@@ -246,7 +246,9 @@ final class MacWorkspaceController {
     /// Scrolling over a local pane in tmux scrolls tmux's history, rather than arriving as arrow
     /// keys (2026-10-08). Amounts are gathered for a frame and sent as whole lines.
     func scrollLocalTmux(_ paneID: UUID, deltaY: CGFloat, precise: Bool) -> Bool {
-        guard localTmuxSession(for: paneID) != nil else { return false }
+        // A control-mode client keeps the history: a scroll on a program's own screen is the program's.
+        guard localTmuxSession(for: paneID) != nil,
+              localRuntimesByPaneID[paneID]?.model.keepsHistoryUnderTmux != true else { return false }
         // A trackpad reports points, a mouse wheel lines; a terminal line is about 16 points.
         pendingScrollByPaneID[paneID, default: 0] += precise ? Double(deltaY) / 16 : Double(deltaY)
         if scrollFlush == nil {
@@ -274,7 +276,8 @@ final class MacWorkspaceController {
     /// after any scroll on its way.
     func localTmuxHistory(_ paneID: UUID) async -> String? {
         let server = MacLocalTmux.server
-        guard let session = localTmuxSession(for: paneID), let tmux = server.executablePath() else { return nil }
+        guard localRuntimesByPaneID[paneID]?.model.keepsHistoryUnderTmux != true,
+              let session = localTmuxSession(for: paneID), let tmux = server.executablePath() else { return nil }
         let captured: String? = await withCheckedContinuation { continuation in
             MacLocalTmux.scrollQueue.async { continuation.resume(returning: server.history(session, tmux)) }
         }

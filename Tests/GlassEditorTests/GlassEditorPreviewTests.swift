@@ -27,6 +27,18 @@ struct GlassEditorPreviewTests {
         #expect(GlassEditorPreviewMode.previewOnly.next(roomBeside: false) == .text)
     }
 
+    /// 2026-10-18, the iPhone Duo: a preview chosen beside the text on the unfolded inner display was
+    /// still drawn beside it on the folded outer one, one word a line. Without room it is shown alone,
+    /// the button goes on from what is shown, and "beside" comes back with the room.
+    @Test("Beside without room is shown alone; the button steps from what is shown")
+    func besideWithoutRoom() {
+        #expect(GlassEditorPreviewMode.beside.shown(roomBeside: false) == .previewOnly)
+        #expect(GlassEditorPreviewMode.beside.shown(roomBeside: true) == .beside)
+        #expect(GlassEditorPreviewMode.text.shown(roomBeside: false) == .text)
+        #expect(GlassEditorPreviewMode.previewOnly.shown(roomBeside: false) == .previewOnly)
+        #expect(GlassEditorPreviewMode.beside.shown(roomBeside: false).next(roomBeside: false) == .text)
+    }
+
     /// The owner, 2026-10-14: a "Blocked Plug-in" pill in the preview of notes that mentioned an
     /// HTML tag in backticks. swift-markdown's formatter escaped nothing, so the code became a tag.
     @Test("text is text: tags in code, in code blocks, in prose and in links are shown, never made")

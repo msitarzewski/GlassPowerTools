@@ -177,6 +177,14 @@ class SettingsManager {
     /// On by default; off here, or from the card itself (the owner, 2026-10-14: "a need to pause on
     /// device AI suggestions … it's monitoring the output of an eval").
     var errorSuggestions: Bool = true
+    /// The font's size grows and shrinks with the system's text size on an iPhone, an iPad and
+    /// Vision Pro (`GlassSystemTextSize`; the owner, 2026-10-19). On by default. This device's, as
+    /// its text size is: it stays out of the portable iCloud preferences.
+    var fontFollowsSystemTextSize: Bool = true
+    /// A paste of text a terminal program wrapped to fit its window has its lines joined again
+    /// (`TerminalWrappedPaste`; the owner, 2026-10-19). The paste review's checkbox sets it, and it
+    /// is on until someone turns it off there. This device's.
+    var joinsWrappedPastes: Bool = true
     /// The one layering state (Stage 1's `GlassLayerStore`). glas.sh's three appearance settings
     /// are views over it so the terminal canvas, the shell's windows and Settings → Appearance all
     /// read and write the same values; nothing here persists a second copy.
@@ -343,6 +351,12 @@ class SettingsManager {
            let saved = TerminalResizeBehavior(rawValue: raw) {
             whenResized = saved
         }
+        if settingsDefaults.object(forKey: UserDefaultsKeys.joinsWrappedPastes) != nil {
+            joinsWrappedPastes = settingsDefaults.bool(forKey: UserDefaultsKeys.joinsWrappedPastes)
+        }
+        if settingsDefaults.object(forKey: UserDefaultsKeys.fontFollowsSystemTextSize) != nil {
+            fontFollowsSystemTextSize = settingsDefaults.bool(forKey: UserDefaultsKeys.fontFollowsSystemTextSize)
+        }
         if settingsDefaults.object(forKey: UserDefaultsKeys.errorSuggestions) != nil {
             errorSuggestions = settingsDefaults.bool(forKey: UserDefaultsKeys.errorSuggestions)
         }
@@ -411,6 +425,8 @@ class SettingsManager {
         settingsDefaults.set(pathPreviews.rawValue, forKey: UserDefaultsKeys.pathPreviews)
         settingsDefaults.set(whenResized.rawValue, forKey: UserDefaultsKeys.whenResized)
         settingsDefaults.set(errorSuggestions, forKey: UserDefaultsKeys.errorSuggestions)
+        settingsDefaults.set(fontFollowsSystemTextSize, forKey: UserDefaultsKeys.fontFollowsSystemTextSize)
+        settingsDefaults.set(joinsWrappedPastes, forKey: UserDefaultsKeys.joinsWrappedPastes)
         settingsDefaults.set(interactiveGlass, forKey: UserDefaultsKeys.interactiveGlass)
         settingsDefaults.set(glassTint, forKey: UserDefaultsKeys.glassTint)
         settingsDefaults.set(tailscaleTailnet, forKey: UserDefaultsKeys.tailscaleTailnet)

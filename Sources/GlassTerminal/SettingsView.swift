@@ -474,13 +474,27 @@ struct TerminalSettingsView: View {
                     Text("Courier New").tag("Courier New")
                 }
                 
-                Slider(value: fontSizeBinding, in: 10...24, step: 1) {
+                Slider(value: fontSizeBinding,
+                       in: Double(TerminalTheme.minimumFontSize)...Double(TerminalTheme.maximumFontSize),
+                       step: 1) {
                     Text("Font Size")
                 } minimumValueLabel: {
-                    Text("10")
+                    Text("\(Int(TerminalTheme.minimumFontSize))")
                 } maximumValueLabel: {
-                    Text("24")
+                    Text("\(Int(TerminalTheme.maximumFontSize))")
                 }
+
+                // A Mac has no system text size to follow.
+                #if !os(macOS)
+                Toggle("Scale with System Text Size", isOn: $settings.fontFollowsSystemTextSize)
+                    .onChange(of: settings.fontFollowsSystemTextSize) { _, _ in
+                        settings.saveSettings()
+                    }
+                    .accessibilityIdentifier("terminal-settings-follows-text-size")
+                Text("Font Size is the size at the standard text size, and a larger text size in Settings makes it larger. On this device only.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                #endif
             }
 
             Section("Initial Terminal Size") {
@@ -1056,9 +1070,9 @@ struct ThemeEditorView: View {
                         ) {
                             Text("Font Size")
                         } minimumValueLabel: {
-                            Text("10")
+                            Text("\(Int(TerminalTheme.minimumFontSize))")
                         } maximumValueLabel: {
-                            Text("24")
+                            Text("\(Int(TerminalTheme.maximumFontSize))")
                         }
 
                         Button("Use Apple Clear Dark Colors", systemImage: "paintpalette") {

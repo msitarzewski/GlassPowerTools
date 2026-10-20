@@ -10,8 +10,8 @@
 # opens on this Mac's screen. The look is the website's (device_shots.sh): Vision Pro windows at Opacity 78%,
 # Glass 50%, Medium, Connections closed where one service is shown, terminals running a btop-style monitor,
 # made-up machines on 192.0.2.x. Unlike the website's, these are whole screens, not cut-outs: the store shows
-# them as they are. A set is replaced whole, and a picture of the wrong size stops the run. Look at every
-# picture before uploading it.
+# them as they are, without an alpha channel, which App Store Connect refuses. A set is replaced whole, and a
+# picture of the wrong size stops the run. Look at every picture before uploading it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 : "${IOS_APP:?set IOS_APP to a Debug iOS simulator build}"
@@ -78,8 +78,15 @@ take() {  # set app simulator-name width height [ios] -- shot...
     case "$args" in *--demo-landscape*) expected="${height}x$width" ;; esac
     size="$(sips -g pixelWidth -g pixelHeight "$file" | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w "x" h}')"
     [ "$size" = "$expected" ] || { echo "store_shots: $file is $size, not $expected" >&2; exit 1; }
+    # App Store Connect refuses a picture with an alpha channel, and the simulators' captures have one.
+    python3 -I -c 'import sys; from PIL import Image; Image.open(sys.argv[1]).convert("RGB").save(sys.argv[1])' "$file"
   done
   xcrun simctl terminate "$sim" com.glasspowertools >/dev/null 2>&1 || true
+  # The empty room, which store_frames.py finds each Vision Pro picture's windows against.
+  if [ "$set" = vision ]; then
+    sleep 4
+    xcrun simctl io "$sim" screenshot "$OUT/../vision-room.png" >/dev/null 2>&1
+  fi
 }
 
 for set in ${@:-iphone ipad vision}; do
@@ -90,4 +97,4 @@ for set in ${@:-iphone ipad vision}; do
     *) echo "store_shots: unknown set $set (iphone, ipad or vision)" >&2; exit 2 ;;
   esac
 done
-echo "store_shots: done; look at each picture in $OUT before uploading"
+echo "store_shots: done; frame them with Tools/Screenshots/store_frames.py, and look at each picture before uploading"

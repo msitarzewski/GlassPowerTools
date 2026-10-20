@@ -374,9 +374,28 @@ enum MacLocalTmux {
     /// `-T` tells tmux what this terminal can do beyond the xterm its TERM names: synchronized
     /// output (DEC 2026), so tmux sends each redraw as one frame, and 24-bit colour, which tmux
     /// otherwise reduces to the 256-colour palette. SwiftTerm supports both.
-    nonisolated static func arguments(session: String, directory: String) -> [String] {
-        ["-u", "-T", "sync,RGB", "new-session", "-A", "-s", session, "-c", directory]
+    ///
+    /// As a control-mode client (`-C` on pipes, D83: `TmuxControlPipe`) tmux hands the pane's every
+    /// byte to the terminal, which draws it itself, so the terminal's features don't pass through tmux
+    /// and `-T` has nothing to say.
+    nonisolated static func arguments(session: String, directory: String, control: Bool = false) -> [String] {
+        control ? ["-u", "-C", "new-session", "-A", "-s", session, "-c", directory]
+            : ["-u", "-T", "sync,RGB", "new-session", "-A", "-s", session, "-c", directory]
     }
+
+    /// Whether this Mac's tmux can have a control-mode client (3.2 or later): asked once a run, for
+    /// each tmux, and only while the setting allows control mode.
+    nonisolated static func supportsControlMode(_ tmux: String) -> Bool {
+        guard TerminalTmux.controlModeEnabled else { return false }
+        return controlModeSupport.withLock { known in
+            if let answer = known[tmux] { return answer }
+            let answer = TmuxControlClient.supports(version: run(tmux, ["-V"]) ?? "")
+            known[tmux] = answer
+            return answer
+        }
+    }
+
+    private nonisolated static let controlModeSupport = OSAllocatedUnfairLock(initialState: [String: Bool]())
 
     // MARK: Reopening after a quit or a crash
 

@@ -37,6 +37,7 @@ enum UserDefaultsKeys {
     static let showSidebarByDefault = "glassdb.showSidebarByDefault"
     static let editorFontSize = "glassdb.editorFontSize"
     static let dataGridFontSize = "glassdb.dataGridFontSize"
+    static let dataGridFollowsSystemTextSize = "glassdb.dataGridFollowsSystemTextSize"
     static let showLineNumbers = "glassdb.showLineNumbers"
     static let autoFormatJSONInRecordEditor = "glassdb.autoFormatJSONInRecordEditor"
     static let redactQueryHistoryLiterals = "glassdb.redactQueryHistoryLiterals"

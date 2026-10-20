@@ -470,6 +470,7 @@ public struct DesktopSessionView: View {
         HStack(spacing: 12) {
                 Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
                 Text(session.status).lineLimit(1)
+                    .accessibilityShowsLargeContentViewer()
                 // What this window is sent (W38): its own connection's picture, or its part of the
                 // desktop's. Not on a phone, where it wrapped onto three lines beside the rest.
                 if !compactScreen, let sending = session.sending(for: viewport) {
@@ -485,15 +486,16 @@ public struct DesktopSessionView: View {
                 #if os(iOS)
                 // Symbols only on a phone, as the keyboard's own bar has them.
                 if compactScreen {
-                    DesktopKeysMenu(session: session).labelStyle(.iconOnly)
+                    DesktopKeysMenu(session: session).labelStyle(.iconOnly).glassBarItem()
                 } else {
-                    DesktopKeysMenu(session: session)
+                    DesktopKeysMenu(session: session).glassBarItem()
                 }
                 #else
                 DesktopKeysMenu(session: session, typeText: { session.releaseInput(); showTextInput = true })
+                    .glassBarItem()
                 #endif
                 #if os(iOS)
-                DesktopArrowPad(session: session)
+                DesktopArrowPad(session: session).glassBarItem()
                 // Asked for again, even when it was asked for before and put away since: the keyboard's
                 // own bar hides it, and this bar steps aside while that one is up.
                 Button("Keyboard", systemImage: "keyboard") {
@@ -503,12 +505,16 @@ public struct DesktopSessionView: View {
                     .labelStyle(.iconOnly)
                     .disabled(!session.isConnected)
                     .accessibilityIdentifier("session.keyboard")
+                    .glassBarItem()
                 #endif
             }
             .font(.caption).padding(10)
         #if !os(visionOS)
         .background(.regularMaterial)
         #endif
+        // One line at any text size: at the largest the status read "Conn…" (2026-10-19). Past
+        // xxxLarge a long press says what an item is (`glassBar`).
+        .glassBar()
     }
 
     /// The window's tools in the bar above the software keyboard, which covers the status bar on an

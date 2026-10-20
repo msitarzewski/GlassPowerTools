@@ -272,8 +272,10 @@ nonisolated enum TerminalFindSourceChoice: Equatable, Sendable {
 
 extension TerminalSession {
     /// An SSH terminal kept in tmux, while connected: its finds go to tmux on the host, over this
-    /// connection. Nil otherwise, and the terminal's own buffer is searched.
+    /// connection. Nil otherwise, and the terminal's own buffer is searched — as it is in tmux too
+    /// once the terminal is tmux's control-mode client and keeps the history (`TmuxControlClient`, D83).
     var tmuxFindTarget: TerminalTmuxFindTarget? {
+        guard !terminalHostModel.keepsHistoryUnderTmux else { return nil }
         guard case .tmux(let name) = TerminalFindSourceChoice.choose(
             tmuxSession: survivesClose ? tmuxSessionName : nil, tmuxReachable: state == .connected) else { return nil }
         return TerminalTmuxFindTarget(

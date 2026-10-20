@@ -138,6 +138,10 @@ public extension View {
         background {
             GlassSpatialWindowGlass(strength: strength)
                 .ignoresSafeArea()
+                // Nothing to VoiceOver. `accessibilityHidden` inside it did not reach the system's
+                // glass view, which every window then offered as a nameless element the size of the
+                // window (2026-10-18: gone with Glass at 0, back with it on; this removes it).
+                .accessibilityRepresentation { EmptyView() }
         }
     }
 

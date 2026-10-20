@@ -118,8 +118,9 @@ enum GlassDemoMode {
         }
         #endif
         switch surface {
-        case "editor", "preview":
-            await openEditor(editor, preview: surface == "preview")
+        case "editor", "preview", "preview-only":
+            // `preview-only`: the README's preview alone, without the text beside it.
+            await openEditor(editor, preview: surface != "editor", previewAlone: surface == "preview-only")
         case "editor-model":
             // A 3D model in the editor's viewer (D78): RealityKit on the Mac, iPhone and iPad, and
             // Apple's Quick Look volume as it opens on Vision Pro. Written here, as the project is.
@@ -389,7 +390,8 @@ enum GlassDemoMode {
     /// Settings ▸ This Window opens over it.
     private static func openEditor(_ editor: GlassEditorRuntime, preview: Bool,
                                    windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
-                                   opensSettings: Bool = false, model: Bool = false) async {
+                                   opensSettings: Bool = false, model: Bool = false,
+                                   previewAlone: Bool = false) async {
         let root = URL.documentsDirectory.appending(path: "shop", directoryHint: .isDirectory)
         do {
             for (path, text) in projectFiles {
@@ -416,7 +418,7 @@ enum GlassDemoMode {
             let others = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
             for file in others where file.pathExtension.lowercased() == "usdz" { _ = await workspace.open(file) }
         }
-        if preview, let last { workspace.previewModes[last.id] = .beside }
+        if preview, let last { workspace.previewModes[last.id] = previewAlone ? .previewOnly : .beside }
         editor.present(window)
     }
 

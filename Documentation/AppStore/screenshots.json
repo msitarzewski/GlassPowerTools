@@ -1,0 +1,26 @@
+{
+  "_about": "Each App Store screenshot's heading and line, in the site's words (site/pages/index.html). Tools/Screenshots/store_frames.py draws them over the raw screenshots from store_shots.sh.",
+  "vision": [
+    {"file": "01-btop", "headline": "Vision Pro first", "line": "A server's terminal, with the room behind its glass."},
+    {"file": "02-database", "headline": "Databases", "line": "MySQL, PostgreSQL and SQLite: the query above, the rows below."},
+    {"file": "03-desktop", "headline": "Remote desktops", "line": "A machine's own screen, as large as you make the window."},
+    {"file": "04-editor", "headline": "Editor", "line": "A project's files, and the one you're changing."},
+    {"file": "05-active", "headline": "Move a session between devices", "line": "Active lists what runs in tmux on each machine. Join one here, or take it over."},
+    {"file": "06-workgroups", "headline": "Workgroups that come back", "line": "After a quit or an update, the windows return on the same sessions."}
+  ],
+  "iphone-6.9": [
+    {"file": "01-btop", "headline": "Terminal", "line": "SSH with host keys you confirm, and tmux sessions you pick up on any device."},
+    {"file": "02-database", "headline": "Databases", "line": "MySQL, PostgreSQL and SQLite: browse, filter and edit rows, and write queries."},
+    {"file": "03-desktop", "headline": "Remote desktops", "line": "RDP and VNC, with the remote resolution following your screen."},
+    {"file": "04-editor", "headline": "Editor", "line": "Files on this iPhone or on a server, with highlighting and previews."},
+    {"file": "05-active", "headline": "Pick up where you left off", "line": "Active lists what still runs in tmux on your machines, to join from here."}
+  ],
+  "ipad-13": [
+    {"file": "01-library-history", "headline": "The machines you work on, in one list", "line": "Add a machine once. Every service on it follows its address."},
+    {"file": "02-btop", "headline": "Terminal", "line": "SSH with host keys you confirm, tabs, and tmux sessions you pick up on any device."},
+    {"file": "03-desktop", "headline": "Remote desktops", "line": "RDP and VNC, with the remote resolution following your window."},
+    {"file": "04-editor", "headline": "Editor", "line": "Files on this iPad or on a server, with highlighting, previews and viewers."},
+    {"file": "05-workgroups", "headline": "Workgroups that come back", "line": "A saved set of terminals, each keeping its own tmux session."},
+    {"file": "06-active", "headline": "Pick up where you left off", "line": "Active lists what runs in tmux on each machine, to join from here."}
+  ]
+}

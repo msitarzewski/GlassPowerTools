@@ -32,6 +32,7 @@ struct SettingsView: View {
         .onChange(of: settings.redactQueryHistoryLiterals) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.editorFontSize) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.dataGridFontSize) { _, _ in settingsManager.saveSettings() }
+        .onChange(of: settings.dataGridFollowsSystemTextSize) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.showLineNumbers) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.autoFormatJSONInRecordEditor) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.showSidebarByDefault) { _, _ in settingsManager.saveSettings() }
@@ -207,6 +208,11 @@ struct SettingsView: View {
                 range: 10...32,
                 suffix: "pt"
             )
+            // A Mac has no system text size to follow.
+            #if !os(macOS)
+            Toggle("Scale grid with system text size", isOn: $settings.dataGridFollowsSystemTextSize)
+                .accessibilityIdentifier("db-settings-grid-follows-text-size")
+            #endif
             Toggle("Show line numbers", isOn: $settings.showLineNumbers)
             Toggle(
                 "Format JSON automatically while editing",
@@ -216,7 +222,11 @@ struct SettingsView: View {
         } header: {
             Text("Editor")
         } footer: {
+            #if os(macOS)
             Text("Text sizes apply to newly rendered editors and results grids. Valid JSON is always compacted before it is sent to the database, regardless of its editor formatting.")
+            #else
+            Text("Text sizes apply to newly rendered editors and results grids. The grid's size is its size at the standard text size, and a larger text size in Settings makes it larger, on this device only. Valid JSON is always compacted before it is sent to the database, regardless of its editor formatting.")
+            #endif
         }
     }
 

@@ -25,8 +25,13 @@ glasspowertools.com/privacy.html and /support.html. The listing's claims were ch
 help pages, which are written from the code, for iPhone, iPad and Vision Pro. Mac-only features
 (the local shell, the Finder's services, default text editor) are left out.
 
-Screenshots are not kept in the repository. `Tools/Screenshots/store_shots.sh` makes them from the
-simulators, at App Store sizes, into `build/appstore/screenshots/`.
+Screenshots are not kept in the repository. They are made in two steps:
+- `Tools/Screenshots/store_shots.sh` takes them from the simulators, at App Store sizes, into
+  `build/appstore/screenshots/`.
+- `Tools/Screenshots/store_frames.py` gives each one the site's look into `build/appstore/framed/`:
+  a heading and a line from `screenshots.json`, in the site's words, on the site's dark surface.
+
+The framed pictures are the ones uploaded (the owner chose this style on 2026-10-18).
 
 The first version has no "What's New" text: App Store Connect asks for it from the second version.
 

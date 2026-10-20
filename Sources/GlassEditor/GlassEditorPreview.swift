@@ -50,6 +50,14 @@ public enum GlassEditorPreviewMode: Equatable, Sendable {
         case .previewOnly: .text
         }
     }
+
+    /// What is drawn. "Beside" chosen with room for it can find itself without: an iPhone Duo folded
+    /// (its outer display is compact) or an iPad window narrowed. The preview is then shown alone
+    /// rather than squeezed to a word a line, and the button goes on from there. The choice itself is
+    /// kept, so it comes back when the room does.
+    public func shown(roomBeside: Bool) -> GlassEditorPreviewMode {
+        self == .beside && !roomBeside ? .previewOnly : self
+    }
 }
 
 public enum GlassEditorPreviewPage {

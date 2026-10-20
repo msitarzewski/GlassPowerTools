@@ -12,6 +12,7 @@
 //
 
 import SwiftUI
+import GlassConnectionUI
 
 /// The footer row: the cloud, and the state in a few words. Tapping it opens the details.
 public struct GlassICloudStatusFooter: View {
@@ -76,6 +77,12 @@ public struct GlassICloudStatusFooter: View {
         .accessibilityLabel("iCloud")
         .accessibilityValue(model.catalogSyncStatusDescription)
         .accessibilityIdentifier("library-icloud-status")
+        // A footer, one line at any text size: at the largest it read "Not synced on t…"
+        // (2026-10-19). Past xxxLarge a long press shows the line whole.
+        .accessibilityShowsLargeContentViewer {
+            Label(shortStatus, systemImage: symbol)
+        }
+        .glassBar()
         .popover(isPresented: $showingDetails) {
             GlassICloudStatusDetails(model: model)
                 .presentationCompactAdaptation(.popover)

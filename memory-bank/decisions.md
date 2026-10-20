@@ -1670,3 +1670,24 @@ so any licence protects this code less than it would code written by hand; the n
 trademark either way. The CLA has not been reviewed by a lawyer.
 **Changed:** `LICENSE`, `CLA.md` (new), `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `THIRD-PARTY-NOTICES.md`,
 `projectbrief.md`, and the site (footer, home page, structured data, `llms.txt`).
+
+## D83 — tmux tabs keep their own history: tmux's control mode — Approved 2026-10-19
+**Owner:** "I need to be able to drag select through a scroll … Now it starts a new selection in the current
+buffer." Offered (A) the terminal keeps its own scrollback in tmux, or (B) a selection anchored in tmux's history:
+"I like A. Seems simpler." Then, shown that A loses lines, and offered (1) repairing the history after bursts or
+(2) tmux's control mode: "2."
+**Why:** tmux takes the alternate screen and the mouse, so history lives in tmux, a scroll redraws in place, and a
+selection made on the screen loses its text. Route A (built and tested 2026-10-19, uncommitted:
+`TerminalTmuxScreen` declines tmux's alternate screen and mouse, turns `CSI n S` into line feeds, and loads
+`capture-pane -e -J` history on attach) put scrolled lines in the terminal's history, but tmux does not send every
+line: measured, 32 of 60 lines printed at once never reached the terminal over SSH, and at least 85 of 1,000 locally.
+They exist only in tmux, so the terminal's history would have holes, and a selection across them would silently
+leave lines out.
+**Decision:** a terminal the app keeps in tmux attaches as a control-mode client (`tmux -C`/`-CC`), as iTerm2 does:
+tmux hands over every byte the pane's program writes (`%output`), and the terminal draws it as it draws a plain
+shell — complete history, the program's own alternate screen and mouse, and the session still survives
+disconnects and other devices. One session, one window, one pane per tab. The history load on attach carries
+over.
+**Status:** Implemented and committed 2026-10-19 (task note); installed in 0.4.482 and, with the slow-reattach fix,
+0.4.483 on the Mac and iPhone (the Vision Pro was unreachable). Route A's code was removed. Remote tabs use `-CC` on the SSH PTY; local panes use `-C` on pipes, because SwiftTerm's
+PTY reader left tmux's last bytes waiting under load (measured; the task note has the runs).

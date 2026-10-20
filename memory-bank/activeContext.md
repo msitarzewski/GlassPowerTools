@@ -29,9 +29,26 @@ use the disposable test VM only).
 | 6 | Upstream contributions (swift-nio-ssh, Citadel) | drafted locally for the owner's review; nothing sent |
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the Sparkle key made and the site live (2026-10-18); the Developer ID profiles and CloudKit's production schema done, and the dry run passed; remaining: the first release run, after the repository is public |
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
-| 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and started. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
+| 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-10-18 — RESUME HERE
+## 2026-10-19 — RESUME HERE
+
+**Committed at his word** ("update the memory bank and commit"); not pushed. 0.4.483 is on the Mac and iPhone; the
+Vision Pro was unreachable and still has 0.4.481. Next, his: "I have a fun exploration next."
+- **Today's work:** the largest text sizes, part two (`2026-10-19_large-text.md`); a wrapped paste joined again
+  (`2026-10-19_wrapped-paste.md`); the Mac Terminal Overview's "open elsewhere" ghosts; tmux tabs as control-mode
+  clients (D83), and the slow reattach 0.4.482 showed, fixed in 0.4.483 (`2026-10-19_tmux-scrollback.md`).
+- **Measured, nothing changed:** Metal against Core Graphics on the Mac; Core Graphics kept (`techContext.md`,
+  Terminal renderer; the benchmark is in the working-files folder, outside the repo).
+- **Open:**
+  - `TerminalPasteUITests` fails: on iPhone, step 2's review never appears; on iPad, step 3.
+  - The iPad terminal-size UI test's measure is unreliable.
+  - `LiveTmuxTests.claimedSessionSeesWhatATypedOneSees`: PATH differs on the Linux test VM.
+  - The app's interface against tmux not yet seen on the iPhone.
+  - The weekly dependency check fails on SwiftTerm 1.99 (an API port, later).
+  - TestFlight for 0.4.483 waits on his word.
+
+## 2026-10-18
 
 **His ask:** "I'd like the vision pro screen shots to have 78% transparency with about 50% medium glass. close the
 connections window so users can see why this was built. Do the same for Mac and let's get all 4 services for each

@@ -122,12 +122,14 @@ struct TerminalOverridesSettingsView: View {
                 GlassWindowSettingRow(TerminalWindowSettings.fontSize, overrides: $settings,
                                       global: Double(themeFont.fontSize), inheritsFrom: Source.allTerminals) { value in
                     GlassSettingLabeled("Font Size") {
-                        Slider(value: value, in: 10...24, step: 1) {
+                        Slider(value: value,
+                               in: Double(TerminalTheme.minimumFontSize)...Double(TerminalTheme.maximumFontSize),
+                               step: 1) {
                             Text("Font Size")
                         } minimumValueLabel: {
-                            Text("10")
+                            Text("\(Int(TerminalTheme.minimumFontSize))")
                         } maximumValueLabel: {
-                            Text("24")
+                            Text("\(Int(TerminalTheme.maximumFontSize))")
                         }
                         .frame(maxWidth: 280)
                         .accessibilityValue("\(Int(value.wrappedValue)) points")

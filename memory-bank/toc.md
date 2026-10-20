@@ -94,6 +94,12 @@ source applications are obsolete and no longer compile.
 | [A terminal window's sidebar adds to the window (D77)](tasks/2026-10/2026-10-16_additive-sidebars.md) | The app moves the window for its sidebar; the titlebar material's opening frame; no line at the edge; the toolbar hold built and reverted; the open 6 pt strip and its log |
 | [3D models (D78)](tasks/2026-10/2026-10-16_3d-models.md) | USDZ, USD and Reality files wherever files open: RealityKit, AR Quick Look, `Model3D` and Quick Look's volume on Vision Pro |
 | [A dropped screenshot that disappeared](tasks/2026-10/2026-10-16_drop-typing.md) | A waiting paste review turned drops away silently; every drop step logged |
+| [The App Store listing](tasks/2026-10/2026-10-18_app-store-listing.md) | Listing text, App Store Connect answers, privacy and support pages, the privacy manifest, store screenshots, TestFlight |
+| [The iPhone Duo, day one](tasks/2026-10/2026-10-18_duo-day-one.md) | Every page folded and unfolded on the Duo simulator; six problems found and fixed |
+| [Accessibility audit](tasks/2026-10/2026-10-18_accessibility-audit.md) | The App Store's accessibility labels: what the app can claim, five naming fixes |
+| [The largest text sizes](tasks/2026-10/2026-10-19_large-text.md) | Rows that stack, bars with the Large Content Viewer; the terminal's 28 pt, text following the system size |
+| [A wrapped paste joined again](tasks/2026-10/2026-10-19_wrapped-paste.md) | Detecting text a terminal program wrapped, "Join Wrapped Lines", when the review is skipped |
+| [tmux tabs keep their own history (D83)](tasks/2026-10/2026-10-19_tmux-scrollback.md) | Route A and why it lost lines, tmux's control mode as iTerm2 does it, the pipes for local panes, the O(n²) reattach |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

@@ -1140,8 +1140,9 @@ struct MacLocalTmuxTests {
             let none = try #require(TerminalTmux.repositoryCommand(session: "glass-5", repository: nil))
             // The note goes from a task of its own, after the title: under a full run's load the
             // title came first and the list was read with the second note still to come.
-            _ = await eventually { host.commands.filter { $0 != host.read }.count >= 2 }
-            #expect(host.commands.filter { $0 != host.read } == [kept, none],
+            // `tmux -V`, for control mode (D83), is a question of its own.
+            _ = await eventually { host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand }.count >= 2 }
+            #expect(host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand } == [kept, none],
                     "the read says the folder and repository too: no lookup or name query of its own: \(host.commands)")
             _ = window
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))

@@ -452,11 +452,15 @@ enum MacOverviewItemID: Hashable {
 }
 
 enum MacOverviewSessions {
-    /// Sessions open elsewhere: everything the app lists, minus the workgroups this window is
-    /// already showing as live tabs — those would be the same terminal twice, once as a preview
-    /// and once as a card.
-    static func others(_ all: [GlassOpenSession], excludingWorkgroups ids: [UUID]) -> [GlassOpenSession] {
+    /// Sessions open elsewhere: everything the app lists, minus what this window is already
+    /// showing as live tabs — those would be the same terminal twice, once as a preview and once as
+    /// a card. Its workgroups, and its terminals in no workgroup: a terminal Connect opens on a Mac
+    /// is in none, and its own window listed it again as open elsewhere (the owner, 2026-10-19:
+    /// "Staging and Production appear in all terminal windows").
+    static func others(_ all: [GlassOpenSession], excludingWorkgroups ids: [UUID],
+                       sessions: [UUID] = []) -> [GlassOpenSession] {
         let own = Set(ids.map { GlassTerminalCapability.sessionID(workgroupID: $0) })
+            .union(sessions.map { GlassTerminalCapability.sessionID(sessionID: $0) })
         return all.filter { !own.contains($0.id) }
     }
 }
@@ -520,7 +524,8 @@ struct MacTerminalOverview: View {
     private var others: [GlassOpenSession] {
         guard !workgroupOnly else { return [] }
         return MacOverviewSessions.others(runtime?.openSessions?() ?? [],
-                                          excludingWorkgroups: controller.tabs.compactMap(\.workgroupID))
+                                          excludingWorkgroups: controller.tabs.compactMap(\.workgroupID),
+                                          sessions: controller.tabs.flatMap { $0.sessionsByPaneID.values.map(\.id) })
     }
 
     private var items: [MacOverviewItem] {

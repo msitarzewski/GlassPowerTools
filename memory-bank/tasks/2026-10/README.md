@@ -144,3 +144,31 @@
   `progress.md`. A crash in database windows found in the VM, fixed in 0.4.476 (5c567dd), on all three devices.
 - 2026-10-18 (evening): the App Store listing begun — text, answers, privacy and support pages, the app's privacy
   manifest, store screenshots ([`2026-10-18_app-store-listing.md`](2026-10-18_app-store-listing.md)).
+- 2026-10-18 (night): every page on the iPhone Duo, folded and unfolded; six problems found and fixed (the tab strip
+  under iOS's status column, a stored "beside" preview without room, Favorites and Recent saying "No Connections",
+  panel titles, a table's pager pushing the workspace under the sidebar, the Markdown preview narrower than its pane)
+  ([`2026-10-18_duo-day-one.md`](2026-10-18_duo-day-one.md)). Committed 2026-10-19.
+- 2026-10-18 (night): the accessibility audit for the App Store's labels; five naming fixes, nothing visible changed;
+  no label can be declared yet ([`2026-10-18_accessibility-audit.md`](2026-10-18_accessibility-audit.md)). Committed 2026-10-19.
+- 2026-10-19: the largest text sizes, at his word — rows stack, bars stay one line with the Large Content Viewer,
+  names wrap ([`2026-10-19_large-text.md`](2026-10-19_large-text.md)). Committed 2026-10-19.
+- 2026-10-19: at his word ("Continue with that work, yes"): the terminal's largest font 24 → 28 points, the grid's
+  and terminal's text following the system text size (a switch for each, on by default, this device's), the iPad
+  editor's file list wider at accessibility sizes ([`2026-10-19_large-text.md`](2026-10-19_large-text.md), part
+  two). Committed 2026-10-19.
+- 2026-10-19: a paste of text a terminal program wrapped is joined again; "Join Wrapped Lines" in the paste review,
+  remembered; joined to one line, no review ([`2026-10-19_wrapped-paste.md`](2026-10-19_wrapped-paste.md)).
+  Committed 2026-10-19; its UI test does not pass yet.
+- 2026-10-19: selecting through a scroll in tmux tabs — route A built and measured (tmux skips lines when output
+  outruns it), then D83: tmux's control mode, built and installed in 0.4.482
+  ([`2026-10-19_tmux-scrollback.md`](2026-10-19_tmux-scrollback.md)). Committed 2026-10-19.
+- 2026-10-19: the Mac's Terminal Overview listed a window's own terminals again as "open elsewhere" when they came
+  from Connect, in no workgroup (the owner: "Staging and Production appear in all terminal windows"); its own
+  sessions are now left out (`MacOverviewSessions.others(sessions:)`, `MacWorkspaceTests`, red without the fix).
+  Installed in 0.4.481 (route A's wiring backed out first). Committed 2026-10-19.
+- 2026-10-19: 0.4.482 reattached the Mac's 26 tmux tabs slowly (the owner: "Why did it take so long? ... used to be
+  instant"): the screen reader's text read the whole buffer at every scrolled line. Fixed in 0.4.483, measured and
+  tested ([`2026-10-19_tmux-scrollback.md`](2026-10-19_tmux-scrollback.md)). Committed 2026-10-19.
+- 2026-10-19: Metal against Core Graphics for the Mac's terminals, at his word: measured with a Release benchmark
+  outside the repo; Core Graphics kept (`techContext.md`, Terminal renderer). macOS 27's own performance work is in
+  the system, nothing for the app to adopt.

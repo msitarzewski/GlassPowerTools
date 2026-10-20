@@ -21,6 +21,8 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
     /// Sections after the machines — Favorites' services, projects, workgroups and folders
     /// (2026-10-13). With any, the machines get a section of their own above them.
     private let extraSections: GlassLibraryExtraSections?
+    /// What the list says with nothing in it: the scope's own words (`GlassLibraryEmptyState`).
+    private let emptyState: GlassLibraryEmptyState
 
     /// Supply already scoped/filtered items from GlassLibraryProjection.
     public init(items: [GlassLibraryItem<ID>], title: String, selection: Binding<ID?>,
@@ -28,7 +30,9 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
                 @ViewBuilder row: @escaping (GlassLibraryItem<ID>) -> Row,
                 backgroundActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
                 onRefresh: (() async -> Void)? = nil,
-                extraSections: GlassLibraryExtraSections? = nil) {
+                extraSections: GlassLibraryExtraSections? = nil,
+                emptyState: GlassLibraryEmptyState = .of(.allConnections, libraryIsEmpty: true)) {
+        self.emptyState = emptyState
         self.items = items
         self.title = title
         _selection = selection
@@ -51,8 +55,8 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
                 // to size itself for a Mac list.
                 Group {
                     if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        ContentUnavailableView("No Connections", systemImage: "server.rack",
-                                               description: Text("Add a saved host to begin."))
+                        ContentUnavailableView(emptyState.title, systemImage: emptyState.systemImage,
+                                               description: Text(emptyState.message))
                     } else {
                         ContentUnavailableView.search(text: searchText)
                     }

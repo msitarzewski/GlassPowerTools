@@ -340,6 +340,19 @@ be measured headless with an `ImageRenderer` probe — `Tools/ChartProbe` is the
   iPad under Scale draws with Core Graphics too (D75). The Mac draws with SwiftTerm's Core Graphics: its
   `TerminalView` starts with Metal off and nothing in the Mac host turns it on (`setUseMetal` is called
   only in the UIKit section, `SwiftTermHostView.swift:3087`/`:3104`).
+  *Measured 2026-10-19, at his request:*
+  - **Setup:** SwiftTerm 1.20.0's Mac view, Release build, at 147×50 cells and 2×, on the M5 Max.
+    Off-screen, AppKit run loop. The harness is `~/Software/glass/tmp/render-bench`, outside the repo.
+  - **Power with the window on the current Space**, from CPU energy over six alternating rounds:
+    - full-screen truecolour at 60/s: Metal 0.40 W against Core Graphics 0.58 W;
+    - agent spinner: 0.05 W against 0.08 W;
+    - 3,000-line/s build log: 0.40 W against 0.43 W.
+  - **Instructions:** Metal executes 32–40% more (it shapes each row with CoreText as Core Graphics
+    does, then builds vertices). Core Graphics' extra cycles are memory-bound backing-store work.
+  - **With a video playing elsewhere,** Core Graphics was cheaper, at 0.32 W against 0.63 W.
+  - **Unmeasured:** Metal's own GPU time; the driver keeps no per-process figure for it.
+  - **Not switched:** the gain is small and depends on conditions. The Mac's terminal pictures
+    (`previewImage`, through `draw(_:)`) would go blank, and Scale and the glass would need verifying.
 
 ## Release and hosting, 2026-09-25 (D38, D39)
 

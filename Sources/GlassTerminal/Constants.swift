@@ -34,6 +34,8 @@ nonisolated enum UserDefaultsKeys {
     static let pathPreviews = "pathPreviews"
     static let whenResized = "whenResized"
     static let errorSuggestions = "errorSuggestions"
+    static let fontFollowsSystemTextSize = "fontFollowsSystemTextSize"
+    static let joinsWrappedPastes = "joinsWrappedPastes"
     static let windowOpacity = "windowOpacity"
     static let blurBackground = "blurBackground"
     static let interactiveGlassEffects = "interactiveGlassEffects"

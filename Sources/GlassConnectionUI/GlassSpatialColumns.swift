@@ -396,6 +396,9 @@ public struct GlassSpatialColumnHeader<Trailing: View>: View {
             }
             .menuIndicator(.hidden)
             .buttonStyle(.plain)
+            // Named outright: a menu with a drawn label reached VoiceOver on visionOS with no name
+            // (2026-10-18, AccessibilityAuditUITests).
+            .accessibilityLabel(title)
             .accessibilityAddTraits(.isHeader)
             .accessibilityHint("Shows the folders above this one")
             .accessibilityIdentifier("glass-column-title-menu")

@@ -296,6 +296,7 @@ public struct GlassKeyManagerPanel: View {
                 HStack(spacing: 10) {
                     GlassServiceIcon(GlassServicePresentation.symbol(for: use.service.kind))
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel(GlassServicePresentation.displayName(for: use.service.kind))
                         .frame(width: 20)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(use.service.displayName).lineLimit(1)

@@ -41,6 +41,9 @@ class SettingsManager {
     var showSidebarByDefault: Bool = true
     var editorFontSize: Double = 14.0
     var dataGridFontSize: Double = 13.0
+    /// The results grid's text grows and shrinks with the system's text size on an iPhone, an iPad
+    /// and Vision Pro (`GlassSystemTextSize`; the owner, 2026-10-19). On by default; this device's.
+    var dataGridFollowsSystemTextSize: Bool = true
     var showLineNumbers: Bool = true
     var autoFormatJSONInRecordEditor: Bool = true
     /// On unless turned off (2026-09-27): history is kept on disk, and a literal can be a password
@@ -97,6 +100,9 @@ class SettingsManager {
         if defaults.object(forKey: UserDefaultsKeys.dataGridFontSize) != nil {
             dataGridFontSize = defaults.double(forKey: UserDefaultsKeys.dataGridFontSize)
         }
+        if defaults.object(forKey: UserDefaultsKeys.dataGridFollowsSystemTextSize) != nil {
+            dataGridFollowsSystemTextSize = defaults.bool(forKey: UserDefaultsKeys.dataGridFollowsSystemTextSize)
+        }
         if defaults.object(forKey: UserDefaultsKeys.showLineNumbers) != nil {
             showLineNumbers = defaults.bool(forKey: UserDefaultsKeys.showLineNumbers)
         }
@@ -127,6 +133,7 @@ class SettingsManager {
         defaults.set(showSidebarByDefault, forKey: UserDefaultsKeys.showSidebarByDefault)
         defaults.set(editorFontSize, forKey: UserDefaultsKeys.editorFontSize)
         defaults.set(dataGridFontSize, forKey: UserDefaultsKeys.dataGridFontSize)
+        defaults.set(dataGridFollowsSystemTextSize, forKey: UserDefaultsKeys.dataGridFollowsSystemTextSize)
         defaults.set(showLineNumbers, forKey: UserDefaultsKeys.showLineNumbers)
         defaults.set(
             autoFormatJSONInRecordEditor,
