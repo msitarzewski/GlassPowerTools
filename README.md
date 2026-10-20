@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/msitarzewski/GlassPowerTools/releases/latest">Download for Mac</a> ·
   <a href="https://glasspowertools.com">Website</a> ·
   <a href="https://glasspowertools.com/help/">Help</a> ·
   <a href="https://glasspowertools.com/why.html">Why one app</a> ·
@@ -20,7 +21,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPLv3-c8102e" alt="Licence: GPLv3"></a>
   <img src="https://img.shields.io/badge/runs%20on-Vision%20Pro%20%7C%20Mac%20%7C%20iPad%20%7C%20iPhone-555" alt="Runs on Vision Pro, Mac, iPad and iPhone">
-  <img src="https://img.shields.io/badge/status-not%20released%20yet-e8a33d" alt="Status: not released yet">
+  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.493-2e7d32" alt="Mac: 0.4.493"></a>
   <a href="https://github.com/sponsors/msitarzewski"><img src="https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
@@ -112,6 +113,33 @@ The same app, with a local shell, menus and windows that are as see-through as y
   </tr>
 </table>
 
+## A terminal worth looking at
+
+You look at terminals all day, so each window can have a look of its own: a picture behind the text,
+Digital Rain that falls faster while the terminal prints, a Synthwave horizon, green or amber
+phosphor, a glow. The text comes first: a picture's bright patches are held down so even dim text
+reads over them, and the motion stops under Reduce Motion and Low Power Mode. On the Mac, iPad and
+Vision Pro, in a window's **This Window** settings.
+
+<table>
+  <tr>
+    <td width="50%"><img src="site/static/shots/mac-look-synthwave.webp" alt="A terminal window on a Mac in the Synthwave look: btop on alpha over a dark purple sky, a low sun and a glowing grid."></td>
+    <td width="50%"><img src="site/static/shots/mac-look-rain.webp" alt="A terminal window on a Mac in the Digital Rain look: btop on alpha in green, with falling green glyphs behind it."></td>
+  </tr>
+  <tr>
+    <td><sub><strong>Synthwave.</strong> A sun going down behind the process list.</sub></td>
+    <td><sub><strong>Digital Rain.</strong> It falls faster while the terminal prints.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="site/static/shots/mac-look-amber.webp" alt="A terminal window on a Mac in the Amber Phosphor look: btop on alpha drawn entirely in glowing amber."></td>
+    <td><img src="site/static/shots/mac-look-picture.webp" alt="A terminal window on a Mac with a made-up evening landscape behind btop, its text glowing amber."></td>
+  </tr>
+  <tr>
+    <td><sub><strong>Amber Phosphor.</strong> Every colour a program draws, in amber, 24-bit colour included.</sub></td>
+    <td><sub><strong>A picture of yours.</strong> Blurred, pixelated or toned to the theme if you like, with a glow on the text.</sub></td>
+  </tr>
+</table>
+
 ## iPad and iPhone
 
 The same library and the same machines. The iPhone gives each session the whole screen.
@@ -156,8 +184,11 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
 - **Terminal:** SSH with host-key pinning, password and key sign-in (including keys held in the
   Secure Enclave), tabs, splits, themes, workgroups, port forwarding, and an SFTP file browser. A
   local shell on the Mac. Terminals kept in tmux, on servers and on the Mac, outlive the app and can
-  be picked up on another device. Windows scale as well as resize, and on the Mac a file whose path
-  a terminal prints previews over it.
+  be picked up on another device, and with tmux 3.2 or later the terminal keeps every line itself, so
+  you scroll and select through the whole history. Windows scale as well as resize, and each can have
+  a look of its own. On the Mac, a file whose path a terminal prints previews over it, SQL it prints
+  opens in the query editor on that machine's database, and the folder button opens the shell's
+  folder in the Finder, Files or the Editor.
 - **Databases:** MySQL, PostgreSQL and SQLite — browse, filter and edit rows, follow foreign keys,
   see a live diagram of every table and key (in three dimensions on Vision Pro), write and explain
   queries (or ask the on-device assistant for one), reach a database directly with TLS, through its
@@ -171,7 +202,9 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   images, PDFs, video, audio and 3D models open as themselves. On the Mac it can be your default
   text editor.
 - **Everywhere you are:** the library, favorites, workgroups and projects sync through iCloud, and
-  credentials through iCloud Keychain; keys made in the Secure Enclave stay on their device. Active
+  credentials through iCloud Keychain; keys made in the Secure Enclave stay on their device. Your
+  Library shows the time you spend on each machine, added up across your devices, and a Mac knows its
+  own record in the library, so its Terminal opens a local shell rather than SSH to itself. Active
   and Show All Windows show what is open and running on every device; widgets, Siri and Shortcuts,
   Spotlight, Controls and Handoff reach your machines, and on the Mac so do the Finder's Services,
   toolbar button and Quick Action.
@@ -187,7 +220,8 @@ The [help](https://glasspowertools.com/help/) is written from the app's own code
 - **Terminal:** [connect](https://glasspowertools.com/help/terminal-connect.html),
   [keys and trust](https://glasspowertools.com/help/terminal-keys-and-trust.html),
   [tmux](https://glasspowertools.com/help/terminal-tmux.html),
-  [workgroups](https://glasspowertools.com/help/terminal-workgroups.html)
+  [workgroups](https://glasspowertools.com/help/terminal-workgroups.html),
+  [looks](https://glasspowertools.com/help/terminal-looks.html)
 - **Databases:** [add one](https://glasspowertools.com/help/database-add-service.html),
   [the workspace](https://glasspowertools.com/help/database-workspace.html),
   [the schema diagram](https://glasspowertools.com/help/database-schema-diagram.html)
@@ -208,13 +242,13 @@ claims on the website were checked against the code and its test records.
 
 ## Status
 
-Not released yet. It is in use daily and in release preparation; there is no download or TestFlight
-build today. What the first release holds, and what changed in the builds leading up to it, is in
+The Mac app is at 0.4.493 (its first release was 0.4.491): download it from
+[glasspowertools.com](https://glasspowertools.com) or this repository's
+[releases](https://github.com/msitarzewski/GlassPowerTools/releases). It is signed with a Developer ID,
+notarized by Apple, and updates itself through Sparkle. It cannot be in the Mac App Store, because a
+terminal cannot work inside App Sandbox. The iPhone, iPad and Vision Pro apps are in TestFlight for
+internal testing, and come to the App Store as 1.0. What each build holds is in
 [RELEASE-NOTES.md](RELEASE-NOTES.md).
-
-When it ships, the Mac app will be distributed directly (signed and notarized, with automatic
-updates) — it cannot be in the Mac App Store, because a terminal cannot work inside App Sandbox —
-and the iPhone, iPad and Vision Pro apps through TestFlight and then the App Store.
 
 ## Build it
 
@@ -226,7 +260,7 @@ Apple Developer team.
 
 The app talks to the servers you add and to iCloud, and to nothing else unless you connect a
 Tailscale account for device discovery, or open a link to a 3D model that a terminal printed; the
-released Mac app will also check its update feed. There are no analytics. Secrets live in the Keychain. See
+Mac app also checks its update feed. There are no analytics. Secrets live in the Keychain. See
 [SECURITY.md](SECURITY.md) for how credentials and connections are protected — and what is not
 protected — and how to report a vulnerability.
 

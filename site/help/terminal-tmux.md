@@ -23,12 +23,26 @@ The switch can only be turned on once a connection has found tmux on the machine
 - Closing the terminal leaves its session running on the machine, so closing it, its window, or quitting doesn't ask first (unless other terminals there would stop). To end it, end it from **Active** (below), or type `exit` in it.
 - In **Active**, a terminal in tmux says **in tmux** under its name, and swiping it offers **Detach** rather than **Close**. Its tools menu says **Detach** rather than **Disconnect**. Afterwards **Active** lists it under the machine as **Detached**.
 - **Open Folder Here** and the **AI Assistant** ask tmux which folder the shell is in, so they follow your `cd` inside tmux too.
-- Detaching from tmux yourself (its prefix key, then **d**) closes the terminal and leaves the session running.
+- With tmux older than 3.2, detaching from tmux yourself (its prefix key, then **d**) closes the terminal and leaves the session running. From 3.2 on, close the tab or choose **Detach** instead (see [The terminal keeps the whole session](#the-terminal-keeps-the-whole-session)).
 - A Workgroup remembers each terminal's session and opens on it again. Its startup command runs only when the session is new, never into one still running. See [Save and open terminal Workgroups](terminal-workgroups.md).
 - A new terminal never takes a session a saved Workgroup keeps on that machine.
 - **On Vision Pro, iPad and iPhone**, after the app quits, crashes or is updated, the terminal windows and sets holding terminals in tmux come back, each terminal on its own session (see [Work in a terminal](terminal-sessions.md#windows-and-tabs)).
 
 If the machine doesn't have tmux, the terminal says so and opens an ordinary shell instead.
+
+## The terminal keeps the whole session
+
+With tmux 3.2 or later on the machine, a terminal joins its session as tmux's control-mode client, as iTerm2's tmux integration does: tmux passes on everything the program in the session writes, and the terminal draws it itself. So a terminal in tmux behaves like any other terminal:
+
+- It keeps the session's history. When it opens on a session that was already running, it reads back what the session printed before, so you can scroll up to it, on any of your devices. Nothing is skipped when a program prints faster than the screen can redraw.
+- Scrolling, **Search** and **Select All** use that history, and a drag selects through a scroll.
+- A program that uses the mouse, such as `vim` or `htop`, gets it, whatever tmux's own mouse setting says.
+- tmux draws no status line. The tab's name says which session it is, and **on Mac** holding the pointer over a tab in the sidebar shows its session, machine, program and folder (see [Windows and tabs](terminal-sessions.md#windows-and-tabs)).
+- Every key goes to the program, tmux's prefix key included: tmux's own key bindings aren't used. To leave the session running, close the tab or choose **Detach**.
+- One pane of the session is shown: the one that is active. Splits and windows another tmux client makes in the session aren't shown.
+- The session's rows and columns follow the terminal's; for a session open in more than one place, see [One session in several places](#one-session-in-several-places).
+
+With tmux older than 3.2, the terminal attaches as an ordinary tmux client, as it always did: tmux draws the screen and keeps the history (see [Scroll back](#scroll-back)), and its prefix key and status line work as usual.
 
 ## Open a terminal without tmux
 
@@ -42,7 +56,9 @@ A basic terminal is never given a tmux session, and never asks whether to use tm
 
 ## Scroll back
 
-tmux keeps its own history, so scrolling over a terminal in tmux scrolls tmux's history: two fingers on a trackpad, a mouse wheel, a finger on iPad and iPhone, or pinch and drag on Vision Pro. Scroll back to the bottom, or press **q**, to return to typing. While you are scrolled back, keys go to tmux's history view rather than to the program.
+Scroll back over a terminal in tmux as over any terminal: two fingers on a trackpad, a mouse wheel, a finger on iPad and iPhone, or pinch and drag on Vision Pro. With tmux 3.2 or later, the terminal scrolls through the session's history, which it keeps itself (see [The terminal keeps the whole session](#the-terminal-keeps-the-whole-session)).
+
+With tmux older than 3.2, tmux keeps the history, so scrolling scrolls tmux's history view. Scroll back to the bottom, or press **q**, to return to typing. While you are scrolled back, keys go to tmux's history view rather than to the program.
 
 ## One session in several places
 
@@ -112,4 +128,4 @@ Under **tmux** in Settings ▸ **Terminal**, **Running in the background** shows
 
 If tmux was already running when you turned the setting on or updated the app, for example one you started in another terminal app, Glass Power Tools uses it as it is. The background process starts with the next tmux: after the Mac restarts, or after **End All Local Terminals…**.
 
-To reach these sessions from another device, turn on **Remote Login** on the Mac (System Settings, **General**, **Sharing**) and add the Mac to the library with a Terminal service that keeps sessions running with tmux. **Active** on your other devices then lists the Mac's sessions like any machine's. On the Mac itself, **Active** recognizes that machine as this Mac and lists its sessions once, under **This Mac**.
+To reach these sessions from another device, turn on **Remote Login** on the Mac (System Settings, **General**, **Sharing**) and add the Mac to the library with a Terminal service that keeps sessions running with tmux. **Active** on your other devices then lists the Mac's sessions like any machine's. On the Mac itself, **Active** recognizes that machine as this Mac and lists its sessions once, under **This Mac**, and its Terminal opens a local terminal rather than connecting to itself (see [When a machine in your library is this Mac](library-browse.md#when-a-machine-in-your-library-is-this-mac)).

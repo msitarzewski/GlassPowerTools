@@ -25,14 +25,15 @@ this repository's `PATCHES.md` files record what is changed locally.
 - **Syncing is iCloud's.** The host library syncs through CloudKit in your private database;
   credentials and host-key pins sync through iCloud Keychain. Favorites, workgroups, projects,
   terminal settings, and each device's name with how many connections it made per day to each
-  machine (no times of day), sync through iCloud's key-value store. Keys created in the **Secure
+  machine and how many minutes it was in use there (no times of day), sync through iCloud's
+  key-value store. Keys created in the **Secure
   Enclave** never leave the device they were made on and are never offered to another device.
 - **Nothing is sent anywhere else.** The app connects to the servers you add, to iCloud for sync,
   and, only if you connect a Tailscale account for device discovery, to Tailscale's API. A link a
   terminal prints is opened only after you confirm it; a link to a 3D model is then downloaded from
-  that address (http or https, at most 512 MB) and kept only if its bytes are a model's. The Mac app,
-  once released, also checks an update feed — Sparkle asks on its second launch whether to do so
-  automatically, and installs only updates signed with the project's key. It has no analytics or
+  that address (http or https, at most 512 MB) and kept only if its bytes are a model's. The Mac app
+  also checks its update feed — Sparkle asks on its second launch whether to do so automatically,
+  and installs only updates signed with the project's key. It has no analytics or
   telemetry. The editor's Markdown preview runs with a content security policy that
   allows no network access.
 

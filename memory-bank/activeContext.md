@@ -33,7 +33,21 @@ use the disposable test VM only).
 
 ## 2026-10-20 — RESUME HERE
 
-**Committed at his word** ("commit."); not pushed. 0.4.491 is on the Mac and iPhone; the Vision Pro unreachable.
+**Shipping** (his "Ship it!"; all three steps, his choice; the Mac at 0.4.491): `2026-10-20_first-mac-release.md`.
+- Pushed (ee8a8007..7f824f86). TestFlight 0.4.491 (491) uploaded for iPhone/iPad and Vision Pro.
+- Site and help brought current with D83–D87 and the release (his ask), with six looks pictures from the VM (his
+  "We need screens for the new terminal themes!"). Not yet committed or deployed.
+- **Released:** Mac 0.4.491 is on GitHub (v0.4.491, notarized dmg and zip) and in the live feed. The site is live (90
+  files checked). Its docs, pictures and feed are not committed yet.
+- **0.4.492, built at his word** ("fix that, and also allow a right on the folder icon…";
+  `2026-10-20_after-the-release.md`):
+  - Scale Text on local tabs.
+  - The folder button's Open in Editor (the machine's project that holds the folder, else a new editor). On the Mac
+    it's a split button with an arrow, as **+** is (his choice, 0.4.493). A Mac toolbar never shows `.contextMenu`.
+  - iCloud's signed-out words.
+  - Uncommitted. Releasing it and deploying its docs wait for his word.
+
+**Committed at his word** ("commit."); pushed with the ship. 0.4.491 is on the Mac and iPhone; the Vision Pro unreachable.
 - **Time in use (D87):** the overview counted only library Connects, not his days of tmux. Each minute with input or
   output now counts for its machine and kind, a Mac tab's local shells included, synced per day. The chart opens on
   hours. Built and tested; 0.4.490 (`2026-10-20_time-in-use.md`). Counting connects from every path is deferred.

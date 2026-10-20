@@ -15,8 +15,9 @@ When you are signed in to iCloud, the hosts you add on one device appear on your
 | Favorites | Your other devices: hosts, and the services, projects, workgroups and folders in **Favorites**. The exception is the star on the device's own host (**This Mac** and the others), which stays on the device. |
 | Terminal Workgroups | Your other devices, while **Sync terminal settings** is on (see [Workgroups](terminal-workgroups.md)) |
 | Terminal themes and terminal preferences | Your other devices, while **Sync terminal settings** is on (see [Terminal settings](terminal-settings.md#edit-a-theme)) |
-| How many connections the device made each day of the last 30, per machine and kind of service, and the device's name (for **Your Library**'s overview) | Your other devices, through iCloud |
+| How many connections the device made, and how many minutes it was in use, each day of the last 30, per machine and kind of service, and the device's name (for **Your Library**'s overview) | Your other devices, through iCloud |
 | The connection history itself (times of day), **Recent**, and which service **Connect opens** | This device only |
+| Which machine in your library is this Mac (see [When a machine in your library is this Mac](library-browse.md#when-a-machine-in-your-library-is-this-mac)) | This Mac only |
 | Window appearance (**Settings** ▸ **Appearance**) | This device only |
 
 > [!NOTE]
@@ -42,6 +43,7 @@ Settings shows the same status:
    - **Synced** followed by a time: the last sync finished then.
    - **Syncing…**: a sync is running.
    - **Waiting to sync**: no sync has finished since the app opened.
+   - **Not signed in to iCloud**: sign in with your Apple Account in **Settings** (**System Settings** on Mac), and the library syncs. The library's footer says **iCloud unavailable**. A restricted account, or one that needs your attention, says so the same way.
    - **Not synced —** followed by a reason: the last attempt failed. The library on this device is unchanged.
 
 ## When two devices disagree

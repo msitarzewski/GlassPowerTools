@@ -11,7 +11,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     <a class="button primary" href="help/terminal-connect.html">Connect over SSH</a>
     <a class="button" href="index.html">Back to the overview</a>
   </div>
-  <p class="status-note">Not released yet. Tested against OpenSSH 10.2 for shell, SFTP, and RSA and Ed25519 sign-in.</p>
+  <p class="status-note">In the Mac's release, 0.4.493; in TestFlight for iPhone, iPad and Vision Pro. Tested against OpenSSH 10.2 for shell, SFTP, and RSA and Ed25519 sign-in.</p>
 </section>
 
 <figure class="window-shot">
@@ -42,7 +42,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     </div>
     <div class="card">
       <h3>Sessions that keep running</h3>
-      <p>Keep a server's terminals in tmux, and a dropped connection or a closed app leaves the work running. <strong>Active</strong> lists those sessions on every device, to pick up, share or take over. On the Mac, local terminals can run in tmux too, in a background process, so quitting, updating or force quitting the app does not stop them. For a shell that ends when you close it, open a basic terminal, outside tmux.</p>
+      <p>Keep a server's terminals in tmux, and a dropped connection or a closed app leaves the work running. <strong>Active</strong> lists those sessions on every device, to pick up, share or take over. On the Mac, local terminals can run in tmux too, in a background process, so quitting, updating or force quitting the app does not stop them. With tmux 3.2 or later the terminal keeps every line itself, so you scroll and select through the whole history as in any other terminal. For a shell that ends when you close it, open a basic terminal, outside tmux.</p>
     </div>
     <div class="card">
       <h3>Every window at a glance</h3>
@@ -53,8 +53,12 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
       <p>Right-click an address or a path a terminal prints, or pinch and hold it on Vision Pro: open the link, open the file in the Editor, show it in the Finder or in Files, or watch a log file grow in a new tab. On the Mac, rest the pointer on a path to see its file over the terminal: code highlighted, Markdown rendered, pictures, PDFs and 3D models shown, from the Mac or the server. A link to a 3D model opens in 3D.</p>
     </div>
     <div class="card">
+      <h3>SQL into the query editor</h3>
+      <p>On the Mac, right-click a SQL statement a terminal printed, from a log, a migration or an AI coding agent, and open it in the query editor on that machine's database. It opens unrun in a new tab, with the table it names opened beside it.</p>
+    </div>
+    <div class="card">
       <h3>Resize or scale</h3>
-      <p>Make a window smaller and the terminal normally gets fewer rows and columns. Scale Text keeps them instead, and the text grows and shrinks with the window, so a 120 × 40 terminal stays 120 × 40 in a small window. On Vision Pro, the Mac and iPad.</p>
+      <p>Make a window smaller and the terminal normally gets fewer rows and columns. Scale Text keeps them instead, and the text grows and shrinks with the window, so a 120 × 40 terminal stays 120 × 40 in a small window. On Vision Pro, the Mac and iPad. Text goes up to 28 points, and on iPhone, iPad and Vision Pro it can follow the system's text size.</p>
     </div>
     <div class="card">
       <h3>Files over SFTP</h3>
@@ -71,6 +75,43 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
   </div>
 </section>
 
+<section class="band" id="looks">
+  <h2>Looks</h2>
+  <p class="intro">Give a terminal window a look of its own, in its This Window settings, on the Mac, iPad and Vision Pro. Start From sets a whole look at once; then change any part of it. The pictures here are from a Mac, where the looks have been checked; on iPad and Vision Pro they have not been looked at yet.</p>
+  <ul class="list">
+    <li><strong>Behind the text:</strong> a picture of yours, which can be blurred, pixelated and toned to the theme; Digital Rain, which falls faster while the terminal prints; a Synthwave horizon; or a Phosphor Screen.</li>
+    <li><strong>The text:</strong> green, amber or digital-green phosphor, which recolours everything a program draws, its own colours included; or Vaporwave's palette. A glow can follow the letters.</li>
+    <li><strong>Readable first:</strong> the window's Readability lays a scrim behind the text, and the bright parts of a picture are held down so even dim text reads over them. The motion stops under Reduce Motion, in Low Power Mode, and when the window is in the background.</li>
+  </ul>
+  <div class="gallery">
+    <figure>
+      <img class="window" src="static/shots/mac-look-rain.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Digital Rain look: btop on alpha drawn in green phosphor, with columns of falling green glyphs behind it.">
+      <figcaption><strong>Digital Rain.</strong> Green phosphor over falling glyphs.</figcaption>
+    </figure>
+    <figure>
+      <img class="window" src="static/shots/mac-look-synthwave.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Synthwave look: btop on alpha over a dark purple sky, a low sun and a glowing grid running to the horizon.">
+      <figcaption><strong>Synthwave.</strong> A sun going down behind the process list.</figcaption>
+    </figure>
+    <figure>
+      <img class="window" src="static/shots/mac-look-amber.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Amber Phosphor look: btop on alpha drawn entirely in amber, glowing, on black.">
+      <figcaption><strong>Amber Phosphor.</strong> Every colour btop draws, in amber.</figcaption>
+    </figure>
+    <figure>
+      <img class="window" src="static/shots/mac-look-green.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Green Phosphor look: btop on alpha drawn entirely in green, glowing, on black.">
+      <figcaption><strong>Green Phosphor.</strong> The screen of an old green terminal.</figcaption>
+    </figure>
+    <figure>
+      <img class="window" src="static/shots/mac-look-picture.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac with a picture behind its text: btop on alpha over an evening landscape of blue sky, purple mountains and a low sun, its text glowing amber.">
+      <figcaption><strong>A picture.</strong> Any picture of yours, here a made-up evening, with an amber glow on the text.</figcaption>
+    </figure>
+    <figure>
+      <img class="window" src="static/shots/mac-look-settings.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in Digital Rain, with its This Window settings open over it, showing its Look settings: Start From, Background, Intensity, Quicken with Output and Readability, then Text Palette and Text Glow.">
+      <figcaption><strong>This Window.</strong> Where a window's look is set.</figcaption>
+    </figure>
+  </div>
+  <p><a href="help/terminal-looks.html">Backgrounds and glowing text</a></p>
+</section>
+
 <section class="band">
   <h2>Pick up where you left off</h2>
   <p class="intro">With a machine's terminals kept in tmux, Active lists what runs there on every device: open on another device, detached, or open here. Choose one to join it, or take it over. A workgroup keeps each of its terminals' sessions, so after a quit, a crash or an update its windows come back on them with everything still running.</p>
@@ -85,7 +126,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 <section class="band">
   <h2>Small things that protect you</h2>
   <ul class="list">
-    <li>Pasting several lines, or more than 4,096 bytes, shows the text for review before it is sent.</li>
+    <li>Pasting several lines, or more than 4,096 bytes, shows the text for review before it is sent. Text a program wrapped to its width, such as an AI coding agent's, can be joined back into its lines there.</li>
     <li>Older algorithms, such as SHA-1 key exchange and AES-CTR, are off. You can turn them on for one host, and you are asked each time you connect.</li>
     <li>Recording keyboard input is a separate choice from recording output, and the terminal shows <strong>INPUT REC</strong> while it runs.</li>
     <li>The command assistant, where Apple Intelligence is available, shows the exact command and asks before sending it.</li>
@@ -95,13 +136,13 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 
 <section class="band">
   <h2>On each device</h2>
-  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-10-17 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.471. Not every newer change has been tried on the headset yet, and Scale Text on iPad only in Apple's simulator.</p>
+  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-10-20 the Mac and the iPhone ran 0.4.493, and the Vision Pro 0.4.481. Not every newer change has been tried on the headset yet, and Scale Text on iPad only in Apple's simulator.</p>
   <div class="two">
     <div>
       <h3>Vision Pro</h3>
       <p>Each connection opens its own window, named after the machine. One button steps a window through tabs, grid and carousel. A window can shrink into a small glass orb with its terminal live inside, and its tabs as dots around it; pinch one to bring the window back on that tab. Select text as Apple's own apps do, with pinches or a trackpad, even while tmux has the mouse. Focus Mode dims the room around you.</p>
       <h3>Mac</h3>
-      <p>A terminal window with tabs and split panes, keyboard shortcuts, a command palette that reaches every machine and service, and a local shell. The plus button lists the terminals already running on each machine, to open one as a tab. Opening the tab sidebar widens the window rather than taking room from the terminal, so its rows and columns stay as they are. Programs such as Claude Code draw smoothly: the terminal answers the questions they ask before they draw, and takes each screen update as one frame.</p>
+      <p>A terminal window with tabs and split panes, keyboard shortcuts, a command palette that reaches every machine and service, and a local shell. The plus button lists the terminals already running on each machine, to open one as a tab, and each tab's tooltip names its tmux session, machine, program and folder. When a machine in your library is this Mac, its Terminal opens a local shell rather than an SSH connection to itself. Opening the tab sidebar widens the window rather than taking room from the terminal, so its rows and columns stay as they are. Programs such as Claude Code draw smoothly: the terminal answers the questions they ask before they draw, and takes each screen update as one frame.</p>
     </div>
     <div>
       <h3>iPad and iPhone</h3>
@@ -119,7 +160,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     <li>The SSH config importer reads explicit <code>Host</code> entries. <code>Match</code>, <code>Include</code> and wildcard entries are skipped and reported. It never reads key files.</li>
     <li>SFTP uploads and downloads files, not folders. Delete removes a folder only when it is empty.</li>
     <li>On the Mac, a workgroup that includes a legacy-algorithm connection does not open. Open that connection directly.</li>
-    <li>On the Mac, Scale Text works for terminals on other machines. A terminal on the Mac itself always changes its rows and columns with its window. iPhone has no Scale Text.</li>
+    <li>iPhone has no Scale Text: its terminal fills the screen.</li>
   </ul>
 </section>
 
@@ -133,6 +174,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     <a class="card" href="help/terminal-files.html"><h3>Files over SFTP</h3><p>Browse, transfer and edit files on a server.</p></a>
     <a class="card" href="help/terminal-port-forwarding.html"><h3>Port forwarding</h3><p>Local, remote and SOCKS5 forwards.</p></a>
     <a class="card" href="help/terminal-workgroups.html"><h3>Workgroups</h3><p>Save sets of terminals and open them together.</p></a>
+    <a class="card" href="help/terminal-looks.html"><h3>Backgrounds and glowing text</h3><p>A window's look: pictures, Digital Rain, Synthwave, phosphor, glow.</p></a>
     <a class="card" href="help/terminal-settings.html"><h3>Settings and themes</h3><p>Connections, themes, snippets, SSH config import, Tailscale.</p></a>
     <a class="card" href="help/library-ssh-keys.html"><h3>Manage SSH keys</h3><p>Import, generate, copy and delete keys.</p></a>
   </div>

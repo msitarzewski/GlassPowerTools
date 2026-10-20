@@ -146,6 +146,37 @@ dock() {  # hide | show
   timeout 60 $VM ssh "defaults write com.apple.dock autohide -bool $([[ $1 == hide ]] && echo true || echo false); killall Dock" >/dev/null 2>&1 || true
   sleep 3
 }
+# `looks`: the terminal's looks (D84), each over the btop-style monitor, as mac-look-<name>.webp. A look draws its
+# own colours, so each is taken once, in the dark appearance. `--demo-look` takes a Start From look, or `none` with
+# settings after it; `picture` puts the made-up landscape (landscape.py) behind the text, with Readability low
+# enough for the landscape to show; `settings` is This Window open on a terminal in Digital Rain, its form scrolled
+# to the Look section. Connections is minimised, not closed: with `--demo-close-connections` and `--demo-look`
+# together no terminal window opened (2026-10-20). LOOKS="picture settings" takes only those.
+typeset -A LOOK
+LOOK=(rain digitalRain  synthwave synthwave  amber amberPhosphor  green greenPhosphor
+      picture "none,intensity=1,readability=0.15,glow=0.3,glowColor=amber"  settings digitalRain)
+LOOK_NAMES=(${=LOOKS:-rain synthwave amber green picture settings})
+looks() {
+  python3 -I Tools/Screenshots/landscape.py "$RAW/landscape.png" >/dev/null
+  timeout 60 $VM copy-in "$RAW/landscape.png" /Users/admin/Pictures >/dev/null
+  appearance dark
+  for look in $LOOK_NAMES; do
+    local -a extra=()
+    [[ $look == picture ]] && extra=(--demo-picture /Users/admin/Pictures/landscape.png)
+    if [[ $look == settings ]]; then
+      SETTLE=16 launch terminal --demo-look "'${LOOK[$look]}'" --demo-look-settings
+    else
+      SETTLE=16 launch btop --demo-look "'${LOOK[$look]}'" $extra
+    fi
+    alone alpha
+    place 1240 780
+    if [[ $look == settings ]]; then
+      events "tell process \"$APP\" to set value of scroll bar 1 of scroll area 1 of group 1 of sheet 1 of window 1 to 0.36"
+      sleep 2
+    fi
+    capture "look-$look" alpha
+  done
+}
 
 names=("$@")
 # `workgroups` and `workspace` are there to name, not in the default set: the Mac's workgroup detail cuts its
@@ -155,6 +186,7 @@ names=("$@")
 prepare
 [[ -n ${(M)names:#database} || -n ${(M)names:#diagram} || -n ${(M)names:#workspace} ]] && shop
 for name in $names; do
+  [[ $name == looks ]] && { looks; continue; }
   [[ -n ${SURFACE[$name]:-} || $name == workspace ]] || { echo "unknown shot: $name"; exit 2; }
   for look in dark light; do
     appearance $look

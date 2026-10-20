@@ -8,6 +8,8 @@ Choose **SQL Editor** in the workspace's toolbar or in the overview. Each SQL do
 
 **On Mac:** **File ▸ New SQL Document** is ⌘N while a database workspace is in front.
 
+**On Mac**, SQL a terminal shows can open here too: right-click it and choose **Open in SQL Editor**. It opens in a new SQL document on the terminal machine's database, without running, with the table it names opened beside it. See [Open SQL in the SQL editor](terminal-sessions.md#open-sql-in-the-sql-editor-mac).
+
 As you type, a row of suggestions under the editor offers keywords, functions and the names of tables and columns in the active database; choose one to insert it. **On Mac:** a dimmed completion is also shown at the cursor; press Tab to accept it.
 
 Unsaved SQL is kept as a draft and comes back the next time you open a workspace on the same service.

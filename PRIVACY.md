@@ -15,8 +15,8 @@ Last changed 18 October 2026. Every change to this page is recorded in the publi
   kept in the Keychain, and sync through iCloud Keychain. Keys made in the Secure Enclave never leave
   the device that made them.
 - **Favorites, workgroups, projects and terminal settings** sync through iCloud's key-value storage.
-  So do each device's name and how many connections it made per day to each machine, with no times
-  of day, for the library's overview of the last 30 days.
+  So do each device's name, how many connections it made per day to each machine, and how many
+  minutes it was in use on each, with no times of day, for the library's overview of the last 30 days.
 - **On the device only:** query history (with literal values removed unless you turn that off), SQL
   drafts, session recordings you choose to make, and the app's diagnostic logs. Files you download
   stay where you put them.

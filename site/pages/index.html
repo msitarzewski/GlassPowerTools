@@ -10,11 +10,12 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
   <p class="tagline">The machines you work on, in one list.</p>
   <p class="lede">Terminals, databases, remote desktops and an editor, for Apple Vision Pro, Mac, iPad and iPhone. You add a machine once. Each machine lists its services, and Connect opens the one you want.</p>
   <div class="cta">
-    <a class="button primary" href="help/index.html">How to use it</a>
+    <a class="button primary" href="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.493/GlassPowerTools-0.4.493.dmg">Download for Mac</a>
+    <a class="button" href="help/index.html">How to use it</a>
     <a class="button" href="why.html">Why one app</a>
     <a class="button" href="security.html">Security</a>
   </div>
-  <p class="facts">Not released yet · Vision Pro, Mac, iPad and iPhone · GPLv3 licence · nothing to sign up for · no analytics, no telemetry</p>
+  <p class="facts">Mac 0.4.493, for macOS 26 on Apple silicon · iPhone, iPad and Vision Pro in testing · GPLv3 licence · nothing to sign up for · no analytics, no telemetry</p>
 </header>
 
 <figure class="window-shot">
@@ -31,7 +32,7 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
     </div>
     <div>
       <p>The Mac, iPad and iPhone apps are the same app, adapted to each device. The Mac adds a local shell and menus. The iPhone gives each session the whole screen.</p>
-      <p>An honest note on testing. The current build is used every day on a Mac and an iPhone, and the headset runs it too: on 2026-10-18 all three had 0.4.476. Not every newer change has been checked on the headset yet.</p>
+      <p>An honest note on testing. The current build is used every day on a Mac and an iPhone, and the headset runs it too: on 2026-10-20 the Mac and iPhone had 0.4.493, the headset 0.4.481. Not every newer change has been checked on the headset yet.</p>
     </div>
   </div>
   <div class="gallery">
@@ -94,6 +95,22 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 </section>
 
 <section class="band">
+  <h2>A terminal worth looking at</h2>
+  <p class="intro">You look at terminals all day, so each window can have a look of its own: a picture behind the text, Digital Rain that quickens while the terminal prints, a Synthwave horizon, green or amber phosphor, a glow. The text comes first: bright patches are held down so it stays readable, and the motion stops under Reduce Motion and Low Power Mode. On the Mac, iPad and Vision Pro.</p>
+  <div class="gallery">
+    <figure>
+      <img class="window" src="static/shots/mac-look-synthwave.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Synthwave look: btop on alpha over a dark purple sky, a low sun and a glowing grid running to the horizon, its text in pinks, greens and blues.">
+      <figcaption><strong>Synthwave.</strong> btop on alpha, over a horizon that never ends.</figcaption>
+    </figure>
+    <figure>
+      <img class="window" src="static/shots/mac-look-rain.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Digital Rain look: btop on alpha drawn in green, with columns of falling green glyphs behind it.">
+      <figcaption><strong>Digital Rain.</strong> It falls faster while the terminal prints.</figcaption>
+    </figure>
+  </div>
+  <p><a href="terminal.html#looks">Every look</a></p>
+</section>
+
+<section class="band">
   <h2>What it does</h2>
   <p class="intro">Four tools share one library. You add a machine once, with its address. Then you add the ways in: a terminal, a database, a desktop. The address, keys and trust you set up once are used by every tool that needs them.</p>
   <div class="grid">
@@ -120,7 +137,7 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
     <a class="card" href="help/library-browse.html">
       <span class="glyph" aria-hidden="true">☰</span>
       <h3>The library</h3>
-      <p>One list of hosts, with favorites, collections and search. It syncs through iCloud. Credentials sync through iCloud Keychain. Widgets show your machines and what's open, and Show All Windows shows every open session as a live picture.</p>
+      <p>One list of hosts, with favorites, collections and search. It syncs through iCloud. Credentials sync through iCloud Keychain. Your Library shows the time you spend on each machine, across your devices. Widgets show your machines and what's open, and Show All Windows shows every open session as a live picture.</p>
     </a>
   </div>
 </section>
@@ -153,7 +170,7 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 
 <section class="band">
   <h2>What leaves your devices</h2>
-  <p class="intro">Today the app connects to three kinds of place, and no others. When the Mac app ships it will also check an update feed; it asks on its second launch whether to do that automatically.</p>
+  <p class="intro">The app connects to three kinds of place, and no others. The Mac app also checks its update feed on this site, and asks on its second launch whether to do that automatically.</p>
   <ul class="list">
     <li><strong>The servers you add.</strong> Only when you connect to them.</li>
     <li><strong>iCloud.</strong> Your host library syncs through your private iCloud database. Passwords, keys and host-key pins sync through iCloud Keychain, except a password you protect with Face ID or Touch ID, which stays on its device. Keys made in the Secure Enclave never leave the device they were made on.</li>
@@ -167,14 +184,14 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
   <h2>What it asks of you</h2>
   <div class="two">
     <div>
-      <h3>Today</h3>
-      <p>It is not released. It is in daily use and being prepared for release. If you want it now, you build it from source. You need a Mac with Apple silicon and Xcode 27, and you sign it under your own Apple Developer team.</p>
-      <p>It runs on macOS 26, iOS and iPadOS 26, and visionOS 26 or later.</p>
+      <h3>On the Mac</h3>
+      <p><a href="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.493/GlassPowerTools-0.4.493.dmg">Download 0.4.493</a>. It is signed with a Developer ID, notarized by Apple, and updates itself through Sparkle. It is not in the Mac App Store, because a terminal cannot work inside App Sandbox: it has to start your shell and reach your files, tools and SSH agent. It needs macOS 26 on a Mac with Apple silicon.</p>
+      <p>It is early. It is used every day, and what has been checked, and what has not, is written down. Expect rough edges, and <a href="support.html">report what you find</a>.</p>
     </div>
     <div>
-      <h3>When it ships</h3>
-      <p>The Mac app will be signed with a Developer ID, notarized by Apple, and updated through Sparkle. It will not be in the Mac App Store, because a terminal cannot work inside App Sandbox. It has to start your shell and reach your files, tools and SSH agent.</p>
-      <p>The iPhone, iPad and Vision Pro apps will come through TestFlight, then the App Store.</p>
+      <h3>iPhone, iPad and Vision Pro</h3>
+      <p>They are in TestFlight for internal testing, and will come to the App Store as 1.0, with the Mac at 1.0 too. They need iOS and iPadOS 26, or visionOS 26.</p>
+      <p>You can also build any of them from source. You need a Mac with Apple silicon and Xcode 27, and you sign it under your own Apple Developer team.</p>
     </div>
   </div>
 </section>
@@ -195,7 +212,7 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 
 <section class="band">
   <h2>Who made it</h2>
-  <p>One developer, Michael Sitarzewski, whose name is on the licence. Nothing is sold today, because nothing is released. The app's About page has a Sponsor link.</p>
+  <p>One developer, Michael Sitarzewski, whose name is on the licence. Nothing is sold: the app is free. The app's About page has a Sponsor link.</p>
   <p>If people use it, the author gains standing from it. That is a real interest, so it is written down here.</p>
 </section>
 

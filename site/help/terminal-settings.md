@@ -1,6 +1,6 @@
 # Terminal settings, themes and snippets
 
-The terminal adds three pages to Settings: **Connections**, **Terminal** and **Snippets**. This page covers what each controls, editing themes, giving a terminal window its own settings, importing an SSH config file, and Tailscale.
+The terminal adds three pages to Settings: **Connections**, **Terminal** and **Snippets**. This page covers what each controls, editing themes, giving a terminal window its own settings and look, importing an SSH config file, and Tailscale.
 
 ## Connections
 
@@ -17,7 +17,8 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 
 - **Theme**: the current theme and its font. **Edit Theme** opens the theme editor.
 - **Canvas**: a tint for the terminal background. **Opacity**, **Glass** and **Material** are shared with every window and set in Settings under **Appearance**. A window can keep its own of these and more; see [Give a terminal window its own settings](#give-a-terminal-window-its-own-settings).
-- **Font Family** (**SF Mono**, **Monaco**, **Menlo** or **Courier New**) and **Font Size** (10 to 24 points).
+- **Font Family** (**SF Mono**, **Monaco**, **Menlo** or **Courier New**) and **Font Size** (10 to 28 points).
+- **On iPhone, iPad and Vision Pro**, **Scale with System Text Size** (on by default): **Font Size** is the size at the standard text size, and a larger text size in the system's Settings makes the terminal's text larger too. Turn it off to keep the terminal at **Font Size** whatever the system's text size. It is kept on this device only.
 - **Initial Terminal Size**: **Columns** and **Rows** for a new terminal before its window is measured.
 - **On Vision Pro, Mac and iPad**, **Resizing**: **When a window is resized**, choose **Change Rows and Columns** (the starting setting), where a smaller window holds fewer and the program redraws to fit, or **Scale the Text**, where the terminal keeps its rows and columns and its text grows and shrinks with the window. **Scale Text** in a window's bar switches that window alone. See [Scale the text with the window](terminal-sessions.md#scale-the-text-with-the-window).
 - **Cursor Style** (**Block**, **Underline** or **Bar**) and **Blinking cursor**.
@@ -43,6 +44,7 @@ Anything about how a terminal window looks and behaves can be set for that windo
 
 - **Appearance**: **Opacity**, **Glass** and a **Glass Tint**. **On iPad**, also **Material**.
 - **Theme**: any theme from your theme library, its **Font Family** and its **Font Size**.
+- **Look** and **Text**: a background behind the text (a picture, **Digital Rain**, **Synthwave** or **Phosphor Screen**), **Readability**, a **Text Palette** and a **Text Glow**, or a whole look from **Start From**. See [Backgrounds and glowing text](terminal-looks.md).
 - **Cursor**: **Cursor Style** and **Blinking cursor**.
 - **When resized** (**on Vision Pro, Mac and iPad**): **Change Rows and Columns** or **Scale the Text**. **Scale Text** in the window's bar changes this setting.
 - **Show previews** (**on Mac**): **Never**, **Mouseover** or **Mouseover + Space**.

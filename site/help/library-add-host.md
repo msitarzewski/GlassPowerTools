@@ -42,6 +42,8 @@ If the host has no address yet, the sheet asks for one. The address is saved on 
 
 Services are not changed from this sheet. Use the buttons beside each service instead.
 
+**On Mac**, the sheet also has **This is this Mac**, for the machine that is the Mac you are using. It takes effect at once, on this Mac only; see [When a machine in your library is this Mac](library-browse.md#when-a-machine-in-your-library-is-this-mac).
+
 ## Remove a service
 
 1. Select the host.

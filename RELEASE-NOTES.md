@@ -1,18 +1,23 @@
 # Release notes
 
-Glass Power Tools has not had a public release yet. These notes say what the first release holds and
-what changed in the builds leading up to it, and are kept current as the work lands. Builds before
-the release are numbered 0.4.*n* and run on the maintainer's own Mac, iPhone and Vision Pro; from
-0.4.479 they also go to TestFlight for internal testing. There is no public download yet; the first
-App Store release will be 1.0. What is verified, and how, is in
-[memory-bank/progress.md](memory-bank/progress.md).
+The Mac app's first release was 0.4.491, and the latest is 0.4.493 (both 20 October 2026): a download from
+[glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
+updated through Sparkle. iPhone, iPad and Vision Pro builds go to TestFlight for internal testing; their
+first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
+then. These notes say what the app holds and what changed in each build, and are kept current as the
+work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## The first release (not yet released)
+## What it holds (0.4.493)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
   choosing among them. Favorites (machines, services, projects, workgroups and folders), collections,
   tags, other names, search, and an overview of what is reachable.
+- Your Library shows the time you spend on each machine: every minute with typing or output counts,
+  per machine and kind of service, added up across your devices, with the connections you made beside
+  it.
+- On a Mac, the library's record of that same Mac is recognised (by its SSH host key, or you say so):
+  its Terminal opens a local shell, its databases are the Mac's own, and its sessions are listed once.
 - Active lists what is open and what is still running on your machines, on every device; Show All
   Windows lays out every window and tab as cards, grouped by machine, with live pictures.
 - The library, favorites, workgroups and projects sync through iCloud; credentials and trusted host
@@ -23,12 +28,22 @@ App Store release will be 1.0. What is verified, and how, is in
   port forwarding (local, remote, SOCKS5) and an SFTP file browser. A local shell on the Mac.
 - Terminals kept in tmux, on servers and on the Mac, so they outlive the app and the device: pick a
   session up from Active on another device, or add it to a window as a tab. Basic terminals outside
-  tmux when you want one.
+  tmux when you want one. With tmux 3.2 or later the terminal keeps every line itself: its whole
+  history, a drag that selects through a scroll, and the mouse for full-screen programs.
+- Looks for a terminal window: a picture behind the text, Digital Rain that quickens while the
+  terminal prints, a Synthwave horizon or a phosphor screen; green or amber phosphor text, a glow, and
+  Vaporwave's colours, on the Mac, iPad and Vision Pro. Readability keeps the text legible over any
+  of them.
+- On the Mac, right-click SQL a terminal printed and open it in the query editor on that machine's
+  database, not yet run, with the table it names opened beside it.
+- A terminal's folder button opens the shell's folder in the Finder (or Files, on another machine) or
+  in the Editor: the project that holds it, or a new window.
 - Windows with tabs and splits, named by what runs in them (repository and branch included), themes,
   workgroups, a window's own look and settings, find, paste review, snippets and recording. Windows
   and their tabs come back after a relaunch on every device.
 - Terminals that scale as well as resize: Scale Text keeps the rows and columns and scales the text,
-  and ⌘+, ⌘− and ⌘0 size the window (on the Mac, SSH terminals; not yet the local shell).
+  and ⌘+, ⌘− and ⌘0 size the window. Text up to
+  28 points; on iPhone, iPad and Vision Pro it can follow the system's text size.
 - On the Mac, a file whose path a terminal prints previews over the terminal; files dropped on a
   terminal have their paths typed, and on a server they are uploaded first. AI coding agents are
   recognised on tabs and cards.
@@ -70,6 +85,53 @@ App Store release will be 1.0. What is verified, and how, is in
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.492 – 0.4.493 (20 October 2026)
+- **0.4.493 is the Mac's second release**, through Sparkle, and TestFlight build 493.
+- **Scale Text on the Mac's own terminals**, tmux tabs included. A local tab ignored Scale Text: the
+  view that draws it never had the part that keeps the rows and columns. Now the bar's Scale Text and
+  ⌘+, ⌘− and ⌘0 work there as on a terminal on another machine.
+- **A terminal's folder button has a menu on the Mac**, an arrow beside it as **+** has: **Open in
+  Finder** (or **Open in Files** on another machine) and **Open in Editor**. Open in Editor opens the
+  project on that machine whose folder is the shell's, or holds it; otherwise the folder, in a new
+  Editor window on this Mac or as a project on another machine. The pinch-and-hold menu Vision Pro has
+  was meant as a right-click on the Mac, which a Mac toolbar never shows.
+- **Not signed in to iCloud says so.** A Mac without an Apple Account showed "iCloud sync failed" and
+  CloudKit's own words; the library now says iCloud is unavailable and to sign in.
+
+### 0.4.481 – 0.4.491 (19 – 20 October 2026)
+- **0.4.491 is the first Mac release.** The same build went to TestFlight for iPhone, iPad and
+  Vision Pro.
+- **Your Library counts time in use.** It counted one connection per Connect, however long the
+  session stayed open, so days of work in tmux showed as one. Now each minute with typing or output
+  counts for its machine and kind of service, a Mac's local terminals included. The overview opens on
+  Time in Use (hours per day, and the machines you use most by time), with Connections beside it.
+  Minutes are counted from 0.4.490.
+- **A Mac knows its own record in the library.** When a machine in the library is this Mac (its SSH
+  host key is the Mac's own, or you say so in its editor), its Terminal opens a local shell instead of
+  SSH to itself, its databases are the Mac's, Active lists its sessions once, and Screen Sharing to
+  itself isn't offered.
+- **Terminal looks** (Mac, iPad and Vision Pro; looked at on the Mac so far): backgrounds (a picture, which can be blurred, pixelated and toned to the theme;
+  Digital Rain; Synthwave; a Phosphor Screen), text palettes (green, amber and digital-green phosphor,
+  Vaporwave), a glow, and Start From looks that set them together. A picture's bright patches are
+  held down so text stays legible, and motion stops under Reduce Motion, in Low Power Mode and in the
+  background.
+- **SQL from a terminal (Mac):** right-click a statement a terminal printed ▸ Open in SQL Editor, a
+  menu when the machine has several databases. The SQL opens unrun in a new query tab, and the table
+  it names is found and opened.
+- **tmux tabs keep every line.** A terminal kept in tmux attaches as tmux's control-mode client, as
+  iTerm2 does: the terminal keeps its own complete history, a drag selects through a scroll, and
+  full-screen programs get the mouse. tmux older than 3.2 attaches as before. Reattaching a tab with
+  a long history is quick (2,000 lines took 15 seconds before).
+- **A new tmux tab's cursor sits on its prompt.** It was one row above it in a terminal taller than
+  tmux's pane. A resize while the tab opens, and a change of font size, now reach tmux.
+- Mac tab rows name each terminal's tmux session, machine, program and folder in a tooltip.
+- **The largest text sizes:** the terminal's font goes to 28 points, and on iPhone, iPad and Vision Pro
+  grid and terminal text follow the system's text size (a switch for each, on by default). The iPad editor's file list is wider at
+  accessibility sizes.
+- **A paste of text a program wrapped is joined again:** Join Wrapped Lines in the paste review,
+  remembered; a paste that joins to one line skips the review.
+- The Mac's Terminal Overview no longer lists a window's own terminals as open elsewhere.
 
 ### 0.4.480 (18 October 2026)
 - **On iPad, opening a database no longer stops the app.** The database's window, which an iPad

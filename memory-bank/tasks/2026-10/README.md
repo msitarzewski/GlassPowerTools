@@ -195,4 +195,4 @@
   the cursor from the top in a terminal taller than the pane; a resize during the start and font size changes never
   reached tmux. All three fixed and tested; 0.4.491 ([`2026-10-19_tmux-scrollback.md`](2026-10-19_tmux-scrollback.md)).
   Not committed.
-
+- 2026-10-20 — [Ship it: the first Mac release, TestFlight 491, site and help](2026-10-20_first-mac-release.md); [after the release: Scale on local tabs, the folder's Open in Editor, iCloud's words](2026-10-20_after-the-release.md)
