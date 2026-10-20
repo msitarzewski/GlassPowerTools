@@ -287,6 +287,24 @@ public final class GlassEditorProjectLibrary {
             .project
     }
 
+    /// The project a folder belongs to, on any of `hostIDs` (one machine can be named more than
+    /// one way: This Mac is nil, its own record, and the library machine it is, D86): the project
+    /// at that folder, else the nearest one whose folder holds it. A terminal's Open in Editor
+    /// (2026-10-20, the owner: "opens the Project with the same server/path or it opens a new
+    /// Editor with pwd at the working directory"): a shell in a project's subfolder is still in
+    /// that project.
+    public func project(containing path: String, on hostIDs: [HostID?]) -> GlassEditorProject? {
+        let wanted = GlassEditorProject.normalized(path)
+        return payload.records
+            .filter { record in !record.isDeleted && hostIDs.contains(record.project.hostID) }
+            .map(\.project)
+            .filter { project in
+                project.path == wanted || project.path == "/"
+                    || wanted.hasPrefix(project.path + "/")
+            }
+            .max { $0.path.count < $1.path.count }
+    }
+
     // MARK: Writing
 
     /// Records that a project was opened, adding it or moving it to the front.

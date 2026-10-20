@@ -147,6 +147,11 @@ public final class GlassTerminalRuntime {
     /// What "Open in Editor" does to a folder in the Files browser. Set by the composition root;
     /// nil means nothing can open a project here and the menu item is not offered.
     public var openFolderAsProject: GlassOpenFolderAsProject?
+    /// A terminal's folder button, right-clicked ▸ Open in Editor (2026-10-20): the project on that
+    /// machine whose folder is or holds the shell's, or else the folder itself in a new editor
+    /// window. `serverID` nil is this Mac's own shell. Set by the composition root; nil where no
+    /// editor is wired in, and then not offered.
+    public var openWorkingFolderInEditor: (@MainActor (_ serverID: UUID?, _ path: String) -> Void)?
     /// Favorites, for Files' star and a workgroup's (2026-10-13). Supplied by the composition root.
     public var favorites: GlassFavoritesAccess?
 

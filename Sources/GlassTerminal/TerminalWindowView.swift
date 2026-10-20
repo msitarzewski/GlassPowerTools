@@ -590,16 +590,18 @@ struct TerminalWindowView: View {
         }
     }
 
-    /// Opens a folder on this machine as an editor project, as Files' Open in Editor does. Nil
-    /// where no editor is wired in, and then not offered.
+    /// Opens the shell's folder in the editor: the machine's project that is or holds it, else the
+    /// folder as a project, as Files' Open in Editor does (2026-10-20). Nil where no editor is
+    /// wired in, and then not offered.
     private var openFolderInEditor: (@MainActor (String) -> Void)? {
-        guard let open = terminalRuntime?.openFolderAsProject else { return nil }
         let serverID = session.server.id
+        if let open = terminalRuntime?.openWorkingFolderInEditor { return { open(serverID, $0) } }
+        guard let open = terminalRuntime?.openFolderAsProject else { return nil }
         return { open(serverID, $0) }
     }
 
     /// What a pinch and hold on the folder button offers (owner, 2026-10-09: "an Open in Editor
-    /// option on pinch and hold on the folder icon").
+    /// option on pinch and hold on the folder icon"), and on a Mac its menu.
     @ViewBuilder
     private var workingFolderActions: some View {
         Button("Open in Files", systemImage: "folder") { withWorkingFolder(openFolderHere) }
@@ -941,14 +943,14 @@ struct TerminalWindowView: View {
         return TerminalFontActions(
             increase: {
                 if model.scaledGrid != nil {
-                    model.zoomScaledWindow(by: Self.scaledZoomStep)
+                    model.zoomScaledWindow(by: TerminalScaling.zoomStep)
                 } else {
                     model.adjustFontSize(by: 1, defaultSize: defaultSize)
                 }
             },
             decrease: {
                 if model.scaledGrid != nil {
-                    model.zoomScaledWindow(by: 1 / Self.scaledZoomStep)
+                    model.zoomScaledWindow(by: 1 / TerminalScaling.zoomStep)
                 } else {
                     model.adjustFontSize(by: -1, defaultSize: defaultSize)
                 }
@@ -962,9 +964,6 @@ struct TerminalWindowView: View {
             }
         )
     }
-
-    /// ⌘+ under Scale: about a point of text at a 10–12 point font.
-    private static let scaledZoomStep: CGFloat = 1.1
 
     #if !os(macOS)
     private var fontSizeMenu: some View {
@@ -1636,13 +1635,28 @@ struct TerminalWindowView: View {
             // In tmux the reported directory is stale, so the button is always there and the
             // directory is asked of tmux when it is pressed.
             if canOpenWorkingFolder {
-                Button {
-                    withWorkingFolder(openFolderHere)
-                } label: {
-                    Image(systemName: "folder")
+                Group {
+                #if os(macOS)
+                    // Click: Files. The arrow beside it: Files or the Editor, as + has its others
+                    // (2026-10-20). A Mac toolbar never shows a `.contextMenu`: the right-click this had
+                    // since 2026-10-09 got the toolbar's own Icon and Text menu.
+                    Menu {
+                        workingFolderActions
+                    } label: {
+                        Image(systemName: "folder")
+                    } primaryAction: {
+                        withWorkingFolder(openFolderHere)
+                    }
+                #else
+                    Button {
+                        withWorkingFolder(openFolderHere)
+                    } label: {
+                        Image(systemName: "folder")
+                    }
+                    // Pinch and hold: the same folder in the editor instead.
+                    .contextMenu { workingFolderActions }
+                #endif
                 }
-                // Pinch and hold (right-click on a Mac): the same folder in the editor instead.
-                .contextMenu { workingFolderActions }
                 .accessibilityLabel("Open Folder Here")
                 .accessibilityIdentifier("terminal-open-folder-here")
                 .help(session.survivesClose ? "Open this shell's folder over SFTP" : "Open \(reportedFolder ?? "") over SFTP")

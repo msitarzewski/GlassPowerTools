@@ -82,6 +82,10 @@ struct TerminalScaling: ViewModifier {
     /// The terminal's own area, now.
     let canvas: CGSize
 
+    /// ⌘+ under Scale sizes the window by this, about a point of text at a 10–12 point font; ⌘−
+    /// by its inverse.
+    static let zoomStep: CGFloat = 1.1
+
     func body(content: Content) -> some View {
         content
             .onChange(of: scales, initial: true) { _, scales in model.setScaling(scales) }

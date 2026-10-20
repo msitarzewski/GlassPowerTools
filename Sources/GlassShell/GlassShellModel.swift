@@ -649,7 +649,11 @@ public final class GlassShellModel: GlassServiceStore {
             // 2026-09-16 that was invisible: a database added on the Mac never reached the phone,
             // and the only evidence was a status line nobody was looking at.
             Logger.catalogSync.error("Sync failed: \(String(describing: error), privacy: .public)")
+            #if canImport(CloudKit)
+            catalogSyncStatus = .after(error)
+            #else
             catalogSyncStatus = .failed(error.localizedDescription)
+            #endif
         }
     }
 

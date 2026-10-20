@@ -60,6 +60,10 @@ struct MacLocalTerminalPaneView: View {
     @State private var didReportLocalShell = false
     @State private var isLocalFullScreen = false
     @State private var showVisualBell = false
+    /// The terminal's own area, for Scale's window shape (D75).
+    @State private var terminalCanvasSize = CGSize.zero
+    /// The terminal has measured its grid, so Scale keeps a real one, not the 120 × 40 it starts at.
+    @State private var hasMeasuredGrid = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,6 +77,7 @@ struct MacLocalTerminalPaneView: View {
                 onResize: { columns, rows in
                     terminalColumns = max(20, columns)
                     terminalRows = max(8, rows)
+                    hasMeasuredGrid = true
                     recorder.recordResize(width: columns, height: rows)
                 },
                 onBell: { [profile = profile] in
@@ -99,6 +104,7 @@ struct MacLocalTerminalPaneView: View {
                     }
                 }
             )
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { terminalCanvasSize = $0 }
             .terminalTextLook(profile.lookStyle, theme: profile.theme)
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
             .overlay(alignment: .bottom) { if isDetachedFromTmux { detachedBanner } }
@@ -172,6 +178,10 @@ struct MacLocalTerminalPaneView: View {
             processState.focus()
         })
         .focusedValue(\.terminalFontActions, isFocused ? fontActions : nil)
+        // Scale Text (D75), as a terminal on another machine has it: the window's When Resized.
+        // This view never had it, so a local tab ignored the bar's Scale Text (2026-10-20).
+        .modifier(TerminalScaling(model: hostModel, scales: wantsScaling, holdsWindow: isFocused,
+                                  aspect: windowShapeAspect, canvas: terminalCanvasSize))
         .toolbar {
             if isFocused {
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -190,7 +200,13 @@ struct MacLocalTerminalPaneView: View {
                         .help("AI Assistant")
                     }
 
-                    Button("Open Folder Here", systemImage: "folder") {
+                    // Click: Finder. The arrow beside it: Finder or the Editor (2026-10-20, the owner:
+                    // "a regular drop down like … new terminal"), as + has New Terminal's others.
+                    Menu {
+                        workingFolderActions
+                    } label: {
+                        Label("Open Folder Here", systemImage: "folder")
+                    } primaryAction: {
                         openFolderHere()
                     }
                     .labelStyle(.iconOnly)
@@ -206,6 +222,10 @@ struct MacLocalTerminalPaneView: View {
                     }
                     .labelStyle(.iconOnly)
                     .help(isLocalFullScreen ? "Exit Focus Mode" : "Focus Mode")
+
+                    if let scalesBinding {
+                        TerminalScaleToggle(scales: scalesBinding)
+                    }
 
                     localRecordingIndicator
                     localToolsMenu
@@ -405,6 +425,9 @@ struct MacLocalTerminalPaneView: View {
                 systemImage: isLocalFullScreen ? "moon.fill" : "moon"
             ) {
                 processState.toggleFullScreen()
+            }
+            if let scalesBinding {
+                TerminalScaleToggle(scales: scalesBinding, inMenu: true)
             }
 
             Divider()
@@ -636,6 +659,30 @@ struct MacLocalTerminalPaneView: View {
         }
     }
 
+    /// The editor's way in for this shell's folder; nil where no editor is wired in.
+    private var openFolderInEditor: (@MainActor (String) -> Void)? {
+        guard let open = terminalRuntime?.openWorkingFolderInEditor else { return nil }
+        return { open(nil, $0) }
+    }
+
+    /// The folder button's menu.
+    @ViewBuilder
+    private var workingFolderActions: some View {
+        Button("Open in Finder", systemImage: "folder") { openFolderHere() }
+        if let openFolderInEditor {
+            Button("Open in Editor", systemImage: "chevron.left.forwardslash.chevron.right") {
+                Task {
+                    // The folder as Open Folder Here finds it, and its problems said the same way.
+                    let folder = await resolveShellFolder()
+                    folderProblem = MacLocalShellFolder.open(folder) { url in
+                        openFolderInEditor(url.path(percentEncoded: false))
+                        return true
+                    }
+                }
+            }
+        }
+    }
+
     private var folderProblemPresented: Binding<Bool> {
         Binding(
             get: { folderProblem != nil },
@@ -691,13 +738,47 @@ struct MacLocalTerminalPaneView: View {
         return theme
     }
 
+    /// Under Scale (D75) the text's size is the window's, so these size the window, as on a
+    /// terminal on another machine.
     private var fontActions: TerminalFontActions {
         let defaultSize = profile.theme.swiftTermTheme.fontSize
+        let model = hostModel
         return TerminalFontActions(
-            increase: { hostModel.adjustFontSize(by: 1, defaultSize: defaultSize) },
-            decrease: { hostModel.adjustFontSize(by: -1, defaultSize: defaultSize) },
-            reset: { hostModel.resetFontSize() }
+            increase: {
+                if model.scaledGrid != nil { model.zoomScaledWindow(by: TerminalScaling.zoomStep) }
+                else { model.adjustFontSize(by: 1, defaultSize: defaultSize) }
+            },
+            decrease: {
+                if model.scaledGrid != nil { model.zoomScaledWindow(by: 1 / TerminalScaling.zoomStep) }
+                else { model.adjustFontSize(by: -1, defaultSize: defaultSize) }
+            },
+            reset: {
+                if model.scaledGrid != nil { model.zoomScaledWindow(by: nil) } else { model.resetFontSize() }
+            }
         )
+    }
+
+    /// Whether this terminal keeps its rows and columns and scales its text to the window (D75),
+    /// once it has measured them.
+    private var wantsScaling: Bool {
+        TerminalResizeBehavior.isOffered && profile.whenResized == .scale && hasMeasuredGrid
+    }
+
+    /// The shape the window keeps under Scale; none while the window is split, where each pane
+    /// scales into its own part.
+    private var windowShapeAspect: Double? {
+        showsPaneChrome ? nil : hostModel.scaledGrid?.aspect
+    }
+
+    /// The bar's Scale Text, which sets This Window's When Resized; nil outside a terminal window.
+    private var scalesBinding: Binding<Bool>? {
+        guard TerminalResizeBehavior.isOffered, let windowSettingsBinding else { return nil }
+        return Binding(
+            get: { profile.whenResized == .scale },
+            set: { scales in
+                windowSettingsBinding.wrappedValue[TerminalWindowSettings.whenResized] =
+                    (scales ? TerminalResizeBehavior.scale : .changeGrid).rawValue
+            })
     }
 
     private var pendingPasteBinding: Binding<SwiftTermPasteReview?> {

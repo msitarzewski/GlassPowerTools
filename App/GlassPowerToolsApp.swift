@@ -361,6 +361,28 @@ struct GlassPowerToolsApp: App {
                 editorRuntime.present(windowID)
             }
         }
+        // A terminal's folder button ▸ Open in Editor (2026-10-20, the owner: "either opens the
+        // Project with the same server/path or it opens a new Editor with pwd at the working
+        // directory"): the machine's project that is or holds the shell's folder, else that folder
+        // in a new editor window. A shell on this Mac (`serverID` nil) is This Mac's, and This Mac
+        // has three names here: no host, its own record, and its library machine (D86).
+        terminal.openWorkingFolderInEditor = { @MainActor serverID, path in
+            let host = serverID.flatMap { library.host(owningEndpoint: EndpointID(rawValue: $0)) }
+                ?? (serverID == nil ? library.host(GlassLocalHost.id) : nil)
+            let onThisMac = serverID == nil || host?.isLocal == true || host?.isThisMac == true
+            var machines: [HostID?] = host.map { [$0.id] } ?? []
+            if onThisMac { machines += [nil, GlassLocalHost.id] }
+            if let project = editorRuntime.projects.project(containing: path, on: machines) {
+                let reach: GlassEditorProjectReach = project.hostID.flatMap { library.host($0) }.map { projectReach($0) }
+                    ?? .thisMachine
+                editorRuntime.present(editorRuntime.openProject(project, reach: reach))
+            } else if let serverID, !onThisMac {
+                terminal.openFolderAsProject?(serverID, path)
+            } else {
+                let folder = URL(filePath: path, directoryHint: .isDirectory)
+                GlassWindowOpener.shared.perform { editorRuntime.show(editorRuntime.open(urls: [folder]), with: $0) }
+            }
+        }
         // Favorites beyond machines (2026-10-13): the editor's and the terminal's stars ask the
         // shell, and the shell asks here how a project, a workgroup or a folder is named and opened.
         terminal.favorites = model.favoritesAccess

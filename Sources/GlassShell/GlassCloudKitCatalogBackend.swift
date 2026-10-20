@@ -169,4 +169,30 @@ public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
     }
 }
 
+extension GlassCatalogSyncStatus {
+    /// A sync that threw, in words a person can act on (2026-10-20). A Mac signed out of iCloud
+    /// said "iCloud sync failed" and, opened, CloudKit's own "This request requires an
+    /// authenticated account" (found running the first release on a Mac with no Apple Account).
+    /// Signed out or restricted isn't a failure: iCloud is unavailable here, and the words say
+    /// what to do. Anything else keeps its own words, as before.
+    static func after(_ error: any Error) -> GlassCatalogSyncStatus {
+        guard let code = (error as? CKError)?.code else { return .failed(error.localizedDescription) }
+        #if os(macOS)
+        let settings = "System Settings"
+        #else
+        let settings = "Settings"
+        #endif
+        switch code {
+        case .notAuthenticated:
+            return .unavailable("Not signed in to iCloud. Sign in with your Apple Account in \(settings) to sync your library with your other devices.")
+        case .accountTemporarilyUnavailable:
+            return .unavailable("iCloud needs your attention. Check your Apple Account in \(settings); your library syncs once it can.")
+        case .managedAccountRestricted:
+            return .unavailable("iCloud is restricted on this device, so your library stays on it.")
+        default:
+            return .failed(error.localizedDescription)
+        }
+    }
+}
+
 #endif

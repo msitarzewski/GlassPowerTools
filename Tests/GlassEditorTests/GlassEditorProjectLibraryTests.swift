@@ -26,6 +26,32 @@ struct GlassEditorProjectLibraryTests {
         )
     }
 
+    // MARK: - A terminal's folder
+
+    /// A terminal's Open in Editor (2026-10-20): the project at the shell's folder, or the nearest
+    /// one holding it, on that machine; none for a folder outside every project.
+    @MainActor
+    @Test("the project a terminal's folder belongs to: its own, else the nearest holding it, on that machine")
+    func projectContainingAFolder() throws {
+        let library = GlassEditorProjectLibrary(defaults: UserDefaults.forTest(suiteName: "editor.containing.\(UUID())")!)
+        let alpha = HostID(), bravo = HostID()
+        let shop = library.remember(GlassEditorProject(hostID: alpha, path: "/srv/shop"))
+        let web = library.remember(GlassEditorProject(hostID: alpha, path: "/srv/shop/web"))
+        _ = library.remember(GlassEditorProject(hostID: bravo, path: "/srv"))
+        let mine = library.remember(GlassEditorProject(path: "/Users/ann/notes"))
+
+        #expect(library.project(containing: "/srv/shop", on: [alpha])?.id == shop.id)
+        #expect(library.project(containing: "/srv/shop/", on: [alpha])?.id == shop.id)
+        #expect(library.project(containing: "/srv/shop/jobs/lib", on: [alpha])?.id == shop.id)
+        #expect(library.project(containing: "/srv/shop/web/src", on: [alpha])?.id == web.id, "the nearest one")
+        #expect(library.project(containing: "/srv/shopfront", on: [alpha]) == nil, "a name that starts the same isn't inside")
+        #expect(library.project(containing: "/srv/other", on: [alpha]) == nil, "bravo's /srv is on another machine")
+        #expect(library.project(containing: "/srv/other", on: [bravo])?.path == "/srv")
+        // This Mac goes by several names: no machine at all among them.
+        #expect(library.project(containing: "/Users/ann/notes/2026", on: [alpha, nil])?.id == mine.id)
+        #expect(library.project(containing: "/Users/ann/notes", on: [alpha]) == nil)
+    }
+
     // MARK: - Validation
 
     @Test("a well-formed list validates")
