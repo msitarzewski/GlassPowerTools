@@ -22,16 +22,19 @@ public struct GlassShellHost: Identifiable, Hashable, Sendable {
     public let tags: [String]
     /// Union of every member's services, canonical member first, deduplicated by endpoint.
     /// On the local host the capabilities' built-in services come first, then the saved ones.
-    public let services: [HostServiceLink]
+    public private(set) var services: [HostServiceLink]
     public let createdAt: Date
     /// Canonical first.
     public let members: [HostProfile]
     /// This is the device itself (D8), not a machine to reach. See `GlassLocalHost`.
     public let isLocal: Bool
+    /// A library machine that is this device (D86): its Terminal opens a shell here, and when This
+    /// Mac keeps no services of its own, This Mac's row is this one. Never the device's own record.
+    public private(set) var isThisMac = false
     /// Services a capability provides on this device without setup, so nothing is stored for
     /// them: they cannot be edited or removed, and the capability that minted the endpoint id
     /// recognises it in `open`. Always empty off the local host.
-    public let builtInEndpointIDs: Set<EndpointID>
+    public private(set) var builtInEndpointIDs: Set<EndpointID>
 
     public var canonical: HostProfile { members[0] }
     public var isConsolidated: Bool { members.count > 1 }
@@ -69,6 +72,25 @@ public struct GlassShellHost: Identifiable, Hashable, Sendable {
         createdAt = record.createdAt
         members = [record]
         isLocal = true
+        builtInEndpointIDs = Set(builtInServices.map(\.endpointID))
+    }
+
+    /// `machine`, known to be this device (D86), without its remote desktop. With `local` — This Mac's record, when it keeps no
+    /// services of its own — it also stands for This Mac: it carries This Mac's built-in services
+    /// (those of a kind the machine doesn't already offer, so one Terminal shows, which opens here)
+    /// and answers for its built-in endpoints. Its id, members and everything synced stay the
+    /// machine's, so favourites, collections and selection are untouched.
+    init(thisMac machine: GlassShellHost, foldingIn local: HostProfile?, builtInServices: [HostServiceLink]) {
+        self = machine
+        isThisMac = true
+        // A remote desktop of the screen it is shown on: nothing to connect to here. The service is
+        // still the machine's, synced and opened from every other device.
+        services.removeAll { $0.kind == .rdp }
+        guard local != nil else { return }
+        let kinds = Set(machine.services.map(\.kind))
+        var seen = Set(machine.services.map(\.endpointID))
+        let added = builtInServices.filter { !kinds.contains($0.kind) && seen.insert($0.endpointID).inserted }
+        services = added + services
         builtInEndpointIDs = Set(builtInServices.map(\.endpointID))
     }
 

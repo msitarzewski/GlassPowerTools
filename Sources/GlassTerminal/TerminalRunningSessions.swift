@@ -89,7 +89,9 @@ extension GlassTerminalCapability {
         #else
         let local: [TerminalTmux.Session]? = nil
         #endif
+        // This Mac's own machine (D86) isn't asked over SSH: its sessions are the local ones.
         let servers = runtime.sessionManager.serverManager.servers.filter(\.keepsSessionsInTmux)
+            .filter { runtime.isThisMacServer?($0.id) != true }
         // Every host asked at once; each task is on the main actor and waits on the network.
         let asks = servers.map { server in (server, Task { await self.tmuxListing(on: server) }) }
         var hosts: [(server: ServerConfiguration, listing: TerminalHostListing)] = []
@@ -124,6 +126,11 @@ extension GlassTerminalCapability {
                 return session.tmuxSessionName
             })
             if let theirs = sessions.first?.server, thisMac.contains(theirs) {
+                shownOverSSH.formUnion(shownHere)
+                continue
+            }
+            // Known to be this Mac (D86), whatever tmux server answered: its sessions are the local ones.
+            if runtime.isThisMacServer?(server.id) == true {
                 shownOverSSH.formUnion(shownHere)
                 continue
             }

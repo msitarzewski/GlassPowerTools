@@ -626,6 +626,17 @@ public struct GlassShellLibraryView: View {
             .alert("Unable to Complete", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
                 Button("OK") { model.errorMessage = nil }
             } message: { Text(model.errorMessage ?? "") }
+            // D86: a machine whose address is this Mac's, offered once as this Mac.
+            .alert(model.thisMacSuggestion.map { "Is \($0.displayName) this Mac?" } ?? "",
+                   isPresented: Binding(get: { model.thisMacSuggestion != nil },
+                                        set: { if !$0, model.thisMacSuggestion != nil { model.declineThisMacSuggestion() } }),
+                   presenting: model.thisMacSuggestion) { host in
+                Button("It's This Mac") { model.setThisMac(host.id) }
+                    .accessibilityIdentifier("this-mac-suggestion-accept")
+                Button("Not Now", role: .cancel) { model.declineThisMacSuggestion() }
+            } message: { host in
+                Text("\(host.displayName)'s address is one of this Mac's. As This Mac, its Terminal opens a shell here, its databases are This Mac's, and the two rows become one. Only on this Mac; you can change it in \(host.displayName)'s settings.")
+            }
     }
 
     private func run(_ body: () async throws -> Void) async {

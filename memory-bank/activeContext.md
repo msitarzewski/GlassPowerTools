@@ -40,7 +40,9 @@ is on the Mac and iPhone; the Vision Pro has been unreachable since 0.4.481.
 - **SQL from a terminal (D85)**, Mac right-click into the query editor (`2026-10-20_sql-detector.md`).
 - **Tab tooltips:** each Mac tab row names its tmux session.
 - **Closing stays as it is:** closing a tmux tab detaches (his word: "Leave it exactly as it is today").
-- **Now building:** D86, This Mac recognising its own library record (`2026-10-20_this-mac-link.md`).
+- **D86, This Mac knows its own library machine:** built and committed (`2026-10-20_this-mac-link.md`). His Mac
+  linked itself by host key; Active lists each session once; no Screen Sharing to itself. Still SSH: Basic Terminal,
+  the palette's "without tmux", workgroups.
 - **Open:**
   - the SQL round trip against a real database;
   - the looks on iPhone, iPad and Vision Pro;

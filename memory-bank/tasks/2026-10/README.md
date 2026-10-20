@@ -184,4 +184,6 @@
   - Instead, tab rows on the Mac now have a tooltip with each terminal's tmux session, its machine, and what runs
     in which folder, since control mode removed tmux's status line (`MacWorkspaceSessionHelp`, 3 tests); 0.4.487.
   - The window's title is AppKit's and has no tooltip seam; not touched.
-
+- 2026-10-20: This Mac knows its own library machine (D86), at his word: linked by SSH host key (his Mac did so by
+  itself), offered by address, or set in the editor; one row, a local Terminal, its databases, Active once, no Screen
+  Sharing to itself; 0.4.488–489 ([`2026-10-20_this-mac-link.md`](2026-10-20_this-mac-link.md)). Committed.

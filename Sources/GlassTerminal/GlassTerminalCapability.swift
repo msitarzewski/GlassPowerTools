@@ -164,6 +164,9 @@ public final class GlassTerminalRuntime {
     public var sqlDestinations: (@MainActor (UUID) -> [GlassTerminalSQLDestination])?
     /// Open in SQL Editor: the SQL, unrun, in a new query tab on that database.
     public var openSQL: (@MainActor (_ sql: String, _ database: UUID) -> Void)?
+    /// Whether a saved server is this Mac's own library machine (D86), which the shell knows: its
+    /// tmux sessions are This Mac's, listed once from here rather than asked for again over SSH.
+    public var isThisMacServer: (@MainActor (UUID) -> Bool)?
     /// The app's one runtime, for a terminal's tab to reach the editor and Files from a path's
     /// menu. Set as it is made.
     public nonisolated(unsafe) static weak var current: GlassTerminalRuntime?

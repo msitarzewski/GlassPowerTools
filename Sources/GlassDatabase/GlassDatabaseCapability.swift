@@ -218,11 +218,13 @@ public struct GlassDatabaseSQLDestination: Sendable, Equatable {
 extension GlassDatabaseRuntime {
     /// The saved databases SQL in a terminal opens in: `machineDatabases` — the Database services of
     /// the terminal's machine, which the shell's catalog knows — then those reached through the
-    /// terminal's server (D45), which only the database's own records say. Each once, by name, with
+    /// terminal's server or servers (D45; This Mac's machine's SSH too, D86), which only the
+    /// database's own records say. Each once, by name, with
     /// its engine and the database it opens in.
-    public func sqlDestinations(machineDatabases: [UUID], reachedThrough terminalEndpoint: UUID) -> [GlassDatabaseSQLDestination] {
+    public func sqlDestinations(machineDatabases: [UUID], reachedThrough terminalEndpoints: Set<UUID>) -> [GlassDatabaseSQLDestination] {
         var ids = machineDatabases.filter { hasConnection(id: $0) }
-        for config in connectionManager.connections where config.tunnelServiceID == terminalEndpoint && !ids.contains(config.id) {
+        for config in connectionManager.connections
+        where config.tunnelServiceID.map(terminalEndpoints.contains) == true && !ids.contains(config.id) {
             ids.append(config.id)
         }
         return ids.compactMap { id in

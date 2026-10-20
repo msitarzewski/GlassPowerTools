@@ -300,17 +300,88 @@ public final class GlassShellModel: GlassServiceStore {
     /// disappeared from the library.
     private func rebuildProjection() {
         var grouped = GlassShellHostGrouping.group(records)
-        if let localRecord {
-            grouped.insert(GlassShellHost(local: localRecord, builtInServices: registry.builtInLocalServices),
-                           at: 0)
+        // D86: the machine that is this device. Where This Mac keeps no services of its own, the two
+        // are one row, the machine's, first; otherwise both stay, and the machine still knows.
+        let linked = preferences.thisMacHostID.flatMap { link in grouped.firstIndex { $0.id == link || $0.contains(link) } }
+        if let linked, let localRecord, localRecord.services.isEmpty {
+            let folded = GlassShellHost(thisMac: grouped.remove(at: linked), foldingIn: localRecord,
+                                        builtInServices: registry.builtInLocalServices)
+            grouped.insert(folded, at: 0)
+        } else {
+            if let linked {
+                grouped[linked] = GlassShellHost(thisMac: grouped[linked], foldingIn: nil, builtInServices: [])
+            }
+            if let localRecord {
+                grouped.insert(GlassShellHost(local: localRecord, builtInServices: registry.builtInLocalServices),
+                               at: 0)
+            }
         }
         hosts = grouped
+    }
+
+    // MARK: This Mac's own machine (D86)
+
+    /// The library machine that is this device, if one is known to be.
+    public var thisMacHostID: HostID? { preferences.thisMacHostID }
+
+    /// Whether a library machine is this device, and how that is known: given by the composition
+    /// root, which holds the terminal's pinned host keys. Nil recognises nothing by itself.
+    public var thisMacEvidence: (@MainActor (GlassShellHost) -> GlassThisMacEvidence?)?
+
+    /// A machine whose address is one of this Mac's, offered once as this Mac (an address is a
+    /// hint; a host key is proof, and links by itself).
+    public private(set) var thisMacSuggestion: GlassShellHost?
+
+    /// Makes `hostID` this device's machine, or none. Kept on this device only.
+    public func setThisMac(_ hostID: HostID?) {
+        let canonical = hostID.map { host($0)?.id ?? $0 }
+        guard canonical != preferences.thisMacHostID else { return }
+        preferences.thisMacHostID = canonical
+        if let canonical { preferences.declinedThisMacHostIDs?.removeAll { $0 == canonical } }
+        thisMacSuggestion = nil
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+        rebuildProjection()
+    }
+
+    /// Not Now on the offer: it isn't made again for that machine.
+    public func declineThisMacSuggestion() {
+        guard let suggestion = thisMacSuggestion else { return }
+        thisMacSuggestion = nil
+        var declined = preferences.declinedThisMacHostIDs ?? []
+        if !declined.contains(suggestion.id) { declined.append(suggestion.id) }
+        preferences.declinedThisMacHostIDs = declined
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+    }
+
+    /// Looks for this device among the library's machines, while none is known: one whose pinned
+    /// host key is this Mac's is linked; one whose address is this Mac's is offered, unless declined.
+    /// Several by key, or the machine linked gone from the library, changes nothing on its own.
+    public func recognizeThisMac() {
+        guard let evidence = thisMacEvidence else { return }
+        if let link = preferences.thisMacHostID {
+            if host(link) == nil, !records.isEmpty { setThisMac(nil) }
+            return
+        }
+        let machines = hosts.filter { !$0.isLocal }
+        let found = machines.compactMap { machine in evidence(machine).map { (machine, $0) } }
+        let byKey = found.filter { $0.1 == .hostKey }
+        if byKey.count == 1 {
+            setThisMac(byKey[0].0.id)
+            return
+        }
+        let declined = Set(preferences.declinedThisMacHostIDs ?? [])
+        let byAddress = found.filter { if case .address = $0.1 { true } else { false } }.map(\.0)
+        if byKey.isEmpty, byAddress.count == 1, !declined.contains(byAddress[0].id) {
+            thisMacSuggestion = byAddress[0]
+        }
     }
 
     /// Told after every load, including a failed one: a capability that cannot read its records
     /// has to learn that too, rather than sitting on an empty list it believes is the truth.
     private func notifyCapabilitiesCatalogLoaded() {
         for capability in registry.registered { capability.catalogDidLoad() }
+        // D86: with the library read, whether one of its machines is this device.
+        recognizeThisMac()
     }
 
     // MARK: The device's own host (D8)
@@ -556,6 +627,8 @@ public final class GlassShellModel: GlassServiceStore {
             if !outcome.toApplyLocally.isEmpty {
                 records = try await catalog.snapshot()
                 rebuildProjection()
+                // A machine that arrived may be this device (D86).
+                recognizeThisMac()
             }
             if !departed.isEmpty {
                 // Deliberately not rethrown: a capability failing to delete its credential must not
@@ -696,7 +769,7 @@ public final class GlassShellModel: GlassServiceStore {
         hosts.map { host in
             let record = preferences[host: host.id]
             let kinds = HostServiceKind.allCases.filter { kind in host.services.contains { $0.kind == kind } }
-            let subtitle = Self.subtitle(for: kinds)
+            let subtitle = host.isThisMac ? "\(GlassLocalHost.displayName) · \(Self.subtitle(for: kinds))" : Self.subtitle(for: kinds)
             return GlassLibraryItem(id: host.id, name: host.displayName, subtitle: subtitle,
                                     searchTerms: host.aliases + host.services.map(\.displayName),
                                     tags: host.tags, isFavorite: record.isFavorite,
@@ -721,6 +794,8 @@ public final class GlassShellModel: GlassServiceStore {
     public func host(_ id: HostID) -> GlassShellHost? {
         hosts.first { $0.id == id } ?? hosts.first { $0.contains(id) }
             ?? mergedMemberIDs[id].flatMap { canonical in hosts.first { $0.id == canonical } }
+            // This Mac folded into its machine (D86): what was This Mac's is that machine's now.
+            ?? (id == GlassLocalHost.id ? hosts.first { $0.isThisMac && !$0.builtInEndpointIDs.isEmpty } : nil)
     }
 
     /// The machine one of whose services is this endpoint.
@@ -730,6 +805,8 @@ public final class GlassShellModel: GlassServiceStore {
     /// is answered without the capability holding a second copy of the answer (D26).
     public func host(owningEndpoint endpointID: EndpointID) -> GlassShellHost? {
         hosts.first { $0.services.contains { $0.endpointID == endpointID } }
+            // A built-in This Mac's machine carries without showing it (the local shell, beside its own Terminal).
+            ?? hosts.first { $0.builtInEndpointIDs.contains(endpointID) }
     }
 
     /// The stored record with this id, if any — the device's own included, though it is not in
@@ -1694,9 +1771,20 @@ public final class GlassShellModel: GlassServiceStore {
     /// Hands one service to its capability. The capability receives the record that owns the
     /// endpoint — its endpoint id is what the capability's own store is keyed by.
     private func open(_ endpointID: EndpointID, on host: GlassShellHost) {
-        guard let service = host.services.first(where: { $0.endpointID == endpointID }),
-              let owner = host.record(owning: endpointID) else {
+        guard var service = host.services.first(where: { $0.endpointID == endpointID }),
+              var owner = host.record(owning: endpointID) else {
             errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
+        }
+        // D86: this device's own machine. Its Terminal is a shell here, not SSH to itself; a built-in
+        // it carries for This Mac is This Mac's.
+        if host.isThisMac, let localRecord {
+            if service.kind == .ssh, !host.isBuiltIn(endpointID),
+               let shell = registry.builtInLocalServices.first(where: { $0.kind == .ssh }) {
+                service = shell
+                owner = localRecord
+            } else if host.isBuiltIn(endpointID) {
+                owner = localRecord
+            }
         }
         // A kind no capability in this build owns cannot be connected: say so and connect nothing.
         guard let capability = registry.capability(for: service.kind) else {

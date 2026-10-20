@@ -503,8 +503,25 @@ public struct GlassShellHostSetupSheet: View {
             } else {
                 LabeledContent("Address", value: setup.address).accessibilityIdentifier("host-editor-address")
             }
+            #if os(macOS)
+            if let host = setup.editedHost, !host.isLocal { thisMacRow(host) }
+            #endif
         }
     }
+
+    #if os(macOS)
+    /// D86: whether this machine is the Mac the app runs on. Kept on this Mac alone, and applied at
+    /// once, as it changes nothing in the library everyone else sees.
+    @ViewBuilder
+    private func thisMacRow(_ host: GlassShellHost) -> some View {
+        Toggle("This is this Mac", isOn: Binding(
+            get: { model.thisMacHostID == host.id },
+            set: { model.setThisMac($0 ? host.id : nil) }))
+            .accessibilityIdentifier("host-editor-this-mac")
+        Text("Only here: its Terminal opens a shell on this Mac, its databases are This Mac's, and This Mac's row joins it. Other devices still reach it as before.")
+            .font(.footnote).foregroundStyle(.secondary)
+    }
+    #endif
 
     // MARK: Services
 

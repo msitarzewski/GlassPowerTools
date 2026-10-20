@@ -215,12 +215,30 @@ struct GlassPowerToolsApp: App {
             #endif
             return GlassMachineIdentity.reach(
                 hostName: host.displayName,
-                isLocalHostRecord: host.isLocal,
+                // This Mac's own machine (D86) is this device, as This Mac is.
+                isLocalHostRecord: host.isLocal || host.isThisMac,
                 remoteFingerprints: pinned,
                 hasTerminalService: !terminalServices.isEmpty,
                 localFingerprints: local
             )
         }
+        #if os(macOS)
+        // D86: whether a library machine is this Mac — by its pinned SSH host key, the proof the
+        // editor and terminal already use, else by an address of this Mac's, which is only offered.
+        model.thisMacEvidence = { [terminal] host in
+            let local = GlassMachineIdentity.localHostKeyFingerprints()
+            var pinned: Set<String> = []
+            if !local.isEmpty {
+                for service in host.services where service.kind == .ssh {
+                    pinned.formUnion(terminal.pinnedHostKeyFingerprints(serverID: service.endpointID.rawValue))
+                }
+            }
+            return GlassThisMac.evidence(
+                address: host.address,
+                keyMatches: GlassMachineIdentity.isThisMachine(remoteFingerprints: pinned, localFingerprints: local),
+                thisMacAddresses: GlassThisMac.addresses())
+        }
+        #endif
         let projectsPanel = GlassEditorProjectsPanelModel()
         let library = model
         model.registry.registerLibraryPanel(
@@ -297,8 +315,18 @@ struct GlassPowerToolsApp: App {
         terminal.sqlDestinations = { [weak model] endpoint in
             let machine = model?.host(owningEndpoint: EndpointID(rawValue: endpoint))
             let databases = machine?.services.filter { $0.kind == .database }.map(\.endpointID.rawValue) ?? []
-            return database.sqlDestinations(machineDatabases: databases, reachedThrough: endpoint)
+            // On This Mac's own machine (D86) a local terminal is that machine's: databases reached
+            // through its SSH service are reached through this one.
+            var through: Set<UUID> = [endpoint]
+            if machine?.isThisMac == true {
+                through.formUnion(machine?.services.filter { $0.kind == .ssh }.map(\.endpointID.rawValue) ?? [])
+            }
+            return database.sqlDestinations(machineDatabases: databases, reachedThrough: through)
                 .map { GlassTerminalSQLDestination(id: $0.id, title: $0.title) }
+        }
+        // D86: a saved server that is This Mac's own machine; Active lists its sessions once, as This Mac's.
+        terminal.isThisMacServer = { [weak model] serverID in
+            model?.host(owningEndpoint: EndpointID(rawValue: serverID))?.isThisMac == true
         }
         // The SQL, unrun, in a new query tab; connected first as the library's Connect does, from a
         // Connections window, where the database asks for a password and says what failed.

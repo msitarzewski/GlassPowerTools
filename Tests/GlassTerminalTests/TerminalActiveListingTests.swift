@@ -121,6 +121,18 @@ struct TerminalActiveListingTests {
         #expect(report.unchecked.first?.reason == "Not checked: signing in would need your password.")
     }
 
+    @Test("D86: a server that is This Mac's own machine isn't listed over SSH: its sessions are This Mac's")
+    func thisMacsMachineListedOnce() {
+        let server = ServerConfiguration(name: "alpha", host: "192.0.2.10", port: 22, username: "casey")
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let listed = TerminalTmux.Session(name: "glass-1", attachedClients: 0, windows: 1, lastActivity: nil)
+        #expect(capability.runningReport(local: nil, hosts: [(server, .sessions([listed]))]).sessions.count == 1,
+                "any other machine's session is a row")
+        runtime.isThisMacServer = { $0 == server.id }
+        #expect(capability.runningReport(local: nil, hosts: [(server, .sessions([listed]))]).sessions.isEmpty)
+    }
+
     @Test("Closing a lone session's row ends the session")
     func closeEndsTheSession() {
         let runtime = GlassTerminalRuntime(layers: GlassLayerStore())

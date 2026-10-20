@@ -45,6 +45,12 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
     /// What this device is called in every device's overview (D81), when the person named it;
     /// nil for what the system calls it (`GlassDeviceName.system`). Optional for older files.
     public var deviceName: String?
+    /// The library machine that is this device (D86): set by its pinned SSH host key, by accepting
+    /// the offer an address of this Mac makes, or in the machine's editor. Never synced: on every
+    /// other device that machine is one to reach. Optional for older files.
+    public var thisMacHostID: HostID?
+    /// Machines whose offer to be this Mac was turned down, so it isn't made again.
+    public var declinedThisMacHostIDs: [HostID]?
 
     /// Adds a connection, dropping what falls outside the window or over the limit.
     public mutating func recordConnection(_ event: ConnectionEvent) {

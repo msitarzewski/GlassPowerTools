@@ -1750,5 +1750,10 @@ already wanted the Mac to recognise its synced record as itself.
 - **Next:** hide Screen Sharing to itself, and list Active's sessions once.
 - **Other devices** keep it a remote machine; nothing about the link syncs.
 
-**Status:** Approved; building. Task note `2026-10-20_this-mac-link.md`.
+**Status:** Implemented and committed 2026-10-20 at his word.
+- 0.4.488 linked his Mac by itself, by its SSH host key.
+- 0.4.489 lists Active's sessions once and hides Screen Sharing to itself.
+- Not done: the terminal's own direct connect paths (Basic Terminal, the palette's "without tmux", workgroups).
+
+Task note `2026-10-20_this-mac-link.md`.
 
