@@ -17,6 +17,9 @@ import GlassConnectionUI
 
 struct TerminalLooksSettingsView: View {
     @Binding var settings: GlassWindowOverrides
+    /// What the look is drawn behind, as the footer says it: this window's tabs, or a saved
+    /// Workgroup's.
+    var subject = "every tab in this window"
 
     @State private var isChoosingPicture = false
     @State private var pictureProblem: String?
@@ -60,7 +63,7 @@ struct TerminalLooksSettingsView: View {
             if style.backdrop != .none {
                 slider(TerminalWindowSettings.backdropIntensity, global: Self.none.intensity,
                        leading: "Faint", trailing: "Strong", identifier: "terminal-window-backdrop-intensity")
-                if style.backdrop == .rain {
+                if style.backdrop.quickensWithOutput {
                     GlassWindowSettingRow(TerminalWindowSettings.backdropFollowsOutput, overrides: $settings,
                                           global: Self.none.followsOutput, inheritsFrom: Self.source) { value in
                         GlassSettingLabeled(TerminalWindowSettings.backdropFollowsOutput.title) {
@@ -75,7 +78,7 @@ struct TerminalLooksSettingsView: View {
         } header: {
             Text("Look")
         } footer: {
-            Text("Drawn behind the text of every tab in this window. Readability darkens it under the text, and more where the text would be hard to read. Moving backgrounds stay still with Reduce Motion or Low Power Mode.")
+            Text("Drawn behind the text of \(subject). Coding Agent shows the agent each terminal is running, moving while it works and glowing while it waits for you. Readability darkens it under the text, and more where the text would be hard to read. Moving backgrounds stay still with Reduce Motion or Low Power Mode.")
         }
 
         Section {

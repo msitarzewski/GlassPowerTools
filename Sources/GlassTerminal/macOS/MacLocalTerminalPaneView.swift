@@ -25,6 +25,8 @@ struct MacLocalTerminalPaneView: View {
     let onProcessStatusChange: (String?) -> Void
     /// The shell's title and directory, as they change — they name the tab (2026-10-07).
     var onContextChange: (_ title: String?, _ directory: String?) -> Void = { _, _ in }
+    /// The coding agent the pane runs, for a look that shows it (D84); asked only when one does.
+    var agent: () -> TerminalAgent? = { nil }
 
     @Environment(SettingsManager.self) private var settingsManager
     /// Present whenever this pane is inside the app's workspace scene. Used only to answer the
@@ -105,7 +107,12 @@ struct MacLocalTerminalPaneView: View {
                 }
             )
             .onGeometryChange(for: CGSize.self) { $0.size } action: { terminalCanvasSize = $0 }
-            .terminalTextLook(profile.lookStyle, theme: profile.theme)
+            .terminalTextLook(profile.lookStyle, theme: profile.theme,
+                              agent: profile.lookStyle.usesAgent ? agent() : nil)
+            // A mark beside each Mermaid diagram it shows as text (2026-10-21), as an SSH pane's.
+            .overlay(alignment: .topLeading) {
+                TerminalDiagramMarks(model: hostModel, draw: terminalRuntime?.diagramView)
+            }
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
             .overlay(alignment: .bottom) { if isDetachedFromTmux { detachedBanner } }
             .padding(.horizontal, 8)
@@ -123,7 +130,8 @@ struct MacLocalTerminalPaneView: View {
                     )
                     // What the window shows behind its text (D84).
                     TerminalBackdropView(style: resolved.lookStyle, theme: resolved.theme,
-                                         activity: hostModel.outputActivity)
+                                         activity: hostModel.outputActivity,
+                                         agent: resolved.lookStyle.usesAgent ? agent() : nil, findAgent: agent)
                 }
             }
             // A framed canvas: the background is clipped to the session canvas's corner radius

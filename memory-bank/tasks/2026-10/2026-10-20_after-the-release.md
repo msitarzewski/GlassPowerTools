@@ -96,3 +96,24 @@ this?"), and the signed-out iCloud wording seen running the release in the VM.
 - **Installed:** Mac and iPhone 0.4.494. The Vision Pro is unreachable.
 - **Install script:** `install-mac2.zsh` now skips a build already in place, so an early hand install isn't quit twice.
 
+
+## Export compliance (2026-10-21, not yet committed)
+
+- **His question:** why not just use Apple's Info.plist key ("Complying with Encryption Export Regulations")?
+- **Apple's table:** standard algorithms need only the French declaration, and only for sale in France. Apple
+  defines `ITSAppUsesNonExemptEncryption = NO` as "exempt from export compliance documentation requirements".
+- **Done:** `NO` added to `App/Info.plist` and `Platforms/macOS/Info.plist` with `plutil` (two lines each);
+  `Documentation/AppStore/README.md` updated.
+- **This holds only while France is out of Pricing and Availability.** Adding France means the ANSSI declaration,
+  then `YES` plus `ITSEncryptionExportComplianceCode`.
+- **Builds 491, 493 and 494** don't have the key, so each needs Manage with the same answers, or they can be left
+  to expire.
+- **TestFlight (his "pull france for now and get these builds into testflight"):**
+  - Builds 491, 493 and 494 (iOS and visionOS) are answered `usesNonExemptEncryption = false` through the API; 494
+    reads READY_FOR_BETA_TESTING.
+  - An internal group, "Internal", gets every build, and he is invited.
+  - Availability has never been set, so France is not on anywhere yet; leave it off when availability is set.
+- **App Store Connect's blank app icon:** both builds carry the right icon (fetched from Apple's processed copies).
+  Neither 1.0 version has a build attached. Apple's forums also report a known App Store Connect bug: Icon Composer
+  `.icon` icons missing from the app overview (thread 801484); one developer's workaround was a classic asset-catalog
+  icon set.

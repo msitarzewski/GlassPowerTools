@@ -33,7 +33,8 @@ In **New Workgroup**:
    - **Startup command**: an optional command to run once after the tab connects, for example `cd /srv/shop && git status`.
    - For a local tab: **Shell** and **Working directory**, or leave them empty to use the app's defaults.
 4. To reorder tabs on Mac, use **Move Up** and **Move Down** in a tab's menu. Elsewhere, choose **Edit** above the tabs and drag them.
-5. Choose **Save**. If another Workgroup already has that name, choose **Replace** to update it, on all your devices, or **Keep Both**.
+5. Optionally, give it a look under **Look** and **Text**: choose **Start From** ▸ **Choose a Look**, or set each part, as in a window's own settings (see [Backgrounds and glowing text](terminal-looks.md)). Every window the Workgroup opens starts with it, on all your devices. A picture you choose stays on this device; your others show the look without it.
+6. Choose **Save**. If another Workgroup already has that name, choose **Replace** to update it, on all your devices, or **Keep Both**.
 
 To rebuild a Workgroup from a window, arrange the window, choose **Save Workspace as Workgroup…**, give it the Workgroup's name, and choose **Replace**.
 
@@ -84,6 +85,8 @@ Your saved Workgroup and its Mac terminals are not changed.
 ## Edit a Workgroup
 
 Select it and choose **Edit**. Changes apply when you choose **Save**; **Cancel** discards them.
+
+A new look applies the next time you open the Workgroup. A window already open keeps its own until you change it in **This Window**.
 
 A Workgroup saved from a Mac window keeps its split layout. You can edit each terminal's settings anywhere, but to add, remove or rearrange its panes, open it on a Mac, change the window, and save the workspace again.
 

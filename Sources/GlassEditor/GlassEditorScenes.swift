@@ -540,12 +540,16 @@ public final class GlassEditorRuntime {
     /// below decides — a window where windows exist, a full-screen presentation where they do not.
     public private(set) var requestedWindowID: UUID?
     public private(set) var presentationSerial = 0
+    /// On a phone, where the window covers the screen, what its back button says it returns to:
+    /// the screen that asked. Nil is Connections.
+    public private(set) var requestedReturnTitle: String?
 
     /// Asks for a window. Nil is a request for a new, empty one.
-    public func present(_ id: UUID?) {
+    public func present(_ id: UUID?, returningTo returnTitle: String? = nil) {
         let id = id ?? newWindowID()
         issuedWindowIDs.insert(id)
         requestedWindowID = id
+        requestedReturnTitle = returnTitle
         presentationSerial += 1
     }
 
@@ -607,7 +611,8 @@ public struct GlassEditorBootstrap<Content: View>: View {
                     openWindow(id: GlassEditorRuntime.windowID, value: id)
                     runtime.clearPresentation()
                 } else {
-                    presented = GlassEditorWindowPresentation(id: id)
+                    presented = GlassEditorWindowPresentation(id: id,
+                                                              returnTitle: runtime.requestedReturnTitle ?? "Connections")
                 }
             }
     }
@@ -625,7 +630,7 @@ public struct GlassEditorBootstrap<Content: View>: View {
                     // is the view's own toolbar item instead.
                     GlassEditorWorkspaceView(
                         workspace: runtime.workspace(for: id), windowID: id,
-                        dismissal: GlassEditorDismissal(title: "Connections") {
+                        dismissal: GlassEditorDismissal(title: window.returnTitle) {
                             presented = nil
                         }
                     )
@@ -646,7 +651,12 @@ public struct GlassEditorBootstrap<Content: View>: View {
 /// One editor window on its way to a full-screen presentation.
 public struct GlassEditorWindowPresentation: Identifiable, Hashable, Sendable {
     public let id: UUID
-    public init(id: UUID) { self.id = id }
+    /// What its back button returns to.
+    public let returnTitle: String
+    public init(id: UUID, returnTitle: String = "Connections") {
+        self.id = id
+        self.returnTitle = returnTitle
+    }
 }
 
 /// Shows the editor window something asked for (`GlassEditorRuntime.present`), from whichever

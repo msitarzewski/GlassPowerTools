@@ -145,6 +145,13 @@ enum GlassDemoMode {
         case "terminal":
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8), windowSettings: demoLook,
                                        opensSettings: arguments.contains("--demo-look-settings"))
+        case "agent":
+            // The Coding Agent look (D84, 2026-10-21): a coding agent at work on the made-up shop,
+            // which names itself in its title as Claude Code does, and waits for an answer.
+            terminal.requestDemoReplay(name: "alpha", output: Data(agentTranscript.utf8), windowSettings: demoLook)
+        case "terminal-diagram":
+            // A Mermaid diagram a coding agent printed as text, with its mark (2026-10-21).
+            terminal.requestDemoReplay(name: "alpha", output: Data(diagramTranscript.utf8), windowSettings: demoLook)
         case "btop":
             // The website's terminal (the owner, 2026-10-18: "run btop or something for the
             // terminal examples"): a btop-style monitor of the made-up shop (GlassDemoBtop.swift).
@@ -394,6 +401,64 @@ enum GlassDemoMode {
             prompt + "uptime",
             " 09:41:12 up 23 days,  4:02,  1 user,  load average: 0.42, 0.37, 0.31",
             prompt,
+        ]
+        return lines.joined(separator: "\r\n")
+    }()
+
+    /// A coding agent finding why the shop's jobs worker restarts (`terminalTranscript`'s error),
+    /// and waiting for an answer. It sets the title Claude Code sets, which is how the app knows
+    /// an agent runs where no program name says so.
+    static let agentTranscript: String = {
+        let e = "\u{1B}["
+        let dot = "\(e)38;5;174m⏺\(e)0m"
+        let dim = "\(e)2m"
+        let lines = [
+            "\u{1B}]0;✳ Claude Code\u{07}",
+            "\(e)2m>\(e)0m The jobs worker keeps restarting. Find out why.",
+            "",
+            "\(dot) Reading the worker's last log lines.",
+            "",
+            "\(dot) \(e)1mBash\(e)0m(docker compose logs --tail 4 jobs)",
+            "  \(dim)⎿\(e)0m  shop-jobs-1 | 09:41:08 \(e)31mERROR\(e)0m smtp: connection refused (mail.example.com:587)",
+            "",
+            "\(dot) The worker can't reach mail.example.com on port 587, so every send-receipt",
+            "  job fails and the container restarts. SMTP_HOST in .env still names the old relay.",
+            "",
+            "\(dot) \(e)1mUpdate\(e)0m(.env)",
+            "  \(dim)⎿\(e)0m  \(e)31m- SMTP_HOST=mail.example.com\(e)0m",
+            "     \(e)32m+ SMTP_HOST=relay.example.com\(e)0m",
+            "",
+            "  Restart the jobs worker so it picks this up?",
+            "",
+            "\(dim)────────────────────────────────────────────────────────────────────\(e)0m",
+            "> ",
+            "\(dim)────────────────────────────────────────────────────────────────────\(e)0m",
+            "  \(dim)? for shortcuts\(e)0m",
+        ]
+        return lines.joined(separator: "\r\n")
+    }()
+
+    /// A coding agent explaining the made-up shop's receipts with a Mermaid diagram it could not draw
+    /// in the terminal, printed as Claude Code prints one (2026-10-21, the owner's paste).
+    static let diagramTranscript: String = {
+        let e = "\u{1B}["
+        let dot = "\(e)38;5;174m⏺\(e)0m"
+        let dim = "\(e)2m"
+        let lines = [
+            "\u{1B}]0;✳ Claude Code\u{07}",
+            "\(e)2m>\(e)0m How does a receipt get from the shop to the customer?",
+            "",
+            "\(dot) This Mermaid diagram uses features the terminal renderer doesn't support.",
+            "  flowchart LR",
+            "      A[Order placed<br/>in the shop] --> B[Jobs worker]",
+            "      B -->|send-receipt| C[Mail relay]",
+            "      C --> D[Customer's inbox]",
+            "",
+            "  The worker sends every receipt through the relay named in SMTP_HOST.",
+            "",
+            "\(dim)────────────────────────────────────────────────────────────────────\(e)0m",
+            "> ",
+            "\(dim)────────────────────────────────────────────────────────────────────\(e)0m",
         ]
         return lines.joined(separator: "\r\n")
     }()

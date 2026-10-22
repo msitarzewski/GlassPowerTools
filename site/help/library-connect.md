@@ -140,11 +140,11 @@ If you close the library window while nothing else is open, the orb takes its pl
 
 A terminal, remote desktop, database or editor window can shrink into a small glass orb where it stands, and grow back when you want it, the way the library window does. Its session keeps running while it is an orb: terminals stay connected, and so does a desktop.
 
-- Choose **Shrink to Orb**, first in the window's bottom bar. A terminal window with two or more terminals has it in its **Terminal View** menu instead: pinch and hold the layout button and choose **Orb**.
+- Choose **Shrink to Orb**, first in the window's bottom bar. A terminal window with two or more terminals has the **Terminal View** button instead: pinch it.
 - The orb is a glass sphere with the session's live picture in it: the terminal in front, or the desktop's screen. A database or editor window shows itself as it looked when it shrank.
 - Look at the orb: it grows a little and shows the window's name below it.
 - Pinch the orb, or its name, to bring the window back where it was, at the size it was.
 
-A terminal window's terminals sit around its orb as small glass dots, up to 12, each colored as its tab shows its state. Look at a dot to see that terminal's picture in the orb and its name beside the dot; you can look across to the name to read it. Pinch the dot, or the name, to bring the window back with that terminal in front.
+A terminal window's terminals sit around its orb as glass dots, up to 12, each showing what its row in the sidebar shows: the coding agent running in it, in the agent's colour, or a terminal, pulsing while it prints. Look at a dot to see that terminal's picture in the orb and its name beside the dot; you can look across to the name to read it. Pinch the dot, or the name, to bring the window back with that terminal in front.
 
 When the window has **Auto-focus on activity** on, the orb pulses while a terminal in it prints, and shows the terminal that printed last. See [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings).

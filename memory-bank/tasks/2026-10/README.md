@@ -196,3 +196,16 @@
   reached tmux. All three fixed and tested; 0.4.491 ([`2026-10-19_tmux-scrollback.md`](2026-10-19_tmux-scrollback.md)).
   Not committed.
 - 2026-10-20 — [Ship it: the first Mac release, TestFlight 491, site and help](2026-10-20_first-mac-release.md); [after the release: Scale on local tabs, the folder's Open in Editor, iCloud's words](2026-10-20_after-the-release.md)
+- 2026-10-21 — [More looks, the Duo half open, Keys on Vision Pro](2026-10-21_looks-duo-keys.md):
+  - Coding Agent, Aurora, Starfield, Blueprint.
+  - The Duo's laptop pose puts the terminal above the fold and its bar below; the book pose keeps controls off the
+    fold.
+  - A Keys menu on Vision Pro.
+  - App Store Connect: the encryption key, TestFlight's internal group, France off.
+  - Then, through 0.4.505 (details in `activeContext.md`): the iPhone crash opening a terminal from Active
+    (a view type too deep for the phone's stack), a Workgroup's look in its editor, Settings and words in the
+    iPhone/iPad Tools menu, Open Folder in Editor from an iPhone terminal, a picture's Blur curve, the Mac
+    sidebar's empty-space menu, Vision Pro's terminal sidebar (the shared spatial columns, its own glass
+    panel, a toggle, additive), agent marks on every tab and on the orb's ring, a pinch on Terminal View for
+    the orb, Mermaid diagram marks in terminals, and Join Wrapped Lines keeping code and diagrams.
+  - Committed 2026-10-21 at his word ("commit everything"); not pushed.

@@ -61,7 +61,8 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         attachTree("tabs")
         XCTAssertEqual(elements("terminal-footer-new-tab").count, 1, "the bar holds more than one terminal's controls")
         XCTAssertEqual(terminalsConnections.count, 1, "the bar holds more than one terminal's controls")
-        XCTAssertEqual(elements("terminal-font-size").count, 1)
+        // Font Size is in Tools now, where the bar had grown to eleven (2026-10-21).
+        XCTAssertEqual(elements("terminal-font-size").count, 0, "Font Size is still in the bar")
         XCTAssertEqual(elements("terminal-open-folder-here").count, 1)
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "Tools menu")).count, 1,
                        "the bar should hold one tools menu")
@@ -69,6 +70,32 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         XCTAssertTrue(elements("vision-terminal-presentation").firstMatch.exists, "the Tabs/Grid/Carousel picker is missing")
         // The grid's own controls are not.
         XCTAssertFalse(app.buttons["Open Terminal"].exists, "the grid's bar shows over a terminal")
+    }
+
+    /// The keys a headset's keyboard lacks (2026-10-21): Apple shows no keyboard accessory to a
+    /// visionOS app, so they are a Keys menu in the bar, once, with every key the phone's
+    /// accessory has and the arrows. A demo terminal is connected to nothing, so what a press sends
+    /// is seen in the app's log ("Ignoring terminal input while session is not connected").
+    func testKeysAreInTheBar() {
+        launch("terminal-tabs")
+        let keys = elements("terminal-keys").firstMatch
+        XCTAssertTrue(keys.waitForExistence(timeout: 40), "Keys is not in the bar")
+        let found = elements("terminal-keys").allElementsBoundByIndex.map(\.debugDescription).joined(separator: "\n")
+        XCTAssertEqual(elements("terminal-keys").count, 1, "the bar holds more than one terminal's Keys:\n\(found)")
+        keys.tap()
+        for title in ["Escape", "Tab", "Control for Next Key", "Navigation", "Function Keys"] {
+            XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 10), "\(title) is not in Keys")
+        }
+        attachTree("keys")
+        app.buttons["Escape"].tap()
+        XCTAssertTrue(keys.waitForExistence(timeout: 10), "the bar is gone after a key")
+        keys.tap()
+        XCTAssertTrue(app.buttons["Navigation"].waitForExistence(timeout: 10))
+        app.buttons["Navigation"].tap()
+        for title in ["Up", "Down", "Left", "Right"] {
+            XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 10), "\(title) is not under Navigation")
+        }
+        app.buttons["Up"].tap()
     }
 
     /// Scale Text (D75): in the bar once, for the terminal in front, and it switches the window
@@ -117,6 +144,69 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: openTerminal)
         XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed, "the grid's bar stayed over the terminal")
         XCTAssertEqual(elements("terminal-footer-new-tab").count, 1)
+    }
+
+    /// A window's tabs are its sidebar from the second terminal on (2026-10-21), as a Mac window's
+    /// are: a row per terminal, which a pinch shows; none with one terminal, and none in the grid.
+    /// Apple's tab bar, which held them before, is gone.
+    func testTwoTerminalsHaveASidebar() {
+        launch("terminal-tabs")
+        let sidebar = elements("vision-terminal-sidebar").firstMatch
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 40), "two terminals and no sidebar")
+        attachTree("sidebar")
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@",
+                                                                        "vision-terminal-sidebar-row-"))
+        XCTAssertEqual(rows.count, 2, "a row per terminal")
+        XCTAssertEqual(app.tabBars.count, 0, "the tab bar ornament is still there")
+
+        // A pinch on the second row shows its terminal: its row is the one selected.
+        let second = rows.element(boundBy: 1)
+        second.tap()
+        let selected = NSPredicate(format: "isSelected == true")
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation(for: selected, evaluatedWith: second)], timeout: 5), .completed,
+                       "the row pinched isn't the one shown")
+
+        // The bar's toggle hides it and shows it again.
+        let toggle = elements("vision-terminal-sidebar-toggle").firstMatch
+        XCTAssertTrue(toggle.exists, "no sidebar toggle in the bar")
+        toggle.tap()
+        let hidden = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: sidebar)
+        XCTAssertEqual(XCTWaiter().wait(for: [hidden], timeout: 10), .completed, "the toggle didn't hide the sidebar")
+        toggle.tap()
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 10), "the toggle didn't show the sidebar again")
+
+        // A pinch on Terminal View makes the window its orb (2026-10-21): the sidebar goes with it.
+        elements("vision-terminal-presentation").firstMatch.tap()
+        XCTAssertTrue(elements("session-orb").firstMatch.waitForExistence(timeout: 15), "the pinch didn't make the orb")
+        XCTAssertFalse(sidebar.exists, "the sidebar stayed with the orb")
+    }
+
+    /// Font Size and the AI assistant are in Tools on the headset, not the bar (2026-10-21).
+    func testFontSizeIsInTools() {
+        launch("terminal-tabs")
+        let tools = app.buttons.matching(NSPredicate(format: "label == %@", "Tools menu")).firstMatch
+        XCTAssertTrue(tools.waitForExistence(timeout: 40), "no Tools menu in the bar")
+        tools.tap()
+        XCTAssertTrue(app.buttons["Font Size"].firstMatch.waitForExistence(timeout: 5), "no Font Size in Tools")
+    }
+
+    /// A Mermaid diagram a program printed as text has a mark beside it, which shows it drawn
+    /// (2026-10-21), in a popover over the terminal.
+    func testADiagramHasAMarkThatShowsIt() {
+        launch("terminal-diagram")
+        let mark = elements("terminal-diagram-mark").firstMatch
+        XCTAssertTrue(mark.waitForExistence(timeout: 40), "no mark beside the diagram")
+        XCTAssertEqual(elements("terminal-diagram-mark").count, 1, "one diagram, one mark")
+        mark.tap()
+        XCTAssertTrue(elements("terminal-diagram").firstMatch.waitForExistence(timeout: 10),
+                      "the mark didn't show the diagram")
+    }
+
+    func testOneTerminalHasNoSidebar() {
+        launch("terminal")
+        XCTAssertTrue(elements("terminal-footer-new-tab").firstMatch.waitForExistence(timeout: 40),
+                      "the terminal's bar did not appear")
+        XCTAssertFalse(elements("vision-terminal-sidebar").firstMatch.exists, "a sidebar for one terminal")
     }
 }
 #endif

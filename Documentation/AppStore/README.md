@@ -67,9 +67,15 @@ and gives a reason for each "required reason" API the app uses.
 
 **Export compliance.** The app uses standard encryption algorithms in addition to the operating
 system's: SSH (SwiftNIO SSH), TLS (BoringSSL, through SwiftNIO SSL) and the session encryption of
-Apple's Screen Sharing protocol. It uses no proprietary algorithms. Once App Store Connect has
-accepted the answers, the matching `ITSAppUsesNonExemptEncryption` value goes into the app's
-Info.plist, so later builds skip the question.
+Apple's Screen Sharing protocol. It uses no proprietary algorithms. Apple asks for no documentation
+for standard algorithms unless the app is sold in France, where the French encryption declaration
+is required
+([Apple](https://developer.apple.com/help/app-store-connect/reference/app-information/export-compliance-documentation-for-encryption)).
+So while France is left out of Pricing and Availability, `ITSAppUsesNonExemptEncryption` is `NO` in
+`App/Info.plist` and `Platforms/macOS/Info.plist`. Apple defines `NO` as encryption "exempt from
+export compliance documentation requirements", and with it builds skip the question. To add France,
+file the declaration with ANSSI and upload it to App Store Connect. Then set the key to `YES` and
+add the code Apple returns as `ITSEncryptionExportComplianceCode`.
 
 **Accessibility Nutrition Labels.** None declared yet. They are voluntary for now. Declare a
 feature for a device only after the app's common tasks (add a host, connect, use the session,

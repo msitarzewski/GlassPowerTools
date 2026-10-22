@@ -91,7 +91,7 @@ struct GlassEditorPreviewPane: View {
 
 /// The preview never navigates away from its own page. A link to the web opens in the browser;
 /// anything else is refused.
-private struct GlassEditorPreviewNavigation: WebPage.NavigationDeciding {
+struct GlassEditorPreviewNavigation: WebPage.NavigationDeciding {
     let openExternally: @MainActor (URL) -> Void
 
     mutating func decidePolicy(for action: WebPage.NavigationAction,

@@ -31,7 +31,101 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-10-20 — RESUME HERE
+## 2026-10-21 — RESUME HERE
+
+Nothing from today is committed. Commit at his word.
+- **App Store Connect and TestFlight** (his "pull france for now and get these builds into testflight"):
+  - `ITSAppUsesNonExemptEncryption = NO` is in `App/Info.plist` and `Platforms/macOS/Info.plist`: standard algorithms
+    need only the French declaration, and only for sale in France (`Documentation/AppStore/README.md`).
+  - Builds 491, 493 and 494 were answered through the API.
+  - An internal TestFlight group, "Internal", gets every build, and he is invited.
+  - Availability has never been set, so France is not on. When it is set, leave France off (no ANSSI declaration
+    yet) and China mainland too (it needs an ICP number).
+  - The app's icon in App Store Connect is blank, though both builds carry it. No build is attached to either 1.0
+    version, and there is Apple's Icon Composer overview bug. Attaching a build is offered, not done.
+- **More looks, Vision Pro Keys, the Duo half open** (`2026-10-21_looks-duo-keys.md`):
+  - **Looks:** Coding Agent (the agent's mark and AutoPaper's smoke in its colour), Aurora, Starfield, Blueprint.
+  - **Vision Pro:** a Keys menu in the terminal's bar. visionOS shows apps no keyboard accessory.
+  - **Duo laptop pose:** the terminal above the fold, its bar in the strip below.
+  - **Duo book pose:** controls off the fold.
+  - Verified on the Duo and visionOS simulators and in the VM. Four new pictures; help, README and release notes
+    updated.
+  - Built as 0.4.495 for the devices. Installed and read back on the iPhone and the Mac (the Mac at 13:18, on
+    the second try: the first quit request went unanswered). The Vision Pro was locked, so its version is
+    unread. No new crash reports. Not committed.
+- **0.4.496 (not committed):**
+  - **iPhone crash fixed** (his report: "iPhone instacrashes when trying to launch a terminal from Active"). Three
+    identical reports on 0.4.495: SIGSEGV on the main thread's stack guard, in `TerminalWindowView.terminalSurface`,
+    deep in Swift's type decoder. The Duo layout's modifiers deepened one view type that also nested the canvas; the
+    phone's smaller main-thread stack overflowed building it, under the deeper stack of opening from Active. Fixed by
+    erasing types (`AnyView`): the iPhone layout is `phoneFoldLayout`, and the canvas and both bars are erased in it.
+    Simulators never showed it. Installed on the iPhone (reads 0.4.496); his retry is the proof, still pending.
+  - **A Workgroup's look:** the Workgroup editor has Look and Text (`TerminalLooksSettingsView`, with a `subject`).
+    Made by hand over another, the look shown is the one saved. Test `editorSavesTheChosenLook` (seen failing with the
+    rule broken). Help (`terminal-workgroups.md`, `terminal-looks.md`) and release notes updated.
+  - **0.4.497 (iPhone only):** his "the folder icon in the tools on iphone in terminal [has no] label ... the whole
+    gear is missing". The iPhone/iPad Tools menu draws the bar's items as rows; the folder, Connections and New
+    Tab rows were bare symbols, and Settings was the last row of Session inside Tools. Now each says its name
+    (`toolLabel`), Settings is its own row with the gear, and Session has `ellipsis.circle` there (bars on Mac and
+    Vision Pro unchanged). `GlassTerminalToolsIPhoneUITests` (iOS 27.2 simulator): failed before, passes;
+    pictures in the working-files folder: tools-iphone-1021. Installed on the iPhone (reads 0.4.497). No iPhone crash
+    reports since 13:31.
+  - **0.4.498:** his "Active works, yes! Open Folder in Editor doesn't though." On iPhone the terminal takes the
+    library's place (`GlassTerminalBootstrap`'s router), and the editor's bootstrap, nested inside it, went too:
+    the request was made and nothing showed it. `mainContent` now has the editor's bootstrap outermost (the editor
+    needs nothing of the others); its back button says where it returns (`present(_:returningTo:)`, "Terminal"
+    from a terminal). `testOpenFolderInEditorShowsTheEditor` failed with the old nesting ("the editor never
+    appeared") and passes. On the iPhone (0.4.498); Mac and Vision Pro 0.4.498 building.
+  - **0.4.499:** (1) a picture's Blur (his "It doesn't blur so much as well... i dunno"): 30 × Blur points smeared
+    the picture by a tenth (seen on the iPhone 27.2 simulator over a test pattern, the working-files folder: blur-1021);
+    now `TerminalBackdropView.pictureBlurRadius` = 30 × Blur³. Test `pictureBlurRamp` failed with the old line.
+    (2) His "a right click ... in the empty space in the left sidebar ... a 'new terminal' option that mimics the
+    top toolbar": the Mac sidebar's empty-space menu (the list's context menu with no selection) shows the +
+    menu's items (`newTabMenuItems`, shared). Not driven on the Mac (no mouse automation there); his right-click is
+    the check. iPad's sidebar is the system's TabView sidebar: no empty-space menu was added there.
+  - **Vision Pro sidebar (in progress, 2026-10-21):** his "Go ahead, sidebar from two terminals ... instead of a
+    generic terminal icon, we replace it with the running agent and color it ... then pulse it". HIG read on
+    Apple's pages (DevTools): tab bars are for an app's sections; sidebars for collections; visionOS windows
+    widen for a sidebar; a drag carrying a user activity opens a window in empty space. Apple's split view was
+    tried first and dropped: visionOS draws glass behind every column, so even a one-terminal window was
+    frosted at Blur 0 (simulator captures, the working-files folder: vision-sidebar-1021). A hand-made frosted column
+    came next (0.4.500), until his "don't we use Apple's chrome in the database manager and in the Editor?": since
+    W33 those use `GlassSpatialSplitView`. Now (0.4.501) `VisionTerminalSidebarLayout` is `GlassSpatialSplitView` +
+    `glassSpatialColumn(workgroup.name)` + `glassSpatialList`, the sidebar on the window's glass (clear at Glass 0,
+    as the database is), and `glassAdditiveSidebar` (new, GlassShell, `GlassWindowSizer`) widens/narrows the window
+    by 360 pt as the second terminal comes/goes. Rows
+    `VisionTerminalSidebarRow` (name, where it is, `TerminalTabMark`), pinch-and-hold = `tabActions`, drag =
+    `TerminalTabDrag` (Transferable + NSUserActivity `com.glasspowertools.terminal-tab`, claimed by the
+    terminal window group; `VisionTerminalDropWindow` moves the terminal in). The title drag uses it too.
+    `TerminalTabMark` (agent mark in its colour, pulsing) also replaces the Mac sidebar's shimmer. To check on
+    the headset: pinch-and-hold vs drag, tear-off into space, the window widening, Scale Text's held shape.
+  - **Mermaid in terminals (his "an inline diagram icon would be amazing. let's"):** `TerminalDiagramFinder`
+    (GlassTerminalEmulator, pure; 7 tests, two seen failing with rules broken) finds diagrams in the screen's rows
+    (`SwiftTermBufferText.screenRows`, wrapped rows joined), kept in `SwiftTermHostModel.diagrams` (its own
+    @Observable, so only the marks redraw), refreshed as output settles, on scroll and on resize.
+    `TerminalDiagramMarks` overlays a mark after each diagram's first line (SSH panes and Mac local panes); it
+    opens `GlassTerminalRuntime.diagramView` = `GlassEditorDiagramView` (the Markdown preview's page and bundled
+    Mermaid, fitted to the view) in a popover (an iPhone sheet with Done). Demo surface `terminal-diagram`.
+    UI tests on iPhone and the headset simulator. The text is never changed. Not seen on the Mac yet.
+  - **Join Wrapped Lines and whitespace (his "it's like we need to process the white space too, right?"):** his pasted
+    diagram had two statements on one line because the joiner read "same indent as the line above" as a
+    continuation, and the widest statement looked as if it reached the margin. `TerminalWrappedPaste` now never
+    joins a Mermaid diagram's lines (`TerminalDiagramFinder`) and treats a no-bullet line deeper than its
+    paragraph's text as code. 3 new tests (17 in the suite), each seen failing with its rule off. 0.4.503.
+  - **Headset bar, orb and sidebar look (0.4.505):** his "the sidebar isn't right ... Why can't we use apple's real
+    sidebar", then his choices ("Ours, in its own glass"; Font Size and AI Assistant into Tools). Done:
+    `GlassSpatialSplitView(sidebarHasGlass:)` draws the sidebar as its own rounded glass panel, inset 8 pt, corners
+    concentric with the window's (visionOS draws glass in an `UnevenRoundedRectangle` as a square, measured);
+    a Sidebar toggle first in the bar (`visionTerminalSidebar`, additive: the window narrows/widens); a pinch on
+    Terminal View shrinks to the orb (held: Tabs/Grid/Carousel/Orb); the orb's ring dots 48 pt with
+    `TerminalSessionMark` (agent, colour, pulse) via `GlassSessionOrbTab.icon`; Font Size and AI Assistant in Tools
+    on visionOS. 12 headset UI tests pass (new: toggle, pinch → orb, Font Size in Tools). Captures in
+    the working-files folder: vision-sidebar-1021 (panel-*). Bar: 9 controls now.
+  - His question, answered: how a Workgroup's window is told from a window with tabs today (Mac: the sidebar icons'
+    colour only; iPad: the sidebar's section heading; iPhone and Vision Pro: nothing in the window).
+
+## 2026-10-20
+
 
 **Shipping** (his "Ship it!"; all three steps, his choice; the Mac at 0.4.491): `2026-10-20_first-mac-release.md`.
 - Pushed (ee8a8007..7f824f86). TestFlight 0.4.491 (491) uploaded for iPhone/iPad and Vision Pro.

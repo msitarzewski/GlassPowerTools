@@ -70,6 +70,18 @@ struct VisionTerminalDropWindow: View {
                 }
             })
         }
+        // A tab dragged out of a window and let go here (`TerminalTabDrag`): its terminal moves in,
+        // still running, and the window it left closes if that was its last.
+        .onContinueUserActivity(TerminalTabDrag.activityType) { activity in
+            guard reserved == nil else { return }
+            // A terminal already gone, or one that couldn't move: nothing to show.
+            guard let tab = TerminalTabDrag.tab(from: activity),
+                  let created = TerminalTabMoves.moveToNewWorkgroup(tab.sessionID, in: sessionManager) else {
+                dismiss()
+                return
+            }
+            reserved = created
+        }
         .task {
             try? await Task.sleep(for: .seconds(2))
             waited = true

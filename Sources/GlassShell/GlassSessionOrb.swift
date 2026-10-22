@@ -28,16 +28,24 @@ public struct GlassSessionOrbTab: Identifiable {
     public var symbolName: String
     /// The dot's glyph colour: the tab's state, as its tab label shows it.
     public var tint: Color
+    /// What the dot shows in place of `symbolName`, drawn by the session's own kind: a terminal's
+    /// coding agent in its colour, pulsing while it works, as its tab in the sidebar shows it
+    /// (2026-10-21).
+    public var icon: AnyView?
     public var picture: @MainActor () -> Image?
     /// Brings the tab to the front, as the window grows back on it.
     public var select: @MainActor () -> Void
 
-    public init(id: String, title: String, symbolName: String, tint: Color,
+    /// The side an `icon` is drawn at, in its dot.
+    public static var iconSize: CGFloat { GlassOrbRingLayout.iconSize }
+
+    public init(id: String, title: String, symbolName: String, tint: Color, icon: AnyView? = nil,
                 picture: @escaping @MainActor () -> Image?, select: @escaping @MainActor () -> Void) {
         self.id = id
         self.title = title
         self.symbolName = symbolName
         self.tint = tint
+        self.icon = icon
         self.picture = picture
         self.select = select
     }
@@ -323,10 +331,16 @@ private struct GlassSessionOrbView: View {
             tab.select()
             grow()
         } label: {
-            Image(systemName: tab.symbolName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(tab.tint)
-                .frame(width: GlassOrbRingLayout.dotDiameter, height: GlassOrbRingLayout.dotDiameter)
+            Group {
+                if let icon = tab.icon {
+                    icon
+                } else {
+                    Image(systemName: tab.symbolName)
+                        .font(.system(size: GlassOrbRingLayout.iconSize, weight: .semibold))
+                        .foregroundStyle(tab.tint)
+                }
+            }
+            .frame(width: GlassOrbRingLayout.dotDiameter, height: GlassOrbRingLayout.dotDiameter)
                 .glassBackgroundEffect(in: .circle)
                 .contentShape(.hoverEffect, .circle)
                 .hoverEffect(.highlight)
@@ -417,7 +431,11 @@ private struct GlassSessionOrbPressStyle: ButtonStyle {
 struct GlassOrbRingLayout: Layout {
     let count: Int
     static let maximumTabs = 12
-    static let dotDiameter: CGFloat = 30
+    /// Large enough to read the agent's mark in it at a glance (the owner, 2026-10-21: "increase the
+    /// size of the icons in orb view"); it was 30, its symbol 12.
+    static let dotDiameter: CGFloat = 48
+    /// A dot's symbol, or its icon's side.
+    static let iconSize: CGFloat = 24
     /// Between the orb's rim and a dot's (the owner: "move the dots away from the orb a few more pixels").
     static let gap: CGFloat = 22
     static let nameWidth: CGFloat = 150

@@ -20,7 +20,7 @@ struct WorkgroupEditorContext: Identifiable {
     var autoFocusOnActivity = false
     var gridCardWidth: Double? = nil
     /// The settings the workgroup's window opens with (W20's look, W22): a captured window's, or
-    /// the one being edited's, kept as they are.
+    /// the one being edited's. The editor changes their Look and Text (D84) and keeps the rest.
     var windowSettings = GlassWindowOverrides()
 
     static func new(
@@ -70,13 +70,21 @@ struct WorkgroupEditorContext: Identifiable {
         )
     }
 
-    /// The window settings the saved workgroup keeps (W20, W22). A window saved as a workgroup
-    /// takes the window's, none included, and so does a copy or an edit of a workgroup keep its
-    /// own; one made by hand keeps those of the workgroup it replaces, as it keeps how that one
-    /// opens.
+    /// The window settings the saved workgroup keeps (W20, W22), as the editor left them
+    /// (`edited`, its Look). A window saved as a workgroup takes the window's, none included, and
+    /// so does a copy or an edit of a workgroup keep its own; one made by hand keeps those of the
+    /// workgroup it replaces, as it keeps how that one opens, but the look it was shown here: the
+    /// editor shows the look a workgroup has, and None chosen there is none.
+    func windowSettingsToSave(_ edited: GlassWindowOverrides, replacing replaced: LayoutPreset?) -> GlassWindowOverrides {
+        if workspaceLayout != nil || original != nil || !windowSettings.isEmpty { return edited }
+        return (replaced?.windowSettings ?? GlassWindowOverrides())
+            .removing(TerminalWindowSettings.lookStyleKeys)
+            .merging(edited)
+    }
+
+    /// As opened, with nothing changed in the editor.
     func windowSettingsToSave(replacing replaced: LayoutPreset?) -> GlassWindowOverrides {
-        if workspaceLayout != nil || original != nil || !windowSettings.isEmpty { return windowSettings }
-        return replaced?.windowSettings ?? GlassWindowOverrides()
+        windowSettingsToSave(windowSettings, replacing: replaced)
     }
 }
 
@@ -190,6 +198,9 @@ struct WorkgroupEditorView: View {
     @State private var colorTag: ServerColorTag
     @State private var openingView: LayoutPreset.OpeningView
     @State private var autoFocusOnActivity: Bool
+    /// The window settings it opens with; Look and Text change them here (the owner, 2026-10-21:
+    /// "This way they can have personality from launch").
+    @State private var windowSettings: GlassWindowOverrides
     @State private var tabs: [WorkgroupTabDraft]
     @State private var selectedTabID: UUID?
     @State private var editingTab: WorkgroupTabDraft?
@@ -212,6 +223,7 @@ struct WorkgroupEditorView: View {
         _colorTag = State(initialValue: context.colorTag)
         _openingView = State(initialValue: context.openingView)
         _autoFocusOnActivity = State(initialValue: context.autoFocusOnActivity)
+        _windowSettings = State(initialValue: context.windowSettings)
         _tabs = State(initialValue: context.sessionIntents.map(WorkgroupTabDraft.init(intent:)))
     }
 
@@ -403,6 +415,10 @@ struct WorkgroupEditorView: View {
                 Text("Split layout preserved. Edit terminal settings here; rearrange or remove panes in the Mac workspace, then save it again.")
             }
         }
+
+        // This Window's Look and Text, which the window opens with; This Window changes them for
+        // that window after, and never the saved Workgroup.
+        TerminalLooksSettingsView(settings: $windowSettings, subject: "every tab this Workgroup opens")
 
         Section {
             if let validationMessage {
@@ -633,7 +649,7 @@ struct WorkgroupEditorView: View {
         preset.autoFocusOnActivity = replaced?.autoFocusOnActivity ?? autoFocusOnActivity
         #endif
         preset.gridCardWidth = context.gridCardWidth ?? replaced?.gridCardWidth
-        preset.windowSettings = context.windowSettingsToSave(replacing: replaced)
+        preset.windowSettings = context.windowSettingsToSave(windowSettings, replacing: replaced)
         onSave(preset)
         dismiss()
     }

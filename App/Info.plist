@@ -43,6 +43,8 @@
 	<string>$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
 	<key>GlassWidgetGroup</key>
 	<string>$(GPT_WIDGET_GROUP)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
@@ -54,6 +56,7 @@
 		<string>com.glasspowertools.open-terminal</string>
 		<string>com.glasspowertools.open-desktop</string>
 		<string>com.glasspowertools.session</string>
+		<string>com.glasspowertools.terminal-tab</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

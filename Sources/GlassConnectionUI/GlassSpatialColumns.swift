@@ -210,21 +210,32 @@ public extension View {
 public struct GlassSpatialSplitView<Sidebar: View, Content: View>: View {
     @Binding private var visibility: NavigationSplitViewVisibility
     private let showsToggle: Bool
+    private let sidebarHasGlass: Bool
     private let sidebar: Sidebar
     private let content: Content
 
-    /// - Parameter showsToggle: false where the sidebar could only ever be empty — an editor with
-    ///   no project — so no control offers it.
+    /// - Parameters:
+    ///   - showsToggle: false where the sidebar could only ever be empty — an editor with no
+    ///     project — so no control offers it.
+    ///   - sidebarHasGlass: the sidebar in Apple's glass of its own, apart from the content, as the
+    ///     system's sidebar stands: for a window whose content can be completely clear, a terminal's
+    ///     (the owner, 2026-10-21: of the sidebar on the window's glass alone, "It's close but it
+    ///     looks out of place"). The content keeps the window's glass, at its Glass.
     public init(visibility: Binding<NavigationSplitViewVisibility>, showsToggle: Bool = true,
+                sidebarHasGlass: Bool = false,
                 @ViewBuilder sidebar: () -> Sidebar,
                 @ViewBuilder content: () -> Content) {
         _visibility = visibility
         self.showsToggle = showsToggle
+        self.sidebarHasGlass = sidebarHasGlass
         self.sidebar = sidebar()
         self.content = content()
     }
 
     private var showsSidebar: Bool { visibility != .detailOnly }
+
+    /// How far a sidebar's own glass stands in from the window's edges.
+    static var sidebarGlassInset: CGFloat { 8 }
 
     public var body: some View {
         GeometryReader { proxy in
@@ -236,6 +247,21 @@ public struct GlassSpatialSplitView<Sidebar: View, Content: View>: View {
                         .environment(\.glassSpatialIsSidebar, true)
                         .frame(width: GlassSpatialColumns.sidebarWidth(windowWidth: proxy.size.width))
                         .frame(maxHeight: .infinity)
+                        .background {
+                            if sidebarHasGlass {
+                                // A panel of its own, set a little in from the window's edges, its
+                                // corners concentric with the window's, as Apple's sidebars float
+                                // since the 26 releases. Rounded all round: visionOS draws glass in
+                                // a shape rounded at some corners only as a square (measured,
+                                // visionOS 27 simulator, 2026-10-21).
+                                Color.clear
+                                    .glassBackgroundEffect(in: RoundedRectangle(
+                                        cornerRadius: GlassWindowShape.spatialWindowCornerRadius - Self.sidebarGlassInset,
+                                        style: .continuous))
+                                    .padding(Self.sidebarGlassInset)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                         .transition(.move(edge: .leading).combined(with: .opacity))
                         // One group for VoiceOver, where the system's split view gave a landmark.
                         .accessibilityElement(children: .contain)

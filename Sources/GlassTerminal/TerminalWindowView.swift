@@ -65,6 +65,8 @@ enum TerminalNewTerminalRoute: Equatable {
 struct TerminalWindowView: View {
     #if os(visionOS)
     @Environment(\.visionTerminalPresentation) private var visionPresentation
+    /// Whether the window shows its sidebar, with two or more terminals in it; nil with one.
+    @Environment(\.visionTerminalSidebar) private var visionSidebar
     #endif
     @Bindable var session: TerminalSession
     /// Standalone terminal windows own their session. An app-level workspace or
@@ -128,6 +130,10 @@ struct TerminalWindowView: View {
     @State private var showingTerminalSettings = false
     #if os(iOS)
     @State private var softwareKeyboardVisible = false
+    /// Where an iPhone Duo's fold crosses the terminal, while it is partly folded (2026-10-21).
+    @State private var deviceFold: GlassDeviceFold?
+    /// The terminal's stack on the screen, to lay it out against the fold.
+    @State private var stackFrame = CGRect.zero
     #endif
     @State private var showingCloseConfirmation = false
     @State private var showVisualBell = false
@@ -355,29 +361,12 @@ struct TerminalWindowView: View {
         terminalContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         #else
-        VStack(spacing: 0) {
-            if !ownsSessionLifecycle && showsConnectionOrnament {
-                connectionLabel
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.regularMaterial)
-                Divider()
-            }
-
-            terminalContent
-                // iOS has an opaque page behind the terminal, not spatial
-                // passthrough. Match that backing to the selected terminal
-                // theme so transparent dark themes never blend into white.
-                .background(windowTheme.canvasBackgroundColor.color)
-                .modifier(GlassWindowBackground(
-                    interactive: false,
-                    material: resolvedMaterial,
-                    blurAmount: effectiveBlurBackground,
-                    appearance: windowTheme.resolvedAppearance
-                ))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
+        // Erased, as are the canvas and both bars inside: one type nesting all of them overflowed
+        // the iPhone's main-thread stack while Swift built it (2026-10-21, 0.4.495, a terminal
+        // opened from Active: a segmentation fault in `terminalSurface`, deep in the runtime's
+        // type decoder). Each piece's type is now built on its own. The simulator's larger stack
+        // never showed it.
+        AnyView(phoneFoldLayout)
         // Under the keyboard's accessory, and the home indicator, the terminal's colour too. With a
         // hardware keyboard the accessory stands alone at the bottom of the screen, and the strip
         // the terminal gives up to it showed the page behind: white under a black terminal
@@ -389,13 +378,16 @@ struct TerminalWindowView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // An iPhone on its side has no height to spare: Tools moves to the top bar instead.
-            if !keyboardToolsShown && !isPhoneLandscape {
-            bottomStatusBar
+            // A Duo stood like a laptop has its own bar below the fold.
+            if !keyboardToolsShown && !isPhoneLandscape && laptopFold == nil {
+            AnyView(bottomStatusBar)
                 .controlSize(.small)
                 .glassEffect(.regular, in: .capsule)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
+                // Held like a book, beside the fold rather than on it: in the trailing half.
+                .padding(.leading, bookFold.map { max(0, $0.globalFrame.maxX - stackFrame.minX) } ?? 0)
                 // The terminal's own colour, not the system bar's: a light grey band under a
                 // dark terminal read as a separate panel (2026-10-04).
                 .background(windowTheme.canvasBackgroundColor.color)
@@ -434,6 +426,63 @@ struct TerminalWindowView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         #endif
     }
+
+    #if os(iOS)
+    /// The connection label and the canvas, and on an iPhone Duo stood like a laptop, the bar below
+    /// the fold. Their types are erased for the reason `terminalSurface` gives.
+    private var phoneFoldLayout: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+            if !ownsSessionLifecycle && showsConnectionOrnament {
+                connectionLabel
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.regularMaterial)
+                Divider()
+            }
+
+            AnyView(terminalContent)
+                // iOS has an opaque page behind the terminal, not spatial
+                // passthrough. Match that backing to the selected terminal
+                // theme so transparent dark themes never blend into white.
+                .background(windowTheme.canvasBackgroundColor.color)
+                .modifier(GlassWindowBackground(
+                    interactive: false,
+                    material: resolvedMaterial,
+                    blurAmount: effectiveBlurBackground,
+                    appearance: windowTheme.resolvedAppearance
+                ))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            // An iPhone Duo stood like a small laptop: the terminal in the top half, down to the
+            // fold. With the keyboard up, the keyboard's own top is the fold and this is all the
+            // room there is; with it away, the rest stays empty below the bar.
+            .frame(height: laptopTopHeight)
+            if laptopFold != nil { Spacer(minLength: 0) }
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stackFrame = $0 }
+        // Below the fold, the window's own bar, in the strip the keyboard leaves above its keys
+        // (Apple: content up top, controls below, where touch is steadier). Placed on the screen
+        // rather than in the stack: with the keyboard up the stack ends at the fold. (A stack that
+        // ignored the keyboard, the first try, was given only the room above it, overflowed and
+        // was centred, its first rows under the title.)
+        .overlay(alignment: .top) {
+            if let fold = laptopFold {
+                AnyView(laptopBar)
+                    .offset(y: fold.globalFrame.maxY - stackFrame.minY + 4)
+            }
+        }
+        // The fold, read from the window, which nothing shortens.
+        .glassDeviceFold($deviceFold)
+        .onChange(of: laptopFold != nil, initial: true) { _, laptop in
+            terminalHostModel.setKeyboardAccessoryWithheld(laptop)
+        }
+        .onChange(of: bookFold != nil, initial: true) { _, book in
+            terminalHostModel.setKeyboardAccessoryKeepsOffMiddle(book)
+        }
+    }
+    #endif
 
     private var terminalPresentation: some View {
         terminalSurface
@@ -717,10 +766,14 @@ struct TerminalWindowView: View {
         if let workgroupID, tabMoving != nil {
             connectionLabel
                 .contentShape(.capsule)
-                .draggable(TerminalTabTransfer(workgroupID: workgroupID, sessionID: session.id)) {
+                // Onto another terminal window, or into empty space for a window of its own
+                // (`TerminalTabDrag`, 2026-10-21), as a sidebar row drags.
+                .onDrag {
+                    TerminalTabDrag.itemProvider(TerminalTabTransfer(workgroupID: workgroupID, sessionID: session.id))
+                } preview: {
                     connectionLabel.glassBackgroundEffect(in: .capsule)
                 }
-                .accessibilityHint("Drag onto another terminal window to move this terminal there.")
+                .accessibilityHint("Drag onto another terminal window to move this terminal there, or into empty space for a window of its own.")
         } else {
             connectionLabel
         }
@@ -752,7 +805,8 @@ struct TerminalWindowView: View {
             #endif
             // What the window shows behind its text (D84), over the canvas and under the text.
             TerminalBackdropView(style: profile.lookStyle, theme: windowTheme,
-                                 activity: terminalHostModel.outputActivity)
+                                 activity: terminalHostModel.outputActivity, agent: lookAgent,
+                                 findAgent: { [session] in GlassTerminalCapability.agent(of: session) })
             SwiftTermHostView(
                 model: terminalHostModel,
                 theme: swiftTermTheme,
@@ -798,7 +852,11 @@ struct TerminalWindowView: View {
             )
             .onGeometryChange(for: CGSize.self) { $0.size } action: { terminalCanvasSize = $0 }
             .background(Color.clear)
-            .terminalTextLook(profile.lookStyle, theme: windowTheme)
+            .terminalTextLook(profile.lookStyle, theme: windowTheme, agent: lookAgent)
+            // A mark beside each Mermaid diagram it shows as text, in its cells (2026-10-21).
+            .overlay(alignment: .topLeading) {
+                TerminalDiagramMarks(model: terminalHostModel, draw: terminalRuntime?.diagramView)
+            }
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
             .padding(.horizontal, terminalCanvasHorizontalPadding)
             .padding(.vertical, terminalCanvasPadding)
@@ -1227,6 +1285,11 @@ struct TerminalWindowView: View {
     /// The window's theme, with its font, else the settings'.
     private var windowTheme: TerminalTheme { profile.theme }
 
+    /// The coding agent this terminal runs, for a look that shows it (D84); asked only when one does.
+    private var lookAgent: TerminalAgent? {
+        profile.lookStyle.usesAgent ? GlassTerminalCapability.agent(of: session) : nil
+    }
+
     private var look: TerminalLook { profile.look }
 
     private var tintColor: Color? { look.tintColor }
@@ -1441,11 +1504,11 @@ struct TerminalWindowView: View {
         showingTerminalSettings = true
     }
 
-    private var footerNewTerminalButton: some View {
+    private func footerNewTerminalButton(inMenu: Bool) -> some View {
         Button {
             openNewTerminalFromFooter()
         } label: {
-            Image(systemName: "plus")
+            toolLabel(newTerminalAccessibilityLabel, image: "plus", inMenu: inMenu)
         }
         #if os(iOS)
         .buttonStyle(.borderless)
@@ -1558,6 +1621,54 @@ struct TerminalWindowView: View {
         softwareKeyboardVisible || terminalHostModel.keyboardAccessoryShown
     }
 
+    /// The Duo's fold across the terminal: the phone stood like a laptop.
+    private var laptopFold: GlassDeviceFold? {
+        deviceFold.flatMap { $0.isAcross ? $0 : nil }
+    }
+
+    /// The terminal's height down to the fold of a Duo stood like a laptop; nil otherwise.
+    private var laptopTopHeight: CGFloat? {
+        laptopFold.map { max(0, min(stackFrame.height, $0.globalFrame.minY - stackFrame.minY)) }
+    }
+
+    /// The Duo's fold down the terminal's middle: the phone held like a book.
+    private var bookFold: GlassDeviceFold? {
+        deviceFold.flatMap { $0.isAcross ? nil : $0 }
+    }
+
+    /// The bar below the fold of a Duo stood like a laptop: what the keyboard's accessory holds —
+    /// the keyboard, Tools and the cursor pad, Keys — where the accessory can't go.
+    private var laptopBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                if softwareKeyboardVisible { terminalHostModel.dismissInputFocus() } else { terminalHostModel.focus() }
+            } label: {
+                Label(softwareKeyboardVisible ? "Dismiss Keyboard" : "Show Keyboard",
+                      systemImage: softwareKeyboardVisible ? "keyboard.chevron.compact.down" : "keyboard")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 44, height: 44)
+            }
+            .glassEffect(.regular.interactive(), in: .circle)
+            .accessibilityIdentifier("terminal-laptop-keyboard")
+            Spacer(minLength: 0)
+            HStack(spacing: 4) {
+                iOSKeyboardToolsMenu
+                    .padding(.leading, 12)
+                TerminalArrowPad { terminalHostModel.press($0) }
+            }
+            .glassEffect(.regular, in: .capsule)
+            Spacer(minLength: 0)
+            TerminalKeysMenu { terminalHostModel.press($0) }
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+                .glassEffect(.regular.interactive(), in: .circle)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .disabled(!isTerminalActive)
+        .environment(\.colorScheme, themeColorScheme ?? systemColorScheme)
+    }
+
     /// An iPhone on its side: compact height.
     private var isPhoneLandscape: Bool {
         verticalSizeClass == .compact && UIDevice.current.userInterfaceIdiom == .phone
@@ -1587,6 +1698,15 @@ struct TerminalWindowView: View {
     @ViewBuilder
     private func bottomStatusBarContents(compact: Bool, inMenu: Bool = false) -> some View {
         #if os(visionOS)
+        // The sidebar first, where a Mac window's toggle is (the owner, 2026-10-21: "We need a
+        // sidebar/tabs toggle in the bottom ornaments"); in the tabs layout, where it is shown.
+        if let visionSidebar, visionPresentation?.wrappedValue != .grid, visionPresentation?.wrappedValue != .carousel {
+            Button(visionSidebar.wrappedValue ? "Hide Sidebar" : "Show Sidebar", systemImage: "sidebar.left") {
+                withAnimation { visionSidebar.wrappedValue.toggle() }
+            }
+            .accessibilityIdentifier("vision-terminal-sidebar-toggle")
+            .help(visionSidebar.wrappedValue ? "Hide Sidebar" : "Show Sidebar")
+        }
         if let visionPresentation {
             VisionTerminalPresentationPicker(selection: visionPresentation)
         }
@@ -1596,7 +1716,7 @@ struct TerminalWindowView: View {
                 Button {
                     showConnections()
                 } label: {
-                    Image(systemName: "server.rack")
+                    toolLabel("Connections", image: "server.rack", inMenu: inMenu)
                 }
                 // iPhone and iPad only: on Vision Pro these are toolbar items, and the toolbar
                 // styles its own buttons (W31).
@@ -1607,12 +1727,10 @@ struct TerminalWindowView: View {
                 .help("Connections")
             }
 
-            if aiAssistant.isAvailable {
+            // In Tools on Vision Pro, whose bar had grown to eleven (the owner, 2026-10-21).
+            if aiAssistant.isAvailable, !Self.toolsHoldViewControls {
                 Button {
-                    Task {
-                        aiAssistantDirectory = await session.workingDirectory(reported: terminalHostModel.currentDirectory)
-                        showingAIAssistant = true
-                    }
+                    openAIAssistant()
                 } label: {
                     toolLabel("AI Assistant", image: "sparkles", inMenu: inMenu)
                 }
@@ -1638,7 +1756,9 @@ struct TerminalWindowView: View {
                 Button {
                     withWorkingFolder(openFolderHere)
                 } label: {
-                    Image(systemName: "folder")
+                    // Words in iPhone's and iPad's Tools menu: an icon's spoken label isn't drawn
+                    // there (the owner, 2026-10-21).
+                    toolLabel("Open Folder Here", image: "folder", inMenu: inMenu)
                 }
                 #if !os(macOS)
                 // Pinch and hold: the same folder in the editor instead. Not on a Mac, whose
@@ -1681,7 +1801,9 @@ struct TerminalWindowView: View {
             recordingIndicator
 
             #if !os(macOS)
-            if inMenu {
+            if Self.toolsHoldViewControls {
+                // In the tools menu below.
+            } else if inMenu {
                 Menu("Font Size", systemImage: "textformat.size") {
                     Button("Increase", action: fontActions.increase)
                         .keyboardShortcut("+", modifiers: .command)
@@ -1701,25 +1823,48 @@ struct TerminalWindowView: View {
                     .disabled(!isTerminalActive)
             }
 
+            #if os(visionOS)
+            // The keys the headset's keyboard lacks: its apps get no keyboard accessory, where the
+            // phone's and iPad's Terminal Keys menu sits (2026-10-21).
+            TerminalKeysMenu { terminalHostModel.press($0) }
+                .disabled(!isTerminalActive)
+            #endif
+
             if showsFooterNewTerminalAction {
                 #if !os(macOS)
                 if let onOpenTerminal {
                     // Held: servers ▸ their terminals, opened in this window (2026-10-15).
                     TerminalNewTabMenu(pickServer: { openNewTerminalFromFooter() }, open: onOpenTerminal) {
-                        Image(systemName: "plus")
+                        toolLabel(newTerminalAccessibilityLabel, image: "plus", inMenu: inMenu)
                     }
                     .accessibilityIdentifier("terminal-footer-new-tab")
                     .accessibilityLabel(newTerminalAccessibilityLabel)
                     .help("New Terminal Tab. Hold for a server's running terminals.")
                 } else {
-                    footerNewTerminalButton
+                    footerNewTerminalButton(inMenu: inMenu)
                 }
                 #else
-                footerNewTerminalButton
+                footerNewTerminalButton(inMenu: inMenu)
                 #endif
             }
 
             Menu {
+                if Self.toolsHoldViewControls {
+                    if aiAssistant.isAvailable {
+                        Button("AI Assistant", systemImage: "sparkles") { openAIAssistant() }
+                    }
+                    Menu("Font Size", systemImage: "textformat.size") {
+                        Button("Increase", systemImage: "textformat.size.larger", action: fontActions.increase)
+                            .keyboardShortcut("+", modifiers: .command)
+                        Button("Decrease", systemImage: "textformat.size.smaller", action: fontActions.decrease)
+                            .keyboardShortcut("-", modifiers: .command)
+                        Button("Reset", systemImage: "arrow.counterclockwise", action: fontActions.reset)
+                            .keyboardShortcut("0", modifiers: .command)
+                    }
+                    .disabled(!isTerminalActive)
+                    .accessibilityIdentifier("terminal-font-size")
+                    Divider()
+                }
                 Button {
                     configureFind()
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -1845,15 +1990,17 @@ struct TerminalWindowView: View {
                     .disabled(session.state == .disconnected)
                 }
 
-                Divider()
+                if !inMenu {
+                    Divider()
 
-                Button {
-                    openTerminalSettings()
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
+                    Button {
+                        openTerminalSettings()
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
                 }
             } label: {
-                toolLabel("Session", image: "gearshape", inMenu: inMenu)
+                toolLabel("Session", image: inMenu ? "ellipsis.circle" : "gearshape", inMenu: inMenu)
             }
             .menuOrder(.fixed)
 #if os(iOS)
@@ -1861,7 +2008,36 @@ struct TerminalWindowView: View {
             .buttonStyle(.borderless)
 #endif
             .help("Tools")
-            .accessibilityLabel("Tools menu")
+            // In the Tools menu it is a row, Session, as it reads; in a bar, the tools menu itself.
+            .accessibilityLabel(inMenu ? "Session" : "Tools menu")
+
+            // iPhone and iPad: Settings is a row of its own, with the gear. Inside Session it was a
+            // menu within the Tools menu, its last row, and not found there (the owner, 2026-10-21:
+            // "the whole gear is missing").
+            if inMenu {
+                Button {
+                    openTerminalSettings()
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+            }
+    }
+
+    /// Vision Pro keeps Font Size and the AI assistant in the tools menu, not the bar (the owner,
+    /// 2026-10-21: "it's getting crowded down there"); iPhone and iPad have all of Tools in one menu.
+    private static var toolsHoldViewControls: Bool {
+        #if os(visionOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    private func openAIAssistant() {
+        Task {
+            aiAssistantDirectory = await session.workingDirectory(reported: terminalHostModel.currentDirectory)
+            showingAIAssistant = true
+        }
     }
 
     @ViewBuilder

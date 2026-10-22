@@ -350,7 +350,9 @@ struct GlassPowerToolsApp: App {
         editor.showActiveConnections = showActive
         // Workgroups is a panel in the library, not a window: its menu items open it there.
         terminal.showLibraryPanel = { [weak model] panelID in model?.showPanel(panelID) }
-        terminal.openFolderAsProject = { @MainActor serverID, path in
+        // A machine's folder as a project; on a phone, `returnTitle` is what the editor's back
+        // button returns to.
+        let openFolderAsProject: @MainActor (UUID, String, String?) -> Void = { serverID, path, returnTitle in
             let host = library.host(owningEndpoint: EndpointID(rawValue: serverID))
             let project = GlassEditorProject(hostID: host?.id, path: path)
             // This Mac browsed over SSH opens from the disk too (B-X22).
@@ -358,9 +360,10 @@ struct GlassPowerToolsApp: App {
             // The returned id is a window that has to be *shown*; dropping it left the project
             // opened into a workspace nothing was displaying.
             if let windowID = editorRuntime.openProject(project, reach: reach) {
-                editorRuntime.present(windowID)
+                editorRuntime.present(windowID, returningTo: returnTitle)
             }
         }
+        terminal.openFolderAsProject = { @MainActor serverID, path in openFolderAsProject(serverID, path, nil) }
         // A terminal's folder button ▸ Open in Editor (2026-10-20, the owner: "either opens the
         // Project with the same server/path or it opens a new Editor with pwd at the working
         // directory"): the machine's project that is or holds the shell's folder, else that folder
@@ -375,9 +378,9 @@ struct GlassPowerToolsApp: App {
             if let project = editorRuntime.projects.project(containing: path, on: machines) {
                 let reach: GlassEditorProjectReach = project.hostID.flatMap { library.host($0) }.map { projectReach($0) }
                     ?? .thisMachine
-                editorRuntime.present(editorRuntime.openProject(project, reach: reach))
+                editorRuntime.present(editorRuntime.openProject(project, reach: reach), returningTo: "Terminal")
             } else if let serverID, !onThisMac {
-                terminal.openFolderAsProject?(serverID, path)
+                openFolderAsProject(serverID, path, "Terminal")
             } else {
                 let folder = URL(filePath: path, directoryHint: .isDirectory)
                 GlassWindowOpener.shared.perform { editorRuntime.show(editorRuntime.open(urls: [folder]), with: $0) }
@@ -438,6 +441,8 @@ struct GlassPowerToolsApp: App {
         // A path a Mac terminal printed, previewed over it as the editor previews files (2026-10-16).
         terminal.filePreview = { url in AnyView(GlassEditorQuickPreview(url: url)) }
         #endif
+        // A Mermaid diagram a terminal shows as text, drawn from the mark beside it (2026-10-21).
+        terminal.diagramView = { source in AnyView(GlassEditorDiagramView(source: source)) }
         // "Edit" on a file in the Files browser opens it in the editor, as a tab, and saves back
         // over the same connection through the verified commit.
         terminal.openFileInEditor = { @MainActor serverID, path in
@@ -670,11 +675,16 @@ struct GlassPowerToolsApp: App {
     }
 
     /// The library, inside every capability's bootstrap, as each Connections window shows it.
+    ///
+    /// The editor's outermost. On an iPhone the terminal takes the library's place on the screen,
+    /// and everything inside the terminal's bootstrap goes with it: an editor asked for from a
+    /// terminal (Open Folder in Editor) had nothing left to show it (2026-10-21). The editor needs
+    /// nothing of the others; it is shown over whichever is on the screen.
     private var mainContent: some View {
-        GlassTerminalBootstrap(runtime: terminal) {
-            GlassDatabaseBootstrap(runtime: database) {
-                GlassDesktopBootstrap(runtime: desktop) {
-                    GlassEditorBootstrap(runtime: editor) {
+        GlassEditorBootstrap(runtime: editor) {
+            GlassTerminalBootstrap(runtime: terminal) {
+                GlassDatabaseBootstrap(runtime: database) {
+                    GlassDesktopBootstrap(runtime: desktop) {
                         GlassShellLibraryView(model: model)
                     }
                 }

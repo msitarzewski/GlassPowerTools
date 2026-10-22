@@ -505,6 +505,61 @@ public final class SwiftTermHostModel: ObservableObject {
         if keyboardAccessoryShown != shown { keyboardAccessoryShown = shown }
     }
 
+    #if canImport(UIKit)
+    /// Presses one of the keys a software keyboard lacks, as the keyboard's accessory's Terminal
+    /// Keys menu does. A Vision Pro shows no keyboard accessory to an app built for it (Apple's
+    /// `inputAccessoryView`), so its terminal window's own Keys menu sends them through here (the
+    /// owner, 2026-10-21: "the full key menu on terminal mode in visionPro").
+    public func press(_ key: SwiftTermAccessoryKey) {
+        // The terminal view's own accessory: UIKit's `inputAccessoryView` isn't there to ask on a
+        // Vision Pro, SwiftTerm's is.
+        terminalView?.terminalAccessory?.press(key)
+    }
+
+    /// The terminal's own view, found in the engine's.
+    private var terminalView: ReviewingTerminalView? {
+        func find(_ view: UIView) -> ReviewingTerminalView? {
+            if let terminal = view as? ReviewingTerminalView { return terminal }
+            return view.subviews.lazy.compactMap(find).first
+        }
+        return terminalEngine.flatMap { find($0.hostView) }
+    }
+    #endif
+
+    #if os(iOS)
+    /// Withholds the keyboard's accessory, or gives it back. An iPhone Duo stood like a small
+    /// laptop has its keyboard in the bottom half, and iOS puts an accessory above the fold, where
+    /// it takes rows from the terminal; the window draws its own bar below the fold instead, where
+    /// the keyboard leaves room (2026-10-21). A keyboard that is up is put away and asked for
+    /// again: the accessory can't change under it, as reloading input views while the keyboard
+    /// moves between halves crashes inside UIKit (UTM's laptop mode found the same).
+    public func setKeyboardAccessoryWithheld(_ withheld: Bool) {
+        guard let terminal = terminalView else { return }
+        if withheld {
+            guard let accessory = terminal.inputAccessoryView else { return }
+            terminal.withheldAccessory = accessory
+            terminal.inputAccessoryView = nil
+        } else {
+            guard let accessory = terminal.withheldAccessory else { return }
+            terminal.inputAccessoryView = accessory
+            terminal.withheldAccessory = nil
+        }
+        guard terminal.isFirstResponder else { return }
+        _ = terminal.resignFirstResponder()
+        Task { @MainActor [weak self] in
+            // Once the pose has settled.
+            try? await Task.sleep(for: .milliseconds(350))
+            self?.focus()
+        }
+    }
+
+    /// Keeps the keyboard's accessory's middle clear: an iPhone Duo held like a book has its fold
+    /// there.
+    public func setKeyboardAccessoryKeepsOffMiddle(_ keeps: Bool) {
+        terminalView?.terminalAccessory?.keepsOffMiddle = keeps
+    }
+    #endif
+
     #if os(iOS)
     private var keyboardToolsView: (UIView & UIContentView)?
 
@@ -711,6 +766,19 @@ public final class SwiftTermHostModel: ObservableObject {
 
     public func getVisibleText(lastNLines: Int = 20) -> [String] {
         terminalEngine?.visibleText(lastNLines: lastNLines) ?? []
+    }
+
+    /// The Mermaid diagrams on screen now (2026-10-21), for the marks beside them: an object of its
+    /// own, so a change redraws the marks and never the window, as this model's published changes do.
+    public let diagrams = SwiftTermDiagrams()
+
+    /// Looks at the screen again for diagrams: as output settles, as the terminal scrolls or resizes.
+    public func refreshDiagrams() {
+        guard let engine = terminalEngine else {
+            diagrams.update(rows: [], cellSize: nil)
+            return
+        }
+        diagrams.update(rows: engine.screenRows(), cellSize: engine.screenCellSize)
     }
 
     #if os(macOS)
@@ -1122,6 +1190,26 @@ private final class SwiftTermFindTracker {
 /// in a debug build; the Mac's 26 tabs held the app for seconds after 0.4.482 launched).
 @MainActor
 enum SwiftTermBufferText {
+    /// The rows on screen now, top to bottom, each with whether it carries on the row above: what
+    /// is looked through for diagrams (`TerminalDiagramFinder`), a screen at a time.
+    static func screenRows(of terminal: Terminal) -> [SwiftTermScreenRow] {
+        let top = terminal.buffer.totalLinesTrimmed + terminal.getTopVisibleRow()
+        return (0..<max(0, terminal.rows)).map { row in
+            let line = terminal.getScrollInvariantLine(row: top + row)
+            return SwiftTermScreenRow(line?.translateToString(trimRight: true) ?? "",
+                                      continuesAbove: line?.isWrapped ?? false)
+        }
+    }
+
+    /// One cell at the view's font, in points: its grid's frame over its grid; nil before it is measured.
+    static func cellSize(of view: TerminalView) -> CGSize? {
+        let terminal = view.getTerminal()
+        guard terminal.cols > 0, terminal.rows > 0 else { return nil }
+        let optimal = view.getOptimalFrameSize().size
+        let cell = CGSize(width: optimal.width / CGFloat(terminal.cols), height: optimal.height / CGFloat(terminal.rows))
+        return cell.width > 0 && cell.height > 0 ? cell : nil
+    }
+
     /// The last `count` lines with any text, oldest first: what `getBufferAsData` holds, as lines,
     /// with the empty ones left out.
     static func lastLines(_ count: Int, of terminal: Terminal) -> [String] {
@@ -1444,6 +1532,16 @@ public struct SwiftTermRuntimeSettings: Equatable {
 /// Narrow boundary between terminal transport/state and the concrete renderer.
 /// The active implementation remains SwiftTerm; an alternate renderer only needs to
 /// conform here and be selected by `SwiftTermHostView.makeEngine`.
+/// A key the Terminal Keys menu presses: what a software keyboard lacks.
+public enum SwiftTermAccessoryKey: Hashable, Sendable {
+    case escape, tab
+    /// Control held for the next key typed.
+    case controlForNextKey
+    case up, down, left, right
+    /// F1–F12.
+    case function(Int)
+}
+
 #if canImport(UIKit)
 @MainActor
 private protocol TerminalEngine: AnyObject {
@@ -1464,6 +1562,9 @@ private protocol TerminalEngine: AnyObject {
     func resignFocus()
     func refreshAccessibilityViewport()
     func visibleText(lastNLines: Int) -> [String]
+    /// The rows on screen now, and one cell's size, for the diagram marks (`TerminalDiagramFinder`).
+    func screenRows() -> [SwiftTermScreenRow]
+    var screenCellSize: CGSize? { get }
     func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult
     func clearSearch()
     var selectedFindLine: String? { get }
@@ -1732,12 +1833,29 @@ private final class MinimalTerminalAccessoryView: UIToolbar {
     func setToolsView(_ view: UIView?) {
         guard view !== installedToolsView else { return }
         installedToolsView = view
-        guard let view else { items = baseItems; return }
-        view.frame = CGRect(x: 0, y: 0, width: 100, height: 44)
-        view.widthAnchor.constraint(equalToConstant: 100).isActive = true
-        view.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        toolsItem = view.map { view in
+            view.frame = CGRect(x: 0, y: 0, width: 100, height: 44)
+            view.widthAnchor.constraint(equalToConstant: 100).isActive = true
+            view.heightAnchor.constraint(equalToConstant: 44).isActive = true
+            return UIBarButtonItem(customView: view)
+        }
+        layOutItems()
+    }
+
+    private var toolsItem: UIBarButtonItem?
+
+    /// An iPhone Duo held like a book has its fold down the middle of the bar: Tools and the cursor
+    /// pad go beside Dismiss rather than across the fold (2026-10-21).
+    var keepsOffMiddle = false {
+        didSet { if keepsOffMiddle != oldValue { layOutItems() } }
+    }
+
+    /// Dismiss, then Tools and the cursor pad in the middle, then Keys; or, kept off the middle,
+    /// Tools and the cursor pad beside Dismiss.
+    private func layOutItems() {
         var updated = baseItems
-        updated.insert(UIBarButtonItem(customView: view), at: 2)
+        if let toolsItem { updated.insert(toolsItem, at: 2) }
+        if keepsOffMiddle { updated.remove(at: 1) }
         items = updated
     }
     #endif
@@ -1902,6 +2020,21 @@ private final class MinimalTerminalAccessoryView: UIToolbar {
     }
 
     private enum Arrow { case left, down, up, right }
+
+    /// A key from a Keys menu outside the accessory: the window's own, where the accessory isn't
+    /// shown (`SwiftTermHostModel.press`).
+    func press(_ key: SwiftTermAccessoryKey) {
+        switch key {
+        case .escape: send(.escape)
+        case .tab: send(.tab)
+        case .controlForNextKey: armControlModifier()
+        case .up: sendArrow(.up)
+        case .down: sendArrow(.down)
+        case .left: sendArrow(.left)
+        case .right: sendArrow(.right)
+        case .function(let number): send(.function(number))
+        }
+    }
 
     @objc private func dismissKeyboard() {
         cancelCursorScrub()
@@ -2072,6 +2205,13 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     var hostModel: () -> SwiftTermHostModel? = { nil }
     var onWindowAttachmentChanged: (() -> Void)?
     var onLeavingWindow: (() -> Void)?
+    /// The keyboard's accessory while it is withheld (`SwiftTermHostModel.setKeyboardAccessoryWithheld`).
+    var withheldAccessory: UIView?
+
+    /// The accessory, shown or withheld.
+    var terminalAccessory: MinimalTerminalAccessoryView? {
+        (inputAccessoryView ?? withheldAccessory) as? MinimalTerminalAccessoryView
+    }
 
     override func willMove(toWindow newWindow: UIWindow?) {
         if newWindow == nil, window != nil { onLeavingWindow?() }
@@ -3149,6 +3289,12 @@ private final class SwiftTermEngine: TerminalEngine {
         SwiftTermBufferText.lastLines(lastNLines, of: terminalView.getTerminal())
     }
 
+    func screenRows() -> [SwiftTermScreenRow] {
+        SwiftTermBufferText.screenRows(of: terminalView.getTerminal())
+    }
+
+    var screenCellSize: CGSize? { SwiftTermBufferText.cellSize(of: terminalView) }
+
     private let findTracker = SwiftTermFindTracker()
     func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult {
         findTracker.find(term, towardOlder: towardOlder, in: terminalView)
@@ -3748,6 +3894,9 @@ private protocol TerminalEngine: AnyObject {
     func resignFocus()
     func refreshAccessibilityViewport()
     func visibleText(lastNLines: Int) -> [String]
+    /// The rows on screen now, and one cell's size, for the diagram marks (`TerminalDiagramFinder`).
+    func screenRows() -> [SwiftTermScreenRow]
+    var screenCellSize: CGSize? { get }
     func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult
     func clearSearch()
     var selectedFindLine: String? { get }
@@ -4028,6 +4177,12 @@ private final class MacSwiftTermEngine: TerminalEngine {
     func visibleText(lastNLines: Int) -> [String] {
         SwiftTermBufferText.lastLines(lastNLines, of: terminalView.getTerminal())
     }
+
+    func screenRows() -> [SwiftTermScreenRow] {
+        SwiftTermBufferText.screenRows(of: terminalView.getTerminal())
+    }
+
+    var screenCellSize: CGSize? { SwiftTermBufferText.cellSize(of: terminalView) }
 
     private let findTracker = SwiftTermFindTracker()
     func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult {
@@ -5309,6 +5464,12 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     func visibleText(lastNLines: Int) -> [String] {
         SwiftTermBufferText.lastLines(lastNLines, of: terminalView.getTerminal())
     }
+
+    func screenRows() -> [SwiftTermScreenRow] {
+        SwiftTermBufferText.screenRows(of: terminalView.getTerminal())
+    }
+
+    var screenCellSize: CGSize? { SwiftTermBufferText.cellSize(of: terminalView) }
 
     private let findTracker = SwiftTermFindTracker()
     func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult {

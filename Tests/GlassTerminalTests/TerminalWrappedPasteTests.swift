@@ -118,6 +118,44 @@ struct TerminalWrappedPasteTests {
         #expect(TerminalWrappedPaste.repair(text) == nil)
     }
 
+    /// The owner's paste (2026-10-21): a diagram Claude printed, whose widest line, at the same indent as
+    /// the next, looked as if it reached the margin, and took the next statement onto it.
+    @Test("a Mermaid diagram's statements keep their own lines, the widest among them too")
+    func mermaidDiagram() {
+        let diagram = [
+            "  flowchart LR",
+            "      A[Configured context files<br/>and a ready sheet, with a long label] --> B[Inspector]",
+            "      B -->|Authorized tenant API| C[Client]",
+            "      C --> D[Shared context builder]",
+        ]
+        let text = (["⏺ This Mermaid diagram uses features the terminal renderer doesn't support."] + diagram)
+            .joined(separator: "\n")
+        let pasted = TerminalWrappedPaste.repair(text)?.text ?? text
+        let lines = pasted.split(separator: "\n").map(String.init)
+        for line in diagram { #expect(lines.contains(line), "\(line) was joined") }
+    }
+
+    @Test("a diagram's first line under the widest line of text isn't joined onto it")
+    func diagramUnderWideText() {
+        let text = """
+            ⏺ The receipts go from the shop's jobs worker through the relay to the customer, as drawn here:
+              flowchart LR
+                  A[Shop] --> B[Relay]
+            """
+        let pasted = TerminalWrappedPaste.repair(text)?.text ?? text
+        #expect(pasted.split(separator: "\n").contains("  flowchart LR"))
+    }
+
+    @Test("code set deeper than the text it follows keeps its lines")
+    func indentedCode() {
+        let text = """
+            ⏺ Add the total to the report, after the orders are loaded:
+                  let total = orders.reduce(0) { partial, order in partial + order.totalCents }
+                  print("Total: \\(total)")
+            """
+        #expect(TerminalWrappedPaste.repair(text) == nil)
+    }
+
     @Test("a table's rows are as wide as each other on purpose")
     func table() {
         let text = """

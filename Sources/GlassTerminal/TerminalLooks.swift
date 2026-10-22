@@ -22,12 +22,23 @@ nonisolated enum TerminalBackdropStyle: String, CaseIterable, Identifiable, Glas
     case none
     /// A picture the person chose, blurred, pixelated or toned as they like.
     case picture
+    /// The coding agent the terminal is running (`TerminalAgent`), as Show All Windows marks it: its
+    /// mark large and faint, in the agent's own colour, and a smoke of that colour drifting while
+    /// it works (AutoPaper's picture while it paints one, the owner's, 2026-10-21). It settles when
+    /// the agent waits for you. Nothing where no agent runs.
+    case agent
     /// Falling columns of glyphs, quicker while the terminal prints.
     case rain
     /// A sunset over a grid that rolls toward you.
     case synthwave
+    /// Curtains of northern light, drifting quicker while the terminal prints.
+    case aurora
+    /// Stars coming toward you, stretched into streaks while the terminal prints.
+    case starfield
     /// A phosphor screen: a glow in the text's colour, darker at the edges, with scanlines.
     case phosphor
+    /// A drafting sheet: a fine grid on deep blue. Still.
+    case blueprint
 
     var id: String { rawValue }
 
@@ -35,25 +46,40 @@ nonisolated enum TerminalBackdropStyle: String, CaseIterable, Identifiable, Glas
         switch self {
         case .none: "None"
         case .picture: "Picture"
+        case .agent: "Coding Agent"
         case .rain: "Digital Rain"
         case .synthwave: "Synthwave"
+        case .aurora: "Aurora"
+        case .starfield: "Starfield"
         case .phosphor: "Phosphor Screen"
+        case .blueprint: "Blueprint"
         }
     }
 
     /// Moves, so it stops under Reduce Motion and in Low Power Mode.
-    var isAnimated: Bool { self == .rain || self == .synthwave }
+    var isAnimated: Bool {
+        switch self {
+        case .agent, .rain, .synthwave, .aurora, .starfield: true
+        case .none, .picture, .phosphor, .blueprint: false
+        }
+    }
+
+    /// Goes quicker while the terminal prints, when the window asks (Quicken with Output). The
+    /// agent's look always follows its agent's work: that is what it shows.
+    var quickensWithOutput: Bool { self == .rain || self == .aurora || self == .starfield }
 }
 
-/// A colour for the text's glow: the text's own, or one of the classic phosphors and neons.
+/// A colour for the text's glow: the text's own, the coding agent's, or one of the classic
+/// phosphors and neons.
 nonisolated enum TerminalGlowColor: String, CaseIterable, Identifiable, GlassWindowSettingValue {
-    case text, green, amber, pink, cyan, purple
+    case text, agent, green, amber, pink, cyan, purple
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .text: "Text Color"
+        case .agent: "Coding Agent's Color"
         case .green: "Green"
         case .amber: "Amber"
         case .pink: "Pink"
@@ -62,10 +88,12 @@ nonisolated enum TerminalGlowColor: String, CaseIterable, Identifiable, GlassWin
         }
     }
 
-    /// The colour, given the text's.
-    @MainActor func color(text: CodableColor) -> CodableColor {
+    /// The colour, given the text's and the agent the terminal runs: an agent without a colour of
+    /// its own, or none running, glows in the text's.
+    @MainActor func color(text: CodableColor, agent: TerminalAgent? = nil) -> CodableColor {
         switch self {
         case .text: text
+        case .agent: agent?.accent ?? text
         case .green: TerminalPhosphor.green.primary
         case .amber: TerminalPhosphor.amber.primary
         case .pink: CodableColor(sRGBRed: 1, green: 0.443, blue: 0.808)
@@ -141,22 +169,35 @@ nonisolated struct TerminalLookStyle: Equatable {
         default: intensity > 0
         }
     }
+
+    /// Whether the look shows the coding agent the terminal runs: only then is it looked for.
+    var usesAgent: Bool { backdrop == .agent || (glowColor == .agent && glow > 0) }
+
+    /// Whether anything is drawn behind the text of a terminal running `agent`: the agent's look
+    /// draws nothing where none runs.
+    func drawsBackdrop(agent: TerminalAgent?) -> Bool {
+        backdrop == .agent ? agent != nil && drawsBackdrop : drawsBackdrop
+    }
 }
 
 // MARK: - Starting points
 
 /// Looks to start from in This Window: each sets the whole look, which can then be changed.
 nonisolated enum TerminalLookPreset: String, CaseIterable, Identifiable {
-    case digitalRain, synthwave, amberPhosphor, greenPhosphor, clear
+    case agent, digitalRain, synthwave, aurora, starfield, amberPhosphor, greenPhosphor, blueprint, clear
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .agent: "Coding Agent"
         case .digitalRain: "Digital Rain"
         case .synthwave: "Synthwave"
+        case .aurora: "Aurora"
+        case .starfield: "Starfield"
         case .amberPhosphor: "Amber Phosphor"
         case .greenPhosphor: "Green Phosphor"
+        case .blueprint: "Blueprint"
         case .clear: "None"
         }
     }
@@ -166,6 +207,12 @@ nonisolated enum TerminalLookPreset: String, CaseIterable, Identifiable {
     func applied(to window: GlassWindowOverrides) -> GlassWindowOverrides {
         var result = window.removing(TerminalWindowSettings.lookStyleKeys.subtracting([TerminalWindowSettings.backdropPicture.key]))
         switch self {
+        case .agent:
+            result[TerminalWindowSettings.backdrop] = .agent
+            result[TerminalWindowSettings.backdropIntensity] = 0.85
+            result[TerminalWindowSettings.glow] = 0.35
+            result[TerminalWindowSettings.glowColor] = .agent
+            result[TerminalWindowSettings.readability] = 0.2
         case .digitalRain:
             result[TerminalWindowSettings.backdrop] = .rain
             result[TerminalWindowSettings.backdropIntensity] = 0.65
@@ -179,6 +226,17 @@ nonisolated enum TerminalLookPreset: String, CaseIterable, Identifiable {
             result[TerminalWindowSettings.glow] = 0.45
             result[TerminalWindowSettings.glowColor] = .pink
             result[TerminalWindowSettings.readability] = 0.2
+        case .aurora:
+            result[TerminalWindowSettings.backdrop] = .aurora
+            result[TerminalWindowSettings.backdropIntensity] = 0.9
+            result[TerminalWindowSettings.glow] = 0.3
+            result[TerminalWindowSettings.glowColor] = .cyan
+            result[TerminalWindowSettings.readability] = 0.2
+        case .starfield:
+            result[TerminalWindowSettings.backdrop] = .starfield
+            result[TerminalWindowSettings.backdropIntensity] = 0.9
+            result[TerminalWindowSettings.glow] = 0.2
+            result[TerminalWindowSettings.readability] = 0.15
         case .amberPhosphor:
             result[TerminalWindowSettings.backdrop] = .phosphor
             result[TerminalWindowSettings.phosphor] = .amber
@@ -187,6 +245,12 @@ nonisolated enum TerminalLookPreset: String, CaseIterable, Identifiable {
             result[TerminalWindowSettings.backdrop] = .phosphor
             result[TerminalWindowSettings.phosphor] = .green
             result[TerminalWindowSettings.glow] = 0.55
+        case .blueprint:
+            result[TerminalWindowSettings.backdrop] = .blueprint
+            result[TerminalWindowSettings.backdropIntensity] = 0.85
+            result[TerminalWindowSettings.phosphor] = .blueprint
+            result[TerminalWindowSettings.glow] = 0.3
+            result[TerminalWindowSettings.readability] = 0.15
         case .clear:
             break
         }
@@ -200,7 +264,7 @@ nonisolated enum TerminalLookPreset: String, CaseIterable, Identifiable {
 /// phosphor by its brightness, keeping a little of its own hue so red still reads as different from
 /// blue; or, for Vaporwave, the sixteen colours in a neon palette.
 nonisolated enum TerminalPhosphor: String, CaseIterable, Identifiable, GlassWindowSettingValue {
-    case none, green, amber, matrix, vaporwave
+    case none, green, amber, matrix, vaporwave, blueprint
 
     var id: String { rawValue }
 
@@ -211,6 +275,7 @@ nonisolated enum TerminalPhosphor: String, CaseIterable, Identifiable, GlassWind
         case .amber: "Amber Phosphor"
         case .matrix: "Digital Green"
         case .vaporwave: "Vaporwave"
+        case .blueprint: "Blueprint"
         }
     }
 
@@ -221,6 +286,8 @@ nonisolated enum TerminalPhosphor: String, CaseIterable, Identifiable, GlassWind
         case .amber: CodableColor(sRGBRed: 1, green: 0.69, blue: 0)
         case .matrix: CodableColor(sRGBRed: 0, green: 1, blue: 0.255)
         case .vaporwave: CodableColor(sRGBRed: 1, green: 0.545, blue: 0.878)
+        // A drafting pen's white, a little blue.
+        case .blueprint: CodableColor(sRGBRed: 0.82, green: 0.93, blue: 1)
         }
     }
 
@@ -228,10 +295,10 @@ nonisolated enum TerminalPhosphor: String, CaseIterable, Identifiable, GlassWind
     /// different from blue.
     static let keptHue = 0.15
 
-    /// One colour for all the text: green, amber and digital green. A filter over the drawn text
+    /// One colour for all the text: green, amber, digital green and blueprint. A filter over the drawn text
     /// makes every colour a shade of it (`terminalPhosphor`) — the sixteen a theme names and the
     /// 24-bit colours programs such as btop draw with, which no palette reaches.
-    var isMonochrome: Bool { self == .green || self == .amber || self == .matrix }
+    var isMonochrome: Bool { self == .green || self == .amber || self == .matrix || self == .blueprint }
 
     /// `theme` in this palette; its background, which the window's glass shows through, is kept.
     /// Vaporwave's neon is a palette; a monochrome phosphor leaves the theme to its filter.

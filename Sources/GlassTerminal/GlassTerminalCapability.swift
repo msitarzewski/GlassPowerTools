@@ -163,6 +163,9 @@ public final class GlassTerminalRuntime {
     /// A file on this device as its preview over a terminal shows it (2026-10-16): the editor's
     /// preview, Quick Look's for most. Set by the composition root; the Mac's terminals use it.
     public var filePreview: (@MainActor (URL) -> AnyView)?
+    /// A Mermaid diagram a terminal shows as text, drawn (2026-10-21): the editor's own Mermaid, as
+    /// its Markdown preview draws one. Set by the composition root; with none, no diagram is marked.
+    public var diagramView: (@MainActor (String) -> AnyView)?
     /// The saved databases SQL in a terminal on a server (its catalog endpoint) can open in
     /// (2026-10-20): its machine's Database services and those reached through it, from the
     /// composition root, which holds the catalog and the database capability. Nil offers none.

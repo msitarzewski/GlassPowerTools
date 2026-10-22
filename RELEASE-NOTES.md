@@ -86,6 +86,49 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### Next (not yet released)
+- **Four more terminal looks.** **Coding Agent** shows the agent each terminal is running, Claude
+  Code, Codex, Gemini CLI or another, behind its text in the agent's own colour: a smoke drifts and
+  the mark breathes while the agent works; when it stops and waits for you, the mark holds still and
+  glows. **Aurora** and **Starfield** move faster while the terminal prints (the stars streak into
+  warp); **Blueprint** is a still drafting grid with white-blue text. A glow can take the agent's
+  colour too.
+- **A Workgroup's look.** Creating or editing a Workgroup now offers Look and Text, as a window's
+  own settings do, so every window it opens starts with that look, on every device, iPhone included.
+  Before, a Workgroup had a look only when saved from a Mac window that had one.
+- **Settings in Tools on iPhone and iPad.** A terminal's Tools menu has Settings as a row of its own;
+  it was the last row of the Session menu inside it. Open Folder Here, Connections and New Terminal
+  Tab say what they are there; they were bare symbols.
+- **Open Folder in Editor from an iPhone terminal** opens the editor over the terminal, and its back
+  button returns to the terminal. Before, it did nothing.
+- **Join Wrapped Lines leaves code alone.** Lines indented deeper than the text around them, and a
+  Mermaid diagram's lines, keep their breaks: a diagram copied from Claude came back with two of its
+  statements on one line, because the widest of them looked as if it reached the margin.
+- **Mermaid diagrams in terminals.** A diagram a program prints as text, as Claude Code does when it
+  can't draw one, gets a button after its first line that shows it drawn over the terminal, on the
+  Mac, iPad, iPhone and Vision Pro.
+- **A sidebar for Vision Pro's terminal windows.** From the second terminal on, a window lists its
+  terminals in a sidebar, as a Mac window does, and widens for it: each row with its name and where
+  it is. Pinch and hold a row for its menu, or drag it onto another window, onto another row, or into
+  empty space for a window of its own; a terminal's name at the top drags the same way. Apple's tab
+  bar, which held the tabs before, showed only identical symbols until looked at.
+- **Vision Pro's terminal bar, tidied.** **Sidebar** shows and hides a window's sidebar; a pinch on
+  **Terminal View** shrinks the window to its orb (held, it lists the layouts); Font Size and the AI
+  Assistant are in the tools menu. The orb's ring has larger dots, each showing its terminal's agent.
+- **Tabs show their coding agent.** On the Mac and Vision Pro, a tab's symbol is the agent running
+  in it, in the agent's colour, pulsing while it works; it replaces the wave under a busy Mac tab.
+- **A picture's Blur works along the whole slider.** It blurred the picture away within the first tenth
+  and changed nothing after; now it softens gradually, to the same full blur at Soft.
+- **New terminals from the Mac sidebar.** Right-click the sidebar's empty space for the toolbar's +
+  menu: New Terminal, New Basic Terminal, running terminals, and New Terminal on a host.
+- **iPhone Duo, half open.** Stood up like a small laptop, the terminal takes the top half and its
+  bar sits below the fold, above the keyboard's keys: the keyboard button, Tools with the cursor pad,
+  and Keys. Before, the bar sat above the fold and took rows from the terminal. Held like a book,
+  the controls keep off the fold.
+- **Keys on Vision Pro.** A terminal's bar has a Keys menu: Escape, Tab, Control for the next key,
+  the arrows and F1–F12, for when no keyboard is paired. The headset shows apps no keyboard
+  accessory, which is where iPhone and iPad keep these.
+
 ### 0.4.492 – 0.4.494 (20 October 2026)
 - **0.4.494 is the Mac's second release**, through Sparkle, and TestFlight build 494.
 - **Scale Text on the Mac's own terminals**, tmux tabs included. A local tab ignored Scale Text: the

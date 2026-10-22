@@ -98,6 +98,33 @@ nonisolated struct TerminalTabTransfer: Codable, Hashable, Sendable, Transferabl
     }
 }
 
+#if os(visionOS)
+/// A tab dragged on Vision Pro — a sidebar row or a terminal's title (2026-10-21): let go over
+/// another terminal window it moves there (`TerminalTabTransfer`); let go in empty space it opens a
+/// window of its own where it was let go, still running. A `Transferable` can't make a window, so
+/// the drag carries an activity as well, which the terminal window group claims at the drop, as a
+/// terminal dragged out of the library does (`GlassServiceDrag`, D72). Declared in Info.plist.
+enum TerminalTabDrag {
+    static let activityType = "com.glasspowertools.terminal-tab"
+
+    static func itemProvider(_ tab: TerminalTabTransfer) -> NSItemProvider {
+        let activity = NSUserActivity(activityType: activityType)
+        activity.targetContentIdentifier = activityType
+        activity.userInfo = ["workgroup": tab.workgroupID.uuidString, "session": tab.sessionID.uuidString]
+        let provider = NSItemProvider(object: activity)
+        provider.register(tab)
+        return provider
+    }
+
+    /// The tab a dropped activity names.
+    static func tab(from activity: NSUserActivity) -> TerminalTabTransfer? {
+        guard let workgroup = (activity.userInfo?["workgroup"] as? String).flatMap(UUID.init(uuidString:)),
+              let session = (activity.userInfo?["session"] as? String).flatMap(UUID.init(uuidString:)) else { return nil }
+        return TerminalTabTransfer(workgroupID: workgroup, sessionID: session)
+    }
+}
+#endif
+
 /// Moving live terminals between workgroups. Pure model changes through `SessionManager`, so
 /// each is tested without a window.
 @MainActor

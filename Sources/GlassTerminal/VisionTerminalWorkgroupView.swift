@@ -64,6 +64,10 @@ extension EnvironmentValues {
         get { self[VisionTerminalPresentationKey.self] }
         set { self[VisionTerminalPresentationKey.self] = newValue }
     }
+
+    /// Whether a terminal window shows its sidebar (2026-10-21), for the toggle in its bar; nil in a
+    /// window of one terminal, which has none.
+    @Entry var visionTerminalSidebar: Binding<Bool>? = nil
 }
 
 /// The window's layout — tabs, grid, carousel — as one control, as the editor's preview is (the
@@ -88,11 +92,14 @@ struct VisionTerminalPresentationPicker: View {
                     .accessibilityIdentifier("vision-terminal-presentation-orb")
             }
         } label: {
-            Label("Terminal View", systemImage: selection.symbolName)
+            Label("Terminal View", systemImage: orb.map { $0.isOrb ? selection.symbolName : "circle.circle" } ?? selection.symbolName)
         } primaryAction: {
-            selection = selection.next
+            // The orb, first (the owner, 2026-10-21: "make Orb the default option in the Tabs menu so
+            // a click gets orb view"); with none to become, the next layout, as before.
+            if let orb, !orb.isOrb { orb.shrink() } else { selection = selection.next }
         }
-        .help("\(selection.title). Pinch for \(selection.next.title); hold to choose.")
+        .help(orb.map { _ in "\(selection.title). Pinch to shrink to an orb; hold to choose a view." }
+              ?? "\(selection.title). Pinch for \(selection.next.title); hold to choose.")
         .accessibilityValue(selection.title)
         .accessibilityIdentifier("vision-terminal-presentation")
     }
@@ -159,6 +166,83 @@ private struct VisionTerminalPreview: View {
         }
     }
 }
+
+/// A terminal window's sidebar beside its terminals, from the second terminal on (the owner,
+/// 2026-10-21), laid out as the headset's database, editor, Files and Connections lay theirs
+/// (`GlassSpatialSplitView`, W33): Apple's split view draws glass behind every column that nothing
+/// clears, and a Glass window is completely clear at Glass 0. The sidebar has Apple's glass of its
+/// own, as the system's sidebar column does; the terminal beside it keeps the window's.
+///
+/// The window widens by the sidebar as its second terminal arrives and narrows as the last but one
+/// leaves (`glassAdditiveSidebar`), as a Mac window does, and as its toggle in the window's bar shows
+/// and hides it (the owner, 2026-10-21: "We need a sidebar/tabs toggle in the bottom ornaments").
+/// The grid, the carousel and the orb hide it and keep the window's size, as the Mac's overview does.
+private struct VisionTerminalSidebarLayout<Sidebar: View, Detail: View>: View {
+    /// Two or more terminals: the window has the sidebar's room.
+    let hasTabs: Bool
+    /// The window's toggle leaves it shown.
+    let wanted: Bool
+    /// The tabs layout, not the grid or the carousel.
+    let showsTabs: Bool
+    @ViewBuilder let sidebar: Sidebar
+    @ViewBuilder let detail: Detail
+
+    @Environment(\.glassSessionOrb) private var orb
+    @State private var visibility = NavigationSplitViewVisibility.detailOnly
+
+    var body: some View {
+        let shown = hasTabs && wanted && showsTabs && orb?.isOrb != true
+        // The sidebar in its own glass, apart from the terminal, which keeps the window's (the owner's
+        // choice, 2026-10-21: "Ours, in its own glass").
+        GlassSpatialSplitView(visibility: $visibility, showsToggle: false, sidebarHasGlass: true) {
+            sidebar
+        } content: {
+            detail
+        }
+        .onChange(of: shown, initial: true) { _, shown in
+            withAnimation(.easeInOut(duration: 0.25)) { visibility = shown ? .all : .detailOnly }
+        }
+        // Its room, given and taken back as the second terminal comes and goes and as its toggle
+        // shows and hides it.
+        .glassAdditiveSidebar(isOpen: hasTabs && wanted, width: GlassSpatialColumns.sidebarIdealWidth)
+    }
+}
+
+/// One terminal in the window's sidebar, as a Mac tab's row (`MacWorkspaceView.tabRow`): its name,
+/// and under it where it is — its repository and branch, its machine, in tmux — in its state's
+/// colour while not connected; its agent's mark in the agent's colour, pulsing while it prints.
+private struct VisionTerminalSidebarRow: View {
+    let session: TerminalSession
+    /// The mark's colour with no agent's own: the window's tint, else its workgroup's.
+    let color: Color
+
+    var body: some View {
+        let name = TerminalWorkgroupOpening.label(session, on: .tabBar)
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .lineLimit(1)
+                Text(whereItIs)
+                    .font(.caption)
+                    .foregroundStyle(session.state == .connected ? Color.secondary : VisionTerminalStatus.color(for: session.state))
+                    .lineLimit(1)
+            }
+        } icon: {
+            TerminalSessionMark(session: session, color: color)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(name)
+        .accessibilityValue(whereItIs)
+    }
+
+    private var whereItIs: String {
+        let machine = "\(session.server.username)@\(session.server.host)"
+        var line = session.repositoryLine.map { "\($0) · \(machine)" } ?? machine
+        if session.survivesClose { line += " · in tmux" }
+        if session.state != .connected { line += " — \(session.state.displayName)" }
+        return line
+    }
+}
 #endif
 #if os(iOS)
 import UIKit
@@ -201,6 +285,8 @@ struct VisionTerminalWorkgroupView: View {
     @FocusState private var overviewFocused: Bool
     /// The grid card a dragged tab is over (W15).
     @State private var dropTargetSessionID: UUID?
+    /// Whether the window shows its sidebar, as its bar's toggle leaves it.
+    @State private var showsSidebar = true
 
     private var presentation: VisionTerminalPresentation {
         get { spatialPresentation.mode }
@@ -331,6 +417,7 @@ struct VisionTerminalWorkgroupView: View {
         // "front tab, or whichever is active").
         let shown = (followsActivity ? activity.lastSessionID : nil) ?? selectedSessionID
         let tabs = workgroup.map { liveSessions(in: $0) } ?? []
+        let markColor = windowLook.tintColor ?? workgroup?.colorTag.color ?? .secondary
         return GlassSessionOrbFace(
             title: title, symbolName: "terminal", pulses: followsActivity && activity.isBusy,
             // With two or more terminals the view menu offers the orb; alone, the bar's button does.
@@ -340,6 +427,8 @@ struct VisionTerminalWorkgroupView: View {
                     title: TerminalWorkgroupOpening.label(session, on: .tabOrnament),
                     symbolName: "terminal",
                     tint: VisionTerminalStatus.color(for: session.state),
+                    // Its agent, in its colour and pulsing while it works, as its sidebar row shows it.
+                    icon: AnyView(TerminalSessionMark(session: session, color: markColor, size: GlassSessionOrbTab.iconSize)),
                     picture: { [weak session] in
                         session?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
                     },
@@ -596,6 +685,9 @@ struct VisionTerminalWorkgroupView: View {
     ) -> some View {
         #if os(visionOS)
         spatialTerminalTabs(workgroup: workgroup, sessions: sessions)
+            // A container of its own, or its name is every view's inside it: the sidebar's rows lost
+            // theirs (2026-10-21), as the iPhone's controls had.
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("terminal-workgroup-tabs")
         #else
         if usesCompactPhoneNavigation {
@@ -614,6 +706,9 @@ struct VisionTerminalWorkgroupView: View {
                     // swaps the library root, so leaving it is `showConnections()`.
                     .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections,
                                                    dismissCurrent: { iOSRouter.showConnections() })
+                    // A container of its own, or the name is every control's inside it, and a
+                    // test finds none of them by theirs (2026-10-21, the Duo's laptop bar).
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("terminal-workgroup-tabs")
             }
         } else {
@@ -630,6 +725,9 @@ struct VisionTerminalWorkgroupView: View {
                     .toolbarBackground(.automatic, for: .tabBar)
                     .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections,
                                                    dismissCurrent: { iOSRouter.showConnections() })
+                    // A container of its own, or the name is every control's inside it, and a
+                    // test finds none of them by theirs (2026-10-21, the Duo's laptop bar).
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("terminal-workgroup-tabs")
             }
         }
@@ -641,22 +739,67 @@ struct VisionTerminalWorkgroupView: View {
         workgroup: TerminalWorkgroup,
         sessions: [TerminalSession]
     ) -> some View {
-        ZStack {
-            // Do not remove the native tab/ornament host during a presentation
-            // change. Its selection is also useful for navigating the overview.
-            TabView(selection: $selectedSessionID) {
-                ForEach(sessions) { session in
-                    Tab(value: Optional(session.id)) { Color.clear } label: {
-                        Label(TerminalWorkgroupOpening.label(session, on: .tabOrnament), systemImage: "terminal")
-                            .foregroundStyle(VisionTerminalStatus.color(for: session.state))
-                            .accessibilityValue(session.state.displayName)
-                    }
-                    .contextMenu { tabActions(for: session) }
-                }
+        // The window's tabs are its sidebar, as a Mac window's are, once it holds two terminals (the
+        // owner, 2026-10-21). They were Apple's tab bar, which Apple keeps for an app's sections:
+        // a column of identical terminal symbols at the window's side until looked at, one short
+        // line each, covering the terminal while open. A sidebar row says where each is, shows its
+        // agent at work, and drags.
+        VisionTerminalSidebarLayout(hasTabs: sessions.count > 1, wanted: showsSidebar, showsTabs: presentation == .tabs) {
+            terminalSidebar(workgroup: workgroup, sessions: sessions)
+        } detail: {
+            spatialTerminals(sessions: sessions)
+        }
+        .onChange(of: sessions.count, initial: true) { _, count in
+            if count < 2 { presentation = .tabs }
+        }
+        .onChange(of: presentation) { _, mode in
+            guard sessions.count > 1 || mode == .tabs else {
+                presentation = .tabs
+                return
             }
-            .toolbarVisibility(presentation == .tabs && sessions.count > 1 ? .visible : .hidden, for: .tabBar)
-            // As its orb, the window's tabs are the ring around it (2026-10-15), not this ornament.
-            .glassHiddenWhileOrb()
+            if mode != .tabs {
+                Task { @MainActor in
+                    await Task.yield()
+                    overviewFocused = true
+                }
+            } else {
+                overviewFocused = false
+            }
+        }
+    }
+
+    /// The sidebar: each terminal as a Mac tab's row. A pinch shows it; a pinch held offers its
+    /// menu, and moving the hand drags it — onto another terminal window to move it there, onto
+    /// another row here to take that place, or into empty space for a window of its own.
+    private func terminalSidebar(workgroup: TerminalWorkgroup, sessions: [TerminalSession]) -> some View {
+        List(selection: $selectedSessionID) {
+            ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
+                VisionTerminalSidebarRow(session: session, color: windowLook.tintColor ?? workgroup.colorTag.color)
+                    .glassSpatialListRow()
+                    .contextMenu { tabActions(for: session) }
+                    .onDrag {
+                        TerminalTabDrag.itemProvider(TerminalTabTransfer(workgroupID: workgroupID, sessionID: session.id))
+                    }
+                    .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
+                        acceptDroppedTabs(tabs, at: index)
+                    }
+                    .accessibilityIdentifier("vision-terminal-sidebar-row-\(session.id.uuidString)")
+            }
+        }
+        .glassSpatialList()
+        // A tab from another window let go below the rows joins after the last.
+        .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
+            acceptDroppedTabs(tabs, at: nil)
+        }
+        .accessibilityIdentifier("vision-terminal-sidebar")
+        // The window's name, its Workgroup's or its machine's, in the header every Glass window's
+        // sidebar has.
+        .glassSpatialColumn(workgroup.name)
+    }
+
+    /// Every terminal in the window, the one shown in front, and the grid and carousel over them.
+    private func spatialTerminals(sessions: [TerminalSession]) -> some View {
+        ZStack {
             ForEach(sessions) { session in
                 let active = presentation == .tabs && selectedSessionID == session.id
                 TerminalWindowView(
@@ -669,6 +812,7 @@ struct VisionTerminalWorkgroupView: View {
                     onSessionRequestedClose: { closeSessionTab(session) }
                 )
                 .environment(\.visionTerminalPresentation, sessions.count > 1 ? presentationBinding : nil)
+                .environment(\.visionTerminalSidebar, sessions.count > 1 ? $showsSidebar : nil)
                 // A grid card or a terminal's title from another window, dropped on the terminal: it
                 // joins this window. This window's own title let go over it changes nothing (W26).
                 .environment(\.terminalTabDrop, { tabs in
@@ -707,23 +851,6 @@ struct VisionTerminalWorkgroupView: View {
                         }
                     }
                 }
-        }
-        .onChange(of: sessions.count, initial: true) { _, count in
-            if count < 2 { presentation = .tabs }
-        }
-        .onChange(of: presentation) { _, mode in
-            guard sessions.count > 1 || mode == .tabs else {
-                presentation = .tabs
-                return
-            }
-            if mode != .tabs {
-                Task { @MainActor in
-                    await Task.yield()
-                    overviewFocused = true
-                }
-            } else {
-                overviewFocused = false
-            }
         }
     }
 
@@ -877,6 +1004,7 @@ struct VisionTerminalWorkgroupView: View {
                 .opacity(active ? 1 : 0)
                 .allowsHitTesting(active)
                 .accessibilityHidden(!active)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("terminal-workgroup-session-\(session.id.uuidString)")
             }
         }
@@ -903,6 +1031,8 @@ struct VisionTerminalWorkgroupView: View {
             )
             // iPad (W26): a tab's own menu is drawn only in the sidebar, so Tools moves it too.
             .environment(\.terminalTabMoving, tabMoving)
+            // A container of its own, so the controls inside keep their names (2026-10-21).
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("terminal-workgroup-session-\(session.id.uuidString)")
         } label: {
             Label {

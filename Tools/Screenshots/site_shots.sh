@@ -150,31 +150,38 @@ dock() {  # hide | show
 # own colours, so each is taken once, in the dark appearance. `--demo-look` takes a Start From look, or `none` with
 # settings after it; `picture` puts the made-up landscape (landscape.py) behind the text, with Readability low
 # enough for the landscape to show; `settings` is This Window open on a terminal in Digital Rain, its form scrolled
-# to the Look section. Connections is minimised, not closed: with `--demo-close-connections` and `--demo-look`
+# to the Look section; `agent` is Coding Agent over a made-up agent session (the `agent` surface). Connections is minimised, not closed: with `--demo-close-connections` and `--demo-look`
 # together no terminal window opened (2026-10-20). LOOKS="picture settings" takes only those.
 typeset -A LOOK
 LOOK=(rain digitalRain  synthwave synthwave  amber amberPhosphor  green greenPhosphor
-      picture "none,intensity=1,readability=0.15,glow=0.3,glowColor=amber"  settings digitalRain)
-LOOK_NAMES=(${=LOOKS:-rain synthwave amber green picture settings})
+      picture "none,intensity=1,readability=0.15,glow=0.3,glowColor=amber"  settings digitalRain
+      agent agent  aurora aurora  starfield starfield  blueprint blueprint)
+LOOK_NAMES=(${=LOOKS:-rain synthwave amber green picture settings agent aurora starfield blueprint})
 looks() {
   python3 -I Tools/Screenshots/landscape.py "$RAW/landscape.png" >/dev/null
   timeout 60 $VM copy-in "$RAW/landscape.png" /Users/admin/Pictures >/dev/null
   appearance dark
   for look in $LOOK_NAMES; do
     local -a extra=()
+    # The agent's window takes the title the agent gives its terminal.
+    local title=alpha
+    [[ $look == agent ]] && title="✳ Claude Code"
     [[ $look == picture ]] && extra=(--demo-picture /Users/admin/Pictures/landscape.png)
     if [[ $look == settings ]]; then
       SETTLE=16 launch terminal --demo-look "'${LOOK[$look]}'" --demo-look-settings
+    elif [[ $look == agent ]]; then
+      # A coding agent at work, which the look shows behind it.
+      SETTLE=16 launch agent --demo-look "'${LOOK[$look]}'"
     else
       SETTLE=16 launch btop --demo-look "'${LOOK[$look]}'" $extra
     fi
-    alone alpha
+    alone "$title"
     place 1240 780
     if [[ $look == settings ]]; then
       events "tell process \"$APP\" to set value of scroll bar 1 of scroll area 1 of group 1 of sheet 1 of window 1 to 0.36"
       sleep 2
     fi
-    capture "look-$look" alpha
+    capture "look-$look" "$title"
   done
 }
 

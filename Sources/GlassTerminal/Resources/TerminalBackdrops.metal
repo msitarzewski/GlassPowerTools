@@ -149,3 +149,95 @@ namespace {
     half3 encoded = half3(pow(linear, 1.0 / 2.2));
     return half4(encoded * color.a, color.a);
 }
+
+/// Curtains of northern light: three that sway across the sky, brightest at their foot and fading
+/// upward, with fine rays along them. Nothing behind them: the window's glass shows between.
+/// `time` runs quicker while the terminal prints.
+[[ stitchable ]] half4 glassAurora(float2 position, half4 color, float2 size, float time, half4 foot,
+                                   half4 crown, float intensity) {
+    float2 uv = position / max(size, float2(1.0));
+    float x = uv.x * size.x / max(size.y, 1.0);
+    float3 rgb = float3(0.0);
+    float light = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float k = float(i);
+        // Where this curtain's foot is: a slow sway, and a quicker ripple along it.
+        float base = 0.34 + 0.15 * k
+            + 0.07 * sin(x * (1.3 + 0.4 * k) + time * (0.11 + 0.03 * k) + k * 2.1)
+            + 0.025 * sin(x * (5.1 + k) - time * (0.27 + 0.05 * k));
+        float above = base - uv.y;
+        float height = 0.3 + 0.08 * k;
+        // Fading upward over its height; a soft but quick edge below its foot.
+        float curtain = above > 0.0 ? exp(-1.8 * above / height) : exp(30.0 * above);
+        float rays = 0.6 + 0.4 * sin(x * 70.0 + 3.0 * sin(x * 4.0 + time * 0.2 + k) + k * 5.0);
+        float strength = curtain * rays * (1.0 - 0.25 * k);
+        rgb += mix(float3(foot.rgb), float3(crown.rgb), saturate(above / height)) * strength;
+        light += strength;
+    }
+    float alpha = saturate(light) * intensity;
+    rgb = min(rgb * intensity, float3(alpha));
+    return half4(half3(rgb), half(alpha));
+}
+
+/// Stars coming toward you from the middle, in four layers. `warp`, from 0 to 1, stretches each
+/// along its way into a streak: how much the terminal is printing. Nothing behind them.
+[[ stitchable ]] half4 glassStarfield(float2 position, half4 color, float2 size, float time, float warp,
+                                      half4 tint, float intensity) {
+    float2 p = (position - size * 0.5) / max(max(size.x, size.y), 1.0);
+    float r = length(p);
+    float2 way = r > 0.0001 ? p / r : float2(1.0, 0.0);
+    float light = 0.0;
+    for (int i = 0; i < 4; i++) {
+        float k = float(i);
+        // 0 far, 1 near: each layer comes closer, and starts again far away.
+        float depth = fract(time * 0.04 + k * 0.25);
+        float2 q = p * mix(16.0, 0.8, depth) + float2(k * 7.3, k * 3.1);
+        float2 cell = floor(q);
+        float seed = hash21(cell + k * 11.0);
+        if (seed < 0.45) continue;
+        float2 star = (float2(hash21(cell + 3.1), hash21(cell + 7.7)) - 0.5) * 0.5;
+        float2 d = (fract(q) - 0.5) - star;
+        float along = dot(d, way) / (1.0 + warp * 7.0 * depth);
+        float across = dot(d, float2(-way.y, way.x));
+        float radius = 0.018 + 0.032 * depth;
+        // A sharp point with a little halo.
+        float distance = length(float2(along, across));
+        float shine = smoothstep(radius, radius * 0.35, distance) + 0.25 * smoothstep(radius * 3.0, radius, distance);
+        float fade = smoothstep(0.0, 0.3, depth) * smoothstep(1.0, 0.8, depth);
+        light += shine * fade * (0.7 + 0.9 * seed);
+    }
+    float alpha = saturate(light) * intensity;
+    float3 rgb = mix(float3(tint.rgb), float3(1.0), 0.5 * saturate(light)) * alpha;
+    return half4(half3(rgb), half(alpha));
+}
+
+/// A drafting sheet: paper with a fine grid every `spacing` points and a bolder line every fifth,
+/// a little darker toward the edges. Still.
+[[ stitchable ]] half4 glassBlueprint(float2 position, half4 color, float2 size, float spacing, half4 paper,
+                                      half4 ink, float intensity) {
+    float2 uv = position / max(size, float2(1.0));
+    float s = max(spacing, 2.0);
+    float2 near = abs(fract(position / s + 0.5) - 0.5) * s;
+    float fine = 1.0 - smoothstep(0.0, 0.9, min(near.x, near.y));
+    float2 nearBold = abs(fract(position / (s * 5.0) + 0.5) - 0.5) * s * 5.0;
+    float bold = 1.0 - smoothstep(0.0, 1.3, min(nearBold.x, nearBold.y));
+    float grain = (hash21(floor(position)) - 0.5) * 0.025;
+    float vignette = smoothstep(1.1, 0.3, length((uv - 0.5) * 1.5));
+    float3 rgb = float3(paper.rgb) * (0.7 + 0.3 * vignette) + grain;
+    rgb = mix(rgb, float3(ink.rgb), fine * 0.16 + bold * 0.32);
+    float alpha = 0.88 * intensity;
+    return half4(half3(saturate(rgb) * alpha), half(alpha));
+}
+
+/// The agent's mark while it works: two crossing waves move each point by at most `amplitude`, so
+/// it breathes rather than swims. AutoPaper's picture does this while it paints a new one (the
+/// owner's project, MIT).
+[[ stitchable ]] float2 glassWorkingRipple(float2 position, float time, float2 size, float amplitude) {
+    float2 uv = position / max(size, float2(1.0));
+    float swell = 0.65 + 0.35 * sin(uv.x * 3.1 + uv.y * 2.3 + time * 0.6);
+    float2 offset = float2(
+        sin(uv.y * 11.0 + time * 1.4) + 0.5 * sin(uv.x * 5.0 - time * 0.8),
+        cos(uv.x * 9.0 + time * 1.1) + 0.5 * cos(uv.y * 4.0 + time * 0.7)
+    );
+    return position + offset * (amplitude * swell / 1.5);
+}

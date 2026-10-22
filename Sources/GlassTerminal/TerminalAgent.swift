@@ -347,6 +347,32 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
     /// The mark as SwiftUI draws it on every platform — the iPhone, iPad and Vision Pro cannot read
     /// SVG text as the Mac does — from the module's asset catalog, as a template: the same SVG as
     /// `logoSVG` (`Resources/AgentMarks.xcassets`, held equal to it by a test).
+    /// The agent's own colour, as the owner's Agency Agents app gives it (MIT): the Coding Agent
+    /// look draws its mark and smoke in it, and can glow the text in it. Nil where the mark is
+    /// black (Cursor, Kimi) or no colour is known: the text's colour stands in.
+    @MainActor var accent: CodableColor? {
+        let hex: UInt32? = switch self {
+        case .claudeCode: 0xD97757
+        case .codex: 0x10A37F
+        case .geminiCLI: 0x4285F4
+        case .copilot: 0x6E40C9
+        case .qwen: 0x615CED
+        case .openCode: 0xFF6B35
+        case .aider: 0x8B5CF6
+        case .openClaw: 0xE11D48
+        case .hermes: 0x7C3AED
+        case .mistralVibe: 0xFA520F
+        case .zCode: 0x4263EB
+        case .deepSeekHarness: 0x4D6BFE
+        case .cursor, .kimi, .amp, .goose, .cline, .kiloCode, .openHands, .grok, .kiro, .trae, .qoder, .crush,
+             .droid, .auggie, .plandex, .iFlow: nil
+        }
+        return hex.map {
+            CodableColor(sRGBRed: Double($0 >> 16 & 0xFF) / 255, green: Double($0 >> 8 & 0xFF) / 255,
+                         blue: Double($0 & 0xFF) / 255)
+        }
+    }
+
     var markImage: Image {
         guard logoSVG != nil else { return Image(systemName: Self.fallbackSymbol) }
         return Image(markName, bundle: Self.markBundle).renderingMode(.template)

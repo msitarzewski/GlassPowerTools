@@ -127,8 +127,9 @@ public struct GlassTerminalScenes: Scene {
                     .trackWindowPresence(key: "terminal-workgroup-missing", recovery: windowRecoveryManager)
             }
         }
-        // A terminal dragged out of the library opens here, where it is dropped (`GlassServiceDrag`).
-        .handlesExternalEvents(matching: [GlassServiceDrag.terminalActivity])
+        // A terminal dragged out of the library opens here, where it is dropped (`GlassServiceDrag`);
+        // so does a tab dragged out of a window (`TerminalTabDrag`).
+        .handlesExternalEvents(matching: [GlassServiceDrag.terminalActivity, TerminalTabDrag.activityType])
         // Plain, with Apple's glass drawn by the window itself (`GlassSpatialWindowGlass`), in
         // Apple's corner, as strong as the window's Blur. The system's own window (cfd5094) gave
         // the canvas a corner to nest in, but its glass is always there while the window has

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GlassTerminalEmulator
 
 /// A program that lays out prose in a terminal — Claude Code, Codex, a man page — breaks it into lines
 /// as wide as the window and indents each continuation under the first line's text. Copied, each
@@ -26,6 +27,14 @@ import Foundation
 ///
 /// Never across a blank line, inside a fenced code block, at a table's border, or after a line
 /// ending in "\" (the shell's own continuation).
+///
+/// **Indentation is structure, not only layout** (the owner, 2026-10-21, a Mermaid diagram pasted
+/// from Claude with two of its statements on one line: "it's like we need to process the white
+/// space too"). In code, the next line at the same indentation is the next statement, and the
+/// widest one in a paste looks as if it reached the margin. So a Mermaid diagram's lines are never
+/// joined (`TerminalDiagramFinder` knows them), and a line with no bullet indented deeper than the
+/// paragraph it is in — how Claude sets code under its text, with no fences — is code, with lines
+/// of its own.
 ///
 /// One case it can't tell: two lines under a bullet where the first is the widest in the paste and
 /// the second is short. The width can only be read from the widest line, so the break after it always
@@ -60,8 +69,13 @@ enum TerminalWrappedPaste {
         let width = lines.map { cellWidth($0) }.max() ?? 0
         guard width >= minimumWidth else { return nil }
 
+        // A Mermaid diagram's lines, which are statements, each its own.
+        let diagramLines = Set(TerminalDiagramFinder.diagrams(in: lines.map { SwiftTermScreenRow($0) }, limit: .max)
+            .flatMap { Array($0.rows) })
         var output: [String] = []
         var hangingIndent: Int?
+        /// Where the paragraph being read sets its text: a line indented deeper is code.
+        var proseIndent: Int?
         var previous = ""
         /// Columns the previous line had on screen that the copy left out: its indent, when the copy
         /// began inside a paragraph.
@@ -73,6 +87,14 @@ enum TerminalWrappedPaste {
             let indent = leadingSpaces(content)
             let body = content.dropFirst(indent)
             let isFence = body.hasPrefix("```") || body.hasPrefix("~~~")
+
+            if diagramLines.contains(index) {
+                output.append(content)
+                previous = content
+                previousOffset = 0
+                hangingIndent = nil
+                continue
+            }
 
             if !inFence, !isFence, let hangingIndent, !output.isEmpty,
                continues(previous, offset: previousOffset, with: body, indent: indent,
@@ -90,12 +112,13 @@ enum TerminalWrappedPaste {
             previous = content
             previousOffset = 0
             if isFence { inFence.toggle() }
-            hangingIndent = inFence || isFence ? nil : self.hangingIndent(of: body, indent: indent)
+            hangingIndent = inFence || isFence ? nil : self.hangingIndent(of: body, indent: indent, prose: &proseIndent)
             // The copy began inside a paragraph, past its indent: the next line's indent is the
             // paragraph's.
             if index == 0, hangingIndent == nil, indent == 0, lines.count > 1 {
                 let next = leadingSpaces(trimmingTrailingWhitespace(lines[1]))
                 hangingIndent = next > 0 ? next : nil
+                if next > 0 { proseIndent = next }
                 previousOffset = next
             }
         }
@@ -117,11 +140,19 @@ enum TerminalWrappedPaste {
     }
 
     /// Where a paragraph's continuations start: past its indent and bullet. Nil for a line with
-    /// neither, which has none.
-    private static func hangingIndent(of body: Substring, indent: Int) -> Int? {
+    /// neither, which has none, and for code: a line with no bullet indented deeper than `prose`,
+    /// where the paragraph it is in sets its text. A bullet sets `prose` for the lines under it; a
+    /// paragraph with none sets it at its own indent.
+    private static func hangingIndent(of body: Substring, indent: Int, prose: inout Int?) -> Int? {
         guard !body.isEmpty, !startsOrEndsFrame(body) else { return nil }
-        if let marker = itemMarkerLength(body) { return indent + marker }
-        return indent > 0 ? indent : nil
+        if let marker = itemMarkerLength(body) {
+            prose = indent + marker
+            return indent + marker
+        }
+        guard indent > 0 else { return nil }
+        if let current = prose, indent > current { return nil }
+        prose = indent
+        return indent
     }
 
     /// The length of a list item's bullet or number and the spaces after it: "• ", "⏺ ", "⎿  ",

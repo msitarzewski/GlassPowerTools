@@ -4,7 +4,8 @@
 # The app is reinstalled first: visionOS restores a previous launch's windows, which would stand in
 # front of the one being captured.
 # Surfaces: library, library-history, editor, editor-window, editor-settings, editor-project, preview,
-# terminal, terminal-window, terminal-settings, terminal-move, terminal-tabs, terminal-grid, files, database,
+# terminal, terminal-window, terminal-settings, terminal-move, terminal-tabs, terminal-grid, agent (a coding agent
+# waiting for an answer), files, database,
 # btop (the terminal running a btop-style monitor), workspace (it, a database, a desktop and the editor at
 # once), active, workgroups,
 # database-window, database-settings, database-server, database-main, diagram,

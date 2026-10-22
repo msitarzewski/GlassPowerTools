@@ -116,8 +116,10 @@ The same app, with a local shell, menus and windows that are as see-through as y
 ## A terminal worth looking at
 
 You look at terminals all day, so each window can have a look of its own: a picture behind the text,
-Digital Rain that falls faster while the terminal prints, a Synthwave horizon, green or amber
-phosphor, a glow. The text comes first: a picture's bright patches are held down so even dim text
+Digital Rain that falls faster while the terminal prints, a Synthwave horizon, an aurora, a starfield
+that streaks into warp while output pours, a blueprint, green or amber phosphor, a glow. The Coding
+Agent look shows the agent each terminal runs, Claude Code, Codex or another, in its own colour:
+drifting while it works, still and glowing when it's waiting for you. The text comes first: a picture's bright patches are held down so even dim text
 reads over them, and the motion stops under Reduce Motion and Low Power Mode. On the Mac, iPad and
 Vision Pro, in a window's **This Window** settings.
 
@@ -137,6 +139,14 @@ Vision Pro, in a window's **This Window** settings.
   <tr>
     <td><sub><strong>Amber Phosphor.</strong> Every colour a program draws, in amber, 24-bit colour included.</sub></td>
     <td><sub><strong>A picture of yours.</strong> Blurred, pixelated or toned to the theme if you like, with a glow on the text.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="site/static/shots/mac-look-agent.webp" alt="A terminal window on a Mac in the Coding Agent look: a made-up coding agent session on alpha, with the agent's mark large and faint in orange behind the text."></td>
+    <td><img src="site/static/shots/mac-look-blueprint.webp" alt="A terminal window on a Mac in the Blueprint look: btop on alpha in pale blue over a fine grid on deep blue."></td>
+  </tr>
+  <tr>
+    <td><sub><strong>Coding Agent.</strong> The agent each terminal runs, in its colour: drifting while it works, still and glowing when it waits for you.</sub></td>
+    <td><sub><strong>Blueprint.</strong> A drafting grid, with every colour in pale blue.</sub></td>
   </tr>
 </table>
 

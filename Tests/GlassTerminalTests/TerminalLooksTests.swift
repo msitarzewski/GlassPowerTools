@@ -46,6 +46,76 @@ struct TerminalLooksTests {
         #expect(TerminalLookStyle.resolved(cleared).glow == 0)
     }
 
+    @Test("the newer looks: the coding agent, aurora, starfield and blueprint")
+    func newerPresets() {
+        let window = GlassWindowOverrides()
+        let agent = TerminalLookStyle.resolved(TerminalLookPreset.agent.applied(to: window))
+        #expect(agent.backdrop == .agent && agent.glowColor == .agent && agent.glow > 0)
+        #expect(agent.usesAgent)
+        let aurora = TerminalLookStyle.resolved(TerminalLookPreset.aurora.applied(to: window))
+        #expect(aurora.backdrop == .aurora && aurora.phosphor == .none && !aurora.usesAgent)
+        let starfield = TerminalLookStyle.resolved(TerminalLookPreset.starfield.applied(to: window))
+        #expect(starfield.backdrop == .starfield)
+        let blueprint = TerminalLookStyle.resolved(TerminalLookPreset.blueprint.applied(to: window))
+        #expect(blueprint.backdrop == .blueprint && blueprint.phosphor == .blueprint)
+        #expect(TerminalPhosphor.blueprint.isMonochrome, "one pen colour for all the text")
+        #expect(!TerminalBackdropStyle.blueprint.isAnimated)
+
+        // Quicken with Output is for the backdrops that have a speed to change.
+        #expect(Set(TerminalBackdropStyle.allCases.filter(\.quickensWithOutput)) == [.rain, .aurora, .starfield])
+        // Every moving backdrop stops under Reduce Motion: it says it moves.
+        for style in [TerminalBackdropStyle.agent, .aurora, .starfield] { #expect(style.isAnimated, "\(style)") }
+    }
+
+    @Test("the Coding Agent look draws only where an agent runs, in that agent's colour")
+    func agentLook() throws {
+        var window = GlassWindowOverrides()
+        window = TerminalLookPreset.agent.applied(to: window)
+        let style = TerminalLookStyle.resolved(window)
+        #expect(!style.drawsBackdrop(agent: nil), "no agent, nothing behind the text")
+        #expect(style.drawsBackdrop(agent: .claudeCode))
+        window[TerminalWindowSettings.backdropIntensity] = 0
+        #expect(!TerminalLookStyle.resolved(window).drawsBackdrop(agent: .claudeCode), "faded out entirely")
+
+        // Another look draws as it always has, agent or none.
+        let rain = TerminalLookStyle.resolved(TerminalLookPreset.digitalRain.applied(to: GlassWindowOverrides()))
+        #expect(rain.drawsBackdrop(agent: nil) && rain.drawsBackdrop(agent: .codex))
+        #expect(!rain.usesAgent, "so the agent is never looked for")
+
+        let text = CodableColor(sRGBRed: 0.9, green: 0.9, blue: 0.9)
+        let claude = try #require(TerminalAgent.claudeCode.accent)
+        #expect(TerminalGlowColor.agent.color(text: text, agent: .claudeCode) == claude)
+        #expect(TerminalGlowColor.agent.color(text: text, agent: nil) == text, "no agent: the text's colour")
+        #expect(TerminalGlowColor.agent.color(text: text, agent: .cursor) == text, "a black mark: the text's colour")
+        #expect(TerminalGlowColor.cyan.color(text: text, agent: .claudeCode) != claude, "only Agent's Color follows it")
+    }
+
+    @Test("an agent's colour is the Agency Agents app's")
+    func agentColours() throws {
+        func hex(_ color: CodableColor?) -> String? {
+            color.map { String(format: "%02X%02X%02X", Int(($0.red * 255).rounded()), Int(($0.green * 255).rounded()),
+                               Int(($0.blue * 255).rounded())) }
+        }
+        #expect(hex(TerminalAgent.claudeCode.accent) == "D97757")
+        #expect(hex(TerminalAgent.codex.accent) == "10A37F")
+        #expect(hex(TerminalAgent.geminiCLI.accent) == "4285F4")
+        #expect(hex(TerminalAgent.mistralVibe.accent) == "FA520F")
+        #expect(TerminalAgent.cursor.accent == nil && TerminalAgent.kimi.accent == nil, "black marks")
+        for agent in TerminalAgent.allCases { #expect(agent.accent?.isValid ?? true, "\(agent)") }
+    }
+
+    @Test("the agent's smoke keeps its corners and edges in place, so it always fills its frame")
+    func agentSmoke() {
+        for time in stride(from: 0.0, through: 120, by: 7.3) {
+            let points = TerminalAgentBackdrop.points(at: time)
+            #expect(points.count == 9)
+            #expect(points[0] == [0, 0] && points[2] == [1, 0] && points[6] == [0, 1] && points[8] == [1, 1])
+            #expect(points[1].y == 0 && points[7].y == 1 && points[3].x == 0 && points[5].x == 1, "edges on their edges")
+            #expect(points.allSatisfy { (-0.01...1.01).contains($0.x) && (-0.01...1.01).contains($0.y) })
+        }
+        #expect(TerminalAgentBackdrop.points(at: 0)[4] != TerminalAgentBackdrop.points(at: 3)[4], "the middle drifts")
+    }
+
     @Test("a picture is a name this store gives, never a path")
     func pictureNames() {
         let name = UUID().uuidString + ".jpg"
@@ -187,7 +257,7 @@ struct TerminalLooksTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let library = try device.makeLibrary(URL: url)
         for function in ["glassRain", "glassSynthwave", "glassPixelate", "glassDuotone", "glassScanlines", "glassPhosphorScreen",
-                         "glassCeiling"] {
+                         "glassCeiling", "glassAurora", "glassStarfield", "glassBlueprint", "glassWorkingRipple"] {
             #expect(library.functionNames.contains(function), "\(function)")
         }
     }
@@ -219,5 +289,18 @@ struct TerminalLooksTests {
         #expect(first > 0.1 && first < 0.4, "between the old speed and the new: \(first)")
         let paused = clock.time(at: start.addingTimeInterval(3_600), speed: 1)
         #expect(paused - first < 2, "an hour asleep doesn't fast-forward")
+    }
+
+    @Test("Blur softens a picture along the whole slider: a quarter barely, half still shows it, Soft as before")
+    func pictureBlurRamp() {
+        let radius = TerminalBackdropView.pictureBlurRadius
+        #expect(radius(0) == 0)
+        #expect(radius(1) == 30)
+        #expect(radius(0.25) < 1, "a quarter softens, no more")
+        #expect(radius(0.5) < 5, "at half the picture still shows; it was 15 points, and gone")
+        #expect(radius(0.75) > 2 * radius(0.5), "the softening keeps growing toward Soft")
+        let steps = stride(from: 0.0, through: 1, by: 0.05).map(radius)
+        #expect(zip(steps, steps.dropFirst()).allSatisfy { $0 < $1 }, "every step softens more")
+        #expect(radius(-1) == 0 && radius(2) == 30, "out of range is held to the slider's ends")
     }
 }

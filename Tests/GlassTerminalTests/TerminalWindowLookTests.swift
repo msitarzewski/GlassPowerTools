@@ -297,6 +297,29 @@ struct TerminalWindowLookTests {
                 "made by hand over it: keeps the look of the one it replaces, as it keeps how it opens")
     }
 
+    @Test("the look chosen in the Workgroup editor is the one it opens with, None included, and the rest is kept")
+    func editorSavesTheChosenLook() {
+        var saved = LayoutPreset(name: "Builds", serverIDs: [UUID()])
+        saved.windowSettings = TerminalLookPreset.synthwave.applied(to: red)
+
+        // An edit: the look chosen, the Workgroup's tint and opacity kept.
+        let aurora = TerminalLookPreset.aurora.applied(to: saved.windowSettings)
+        let edited = WorkgroupEditorContext.edit(saved).windowSettingsToSave(aurora, replacing: nil)
+        #expect(edited[TerminalWindowSettings.backdrop] == .aurora)
+        #expect(edited[TerminalWindowSettings.phosphor] == nil, "Synthwave's palette goes with it")
+        #expect(edited[TerminalWindowSettings.tint] == "#FF2D55")
+
+        // Made by hand over it: the one it replaces, with the look this editor showed.
+        let byHand = WorkgroupEditorContext.new(name: "Builds")
+        let blueprint = byHand.windowSettingsToSave(TerminalLookPreset.blueprint.applied(to: GlassWindowOverrides()),
+                                                    replacing: saved)
+        #expect(blueprint[TerminalWindowSettings.backdrop] == .blueprint)
+        #expect(blueprint[TerminalWindowSettings.glowColor] == nil, "nothing of Synthwave's under it")
+        #expect(blueprint[TerminalWindowSettings.tint] == "#FF2D55")
+        let none = byHand.windowSettingsToSave(GlassWindowOverrides(), replacing: saved)
+        #expect(none == red, "None, as it was shown, and the replaced one's other settings")
+    }
+
     // MARK: The per-session overrides it replaces
 
     @Test("per-session overrides left from earlier builds are removed: no later session could use them")

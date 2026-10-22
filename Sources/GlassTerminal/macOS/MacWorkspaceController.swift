@@ -438,6 +438,12 @@ final class MacWorkspaceController {
     /// The agent the focused pane is running, if any.
     var focusedAgent: TerminalAgent? { focusedPaneID.flatMap(agent(for:)) }
 
+    /// The agent the sidebar shows for this tab (`TerminalTabMark`): the focused pane's, else the
+    /// first pane's that runs one.
+    var tabAgent: TerminalAgent? {
+        focusedAgent ?? state.root?.paneIDs.lazy.compactMap(agent(for:)).first
+    }
+
     var focusedPane: MacWorkspacePane? {
         guard let focusedPaneID else { return nil }
         return state.root?.pane(id: focusedPaneID)

@@ -144,6 +144,52 @@ struct MacWorkspaceView: View {
             .disabled(!windowController.canTransferTabs(chosenIDs))
             Button("Close \(chosen.count) Tabs", systemImage: "xmark") { requestCloseTabs(chosenIDs) }
                 .labelStyle(.titleAndIcon)
+        } else {
+            // The sidebar's empty space: the toolbar's + menu (the owner, 2026-10-21: "a right click
+            // ... in the empty space in the left sidebar ... looking for a 'new terminal' option
+            // that mimics the top toolbar").
+            newTabMenuItems
+                .labelStyle(.titleAndIcon)
+                .disabled(!windowController.canAddTab)
+        }
+    }
+
+    /// What the toolbar's + offers, and the sidebar's empty space: a terminal, a basic one, the
+    /// terminals running here and on each host, and a new one on any host.
+    @ViewBuilder
+    private var newTabMenuItems: some View {
+        Button("New Terminal", systemImage: "plus", action: addTab)
+        Button("New Basic Terminal", systemImage: "apple.terminal", action: addPlainTab)
+        // The terminals running on this Mac and on each host, as Active last listed
+        // them, opened here as a tab (the owner, 2026-10-15: "add running terminals
+        // to the Mac + menu too").
+        let localRunning = runningOnThisMac
+        if !localRunning.isEmpty {
+            Menu("Running on This Mac", systemImage: "desktopcomputer") {
+                ForEach(localRunning) { running in
+                    runningButton(running) { addTab(runningLocally: $0) }
+                }
+            }
+        }
+        let hosts = terminalHostEntries
+        if !hosts.isEmpty {
+            Menu("New Terminal on", systemImage: "server.rack") {
+                ForEach(hosts) { host in
+                    if host.running.isEmpty {
+                        Button(host.title) { addTab(onHost: host.server.id) }
+                    } else {
+                        Menu(host.title) {
+                            Button("New Terminal", systemImage: "plus") { addTab(onHost: host.server.id) }
+                            Section("Running") {
+                                ForEach(host.running) { running in
+                                    runningButton(running) { addTab(onHost: host.server.id, attachingTo: $0) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .accessibilityIdentifier("mac-workspace-new-tab-on-host")
         }
     }
 
@@ -189,22 +235,16 @@ struct MacWorkspaceView: View {
                     }
                 }
             } icon: {
-                Image(systemName: "apple.terminal")
-                    .foregroundStyle(windowTint ?? controller.workgroupColor?.color ?? .secondary)
+                // The agent running in the tab, in its colour, pulsing while the tab prints — the
+                // wave that moved under the row before (2026-10-21, as Vision Pro's sidebar).
+                TerminalTabMark(agent: controller.tabAgent,
+                                color: windowTint ?? controller.workgroupColor?.color ?? .secondary,
+                                working: controller.isProducingOutput)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             // Its tmux session, machine, program and folder, as the tmux status line showed them
             // (the owner, 2026-10-20: "let's add an Apple way to see the session info").
             .help(controller.sessionHelp(servers: sessionManager.serverManager.servers) ?? "")
-            // While a terminal in the tab is printing, a wave moves under the row.
-            .background {
-                if controller.isProducingOutput {
-                    MacTerminalActivityShimmer(color: windowTint ?? controller.workgroupColor?.color ?? .accentColor)
-                        .padding(.horizontal, -6)
-                        .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: controller.isProducingOutput)
             if showsCloseBox {
                 Button("Close Tab", systemImage: "xmark") { requestCloseTabs([controller.workspaceID]) }
                     .labelStyle(.iconOnly)
@@ -314,39 +354,7 @@ struct MacWorkspaceView: View {
                     // terminal, new basic terminal, new terminal on..." — the last a cascading menu
                     // of every saved host with a terminal, in tmux as that host says.
                     Menu {
-                        Button("New Terminal", systemImage: "plus", action: addTab)
-                        Button("New Basic Terminal", systemImage: "apple.terminal", action: addPlainTab)
-                        // The terminals running on this Mac and on each host, as Active last listed
-                        // them, opened here as a tab (the owner, 2026-10-15: "add running terminals
-                        // to the Mac + menu too").
-                        let localRunning = runningOnThisMac
-                        if !localRunning.isEmpty {
-                            Menu("Running on This Mac", systemImage: "desktopcomputer") {
-                                ForEach(localRunning) { running in
-                                    runningButton(running) { addTab(runningLocally: $0) }
-                                }
-                            }
-                        }
-                        let hosts = terminalHostEntries
-                        if !hosts.isEmpty {
-                            Menu("New Terminal on", systemImage: "server.rack") {
-                                ForEach(hosts) { host in
-                                    if host.running.isEmpty {
-                                        Button(host.title) { addTab(onHost: host.server.id) }
-                                    } else {
-                                        Menu(host.title) {
-                                            Button("New Terminal", systemImage: "plus") { addTab(onHost: host.server.id) }
-                                            Section("Running") {
-                                                ForEach(host.running) { running in
-                                                    runningButton(running) { addTab(onHost: host.server.id, attachingTo: $0) }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .accessibilityIdentifier("mac-workspace-new-tab-on-host")
-                        }
+                        newTabMenuItems
                     } label: {
                         Label("New Terminal Tab", systemImage: "plus")
                     } primaryAction: {
@@ -1205,6 +1213,7 @@ private struct MacWorkspaceTabContent: View {
                     onDisconnect: { closeLocalPane(pane.id) },
                     onProcessStatusChange: { controller.updateLocalProcessStatus($0, for: pane.id) },
                     onContextChange: { controller.updatePaneContext(title: $0, directory: $1, for: pane.id) },
+                    agent: { controller.agent(for: pane.id) },
                     hostModel: runtime.model,
                     processState: runtime.processState
                 )
