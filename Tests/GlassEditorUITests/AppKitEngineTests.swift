@@ -201,11 +201,12 @@ struct AppKitEngineTests {
             coordinator.textDidChange(
                 Notification(name: NSText.didChangeNotification, object: engine.textView)
             )
-            _ = coordinator.textView(
+            let accepted = coordinator.textView(
                 engine.textView,
                 shouldChangeTextIn: NSRange(location: 0, length: 6),
                 replacementString: "XXXXXX"
             )
+            #expect(accepted, "the view's own write is allowed through untouched")
         }
         #expect(coordinator.forwardedEditCount == editsBefore)
         #expect(engine.model.text == "SELECT 1 FROM t")
@@ -535,6 +536,44 @@ struct AppKitEngineTests {
         )
         #expect(hit == 0..<5)
         #expect(engine.selectedRange == 0..<5)
+    }
+
+    /// The find bar and Go to Line select through the model, and the view never followed it
+    /// (2026-10-22: Return in the find bar selected nothing on screen).
+    @Test("a selection revealed through the model reaches the text view, each time it is asked for")
+    func revealReachesTheView() async {
+        let engine = makeEngine("alpha beta alpha")
+        engine.model.reveal(11..<16)
+        await settle()
+        #expect(engine.textView.selectedRange() == NSRange(location: 11, length: 5))
+
+        engine.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        #expect(engine.model.selectedRange == 0..<0, "the view's own selection reaches the model")
+        engine.model.reveal(11..<16)
+        await settle()
+        #expect(engine.textView.selectedRange() == NSRange(location: 11, length: 5))
+    }
+
+    /// And scrolled to, in a window the size of an editor's, for a match far down the file.
+    @Test("a match revealed far down the file is scrolled to")
+    func revealScrollsToAFarMatch() async {
+        let content = (1...400).map { "line \($0)" }.joined(separator: "\n") + "\nneedle\n"
+        let engine = makeEngine(content)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        engine.containerView.frame = window.contentView!.bounds
+        window.contentView!.addSubview(engine.containerView)
+        engine.containerView.layoutSubtreeIfNeeded()
+        let top = engine.scrollView.contentView.bounds.minY
+
+        let needle = (content as NSString).range(of: "needle")
+        engine.model.reveal(needle.location..<NSMaxRange(needle))
+        await settle()
+        #expect(engine.textView.selectedRange() == needle)
+        #expect(engine.scrollView.contentView.bounds.minY > top + 1000,
+                "scrolled to the match: \(engine.scrollView.contentView.bounds.minY)")
+        window.close()
     }
 }
 

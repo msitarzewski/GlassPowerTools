@@ -7,15 +7,15 @@ import Testing
         RDPConnectionIdentity(
             host: "server.local",
             port: 3390,
-            username: "anees"
-        ).displayName == "anees@server.local:3390"
+            username: "casey"
+        ).displayName == "casey@server.local:3390"
     )
     #expect(
         RDPConnectionIdentity(
             host: "server.local",
-            username: "anees",
+            username: "casey",
             domain: "LAB"
-        ).displayName == "LAB\\anees@server.local"
+        ).displayName == "LAB\\casey@server.local"
     )
 }
 
@@ -24,16 +24,16 @@ import Testing
     #expect(
         RDPConnectionIdentity(
             host: "server.local",
-            username: "anees"
-        ).credentialAccountName == "anees@server.local:3389"
+            username: "casey"
+        ).credentialAccountName == "casey@server.local:3389"
     )
     #expect(
         RDPConnectionIdentity(
             host: "server.local",
             port: 3390,
-            username: "anees",
+            username: "casey",
             domain: "LAB"
-        ).credentialAccountName == "LAB\\anees@server.local:3390"
+        ).credentialAccountName == "LAB\\casey@server.local:3390"
     )
 }
 
@@ -41,33 +41,33 @@ import Testing
     let identity = RDPConnectionIdentity(
         host: "  Server.Local  ",
         port: 3389,
-        username: "  anees  ",
+        username: "  casey  ",
         domain: "  LAB  "
     )
 
     #expect(identity.host == "Server.Local")
-    #expect(identity.username == "anees")
+    #expect(identity.username == "casey")
     #expect(identity.domain == "LAB")
-    #expect(identity.displayName == "LAB\\anees@Server.Local")
+    #expect(identity.displayName == "LAB\\casey@Server.Local")
 }
 
 @Test func connectionIdentityMatchesNormalizedHostAndAccount() {
     let lhs = RDPConnectionIdentity(
         host: "SERVER.LOCAL",
         port: 3389,
-        username: "anees",
+        username: "casey",
         domain: ""
     )
     let rhs = RDPConnectionIdentity(
         host: "server.local",
         port: 3389,
-        username: "anees",
+        username: "casey",
         domain: nil
     )
     let differentAccount = RDPConnectionIdentity(
         host: "server.local",
         port: 3389,
-        username: "anees",
+        username: "casey",
         domain: "LAB"
     )
 

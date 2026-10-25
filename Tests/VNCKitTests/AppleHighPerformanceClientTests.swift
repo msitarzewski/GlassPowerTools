@@ -48,12 +48,14 @@ struct AppleHighPerformanceClientTests {
                                addresses: { ("127.0.0.1", "127.0.0.1") })
         let run = Task { try await client.run() }
 
-        for _ in 0..<200 where await sink.written.count < 13 + 256 { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<6_000 where await sink.written.count < 13 + 256 { try await Task.sleep(for: .milliseconds(5)) }
         let answer = await sink.written
+        // Required before slicing: a short answer was an out-of-range crash, which ended the whole run.
+        try #require(answer.count >= 13 + 256, "the viewer's answer: \(answer.count) bytes")
         let clientPublic = Array(answer[(13 + 128)..<(13 + 256)])
         let shared = RFBSecurity.fit(try group.power(baseBigEndian: clientPublic, exponentBigEndian: serverPrivate), to: 128)
         let wrap = Array(Insecure.MD5.hash(data: shared))
-        // macvm's command bitmap, which lists SetDisplayConfiguration (0x1d) and the stream's offer (0x1c).
+        // A Mac's command bitmap, as captured, which lists SetDisplayConfiguration (0x1d) and the stream's offer (0x1c).
         var name: [UInt8] = [0, 0] + UInt32(0x10 | 0x02).bigEndianBytes
         name += [0xbf, 0xf6, 0xe7, 0x2f, 0xec] + [UInt8](repeating: 0, count: 11) + Array("Studio".utf8)
         var after = UInt32(0).bigEndianBytes
@@ -61,7 +63,7 @@ struct AppleHighPerformanceClientTests {
         after += UInt32(name.count).bigEndianBytes + name
         await source.append(after)
         let preludeEnd = 13 + 256 + 1 + 66 + 4 + 8 + 12
-        for _ in 0..<200 where await sink.written.count < preludeEnd { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<6_000 where await sink.written.count < preludeEnd { try await Task.sleep(for: .milliseconds(5)) }
         var rekey: [UInt8] = [0, 0, 0, 1] + [UInt8](repeating: 0, count: 8) + RFBAppleMessages.rekeyEncoding.bigEndianBytes
         rekey += UInt32(1).bigEndianBytes
         rekey += try RFBSecurity.encryptECB(algorithm: CCAlgorithm(kCCAlgorithmAES128), key: wrap, plaintext: AppleRecordLayerTests.keys.key)
@@ -82,7 +84,7 @@ struct AppleHighPerformanceClientTests {
             }
         }
         func waitFor(_ what: String, _ found: ([[UInt8]]) -> Bool) async throws {
-            for _ in 0..<300 {
+            for _ in 0..<6_000 {
                 try await readMessages()
                 if found(messages) { return }
                 try await Task.sleep(for: .milliseconds(5))
@@ -106,7 +108,7 @@ struct AppleHighPerformanceClientTests {
             list.contains { $0.first == 2 && Array($0.dropFirst(4).prefix(4)) == RFBEncoding.appleMediaStream.rawValue.bigEndianBytes }
         }
         // The Mac names its ports; the offer follows.
-        let base = UInt16.random(in: 40_000...60_000)
+        let base = try freeUDPBase()
         var ports = hexBytes("0001000100000000170c00000001170d0000000100000000000000000000000000000000")
         ports.replaceSubrange(8..<10, with: base.bigEndianBytes)
         ports.replaceSubrange(14..<16, with: (base + 1).bigEndianBytes)
@@ -144,7 +146,7 @@ struct AppleHighPerformanceClientTests {
                                                                highPerformance: VNCHighPerformance(width: 800, height: 600, density: 1)),
                                callbacks: callbacks, source: source, sink: MemoryByteSink())
         let run = Task { try await client.run() }
-        for _ in 0..<200 where seen.lock.withLock({ seen.status.isEmpty }) { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<6_000 where seen.lock.withLock({ seen.status.isEmpty }) { try await Task.sleep(for: .milliseconds(5)) }
         seen.lock.withLock {
             if case .unavailable? = seen.status.first {} else { Issue.record("said why: \(seen.status)") }
         }

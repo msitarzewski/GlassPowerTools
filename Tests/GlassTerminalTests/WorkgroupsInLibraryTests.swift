@@ -19,8 +19,8 @@ struct WorkgroupsInLibraryTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: nil, resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         model.registry.register(GlassTerminalCapability(runtime: runtime))
         // As the composition root wires it.
         runtime.showLibraryPanel = { [weak model] panelID in model?.showPanel(panelID) }

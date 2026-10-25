@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GlassLayers
 import GlassConnectionKit
 import GlasSecretStore
 import GlassShell
@@ -156,7 +157,7 @@ struct TerminalServiceDraftTests {
 
     @Test("The capability hands the shell a fresh draft, a loaded one for a saved server, and a settable one for a bare link")
     func capabilityContract() throws {
-        let runtime = GlassTerminalRuntime()
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let fresh = capability.makeSetupDraft()
         #expect(fresh.kind == .ssh && fresh is TerminalServiceDraft)

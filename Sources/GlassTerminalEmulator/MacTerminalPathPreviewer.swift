@@ -13,6 +13,7 @@
 import AppKit
 import SwiftUI
 import SwiftTerm
+import os
 
 /// A Mac terminal view with a previewer, for its right-click menu's Quick Look.
 @MainActor
@@ -22,6 +23,8 @@ protocol MacTerminalPreviewHolding: AnyObject {
 
 @MainActor
 final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
+    /// Where a preview stopped: the reason, never the path.
+    private static let log = Logger(subsystem: "sh.glas", category: "path-preview")
     private weak var view: TerminalView?
     private let model: () -> SwiftTermHostModel?
     var mode: TerminalPathPreviews = .mouseover {
@@ -181,9 +184,11 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
     /// pointer resting shows only a file it found, and only while the pointer is still on it.
     func show(path: String, at windowPoint: NSPoint, explicit: Bool) async {
         guard let view, let model = model(), let resolve = model.previewFile, let content = model.previewContent else {
+            Self.log.error("event=show result=not-wired model=\(self.model() != nil, privacy: .public) explicit=\(explicit, privacy: .public)")
             if explicit { NSSound.beep() }
             return
         }
+        Self.log.notice("event=show asked explicit=\(explicit, privacy: .public)")
         generation &+= 1
         let mine = generation
         close()
@@ -196,6 +201,7 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
             return
         }
         guard let file else {
+            Self.log.notice("event=show result=no-file explicit=\(explicit, privacy: .public)")
             close()
             if explicit { NSSound.beep() }
             return
@@ -210,6 +216,7 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
             // Still on the path, in a window still in front: the pointer may have moved on.
             guard let window = view.window, window.isKeyWindow, !view.isHiddenOrHasHiddenAncestor,
                   self.path(in: view, at: window.mouseLocationOutsideOfEventStream) == path else {
+                Self.log.notice("event=show result=pointer-moved-on")
                 file.discard?()
                 return
             }
@@ -238,7 +245,7 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
             }
         }
         return AnyView(VStack(spacing: 0) {
-            MacTerminalPreviewBar(name: (path as NSString).lastPathComponent, open: open,
+            TerminalPreviewBar(name: (path as NSString).lastPathComponent, open: open,
                                   revealTitle: model.revealPathTitle, reveal: reveal)
             Divider()
             content.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -323,33 +330,4 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
     }
 }
 
-/// The bar over a preview: the file's name, Show in Finder or Files, Open in Editor.
-private struct MacTerminalPreviewBar: View {
-    let name: String
-    let open: (@MainActor () -> Void)?
-    let revealTitle: String
-    let reveal: (@MainActor () -> Void)?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Text(name)
-                .font(.headline)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 8)
-            if let reveal {
-                Button(revealTitle, systemImage: "folder") { reveal() }
-                    .labelStyle(.iconOnly)
-                    .help(revealTitle)
-            }
-            if let open {
-                Button("Open in Editor", systemImage: "pencil") { open() }
-                    .help("Open in Editor")
-            }
-        }
-        .buttonStyle(.borderless)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-}
 #endif

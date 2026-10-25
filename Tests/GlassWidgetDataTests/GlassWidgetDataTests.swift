@@ -84,12 +84,23 @@ struct GlassWidgetDataTests {
         #expect(handled.last == .showMachine(machine) && handled.count == 3)
     }
 
-    @Test("the intents carry what the widget gave them, and a malformed one asks for nothing")
+    @Test("the intents ask for what the widget gave them, and a malformed one asks for nothing")
     @MainActor
     func intents() async throws {
         let machine = UUID(), service = UUID()
-        let connect = GlassConnectServiceIntent(machine: machine, service: service)
-        #expect(connect.machine == machine.uuidString && connect.service == service.uuidString)
-        #expect(GlassShowMachineIntent(machine: machine).machine == machine.uuidString)
+        // Performed, as a widget's tap performs them: what they ask the app for. (Until 2026-10-24 this
+        // read back the strings the initializers stored and never performed one.)
+        var asked: [GlassWidgetRequest] = []
+        GlassWidgetRequests.shared.handle { asked.append($0) }
+        _ = try await GlassConnectServiceIntent(machine: machine, service: service).perform()
+        _ = try await GlassShowMachineIntent(machine: machine).perform()
+        var malformed = GlassConnectServiceIntent(machine: machine, service: service)
+        malformed.service = "not a service"
+        _ = try await malformed.perform()
+        var unnamed = GlassShowMachineIntent(machine: machine)
+        unnamed.machine = "nobody"
+        _ = try await unnamed.perform()
+        #expect(asked == [.connect(machine: machine, service: service), .showMachine(machine)],
+                "the two well-formed ones, and nothing for the malformed")
     }
 }

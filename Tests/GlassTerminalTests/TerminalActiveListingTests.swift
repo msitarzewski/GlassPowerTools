@@ -18,7 +18,7 @@ struct TerminalActiveListingTests {
 
     @Test("A lone session is one row, on its server's endpoint; grouped, it is the workgroup's row")
     func loneSessionIsListed() {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let manager = runtime.sessionManager
         let session = session(named: "alpha")
@@ -42,7 +42,7 @@ struct TerminalActiveListingTests {
     /// owner, 2026-10-17, light mode: a dark theme's picture was green text on the white sheet).
     @Test("A terminal's cards carry its theme's canvas and its light or dark")
     func cardsCarryTheThemesBackdrop() throws {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let manager = runtime.sessionManager
         let group = manager.createWorkgroup(name: "alpha", colorTag: .blue)
@@ -67,7 +67,7 @@ struct TerminalActiveListingTests {
 
     @Test("A workgroup Connect made for one terminal is named as its window names it; a named workgroup keeps its name")
     func connectWorkgroupTakesTheTerminalsName() {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let manager = runtime.sessionManager
         func open(_ server: String, inWorkgroup name: String, count: Int = 1) -> (UUID, [TerminalSession]) {
@@ -114,7 +114,7 @@ struct TerminalActiveListingTests {
         #expect(TerminalListingSkip.connectionFailed.errorDescription == "The connection failed. Connect to it to see why.",
                 "ending a session there says the same, without the note's prefix")
 
-        let capability = GlassTerminalCapability(runtime: GlassTerminalRuntime(layers: GlassLayerStore()))
+        let capability = GlassTerminalCapability(runtime: GlassTerminalRuntime(layers: GlassLayerStore.forTest()))
         let report = capability.runningReport(local: nil, hosts: [(server, .skipped(TerminalListingSkip.needsPassword.reason))])
         #expect(report.sessions.isEmpty)
         #expect(report.unchecked.map(\.endpointID) == [EndpointID(rawValue: server.id)])
@@ -124,7 +124,7 @@ struct TerminalActiveListingTests {
     @Test("D86: a server that is This Mac's own machine isn't listed over SSH: its sessions are This Mac's")
     func thisMacsMachineListedOnce() {
         let server = ServerConfiguration(name: "alpha", host: "192.0.2.10", port: 22, username: "casey")
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let listed = TerminalTmux.Session(name: "glass-1", attachedClients: 0, windows: 1, lastActivity: nil)
         #expect(capability.runningReport(local: nil, hosts: [(server, .sessions([listed]))]).sessions.count == 1,
@@ -135,7 +135,7 @@ struct TerminalActiveListingTests {
 
     @Test("Closing a lone session's row ends the session")
     func closeEndsTheSession() {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let manager = runtime.sessionManager
         let session = session(named: "alpha")
@@ -147,7 +147,7 @@ struct TerminalActiveListingTests {
     /// All Windows off the Mac (the owner, 2026-10-14): "Grouped by machine, but show each tab as a card."
     @Test("A workgroup's terminals are its tabs: named as their tabs are, each on its server; chosen, a tab comes back selected")
     func workgroupTabsAreCards() throws {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let manager = runtime.sessionManager
         let group = manager.createWorkgroup(name: "Backend", colorTag: .blue)
@@ -177,12 +177,114 @@ struct TerminalActiveListingTests {
         manager.closeWorkgroup(group)
     }
 
+    /// The owner, on the iPhone (2026-10-24): each tab whose connection had dropped was listed
+    /// twice — "Disconnected · in tmux (Terminal 1)", and its session again below it, "Open
+    /// elsewhere", where Open made a second tab on it.
+    @Test("A dropped tab holds its session: listed once, as the tab, saying what the machine said")
+    func aDroppedTabStandsForItsSession() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let terminal = session(named: "alpha")
+        manager.registerSession(terminal)
+        let group = manager.createWorkgroup(name: "alpha", colorTag: .blue)
+        #expect(manager.appendSession(terminal, toWorkgroup: group))
+        terminal.tmuxSessionName = "glass-1"
+        terminal.state = .disconnected
+        let server = terminal.server
+        let mine = TerminalTmux.Session(name: "glass-1", attachedClients: 1, windows: 1)
+        let other = TerminalTmux.Session(name: "glass-2", attachedClients: 0, windows: 1)
+        func row() throws -> GlassOpenSession {
+            try #require(capability.openSessions().first { $0.id == GlassTerminalCapability.sessionID(workgroupID: group) })
+        }
+        #expect(try row().subtitle == "Disconnected · in tmux (Terminal 1)", "nothing asked of the machine yet")
+
+        let report = capability.runningReport(local: nil, hosts: [(server, .sessions([mine, other]))])
+        #expect(report.sessions.map(\.attachment?.name) == ["glass-1", "glass-2"])
+        #expect(report.sessions.map { $0.isHeldHere() } == [true, false], "the tab's session is its row's, not one of its own")
+        #expect(try row().subtitle == "Disconnected · Open elsewhere", "what the session's own row said")
+
+        // A session of the same name on another machine is that machine's, not this tab's.
+        let bravo = ServerConfiguration(name: "bravo", host: "bravo.example.invalid", port: 22, username: "casey")
+        let elsewhere = capability.runningReport(local: nil, hosts: [(bravo, .sessions([mine]))])
+        #expect(elsewhere.sessions.map { $0.isHeldHere() } == [false], "held only on the tab's own machine")
+
+        // Detached, the session is a row of its own at once: nothing has to ask the machine again.
+        manager.closeWorkgroup(group)
+        #expect(report.sessions.map { $0.isHeldHere() } == [false, false])
+    }
+
+    @Test("A dropped tab whose session has ended says so; a live one is shown as it was")
+    func aDroppedTabWhoseSessionEnded() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let terminal = session(named: "alpha")
+        manager.registerSession(terminal)
+        let group = manager.createWorkgroup(name: "alpha", colorTag: .blue)
+        defer { manager.closeWorkgroup(group) }
+        #expect(manager.appendSession(terminal, toWorkgroup: group))
+        terminal.tmuxSessionName = "glass-1"
+        terminal.state = .disconnected
+        let other = TerminalTmux.Session(name: "glass-2", attachedClients: 0, windows: 1)
+
+        _ = capability.runningReport(local: nil, hosts: [(terminal.server, .sessions([other]))])
+        let window = try #require(capability.openSessions().first)
+        #expect(window.subtitle == "Disconnected · its tmux session has ended")
+        #expect(window.tabs.first?.subtitle == window.subtitle, "its card in All Windows says the same")
+
+        // On its way back, it is listed as it always was, and its session is not listed again.
+        terminal.state = .reconnecting
+        let mine = TerminalTmux.Session(name: "glass-1", attachedClients: 1, windows: 1)
+        let report = capability.runningReport(local: nil, hosts: [(terminal.server, .sessions([mine, other]))])
+        #expect(report.sessions.map(\.attachment?.name) == ["glass-2"])
+        #expect(capability.openSessions().first?.subtitle == "Reconnecting... · in tmux (Terminal 1)")
+    }
+
+    @Test("Choosing a dropped tab in tmux reconnects it; not one disconnected on purpose, a slot, or a plain shell")
+    func choosingADroppedTabReconnectsIt() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let group = manager.createWorkgroup(name: "Backend", colorTag: .blue)
+        defer { manager.closeWorkgroup(group) }
+        let dropped = session(named: "alpha"), chosen = session(named: "bravo"), slot = session(named: "charlie"),
+            plain = session(named: "delta")
+        for terminal in [dropped, chosen, slot, plain] {
+            manager.registerSession(terminal)
+            #expect(manager.appendSession(terminal, toWorkgroup: group))
+            terminal.state = .disconnected
+        }
+        dropped.tmuxSessionName = "glass-1"
+        chosen.tmuxSessionName = "glass-2"
+        chosen.disconnect()
+        slot.tmuxSessionName = "glass-3"
+        slot.isWorkgroupSlot = true
+        slot.connectsWhenShown = true
+        func reconnects(_ request: GlassTerminalRuntime.Request) -> UUID? {
+            if case .reconnect(let id) = request { id } else { nil }
+        }
+        let window = try #require(capability.openSessions().first)
+        _ = runtime.takeRequests()
+
+        window.tabs[0].activate()
+        #expect(runtime.takeRequests().compactMap(reconnects) == [dropped.id])
+        for tab in window.tabs.dropFirst() {
+            tab.activate()
+            #expect(runtime.takeRequests().compactMap(reconnects).isEmpty, "\(tab.title)")
+        }
+        // The window's own row: its tab in front.
+        _ = manager.selectSession(dropped.id, inWorkgroup: group)
+        window.activate()
+        #expect(runtime.takeRequests().compactMap(reconnects) == [dropped.id])
+    }
+
     /// The owner (2026-10-15): "in the expose it show one card for all tabs". The iPhone opens a
     /// window's other tabs as slots that connect when shown; All Windows dropped them as
     /// disconnected.
     @Test("A tab that connects when it is shown waits, and says so; one that dropped does not")
     func slotTabsWaitToBeShown() throws {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let manager = runtime.sessionManager
         let group = manager.createWorkgroup(name: "Backend", colorTag: .blue)

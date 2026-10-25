@@ -850,12 +850,16 @@ struct GlassEditorCommands: Commands {
 
             Divider()
 
-            Button("Find in Document…") { actions?.find() }
-                .keyboardShortcut("f", modifiers: [.command, .option])
-                .disabled(actions == nil)
             Button("Go to Line…") { actions?.goToLine() }
                 .keyboardShortcut("l", modifiers: [.command, .option])
                 .disabled(actions == nil)
+
+            Divider()
+
+            // What changed since the last commit (2026-10-23), on VS Code's key for it.
+            Button("Show Changes") { actions?.showChanges?() }
+                .keyboardShortcut("g", modifiers: [.control, .shift])
+                .disabled(actions?.showChanges == nil)
         }
     }
 }
@@ -895,18 +899,20 @@ public struct GlassEditorActions {
     public let increaseFontSize: () -> Void
     public let decreaseFontSize: () -> Void
     public let resetFontSize: () -> Void
-    public let find: () -> Void
     public let goToLine: () -> Void
+    /// The project's Changes tab; nil when the window's project is in no repository.
+    public let showChanges: (() -> Void)?
 
     public init(increaseFontSize: @escaping () -> Void,
                 decreaseFontSize: @escaping () -> Void,
                 resetFontSize: @escaping () -> Void,
-                find: @escaping () -> Void, goToLine: @escaping () -> Void) {
+                goToLine: @escaping () -> Void,
+                showChanges: (() -> Void)? = nil) {
         self.increaseFontSize = increaseFontSize
         self.decreaseFontSize = decreaseFontSize
         self.resetFontSize = resetFontSize
-        self.find = find
         self.goToLine = goToLine
+        self.showChanges = showChanges
     }
 }
 

@@ -561,17 +561,19 @@ struct TerminalSettingsView: View {
                     }
             }
 
-            #if os(macOS)
+            #if os(macOS) || os(visionOS)
             // The file a printed path names, over the terminal (2026-10-16: "Show previews:
-            // ( ) Never (•) Mouseover ( ) Mouseover + space"). Quick Look on a path's right-click
-            // menu shows it whatever this says.
+            // ( ) Never (•) Mouseover ( ) Mouseover + space"; on the headset too, 2026-10-22).
+            // Quick Look on a path's menu shows it whatever this says.
             Section {
                 Picker("Show previews", selection: $settings.pathPreviews) {
                     ForEach(TerminalPathPreviews.allCases, id: \.self) { choice in
                         Text(choice.title).tag(choice)
                     }
                 }
+                #if os(macOS)
                 .pickerStyle(.radioGroup)
+                #endif
                 .onChange(of: settings.pathPreviews) { _, _ in
                     settings.saveSettings()
                 }
@@ -579,11 +581,19 @@ struct TerminalSettingsView: View {
             } header: {
                 Text("Previews")
             } footer: {
+                #if os(macOS)
                 Text("A file whose path a terminal printed — a picture, a PDF, Markdown, code — shown over the terminal, from this Mac or the server. Mouseover shows it when the pointer rests on the path. With Mouseover + Space, Space shows it instead, and on a web address asks to open it. Quick Look in a path's right-click menu shows it either way.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                #else
+                Text("A file whose path a terminal printed — a picture, a PDF, Markdown, code — shown over the terminal, from the server. Mouseover shows it when a trackpad's or mouse's pointer rests on the path; your eyes can't, as visionOS doesn't tell apps where you look. With Mouseover + Space, Space shows it instead. Quick Look in a path's pinch-and-hold menu shows it either way.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                #endif
             }
+            #endif
 
+            #if os(macOS)
             MacLocalTerminalServerSection(settings: settingsManager)
             #endif
         }

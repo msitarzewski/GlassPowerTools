@@ -52,6 +52,14 @@ struct GlassWindowAspectLockTests {
             try? await Task.sleep(for: .milliseconds(50))
         }
 
+        /// Until SwiftUI has done what is asked, for up to 10 s: a fixed 50 ms stood for it, which a
+        /// run whose other tests hold the main actor outlasts (2026-10-24).
+        func settle(until condition: () -> Bool) async -> Bool {
+            let deadline = ContinuousClock.now + .seconds(10)
+            while !condition(), ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(20)) }
+            return condition()
+        }
+
         func close() {
             hosting?.removeFromSuperview()
             window.close()
@@ -62,6 +70,7 @@ struct GlassWindowAspectLockTests {
     func holdsTheShape() async {
         let host = await Hosted(aspect: 2)
         defer { host.close() }
+        _ = await host.settle { abs(host.canvas.width / host.canvas.height - 2) < 0.01 && host.window.contentAspectRatio != .zero }
         let canvas = host.canvas
         #expect(abs(canvas.width / canvas.height - 2) < 0.01, "800 wide: the part 400 high, the content 440: \(canvas)")
         #expect(host.window.contentAspectRatio != .zero, "and held to it as the window is resized")
@@ -77,8 +86,7 @@ struct GlassWindowAspectLockTests {
         // The lock looks again as what it holds changes size.
         host.window.setContentSize(NSSize(width: 700, height: 500))
         host.show(aspect: nil)
-        await host.settle()
-        #expect(host.window.contentAspectRatio == .zero, "free to take any shape")
+        #expect(await host.settle { host.window.contentAspectRatio == .zero }, "free to take any shape")
     }
 }
 #endif

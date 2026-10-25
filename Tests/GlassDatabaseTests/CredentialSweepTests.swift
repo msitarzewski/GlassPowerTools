@@ -72,11 +72,23 @@ struct CredentialSweepTests {
     @Test("Deleting a service sweeps the database password at every policy, not just the current one")
     func deleteSweepsEveryDatabaseDescriptor() throws {
         let store = RecordingStore()
-        _ = try KeychainManager.deleteCredentials(for: config(), store: store.asMutationStore)
+        let connection = config()
+        _ = try KeychainManager.deleteCredentials(for: connection, store: store.asMutationStore)
 
-        let services = Set(store.deleted.map(\.service))
-        #expect(services.count >= 3,
+        // The database account's own deletions, at each policy's descriptor. (It counted every
+        // deletion until 2026-10-24, and the SSH sweep alone made three.)
+        #expect(databaseServicesSwept(store, connection) == Self.everyDatabaseDescriptor,
                 "every policy's descriptor is visited, not only the record's current one")
+    }
+
+    private static var everyDatabaseDescriptor: Set<String> {
+        Set([CredentialStoragePolicy.sharedWithGlas, .appOnly, .requireAuthentication]
+            .map { KeychainManager.descriptor(for: $0, kind: .databasePassword).service })
+    }
+
+    private func databaseServicesSwept(_ store: RecordingStore, _ connection: DatabaseConnectionConfig) -> Set<String> {
+        let account = KeychainManager.databaseAccount(for: connection.id)
+        return Set(store.deleted.filter { $0.account == account }.map(\.service))
     }
 
     /// The engine condition is gone: what a record can hold *today* says nothing about what was
@@ -84,9 +96,9 @@ struct CredentialSweepTests {
     @Test("A SQLite service still sweeps the password it held as a networked engine")
     func sqliteServiceStillSweepsItsOldPassword() throws {
         let store = RecordingStore()
-        _ = try KeychainManager.deleteCredentials(for: config(engine: .sqlite),
-                                                  store: store.asMutationStore)
-        #expect(!store.deleted.isEmpty,
+        let connection = config(engine: .sqlite)
+        _ = try KeychainManager.deleteCredentials(for: connection, store: store.asMutationStore)
+        #expect(databaseServicesSwept(store, connection) == Self.everyDatabaseDescriptor,
                 "a SQLite record cannot hold a password, but it may have held one before")
     }
 

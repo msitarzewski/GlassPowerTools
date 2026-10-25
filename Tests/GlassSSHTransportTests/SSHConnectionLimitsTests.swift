@@ -226,15 +226,17 @@ struct SSHConnectionLimitsTests {
     @Test func aQueuedCommandGivesUpAtItsTimeout() async throws {
         let transport = SSHTransport(route: Self.route(), credentials: NoCredentials(), trustStore: InMemoryHostTrustStore(), commandLimit: 1)
         await transport.setCommandRunnerForTesting { command in
-            if command == "slow" { try await Task.sleep(for: .milliseconds(600)) }
+            if command == "slow" { try await Task.sleep(for: .seconds(5)) }
             return command
         }
         let slow = Task { try await transport.execute("slow") }
-        try await Task.sleep(for: .milliseconds(20))
+        // Until "slow" holds the only permit: a 20 ms sleep stood for it, and "read" could run first.
+        while await transport.commandsRunning < 1 { await Task.yield() }
         let clock = ContinuousClock()
         let start = clock.now
         await #expect(throws: (any Error).self) { _ = try await transport.execute("read", timeout: .milliseconds(60)) }
-        #expect(clock.now - start < .milliseconds(400), "it stopped waiting at its own timeout")
+        // Well short of the five seconds "slow" holds the permit, with room for a busy run.
+        #expect(clock.now - start < .seconds(2), "it stopped waiting at its own timeout")
         #expect(await transport.commandsWaiting == 0)
         #expect(try await slow.value == "slow")
     }
@@ -272,12 +274,14 @@ struct SSHConnectionLimitsTests {
     /// Shared connections are left while they sign in — six terminals closed before it finished.
     /// The connection must not survive its owners.
     @Test func loopbackConnectionEveryoneLeftWhileSigningInIsClosed() async throws {
-        let server = try await LoopbackSSHServer.start(dropFirst: 0, sessionsPerConnection: 10, signInDelay: .milliseconds(300))
+        // A sign-in long enough that leaving always comes in the middle of it, and the connection
+        // waited for rather than slept on: 100 ms against a 300 ms sign-in raced on a busy run.
+        let server = try await LoopbackSSHServer.start(dropFirst: 0, sessionsPerConnection: 10, signInDelay: .seconds(5))
         let transport = server.transport()
         let owner = UUID()
         #expect(await transport.acquire(owner: owner, limit: 6))
         let connecting = Task { try await transport.connect() }
-        try await Task.sleep(for: .milliseconds(100))
+        for _ in 0..<1_000 where server.counts.withLock({ $0 }).accepted < 1 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(server.counts.withLock { $0 }.accepted == 1)
         await transport.release(owner: owner)      // the last owner leaves mid sign-in
         await #expect(throws: SSHTransportError.notConnected) { try await connecting.value }
@@ -330,10 +334,9 @@ struct SSHConnectionLimitsTests {
 /// Without W21 a stock OpenSSH meets both limits: sixteen connections signing in at once is past
 /// MaxStartups' ten (some dropped, at random), and six shells plus eight commands is past
 /// MaxSessions' ten (the rest refused).
-@Suite("Connections within the server's limits, real host (gated)", .serialized)
+@Suite("Connections within the server's limits, real host (gated)", .serialized, .enabled(if: IntegrationEnvironment.isConfigured, IntegrationEnvironment.notConfigured))
 struct SSHConnectionLimitsLiveTests {
     @Test func sixteenShellsTogetherThenCommandsBesideThem() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let pool = SSHTransportPool<SSHTransport>(limits: .standard)
         let route = IntegrationTransport.make().route
         let opened = try await withThrowingTaskGroup(of: (SSHTransport, SSHShellChannel).self,

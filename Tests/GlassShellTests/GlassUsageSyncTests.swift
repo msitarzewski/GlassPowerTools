@@ -37,9 +37,9 @@ struct GlassUsageSyncTests {
         #expect(counts.first { $0.hostID == alpha && $0.kind == .ssh }?.date == today)
         #expect(counts.first { $0.hostID == alpha && $0.kind == .database }?.count == 1)
         #expect(counts.reduce(0) { $0 + $1.count } == 4)
-        // No time of day travels: only the day.
-        let encoded = String(decoding: try JSONEncoder().encode(device.days), as: UTF8.self)
-        #expect(!encoded.contains(":00"), "\(encoded)")
+        // No time of day travels: only the day, as its key. (This looked for ":00" in an encoding that
+        // has no date in it to find, until 2026-10-24.)
+        #expect(device.days.keys.allSatisfy { $0.wholeMatch(of: /[0-9]{4}-[0-9]{2}-[0-9]{2}/) != nil }, "\(device.days.keys)")
     }
 
     @Test("minutes in use travel with the counts, under the same machines; a minute-only day is kept")
@@ -126,7 +126,7 @@ struct GlassUsageSyncTests {
     private func makeModel(_ root: URL, _ name: String) -> GlassShellModel {
         GlassShellModel(storageDirectory: root.appendingPathComponent(name),
                         sharedContainerURL: nil, resolveSharedContainer: false,
-                        accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                        accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
     }
 
     @Test("a connection made on one device is counted in the other's overview, under the device's name")

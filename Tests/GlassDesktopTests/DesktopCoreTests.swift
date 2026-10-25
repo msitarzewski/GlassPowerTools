@@ -252,3 +252,24 @@ func rejectsInvalidNavigation(value: String) {
                                                  viewport: CGSize(width: 400, height: 300))
     #expect(pinned.x == 0 && pinned.y == 0)
 }
+
+/// 2026-10-22: stamping one desktop wrote every desktop back as this build encodes it, so a field a
+/// newer build had added to another was dropped, and the drop synced to every device.
+@Test @MainActor func stampingOneDesktopKeepsAnotherDesktopsUnknownField() async throws {
+    let catalog = GlassInMemoryServiceStore(defaultKind: .rdp)
+    let store = DesktopRepository(store: catalog)
+    let other = DesktopConnection(name: "Windows", host: "192.0.2.20", username: "user")
+    let mine = DesktopConnection(name: "Ubuntu", host: "192.0.2.21", username: "user")
+    _ = try await store.save(other)
+    _ = try await store.save(mine)
+    let written = try #require(catalog.configuration(for: other.id))
+    var newer = try #require(try JSONSerialization.jsonObject(with: written) as? [String: Any])
+    newer["fieldFromTheFuture"] = "kept"
+    catalog.setConfiguration(try JSONSerialization.data(withJSONObject: newer), kind: .rdp, for: other.id)
+
+    _ = try await store.recordConnection(mine.id, at: Date(timeIntervalSince1970: 100))
+
+    let after = try #require(catalog.configuration(for: other.id))
+    let stored = try #require(try JSONSerialization.jsonObject(with: after) as? [String: Any])
+    #expect(stored["fieldFromTheFuture"] as? String == "kept")
+}

@@ -9,9 +9,11 @@ import GlassEditorCore
 @Suite("Laying out a very large one-line file")
 @MainActor
 struct LargeFileLayoutTimingTests {
-    @Test(arguments: [false, true])
+    /// A measurement, printed, not a check: run with GPT_LARGE_FILE naming the file.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["GPT_LARGE_FILE"] != nil, "a timing probe: set GPT_LARGE_FILE"),
+          arguments: [false, true])
     func stages(wraps: Bool) throws {
-        guard let path = ProcessInfo.processInfo.environment["GPT_LARGE_FILE"] else { return }
+        let path = try #require(ProcessInfo.processInfo.environment["GPT_LARGE_FILE"])
         let clock = ContinuousClock()
         var t = clock.now
         func lap(_ name: String) { let now = clock.now; print("LAYOUT wraps=\(wraps) \(name): \(now - t)"); t = now }

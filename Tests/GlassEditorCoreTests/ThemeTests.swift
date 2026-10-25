@@ -388,6 +388,7 @@ struct ThemeTests {
             )
         }
 
+        #expect(GlassEditorConfiguration().minimumContrastRatio == 4.5)   // WCAG AA, the default base
         #expect(floor(1.0, .unknown) == 4.5)
         #expect(floor(0.45, .unknown) == 4.5)      // boundary is not "below"
         #expect(floor(0.4499, .unknown) == 5.5)

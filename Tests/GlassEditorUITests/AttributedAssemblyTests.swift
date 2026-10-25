@@ -163,6 +163,8 @@ struct AttributedAssemblyTests {
     @Test("an empty or negative-start run is handled without trapping")
     func degenerateRunsAreSafe() {
         #expect(AttributedAssembly.clampedRange(5..<5, toUTF16Length: 10) == nil)
+        #expect(AttributedAssembly.clampedRange(-5..<0, toUTF16Length: 10) == nil)
+        #expect(AttributedAssembly.clampedRange(0..<10, toUTF16Length: 0) == nil)
         #expect(
             AttributedAssembly.clampedRange(-3..<4, toUTF16Length: 10)
                 == NSRange(location: 0, length: 4)

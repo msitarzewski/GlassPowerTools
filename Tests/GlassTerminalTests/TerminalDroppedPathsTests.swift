@@ -27,18 +27,15 @@ struct TerminalDroppedPathsTests {
 
     /// The escaping is only right if a shell reads it back as the same path.
     @Test("a shell reads every escaped path back unchanged")
-    func shellRoundTrip() throws {
+    func shellRoundTrip() async throws {
         for path in ["/tmp/My Pictures/a (1).png", "/tmp/it's $HOME & `x`;", "/tmp/[brackets]{x}*?#~!",
                      "/tmp/café/日本.txt", "/tmp/two\nlines\tand tab", "/tmp/back\\slash"] {
+            let escaped = TerminalDroppedPaths.escaped(path)
             for shell in ["/bin/zsh", "/bin/bash"] {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: shell)
-                process.arguments = ["-c", "printf '%s' " + TerminalDroppedPaths.escaped(path)]
-                let output = Pipe()
-                process.standardOutput = output
-                try process.run()
-                process.waitUntilExit()
-                let echoed = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                // Off the main actor: `Process.waitUntilExit` ran the main run loop while it waited,
+                // so other tests' main-actor work ran inside this one (2026-10-24).
+                let echoed = await LiveProcess.runDetached(shell, ["-c", "printf '%s' " + escaped],
+                                                           environment: ["PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8"]).output
                 #expect(echoed == path, "\(shell): \(path.debugDescription) came back \(echoed.debugDescription)")
             }
         }

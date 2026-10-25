@@ -109,8 +109,9 @@ struct GridScrollTimingTests {
         return frames
     }
 
-    @Test func frames() async throws {
-        guard ProcessInfo.processInfo.environment["GPT_GRID_TIMING"] != nil else { return }
+    /// A measurement, printed, not a check: run with GPT_GRID_TIMING set.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["GPT_GRID_TIMING"] != nil, "a timing probe: set GPT_GRID_TIMING"))
+    func frames() async throws {
         let database = try makeDatabase()
         defer { try? FileManager.default.removeItem(at: database) }
         let sizes = ProcessInfo.processInfo.environment["GPT_GRID_PAGE"].flatMap(Int.init).map { [$0] } ?? [100, 1_000, 10_000]

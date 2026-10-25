@@ -95,8 +95,10 @@ final class GlassShellLocalHostUITests: XCTestCase {
             NSPredicate(format: "label == %@ AND (elementType == %d OR elementType == %d)", "All",
                         XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.tab.rawValue)).firstMatch
         #else
-        let scope = element("glass-library-scope-all-connections")
+        let scope = app.libraryScope("all-connections")
         #endif
+        // Only where the scopes are showing: after a save an iPhone is already on the results.
+        // Callers check where they arrived (the row they look for next).
         if scope.waitForExistence(timeout: 5) { press(scope) }
     }
 
@@ -195,6 +197,9 @@ final class GlassShellLocalHostUITests: XCTestCase {
 
         XCTAssertTrue(element("host-editor-name").waitForExistence(timeout: 10), "the sheet opened")
         XCTAssertFalse(element("host-editor-delete").exists, "this device is not a host you can delete")
+        let sections = element("setup-sections")
+        XCTAssertFalse(sections.buttons["Terminal"].exists || sections.radioButtons["Terminal"].exists,
+                       "its terminal is the built-in shell: no Terminal tab")
         snap("33-local-host-edit-sheet")
         press(element("host-editor-cancel"))
     }

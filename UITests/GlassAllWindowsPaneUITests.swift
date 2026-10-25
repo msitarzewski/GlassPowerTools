@@ -1,3 +1,4 @@
+#if os(iOS)
 import XCTest
 
 /// All Windows on a phone (the owner, 2026-10-14: "drag down from an empty space in the toolbar
@@ -54,6 +55,44 @@ final class GlassAllWindowsPaneUITests: XCTestCase {
         shoot(app, "hold-01-pane")
         app.buttons["all-windows-done"].firstMatch.tap()
         XCTAssertTrue(pane(app).waitForNonExistence(timeout: 5))
+    }
+
+    /// A ⚡ under a sheet is covered, and a hold there is the sheet's. On the Duo's outer display
+    /// the Add Host sheet's bar lies over the library's ⚡, and a hold on the bar opened All Windows
+    /// over the sheet (2026-10-25: a database test's press for the edit menu landed there, the pane
+    /// took the screen, and the field kept its old text). The hold knows a ⚡ that SwiftUI draws by
+    /// the view behind it, and a sheet does not take that view out of the window.
+    func testHoldingASheetOverTheBoltIsNotAHoldOnTheBolt() throws {
+        let app = launch()
+        let bolt = app.buttons["active-connections-bolt"].firstMatch
+        XCTAssertTrue(bolt.waitForExistence(timeout: 20), "no ⚡ in the library's toolbar")
+        let under = bolt.frame
+
+        let empty = app.descendants(matching: .any).matching(identifier: "connection-library-add-host-empty").firstMatch
+        if empty.waitForExistence(timeout: 3) {
+            empty.tap()
+        } else {
+            app.descendants(matching: .any).matching(identifier: "connection-library-add-host").firstMatch.tap()
+        }
+        let name = app.textFields["host-editor-name"].firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 10), "the Add Host sheet")
+        shoot(app, "covered-01-sheet")
+
+        // A part of the ⚡ clear of the sheet's own buttons: on the Duo's outer display Cancel lies
+        // over most of it, and a hold on Cancel is Cancel.
+        let sheetButtons = ["host-editor-cancel", "host-editor-save"].map { app.buttons[$0].firstMatch.frame }
+        let spot = stride(from: under.minX + 2, through: under.maxX - 2, by: 2)
+            .map { CGPoint(x: $0, y: under.midY) }
+            .first { point in !sheetButtons.contains { $0.contains(point) } }
+        guard let spot else {
+            XCTFail("the sheet's Cancel and Add cover the whole ⚡ (\(under)); this test needs another spot here")
+            return
+        }
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: spot.x, dy: spot.y)).press(forDuration: 1.0)
+        XCTAssertFalse(pane(app).waitForExistence(timeout: 3),
+                       "a hold on the sheet, where the library's ⚡ is underneath, opened All Windows")
+        XCTAssertTrue(name.exists, "the sheet is still there")
+        shoot(app, "covered-02-after-hold")
     }
 
     /// The pull waits on a touch that starts on the bar; a tap on the bar's buttons must still be
@@ -126,3 +165,4 @@ final class GlassAllWindowsPaneUITests: XCTestCase {
         XCTAssertTrue(pane(app).waitForNonExistence(timeout: 5), "a push far enough did not close it")
     }
 }
+#endif

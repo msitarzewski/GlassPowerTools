@@ -517,11 +517,12 @@ enum MacLocalTmux {
         posix_spawn_file_actions_addclose(&actions, output[0])
         posix_spawn_file_actions_addclose(&actions, output[1])
         // Nothing else of the app's: a claim can start the tmux server, which keeps whatever its
-        // first client inherited for as long as it runs — another run's pipe, or a pane's terminal.
+        // first client inherited for as long as it runs — another run's pipe, or a pane's terminal,
+        // or the signals the calling thread blocks (`GlassSpawn`). Reads and End run off the main thread.
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+        GlassSpawn.prepare(&attributes)
         let argv = ([executable] + arguments).map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
         var pid: pid_t = 0
@@ -566,6 +567,9 @@ final class MacLocalTmuxContextReads {
     let interval: Duration
     /// How many reads ran, for tests.
     private(set) var reads = 0
+    /// How many reads' answers have been handed to their tabs, for tests: a test that a stale read
+    /// is not taken over a newer name waits for this rather than for a guess at how long it takes.
+    private(set) var applied = 0
 
     private final class Asker {
         weak var tab: MacWorkspaceController?
@@ -612,6 +616,7 @@ final class MacLocalTmuxContextReads {
             for (tab, generation) in zip(tabs, generations) {
                 tab.applyLocalTmuxContexts(contexts, askedAt: generation)
             }
+            applied += 1
         }
     }
 }

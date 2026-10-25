@@ -30,7 +30,7 @@ struct ActiveRowFocusTests {
 
     @Test("Moving to another table or tab marks the session active, for the library's time in use (2026-10-20)")
     func focusIsActivity() throws {
-        let runtime = GlassDatabaseRuntime(layers: GlassLayerStore())
+        let runtime = GlassDatabaseRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassDatabaseCapability(runtime: runtime)
         let session = DatabaseSession(connectionConfig: DatabaseConnectionConfig(name: "MySQL on alpha"))
         runtime.sessionManager.sessions[UUID()] = session
@@ -46,7 +46,7 @@ struct ActiveRowFocusTests {
 
     @Test("The row Active gets carries the session's focus")
     func rowCarriesFocus() {
-        let runtime = GlassDatabaseRuntime(layers: GlassLayerStore())
+        let runtime = GlassDatabaseRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassDatabaseCapability(runtime: runtime)
         let session = DatabaseSession(connectionConfig: DatabaseConnectionConfig(name: "MySQL on alpha"))
         session.state = .connected

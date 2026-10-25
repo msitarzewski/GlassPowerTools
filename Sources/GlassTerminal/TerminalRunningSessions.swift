@@ -19,6 +19,12 @@
 //  W11 (2026-10-09): a session's line says the repository and branch it is in — for this Mac's
 //  own sessions read from the folder, for a host's from what the tab showing it kept there.
 //
+//  2026-10-24, the owner, on the iPhone: a tab whose connection dropped stopped counting as
+//  showing its session, so the session was listed again below it, "Open elsewhere", and Open there
+//  made a second tab on it. A dropped tab still holds its session — reconnecting attaches to it
+//  again — so its row stands for the session and says what the machine said of it, and the
+//  session's own row comes back the moment the tab is detached.
+//
 
 import Foundation
 import os
@@ -30,6 +36,13 @@ enum TerminalHostListing: Equatable {
     case sessions([TerminalTmux.Session])
     /// Not listed, and why, in plain words.
     case skipped(String)
+}
+
+/// What a host's list said of a tmux session a terminal here holds while its connection is down.
+enum TerminalTmuxWhileDown: Equatable {
+    case running(TerminalTmux.Session)
+    /// Not listed: reconnecting makes it again, empty.
+    case ended
 }
 
 /// Why a host's sessions were not listed, in words for Active (W6). The raw error goes to the log.
@@ -119,12 +132,18 @@ extension GlassTerminalCapability {
             case .sessions(let listed):
                 sessions = listed
             }
+            let here = manager.sessions.filter {
+                $0.server.id == server.id && $0.purpose == .terminal && $0.tmuxSessionName != nil
+            }
             // Shown here already: a live terminal on this device attached to it.
-            let shownHere = Set(manager.sessions.compactMap { session -> String? in
-                guard session.server.id == server.id, session.purpose == .terminal,
-                      session.state != .disconnected else { return nil }
-                return session.tmuxSessionName
-            })
+            let shownHere = Set(here.filter { !$0.isDown }.compactMap(\.tmuxSessionName))
+            // Held here by a terminal that is down, whose row says what is known of it: listed,
+            // though not shown while that terminal is open (`isHeldHere`).
+            let byName = Dictionary(sessions.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+            for terminal in here where terminal.isDown {
+                guard let name = terminal.tmuxSessionName else { continue }
+                terminal.tmuxWhileDown = byName[name].map(TerminalTmuxWhileDown.running) ?? .ended
+            }
             if let theirs = sessions.first?.server, thisMac.contains(theirs) {
                 shownOverSSH.formUnion(shownHere)
                 continue
@@ -240,6 +259,7 @@ extension GlassTerminalCapability {
 
     private func runningSession(_ tmux: TerminalTmux.Session, on server: ServerConfiguration) -> GlassRunningSession {
         let runtime = self.runtime
+        let manager = runtime.sessionManager
         return GlassRunningSession(
             id: "terminal-tmux:\(server.id.uuidString):\(tmux.name)",
             title: tmux.displayName,
@@ -255,7 +275,12 @@ extension GlassTerminalCapability {
                 guard let self else { return }
                 try await self.withTmuxSession(on: server) { _ = try await $0.runTmuxCommand(TerminalTmux.killCommand(name: tmux.name)) }
             },
-            attachment: Self.attachment(serverID: server.id, name: tmux.name))
+            attachment: Self.attachment(serverID: server.id, name: tmux.name),
+            isHeldHere: {
+                manager.sessions.contains {
+                    $0.server.id == server.id && $0.purpose == .terminal && $0.tmuxSessionName == tmux.name
+                }
+            })
     }
 
     /// The host's tmux sessions, or why they were not listed: it could not be asked without a

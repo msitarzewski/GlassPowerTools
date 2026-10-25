@@ -355,16 +355,27 @@ final class MacWorkspaceController {
     /// The file a pane printed the path of, on this Mac for its preview: the file itself here, or a
     /// copy of the host's (`TerminalRemotePreview`). Nil for a folder, or what isn't there.
     func previewFile(_ path: String, from paneID: UUID) async -> TerminalPreviewFile? {
-        guard let found = await locatePath(path, from: paneID), !found.isDirectory else { return nil }
+        guard let found = await locatePath(path, from: paneID) else { return nil }
+        guard !found.isDirectory else {
+            Logger.pathPreview.notice("event=preview result=folder")
+            return nil
+        }
         guard found.serverID != nil else { return TerminalPreviewFile(url: URL(fileURLWithPath: found.path)) }
-        guard let session = sessionsByPaneID[paneID] else { return nil }
+        guard let session = sessionsByPaneID[paneID] else {
+            Logger.pathPreview.error("event=preview result=no-session")
+            return nil
+        }
         return await TerminalRemotePreview.fetch(found.path, from: session)
     }
 
     /// Where a path a pane printed is: absolute, on this Mac or on the pane's host, and whether it
     /// is a folder. Nil when it cannot be told, or is not there.
     func locatePath(_ path: String, from paneID: UUID) async -> (path: String, serverID: UUID?, isDirectory: Bool)? {
-        guard let pane = state.root?.pane(id: paneID) else { return nil }
+        guard let pane = state.root?.pane(id: paneID) else {
+            // The pane has closed since the path was printed.
+            Logger.pathPreview.error("event=locate result=pane-not-here")
+            return nil
+        }
         switch pane.intent.kind {
         case .local:
             let directory = localDirectory(for: paneID) ?? pane.intent.localDirectory
@@ -374,8 +385,11 @@ final class MacWorkspaceController {
             return (absolute, nil, isDirectory.boolValue)
         case .ssh:
             // On the host, as every platform finds one (`TerminalSession.locate`).
-            guard let serverID = pane.intent.serverID, let session = sessionsByPaneID[paneID],
-                  let found = await session.locate(path) else { return nil }
+            guard let serverID = pane.intent.serverID, let session = sessionsByPaneID[paneID] else {
+                Logger.pathPreview.error("event=locate result=no-session")
+                return nil
+            }
+            guard let found = await session.locate(path) else { return nil }
             return (found.path, serverID, found.isDirectory)
         }
     }

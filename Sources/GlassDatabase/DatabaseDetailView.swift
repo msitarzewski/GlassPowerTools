@@ -11,6 +11,7 @@ import GlassDBKit
 import Charts
 import GlassShell
 import GlassConnectionUI
+import GlassConnectionKit
 
 struct ConnectionOverviewView: View {
     let sessionID: UUID
@@ -20,6 +21,8 @@ struct ConnectionOverviewView: View {
     var onOpenSQLEditor: (() -> Void)?
 
     @Environment(DatabaseSessionManager.self) private var sessionManager
+    /// Optional, as the workspace reads it: for the name of a machine a tunnel goes through.
+    @Environment(GlassDatabaseRuntime.self) private var runtime: GlassDatabaseRuntime?
 
     @State private var serverVersion: String?
     @State private var databaseSummaries: [ConnectionDatabaseSummary] = []
@@ -212,7 +215,7 @@ struct ConnectionOverviewView: View {
                 .font(.headline)
 
             Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 12) {
-                connectionDetailRow("Endpoint", value: endpointDescription, systemImage: "network")
+                connectionDetailRow("Endpoint", value: config?.endpointDescription ?? "Unavailable", systemImage: "network")
                 if config?.engine.supportsCredentials == true {
                     connectionDetailRow("User", value: config?.username ?? "—", systemImage: "person")
                 }
@@ -223,10 +226,9 @@ struct ConnectionOverviewView: View {
                     systemImage: "cylinder"
                 )
                 if let config, config.usesHostTunnel, let localPort = session?.hostTunnel?.localPort {
-                    // The route itself belongs to the host's Terminal service, which owns the
-                    // credentials and the trust; all this surface honestly knows is the local
-                    // end of the forward it is using.
-                    connectionDetailRow("Tunnel", value: "Through this machine's Terminal service, on local port \(localPort)",
+                    // The route itself belongs to a Terminal service, which owns the credentials
+                    // and the trust; this surface knows whose, and the local end of the forward.
+                    connectionDetailRow("Tunnel", value: "Through \(tunnelOwner(config)) Terminal service, on local port \(localPort)",
                                         systemImage: "point.3.connected.trianglepath.dotted")
                 }
             }
@@ -364,12 +366,13 @@ struct ConnectionOverviewView: View {
             .frame(width: 120, alignment: .trailing)
     }
 
-    private var endpointDescription: String {
-        guard let config else { return "Unavailable" }
-        if config.engine == .sqlite {
-            return config.host
-        }
-        return "\(config.host):\(config.port)"
+    /// Whose Terminal service carries the tunnel: this machine's, or the machine's it goes through,
+    /// by its name in the library, as the setup sheet finds it (`DatabaseServiceDraft.tunnelMachineName`).
+    /// It used to say "this machine's" for both.
+    private func tunnelOwner(_ config: DatabaseConnectionConfig) -> String {
+        guard let through = config.tunnelServiceID else { return "this machine's" }
+        let name = runtime?.tunnelAccess?().tunnelChoices.first { $0.serviceID.rawValue == through }?.machineName
+        return name.map { "\($0)'s" } ?? "another machine's"
     }
 
     /// Says **what TLS verifies**, not merely that it is on. "Required TLS" is true of a mode that

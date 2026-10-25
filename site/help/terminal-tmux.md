@@ -19,7 +19,7 @@ The switch can only be turned on once a connection has found tmux on the machine
 ## What changes when you connect
 
 - Each terminal gets its own session on the machine: **Terminal 1**, **Terminal 2**, and so on (named `glass-1`, `glass-2` in tmux). Open as many terminals on the machine as you like; each one is separate.
-- If the connection drops, **Reconnect**, or the automatic reconnect, goes back into the same session, with everything still running.
+- If the connection drops, **Reconnect**, the automatic reconnect, or choosing the terminal in **Active** goes back into the same session, with everything still running.
 - Closing the terminal leaves its session running on the machine, so closing it, its window, or quitting doesn't ask first (unless other terminals there would stop). To end it, end it from **Active** (below), or type `exit` in it.
 - In **Active**, a terminal in tmux says **in tmux** under its name, and swiping it offers **Detach** rather than **Close**. Its tools menu says **Detach** rather than **Disconnect**. Afterwards **Active** lists it under the machine as **Detached**.
 - **Open Folder Here** and the **AI Assistant** ask tmux which folder the shell is in, so they follow your `cd` inside tmux too.
@@ -62,7 +62,7 @@ With tmux older than 3.2, tmux keeps the history, so scrolling scrolls tmux's hi
 
 ## One session in several places
 
-A session can be open in more than one place at once: on your Mac and your Vision Pro, say. Both show the same screen, and typing in either goes to the same program. The window fits the device you used last. Choosing the session in **Active** (or **Open Here** in its menu) joins whoever is already there; **Take Over** disconnects them first.
+A session can be open in more than one place at once: on your Mac and your Vision Pro, say. Both show the same screen, and typing in either goes to the same program. tmux gives a session one size: the terminal in front takes it, when you select its tab, come back to its window or type in it, and the program redraws for that device. The other device shows the session at that size, from the top left, with dots in the space past it, as tmux marks it, until you use it there. Choosing the session in **Active** (or **Open Here** in its menu) joins whoever is already there; **Take Over** disconnects them first.
 
 ## Pick up a session from Active
 
@@ -72,7 +72,7 @@ A session can be open in more than one place at once: on your Mac and your Visio
 - **Open elsewhere**: another device, or a terminal outside Glass Power Tools, is attached.
 - **Open here**: a tab on this Mac shows it. Choosing it brings that tab forward.
 
-A terminal this device has open over SSH is listed with the open sessions instead, so nothing appears twice. Your own tmux sessions, with names you gave them, are listed too.
+A terminal this device has open over SSH is listed with the open sessions instead, so nothing appears twice. That holds after its connection drops, as an iPhone's do while it's put away: the terminal's row then says **Disconnected** and what the machine last said of its session (where it is, whether it's open elsewhere, when it was used), or that the session has ended. Choosing it reconnects to the session, or starts a new one in its place if it ended. Swipe it to **Detach** and the session is listed under the machine straight away. Your own tmux sessions, with names you gave them, are listed too.
 
 Choose a session to open it here. To use it here and disconnect everyone else, right-click it (touch and hold on touch devices) and choose **Take Over**.
 

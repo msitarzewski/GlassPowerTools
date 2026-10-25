@@ -15,7 +15,7 @@ private func handshake(width: UInt16, height: UInt16) -> [UInt8] {
     return bytes
 }
 
-@Suite("GlassVNCSession")
+@Suite("GlassVNCSession", .timeLimit(.minutes(1)))
 struct GlassVNCSessionTests {
     @Test func cursorConversionMatchesRDPLayout() throws {
         var bgra = Data(count: 3 * 2 * 4), mask = Data(count: 6)
@@ -68,6 +68,8 @@ struct GlassVNCSessionTests {
         expected += [5, 1, 0, 10, 0, 20]
         // Release: pressed keys up (set order is not defined), then buttons cleared.
         let releaseKeys: Set<[UInt8]> = [[4, 0, 0, 0, 0, 0, 0, 0x61], [4, 0, 0, 0, 0, 0, 0xFF, 0xE4]]
+        // Required before slicing: a short write was an out-of-range crash, which ended the whole run.
+        try #require(written.count >= expected.count + 22, "\(written.count) bytes written")
         let head = Array(written[0..<expected.count])
         #expect(head == expected)
         let offset = expected.count
@@ -116,7 +118,7 @@ struct GlassVNCSessionTests {
     }
 }
 
-@Suite("Session ending")
+@Suite("Session ending", .timeLimit(.minutes(1)))
 struct VNCSessionEndingTests {
     /// Signing out of the remote session closes the transport. After a desktop has been shown that
     /// is a normal ending, so the app closes the window instead of showing a failure panel.
@@ -164,7 +166,7 @@ struct VNCSessionEndingTests {
 
 /// W30: the session carries its windows' displays and its quality into the client, and the
 /// client's statistics out to the app.
-@Suite("What the link carries")
+@Suite("What the link carries", .timeLimit(.minutes(1)))
 struct VNCStreamSettingsTests {
     @Test func qualityAndRegionsSetBeforeConnectingShapeTheOpeningMessages() async throws {
         let source = MemoryByteSource(handshake(width: 3000, height: 1600), holdsOpen: true)
@@ -262,7 +264,7 @@ private func ending(_ session: GlassVNCSession) async -> String? {
 /// W30, W36: a Mac's displays and scale are read from forms known only from others' measurements.
 /// If a Mac breaks the protocol once it has sent its displays, or ends the session while a scale is
 /// unanswered, the next connection does not ask it again, so Reconnect works.
-@Suite("Apple displays and scaling fallback")
+@Suite("Apple displays and scaling fallback", .timeLimit(.minutes(1)))
 struct AppleLayoutFallbackTests {
     private func session(_ mac: [UInt8], asked: Asked, sink: MemoryByteSink = MemoryByteSink()) -> GlassVNCSession {
         GlassVNCSession { configuration, callbacks in

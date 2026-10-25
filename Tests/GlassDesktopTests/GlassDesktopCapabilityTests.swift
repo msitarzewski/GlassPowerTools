@@ -35,8 +35,17 @@ struct GlassDesktopCapabilityTests {
         #expect(capability.openSessions().isEmpty)
 
         let connection = DesktopConnection(name: "alpha", host: "alpha.local", username: "casey")
-        let session = DesktopSessionModel(connection: connection, app: runtime.app)
-        // No host to reach: the attempt fails at once, and a failed desktop is still on screen.
+        // A connect that fails at once, as one to a machine that isn't there does. The real one
+        // dialled alpha.local — an mDNS lookup on the owner's network — until it was closed
+        // (2026-10-24). A failed desktop is still on screen.
+        var operations = DesktopSessionOperations()
+        struct NoMachine: Error {}
+        operations.connect = { _, _ in throw NoMachine() }
+        operations.disconnect = { _ in }
+        operations.save = { _, _, _ in }
+        operations.recordConnection = { _, _, _ in }
+        let session = DesktopSessionModel(connection: connection, app: runtime.app, operations: operations,
+                                          wallpaperRoot: root.appendingPathComponent("wallpapers"))
         try? await session.connect(username: "casey", domain: nil, password: "x")
         let rows = capability.openSessions()
         #expect(rows.map(\.id) == [GlassDesktopCapability.sessionID(connectionID: connection.id)])
@@ -259,8 +268,11 @@ struct GlassDesktopCapabilityTests {
 
         machine.services = [HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "foxtrot", credentialID: nil)]
         capability.hostAddressDidChange(host: machine, address: "10.0.0.22")
-        // The capability persists on a task; give it one turn to land.
-        try await Task.sleep(for: .milliseconds(200))
+        // The capability persists on a task of its own: until it lands, up to 30 s. A fixed 200 ms
+        // stood for that (2026-10-24).
+        for _ in 0..<3_000 where runtime.connection(for: endpoint)?.host != "10.0.0.22" {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(runtime.connection(for: endpoint)?.host == "10.0.0.22")
     }
 }

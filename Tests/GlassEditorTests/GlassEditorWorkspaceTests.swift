@@ -13,6 +13,7 @@
 
 import Foundation
 import Testing
+import GlassLayers
 import GlassEditorCore
 @testable import GlassEditor
 
@@ -191,9 +192,9 @@ struct GlassEditorWorkspaceTests {
         _ = try #require(opened)
         workspace.findUsesRegularExpression = true
         workspace.findQuery = "(a+)+$"
-        let started = ContinuousClock.now
+        // Unstopped, this pattern on forty letters doesn't come back at all; the message says it was
+        // stopped. (A three-second limit on the call stood beside it, which a busy run could outlast.)
         workspace.findNext()
-        #expect(ContinuousClock.now - started < .seconds(3), "the search was not stopped")
         #expect(workspace.message?.hasPrefix("The search was stopped after a second") == true, "\(workspace.message ?? "")")
     }
 
@@ -213,6 +214,37 @@ struct GlassEditorWorkspaceTests {
         workspace.replacement = "amber"
         #expect(workspace.replaceAll() == 3)
         #expect(document.model.text == "amber green amber blue amber")
+    }
+
+    /// ⌘F, ⌘G and ⇧⌘G in an editor window (2026-10-22: "Command F should always Find right?").
+    /// A match is revealed, not only set, so the text view selects it and scrolls to it.
+    @Test func findShowsTheBarAndFindAgainRevealsTheNextMatch() async throws {
+        let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let url = try write("red green red blue red", named: "colours.txt", in: root)
+        let workspace = makeWorkspace()
+        let opened = await workspace.open(url)
+        let document = try #require(opened)
+
+        // ⌘G with nothing searched for yet: the bar, with the keyboard in it.
+        workspace.findAgain()
+        #expect(workspace.findIsPresented && workspace.findFocusRequest == 1)
+
+        // ⌘F with the bar showing asks for the field again; the bar's Done closes it.
+        workspace.presentFind()
+        #expect(workspace.findFocusRequest == 2)
+        workspace.findQuery = "red"
+        workspace.findIsPresented = false
+
+        let reveals = document.model.revealRequest
+        workspace.findAgain()
+        #expect(workspace.findIsPresented, "⌘G shows the bar it searches with")
+        #expect(document.model.selectedRange == 0..<3)
+        #expect(document.model.revealRequest == reveals + 1, "the match is revealed, not only set")
+        workspace.findAgain()
+        #expect(document.model.selectedRange == 10..<13)
+        workspace.findAgain(reverse: true)
+        #expect(document.model.selectedRange == 0..<3)
+        #expect(workspace.findFocusRequest == 2, "finding again leaves the keyboard where it is")
     }
 
     // MARK: Recents
@@ -245,7 +277,7 @@ struct GlassEditorWindowIsolationTests {
     }
 
     private func makeRuntime() -> GlassEditorRuntime {
-        GlassEditorRuntime(defaults: UserDefaults.forTest(suiteName: "editor.windows.\(UUID().uuidString)")!)
+        GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: UserDefaults.forTest(suiteName: "editor.windows.\(UUID().uuidString)")!)
     }
 
     private func makeFile(_ name: String) throws -> URL {
@@ -357,13 +389,19 @@ struct GlassEditorWindowIsolationTests {
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
 
         // Exactly what SwiftUI does while building a scene, and nothing more.
-        _ = runtime.workspace(for: UUID())
+        let stray = UUID()
+        _ = runtime.workspace(for: stray)
         #expect(!runtime.hasOpenWindow, "a workspace was mistaken for a window")
 
+        // The point: a window is named, not the workspace no window shows, and the file reaches it.
+        // (It checked `… || true` and a new UUID against itself until 2026-10-24: neither could fail.)
         let named = try #require(runtime.open(file))
-        #expect(runtime.workspace(for: named).documents.isEmpty == false
-                || runtime.requestedWindowID == nil || true)
-        // The point: a window is named, so the caller has something to show.
-        #expect(named != UUID())
+        #expect(named != stray, "the file was sent to a workspace no window shows")
+        var arrived = false
+        for _ in 0..<500 where !arrived {
+            arrived = !runtime.workspace(for: named).documents.isEmpty
+            if !arrived { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        #expect(arrived, "the file never reached the window named for it")
     }
 }

@@ -101,3 +101,33 @@ Validation: the package suite (1015 tests), including the mock server's TLS, Cre
 handshakes, passes. No test presents a multi-certificate chain: the result reports only the leaf's
 digest, and system trust cannot be pointed at a test root. Not yet tried against a real server
 whose certificate comes from an intermediate authority.
+
+## Test fixtures' names (2026-10-24)
+
+Upstream's tests named a person's own machine (`ANEES-MSI-LAPTOP`, a NetBIOS name in a redirection
+PDU the test builds) and account (`anees`). The repository is public and names no real machine or
+person, so they are `ALPHA-PC` and `casey`; the PDUs are built from the strings, so the tests check
+the same things.
+
+## NTLM against the specification's example (2026-10-24)
+
+The handshake tests run against a mock server that derives its keys with the client's own code, so a
+mistake made on both sides passes them. `CredSSPTests` now checks the client against MS-NLMP 4.2.4's
+example: NTOWFv2, the session base key, NTProofStr and the blob after it, the encrypted session key,
+the LMv2 response, and the first sealed message with its signature, with the bytes copied from the
+specification. `ntlmV2Hash`, `ntlmV2Response` and `RDPNTLMRC4` lost `private` for it; nothing else
+changed.
+
+## A server's last packets before it hangs up (2026-10-24)
+
+The TPKT reader discarded packets that had arrived whole but not yet been asked for when the
+connection closed, and it reported a failure before anything queued. A server ending a session sends
+its reason, an ErrorInfo and a Deactivate All, and closes; a client still drawing the frame before
+them lost both, and the session read as a clean end with no reason. Found by
+`liveDeactivateThenEOFHonorsOptionalReasonAndExplicitDenial`, which failed only on a busy test run.
+A close now hands on what arrived first, then the disconnect; an error or a cancellation still
+discards everything at once. `TPKTReaderTests` covers both, on an embedded channel.
+
+The tests' `trustFixtureCertificate()` also turned on cross-host redirection and auxiliary input
+channels, which the app never does, so every mock and replay test ran those opt-in paths. It now
+trusts the certificate and nothing more; the two tests of auxiliary channels turn them on themselves.

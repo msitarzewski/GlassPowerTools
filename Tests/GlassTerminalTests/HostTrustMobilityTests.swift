@@ -46,8 +46,10 @@ struct HostTrustMobilityTests {
     /// The second regression: the transport pinned under one configuration while this type's own
     /// methods — the ones the trust prompt calls — used another. A synchronizable Keychain item and
     /// a device-only one with the same account are **different items**, so the two paths could not
-    /// see each other's pins even where neither threw.
-    @Test("Connect-time pinning and the trust prompt store under one configuration")
+    /// see each other's pins even where neither threw. Both now read `hostTrustConfig`; what this
+    /// pins is that it stays the credentials' configuration, since moving it would leave every pin
+    /// already made under the old one unread.
+    @Test("Host trust is stored under the credentials' configuration")
     func oneConfigurationForBothTrustPaths() {
         let promptDestination = KeychainManager.hostTrustConfig
         let transportDestination = KeychainManager.config

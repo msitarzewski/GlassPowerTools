@@ -17,8 +17,8 @@ struct NewHostTerminalSettingsTests {
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
                                     resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
-        let runtime = GlassTerminalRuntime()
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         model.registry.register(GlassTerminalCapability(runtime: runtime))
         runtime.connectToLibrary(
             store: model,

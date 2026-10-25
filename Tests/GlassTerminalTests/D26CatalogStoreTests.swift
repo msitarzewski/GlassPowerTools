@@ -29,7 +29,7 @@ struct D26CatalogStoreTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: nil, resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
         return (model, root)
     }
 
@@ -182,7 +182,7 @@ struct D26CatalogStoreTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
         let manager = makeManager(model)
-        let capability = GlassTerminalCapability(runtime: GlassTerminalRuntime(layers: GlassLayerStore()))
+        let capability = GlassTerminalCapability(runtime: GlassTerminalRuntime(layers: GlassLayerStore.forTest()))
 
         // A link with nothing behind it: what another device's sync leaves when the configuration
         // has not arrived.

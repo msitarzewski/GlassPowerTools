@@ -33,7 +33,8 @@ use the disposable test VM only).
 
 ## 2026-10-21 — RESUME HERE
 
-Nothing from today is committed. Commit at his word.
+Committed at his word: through 0.4.505 on 2026-10-21 (`dcad5dcb`), and everything after it, through the
+test audit, with 0.4.522 on 2026-10-25. Not pushed. The "not committed" notes below predate those commits.
 - **App Store Connect and TestFlight** (his "pull france for now and get these builds into testflight"):
   - `ITSAppUsesNonExemptEncryption = NO` is in `App/Info.plist` and `Platforms/macOS/Info.plist`: standard algorithms
     need only the French declaration, and only for sale in France (`Documentation/AppStore/README.md`).
@@ -121,8 +122,242 @@ Nothing from today is committed. Commit at his word.
     `TerminalSessionMark` (agent, colour, pulse) via `GlassSessionOrbTab.icon`; Font Size and AI Assistant in Tools
     on visionOS. 12 headset UI tests pass (new: toggle, pinch → orb, Font Size in Tools). Captures in
     the working-files folder: vision-sidebar-1021 (panel-*). Bar: 9 controls now.
+  - **Show All Windows by hand on Vision Pro (his "go! build both with the switch"):** research first (Apple's HIG
+    on Apple's pages: two-handed pinch together/apart is the standard Zoom gesture; custom gestures supplement, never
+    replace; "ARKit data is available only when your app presents a Full Space and other apps are hidden"; sci-fi:
+    Shedroff & Noessel's seven recurring gestures, g-speak). Built (`GlassAllWindowsAround.swift`, GlassShell):
+    `GlassPinchSteps` (in/deeper/out, once per gesture; 5 tests, seen failing); `glassShowAllWindowsPinch()` on
+    terminal and desktop windows (in opens the window or the arc per Settings ▸ Appearance ▸ Show All Windows ▸
+    Pinch In Opens; deeper goes around); the All Windows window's Around You button and pinch; the arc
+    (`GlassAllWindowsAroundView`, a mixed `ImmersiveSpace` "all-windows-around", RealityView attachments on a
+    head anchor, a group per machine, the room dimmed) with In a Window / Done and pinch out; Focus Mode's space
+    steps aside and returns (`glassImmersiveSpacePresence`). XCUITest has no pinch on visionOS and can't tap
+    buttons in an immersive attachment: the way back is tested through `--demo-all-windows-around-back`. The
+    two-handed pinch itself is unproven until the headset. Captures: working-files folder, around-1021.
+  - **"The host library could not be read … hosts.json … permission" on the headset (0.4.507):** the library is
+    complete-protected; a re-read while the headset was off (locked) was refused, and `load()` took that for a
+    missing App Group and moved the session to the app's private copy (there since 9/16; sync had filled it, so
+    nothing looked lost — compared with the Mac's that night: same 25 records). Now locked means read again on
+    unlock, no alert, no switch (`GlassShellModel.response`, `protectedDataBecameAvailable`, wired in the App).
+    3 tests, seen failing without the check.
   - His question, answered: how a Workgroup's window is told from a window with tabs today (Mac: the sidebar icons'
     colour only; iPad: the sidebar's section heading; iPhone and Vision Pro: nothing in the window).
+- **2026-10-22, the headset sidebar and new windows' size** (his "The terminal still resizes when you hide or show
+  the tabs. The terminal content should not move or redraw", then "new windows aren't respecting the settings for
+  width and height by character … essentially portrait shaped … or square"):
+  - 0.4.508 had held the terminal's width while the window widened, but visionOS resizes a window about its centre
+    (no app can move one), so the terminal still shifted; and the narrowing on hide applied to windows never
+    widened, and visionOS opens new windows at the size it last gave one, so windows came up square or tall.
+  - **Sidebar is now an ornament** (`VisionTerminalSidebarLayout`: `.ornament(attachmentAnchor: .scene(.leading),
+    contentAlignment: .trailing)`, its own glass, the window's height). The window never resizes for it. The
+    `sidebarHasGlass` option of `GlassSpatialSplitView` and the headset `glassAdditiveSidebar` path were removed.
+  - **New windows fit their grid as they open**, as a Mac window does: `TerminalWindowOpeningFit` (once per window,
+    3 asks at most, the grid first given: Settings' for a new terminal, its own for a moved one) →
+    `SwiftTermHostModel.fitVisionWindowToTerminalGrid` → the UIKit container's `fitWindow` (chrome kept, the
+    terminal's part made `SwiftTermScaleLayout.contentSize`; under Scale the kept grid becomes that one and ⌘0's
+    sizing applies) via `requestGeometryUpdate(.Vision(size:))`. The session still takes every measured grid (the
+    system may not resize). 4 unit tests, seen failing with the once/first-grid rules off. A UI-test mark
+    `terminal-grid-<c>x<r>` (DEBUG, visionOS). Help (terminal-sessions, terminal-settings) and release notes updated.
+  - Found on the simulator: the window picks its shown terminal in `onAppear`, after the terminals first measure, so
+    the fit is given to every terminal in the window and asks once per measured grid (5 unit tests). The request is
+    honoured: 1200×800 → 1173×773 in under 1.5 s, the grid 123×41 → 120×40 (probe logs, since removed; one notice
+    line `event=fit-window` stays). Under Scale the first layout overwrote the kept grid the fit set from inside
+    SwiftTerm's report, so that branch now runs after the layout pass. The grid mark is set from SwiftTerm's
+    `sizeChanged` (a mark made in the container's layout showed the grid before). UI tests: new window 120×40 passes;
+    sidebar toggle leaves grid and frame unchanged passes; Scale Text toggle passes; Scale new window 120×40 passes.
+    Bites: the new-window tests failed (123×41) before each fix; the sidebar test fails with the sidebar put back in
+    the window (120×40 → 155×40 on hiding it). **0.4.509 installed and read back on the Mac (running), Vision Pro and
+    iPhone**; no new Mac crash reports. Not committed.
+- **2026-10-22, "hover / context previews aren't working over ssh?"** (device not stated; previews exist only on the
+  Mac, D76). Live on the test VM (`LivePathPreviewTests`, new, gated): `TerminalSession.locate` finds absolute, `~/` and
+  tmux-relative paths. Relative paths in an SSH shell *not* in tmux can't resolve unless the shell reports its folder
+  (OSC 7), which stock remote shells don't. The server half was never seen end to end (d733b3c: "his to try").
+  Added `sh.glas` / `path-preview` log lines with a public reason at every stopping point (previewer not wired, pane
+  gone, no session, no folder/home, command failed, not on host, SFTP unavailable, stat/open/read failed, too large,
+  pointer moved on) so his next try says where it stops: `/usr/bin/log show --predicate 'subsystem == "sh.glas" AND
+  category == "path-preview"'`.
+- **2026-10-22, the headset, continued** (his "two handed pinch resizes the window", "switch it to the lightning bolt
+  and send it to active", "put the tab bar on the same plane as the terminal window, and put only a few pixels
+  between them", "drag tabs to reorder should work, too. doens't."):
+  - The two-handed pinch is gone from terminal, desktop and All Windows windows (visionOS resizes a window with it);
+    the arc keeps its pinch out. The ⚡ held opens All Windows where Settings ▸ Appearance ▸ Show All Windows ▸ Opens
+    says (In a Window / Around You; was "Pinch In Opens").
+  - The headset terminal's bar: Connections became the ⚡ (`GlassActiveConnectionsButton`, id
+    `terminal-active-connections`): Connections on Active; held, All Windows. Orb UI tests moved to it.
+  - The sidebar ornament pushed back onto the window's plane (`ornamentDepth` 109.5, measured with an immersive space
+    open: window z −2720.8, ornament −2515.6 at 1.874 units/pt; after, −2720.75), 4 pt from the window's edge.
+    Rows still select by pinch (UI test).
+  - Reorder: the sidebar is our own rows now (ScrollView + buttons, tinted when shown, hover highlight), not a
+    `List` — a List takes no drop of its own rows (Apple's forums; tried onMove and the ForEach drop too). Not proven:
+    XCUITest on the visionOS simulator never starts a SwiftUI drag (a log in `onDrag` never printed, with the
+    context menu, without it, and with `draggable`); the hold opens the row's menu. His to try on 0.4.510.
+- **Wrapping in every headset tmux window on 0.4.509** (his screenshot, then "It's all windows in vision pro now").
+  tmux on his Mac: glass-2's window 127×53 (the headset client's size, `window-size latest`), while the headset
+  showed ~174 columns — Claude Code drawn for 127 into a wider screen, leftovers beyond. Other sessions alike (97×32,
+  113×46, 133×48 at tmux). Cause not found: the opening fit (window resized just after open) or the Mac app's
+  relaunch at the 0.4.509 install (all its control clients re-attached 01:07). **The opening fit is left out of
+  0.4.510** (environment not passed; type and unit tests kept; its two UI tests skip). Next: reproduce with a real
+  tmux session on the test VM from the visionOS simulator (`GlassTerminalUITests` adds a host with the key; tmux must
+  be turned on after a first connection finds it).
+- **The wrapping, found (his "still messed up ... big time. Please review the code that you used to try and force
+  sizes")** — the Mac too. The control-mode client (D83) drew a pane at its own terminal's size whatever tmux's was;
+  with the Mac and the headset on one session, tmux (`window-size latest`) sizes the window to the client that last
+  switched to the session (measured on a private tmux 3.8 server: the other client's typing, `refresh-client -C`
+  and new sizes don't take it back; `switch-client -t %pane` does). Installs relaunch an app, which re-attaches
+  (and takes) every session; today's headset resizes (0.4.508's width hold, 0.4.509's fit) added to it.
+  Fixed: `TmuxControlClient.paneSize` (from the pane read and `%layout-change`, `TmuxLayout.size(ofPane:in:)`),
+  `.paneSize` action → `SwiftTermHostModel.showTmuxPane` → both containers lay the terminal out at the pane's grid,
+  top left, scaled down only to fit (`paneGrid`, `naturalGrid`); `claim(natural:)` on a keystroke while the size is
+  another's: `refresh-client -C own ; switch-client -t %pane`. Tests: 3 client unit tests (seen failing with layouts
+  ignored), live two-client test on this Mac's tmux (`LiveTmuxControlTests.twoClients`), `MacTmuxPaneSizeTests` (a
+  real pane's `stty size`, seen failing with the layout off); tmux/scale suites 263 pass. Help terminal-tmux.
+- **Unwound (his "both of the windows without vision equivalents are fixed sized. Can we just unwind all of the
+  changes this session having to do with this part of the code"), 0.4.512:** 0.4.511's pane-size display and claim
+  showed sessions with no headset client at a fixed size on the Mac, and he wanted the sizing back as it was. Removed:
+  `TmuxControlClient` (paneSize, claim, layouts), `SwiftTermScale.swift`, `Models.swift` and the two tmux test files
+  restored from HEAD; `TerminalWindowOpeningFit` (0.4.509) and its tests, `fitVisionWindowToTerminalGrid`/`fitWindow`,
+  `showTmuxPane`/`naturalGrid`/`paneGrid` and `MacTmuxPaneSizeTests` deleted; help terminal-tmux and Initial
+  Terminal Size, and the release notes, back. Kept: the sidebar ornament (depth corrected to 15.3 pt: 109.5 stood it
+  "pretty far behind" on the headset), ⚡, Quick Look, previews, reorder rows, the DEBUG grid mark for the sidebar
+  test.
+- **The focus claim (his "yes, do the focus claim. The old way drew lines and patterns in the terminal if the focused
+  verion was smaller"), 0.4.513:** `TmuxControlClient` keeps the window's size from `%layout-change`
+  (`TmuxLayout.windowSize`) and `claim()` sends `switch-client -t %pane` when it isn't this client's (once a layout);
+  its own switch's `%session-changed` (same `$id`) no longer re-reads the pane (tmux sends one on every switch,
+  measured). Called from `SwiftTermHostModel.onTerminalFocused`: the model's `focus()` succeeding, a Mac window
+  becoming key with the terminal first responder (SwiftTerm's Mac `becomeFirstResponder` isn't overridable), a UIKit
+  terminal becoming first responder or its window key, and every keystroke (`writeInput`, the Mac local engine's
+  `sendUserInput`). No drawing changes; a one-device session never claims (no other size). Tests: 2 client unit
+  tests and `LiveTmuxControlTests.twoClients` (this Mac's tmux), each seen failing with the claim off; tmux suites
+  pass (`MacLocalPaneScaleTests` failed once under the parallel suite, passes alone twice). Help terminal-tmux.
+- **What changed, answered (his "What else changed? What are we missing?"):** tmux processes on his Mac: the app's
+  local panes are `tmux -u -C` clients over pipes (re-attached 04:35:32 by the 0.4.513 install), the headset's are
+  `tmux -u -CC` over SSH (04:41); the server (`--tmux-host`, `tmux -u -D`) since 10-21 17:29. Nothing in the tmux
+  path changed since 10-20 (git). The difference is D83 itself: before it tmux drew each client's screen and marked
+  the space past a smaller window (his "lines and patterns"); since, the app draws, and the device not in front drew
+  output for another width. Today's resizes and installs only moved the size more often.
+- **The dotted fix (his "dotted"), 0.4.514:** `TmuxControlAction.showGrid(columns:rows:own:)` — tmux's window size
+  (from `%layout-change`, and read back with `display-message` after every size sent, so a one-device session is
+  never taken for another's while tmux catches up) against the size this terminal last sent. Hosts resize only
+  SwiftTerm's `Terminal` (`showTmuxGrid`), never the frame, so SwiftTerm still reports its real size on every frame
+  change (no lock, the 0.4.511 failure); `TmuxUnusedAreaView` dots the rest. Tests: one-device never told a grid
+  (failed first against the stale-window flaw), another client's size shown and own size still sent, live two-client
+  terminal at 127 then 166 after the claim; each seen failing with the grid off. Mac suites 258 pass.
+- **MySQL on Web won't connect (Mac, 05:05):** the host tunnel opened (local port 57814, SSH leg fine; no tmux in
+  that path — `openPortForward` is a bare `SSHTransport` forward), then "Connecting to MySQL" and nothing logged;
+  the listener stays open with nothing connected. Last success Oct 5. He: "I don't see anything", and DBeaver
+  connects "same setup" (no DBeaver connection to Web's address is saved, so which address DBeaver used is unknown).
+  **Measured, 0.4.515:** through a tunnel to a port nothing listens on (the test VM, port 9) the server refuses in
+  57 ms (`NIOSSHError.channelSetupRejected: Reason: 2 Connection refused`), the tunnel closes the local socket at
+  once, and mysql-nio's connect never returns: `MySQLConnectionHandler.channelInactive` fails only queued commands,
+  never the handshake's `done` promise (fork pinned in Package.swift; a fix there needs his word, it is his GitHub).
+  **Fixed in the app:** `SSHTunnel.refusal` (the server's words; logged at error level, was debug) →
+  `GlassHostPortForward.refusal` → `DatabaseSessionManager.connectWatched` gives up at once on a refusal or after
+  `connectTimeout` (30 s), closing a connection that arrives late; `DatabaseConnectAbandoned` worded in
+  `DatabaseConnectionFailure` (nothing listening on the machine → enter the Database address; prohibited →
+  AllowTcpForwarding; timed out). Tests: `DatabaseConnectWatchTests` (incl. real mysql-nio against a server that
+  hangs up before its greeting) and the live `mysqlTunnelToNothingFails` (0.2 s; 40 s hang before); the four
+  behaviour tests each fail with the watch off. His retry on 0.4.515 showed the new message at once; re-entering the
+  Database address connected (10:16). **The address had been lost from the saved record** (his "the setup lost the IP").
+- **Lost address → whole-list saves, 0.4.516.** Measured in tests, not traced to the one occurrence (no write history
+  is kept; Web's database service was added 10-05 07:48, the field shipped 10-05 08:16, last connect 10-05):
+  `GlassServiceRecords.replaceAll` wrote every record that differed from the store, so a save of anything (a
+  "last connected" stamp) put back each held copy — older than another device's edit, or without a field the
+  build didn't know — and deleted records added since the last read (the B-X14 guard never held: the database
+  and terminal read the whole list again before or after each save, which reset `shown`). Fix:
+  `replaceAll(with:changedFrom:)` writes only the difference from the base; the database and terminal keep
+  `persisted` (last read or written) and pass it via `saveChanges`; the terminal's readback checks only what it
+  wrote; the desktop passes the list it loaded; the shell re-reads capabilities after a sync applies records.
+  Tests (each failed first, or with the base ignored): `DatabaseRecordsFromElsewhereTests`,
+  `ServerRecordsFromElsewhereTests`, `GlassServiceRecordsChangedFromTests`, `GlassSyncRereadTests`, the desktop's
+  `stampingOneDesktopKeepsAnotherDesktopsUnknownField`. Shell/terminal/database/desktop/SSH suites: 2,001 pass.
+  Devices on builds before 516 still save whole lists.
+- **Connection Details show where the tunnel goes, 0.4.517 (his "yes, show where the tunnel really goes").** The
+  overview's Endpoint was `host:port`, the machine's own address, even for a tunnel on to a Database address — so
+  the lost address could not be seen there. One rule now, `DatabaseConnectionConfig.reachedHost` (the address
+  `forwardProvider` aims at; nil = the machine's loopback), feeds `endpointDescription` ("10.0.0.12:13306", or
+  "Port N on this machine"), the tunnel's aim, and both failure wordings. The Tunnel row names the machine a
+  tunnel goes through (`runtime.tunnelAccess` choices, as the setup sheet finds it); it said "this machine's" for
+  both routes. Test `endpointIsWhereTheConnectionEnds` failed 3 ways on the old wording; database suite 350 pass.
+  Installed on the Mac (running, no crash report). Vision Pro and iPhone were "unavailable" to devicectl (error
+  4016) at 16:25 and stay on 516; install 517 there when they are reachable (the builds are in tmp/dd-*).
+- **⌘F in the editor (his "How is there no Find in the Editor? Command F should always Find right?").** Two defects:
+  the editor never published `\.glassFindItem`, so the shell's Edit ▸ Find ▸ Find…/⌘G/⇧⌘G were disabled in its
+  windows (its find bar was ⌥⌘F in the Editor menu, and `MenuBarPlacementTests` pinned the terminal as the only
+  publisher); and the find bar and Go to Line set `model.selectedRange`, which neither engine watched, so nothing on
+  screen moved (reproduced in a scratch engine test). Fix: `GlassEditorModel.reveal` + `revealRequest` (the
+  `keyboardRequest` pattern), watched by both engines; UIKit scrolls to `firstRect`/`caretRect`, because
+  `scrollRangeToVisible` did nothing for text TextKit 2 had not laid out (measured on the simulator); the editor
+  publishes `findItem` (`presentFind`, `findAgain`), the find field takes the keyboard on each request
+  (`findFocusRequest`); the toolbar Find off the Mac presents rather than toggles; Editor ▸ Find in Document (⌥⌘F)
+  removed. Tests, each shown failing without its fix: AppKit `revealReachesTheView`, `revealScrollsToAFarMatch`;
+  UIKit (simulator) `UIKitRevealTests` ×2; `findShowsTheBarAndFindAgainRevealsTheNextMatch`; the publisher guard.
+  Suites pass: shell 356, editor UI 119, editor core 174, editor 318, database 350, UIKit editor 7. Checked in the
+  macOS VM's running app: Find… enabled on ⌘F, the find field focused, Return selected match 1 of 13 (line 3), ⌘G/⇧⌘G
+  stepped between matches. 0.4.518 built: on the iPhone; the Mac's quit was cancelled ("User canceled", the install
+  waited 10 minutes and left 517 running); the Vision Pro was unreachable again.
+- **Quick Look on the headset (his "add Quick Look on the headset - even it if has to be a mouse hover"):**
+  `VisionTerminalPathPreviewer` (popover, the shared `TerminalPreviewBar`), Quick Look first in a held path's menu,
+  a trackpad/mouse pointer resting 0.6 s (`UIHoverGestureRecognizer`), Space under Mouseover + Space; the file via
+  `TerminalSession.locate` + `TerminalRemotePreview.fetch` (wired in `TerminalPathActions.install` on visionOS);
+  Show previews in Settings and This Window on visionOS. Demo `terminal-path`, UI test `testQuickLookOnAHeldPath`.
+- **Proposed, his idea (2026-10-22): Focus Mode environments** — per window over the app's setting: his own USDZ
+  room or 360° picture, and a Sketchfab browser (rooms/environments filters). Sketchfab's terms (read on their
+  developer pages): downloads need each person signed in by OAuth 2.0 in the app; the app is registered by
+  contacting Sketchfab (name, grant type, redirect URI — no custom schemes; an https or localhost one); USDZ is one
+  of the formats; every model shows its license, author and link, and Sketchfab is credited. Not started.
+- **Git and diffs in the editor (his "We really, really need git support and diffs in the editor now... see this
+  instead of having to open Zed"), 2026-10-23** (`tasks/2026-10/2026-10-23_editor-git.md`). He withdrew the iOS
+  Files report ("files works now, focus on git"). Built, read-only: the real `git` where the folder is (the Mac's
+  own; a server's over the project's SSH connection, on every device; Citadel F12 for exit status and stderr);
+  a Changes tab (every changed file's lines since HEAD, new files whole, a line opens its file); tree marks and
+  folder dots; the footer's branch button; the overview's git row; Text ▸ Show Changes (⌃⇧G). Tests: editor 187,
+  Citadel exec 12, terminal listers 11, shell 356, SSH 86. The VM had no network (host bridge never made), so the
+  window was drawn offscreen instead, which caught blank rows (fixed). Next steps he may want: gutter marks in the
+  text, stage/commit. 0.4.519 installed on the Mac (running, no crash report) and the iPhone; the Vision Pro was
+  unreachable (4016). Not committed.
+- **Then gutter marks and stage/commit (his "add gutter marks and stage/commit too")**, same task note: marks
+  beside the numbers compare the buffer with HEAD as you type (`LineChanges`, Myers; `GlassEditorLineMarker`);
+  Changes gains a box per file, Stage All, a message and Commit/Commit All (⌘↩), and asks before committing files
+  staged outside a subfolder project. Tests: core 328, UI 120, editor 195 (new suites shown failing when broken).
+  0.4.520 on the Mac (running, no crash report) and the iPhone; Vision Pro unreachable (4016). Not committed.
+  Not done: hunk staging/revert, marks with line numbers hidden, push/pull.
+- **A dropped terminal listed once in Active (his iPhone picture: each dropped tmux tab was listed twice), 2026-10-24**
+  (`tasks/2026-10/2026-10-24_active-dropped-tabs.md`; his "yes!" to the proposal and to Detach showing the session
+  at once). A down terminal holds its session (`GlassRunningSession.isHeldHere`, `listedRunningSessions`), its row
+  says what the machine said (`tmuxWhileDown`) or that the session ended, and choosing it reconnects
+  (`Request.reconnect`). New tests shown failing when broken. 0.4.521 building for all three. Not committed.
+- **Test audit (his "make sure those are found and settled properly … verify that all of our tests are useful and
+  work"), 2026-10-24** (`tasks/2026-10/2026-10-24_test-audit.md`). The "load" failures were the terminal suite
+  blocking the main actor. Six product defects found and fixed, each with a test shown failing without it:
+  blocked signals inherited by what the app spawns (`GlassSpawn`), SQLite Cancel/timeout lost before a statement
+  runs, MySQL backslashes in default literals, RDPKit dropping a server's reason when it hangs up straight after,
+  and, from the iPhone UI run, the paste review wider than the phone and VoiceOver's terminal lines stale after a
+  resize. Package: 3,113 tests pass in three full runs (2–2.5 min), plus RDPKit 1,030, Citadel 62 and
+  swift-nio-ssh 367. UI tests compile for macOS and iOS. Final runs on the latest build (2026-10-25): iPhone 72
+  pass / 6 fail, folded Duo 71 / 7, no skips. The first re-run of those suites still failed seven (the text
+  helper skipped Select All when the value equalled the prompt; the tag tap; the terminal's typing raced D44's
+  tmux offer, and its echo check could not fail). Fixed since, each shown failing without its fix. **VoiceOver
+  (his "check the VoiceOver thing too")**: the real VoiceOver runs in the iOS 27.1 simulator (task note has how);
+  the tag field's input had the whole row, chips included, as its accessibility frame (outline, touch, and an
+  activation point on Lab's remove button). Fixed in `GlassTagField` (the row's tap gesture moved to a
+  background), verified with VoiceOver; a tag-suite check covers it. The database suite on iOS had never got
+  past text entry; taken through every iPhone step (hidden tabs' controls, Run behind the keyboard, Select All in
+  the editor, the schema list a level back, the row's "…" menu). Full iPhone run: 78 tests, 0 fail, 2 skip; the
+  skips (foreign-key follow) were a Mac-only lookup, fixed: Follow Reference now runs and passes on the iPhone on
+  both engines (first time seen working in the UI), and fails when the composite pairing is transposed. Full
+  folded-Duo run: 67 pass, 11 fail. Product defect found and fixed: a ⚡ under a sheet answered a hold (All
+  Windows over Add Host, on both phones; `GlassAllWindowsPull.isOnProbe` now takes only the frontmost
+  presented screen's ⚡); new test fails without it on both phones. The rest: the Duo's sheet bar leaving after
+  a password (decision 8), so Save is tapped by `tapUntilSheetCloses`. Second full Duo run: 79, 75 pass, 4 fail,
+  all the grid reader walking rows the keyboard covered (fixed: `serverRows` puts the keyboard away). Second
+  iPhone run: database tests failed in Set Up on iOS's Allow Paste prompt for the Mac's clipboard (fixed:
+  `UITestClipboard` taps Allow Paste; proven on the Duo) and, after a Don't Allow, the guard emptied the clipboard
+  (fixed: `Refused` when the read is empty but the types are not; proven by a deleted probe). iPhone run: 79, 74
+  pass, 5 fail (all the prompt). Mac compile of every changed file: passes. Running: the database, terminal and
+  paste suites with the final code on the Duo then the iPhone (`fix-{duo,iphone}.log`, `dd-ios-fix`). Not run: the iPad on the latest
+  build, the unfolded Duo, the Mac. Open for the
+  owner: the decisions list in the task note, plus the tag draft split proposal. Not committed.
 
 ## 2026-10-20
 
@@ -693,7 +928,7 @@ not the owner's — the test was an agent's probe, 2026-10-11 — and both were 
   scratchpad installs each when it unlocks. The tree-sitter match limit landed after this build: it goes in the next.
 - **Scratch and Windows 11 are in the Duo probe's library** (added by a temporary UI test, not committed). How to reach
   both machines is in the agent memory runbook (`test-machines-runbook`): Parallels VMs; Windows account `gptrdp`,
-  password reset per need into a 0700 file, never printed; tunnels on port 2223, never 2222 (Citadel's tests bind it).
+  password reset per need into a 0700 file, never printed; tunnels on port 2223 (Citadel's tests bound 2222 until 2026-10-24; they take a free port now).
 - **Temporary UI tests** (tour + demo) live only in the scratchpad (`GlassTerminalUITests.tour.swift`) — swap in to
   run, restore after, never commit. (The "owner-backup" copy beside it held an agent's probe, discarded 2026-10-13.)
 - **Done 2026-10-13:** workgroup details use `glassDetailColumnTitle` (host, keys, projects already had it through

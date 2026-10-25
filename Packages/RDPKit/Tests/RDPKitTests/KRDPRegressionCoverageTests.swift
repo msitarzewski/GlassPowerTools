@@ -432,7 +432,8 @@ private func le16(_ data: Data, _ offset: Int) -> UInt16 {
 }
 
 @Test func regression48WindowsAuxiliaryDynamicChannelsPreserveActivationOrdering() throws {
-    let report = try runRegressionPreflight(auxiliaryDynamicChannelBehavior: .windowsInputAndCursor)
+    let report = try runRegressionPreflight(auxiliaryDynamicChannelBehavior: .windowsInputAndCursor,
+                                            allowsAuxiliaryInputChannels: true)
 
     #expect(report.status == "success")
     #expect(report.rdpFinalizationResponseTypes?.contains("server-synchronize") == true)
@@ -495,6 +496,7 @@ private func runRegressionPreflight(
     finalizationBehavior: MockKRDPFinalizationBehavior = .grantBeforeFontList,
     auxiliaryDynamicChannelBehavior: MockKRDPAuxiliaryDynamicChannelBehavior = .none,
     clipboardEnabled: Bool = false,
+    allowsAuxiliaryInputChannels: Bool = false,
     wireTranscript: RDPWireTranscript? = nil
 ) throws -> RDPPreflightReport {
     let server = try MockKRDPServer.start(
@@ -504,10 +506,9 @@ private func runRegressionPreflight(
     )
     defer { server.stop() }
 
-    return RDPPreflightClient().run(
-        configuration: regressionConfiguration(port: server.port, clipboardEnabled: clipboardEnabled),
-        wireTranscript: wireTranscript
-    )
+    var configuration = regressionConfiguration(port: server.port, clipboardEnabled: clipboardEnabled)
+    configuration.allowsAuxiliaryInputChannels = allowsAuxiliaryInputChannels
+    return RDPPreflightClient().run(configuration: configuration, wireTranscript: wireTranscript)
 }
 
 private func regressionConfiguration(port: UInt16, clipboardEnabled: Bool = false) -> RDPConnectionConfiguration {

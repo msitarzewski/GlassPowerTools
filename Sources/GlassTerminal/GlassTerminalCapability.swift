@@ -113,6 +113,9 @@ public final class GlassTerminalRuntime {
         /// Bring an already-open workgroup back to the screen (D1's `activate`). Not a connect:
         /// the sessions are live and only the thing pointing at them was cleared.
         case showWorkgroup(workgroupID: UUID)
+        /// A terminal in tmux whose connection dropped, chosen in Active or All Windows: back to
+        /// its session (2026-10-24). What stops it is said in the connect flow's alert.
+        case reconnect(sessionID: UUID)
         /// Show the connect flow's failure alert with this message (a link with nothing behind it).
         case showFailure(String)
         #if DEBUG
@@ -746,7 +749,10 @@ public final class GlassTerminalCapability: GlassCapability {
                 subtitle: Self.subtitle(for: [session]),
                 symbolName: session.purpose == .sftp ? "folder" : symbolName,
                 endpointIDs: [EndpointID(rawValue: session.server.id)],
-                activate: { Self.reveal(session, in: manager) },
+                activate: { [runtime] in
+                    Self.reveal(session, in: manager)
+                    Self.reconnectIfDropped(session, runtime: runtime)
+                },
                 close: { Self.close(session, in: manager) },
                 closeTitle: Self.closeTitle(for: [session]),
                 closeSymbolName: Self.closeSymbolName(for: [session]),
@@ -822,7 +828,12 @@ public final class GlassTerminalCapability: GlassCapability {
                 symbolName: symbolName,
                 // The machines this workgroup is on: its servers are the shell's endpoints (D26).
                 endpointIDs: live.map { EndpointID(rawValue: $0.server.id) },
-                activate: { [runtime] in runtime.enqueue(.showWorkgroup(workgroupID: workgroup.id)) },
+                activate: { [runtime] in
+                    runtime.enqueue(.showWorkgroup(workgroupID: workgroup.id))
+                    if let shown = manager.selectedSession(inWorkgroup: workgroup.id) {
+                        Self.reconnectIfDropped(shown, runtime: runtime)
+                    }
+                },
                 close: { manager.closeWorkgroup(workgroup.id) },
                 closeTitle: Self.closeTitle(for: live),
                 closeSymbolName: Self.closeSymbolName(for: live),
@@ -865,6 +876,7 @@ public final class GlassTerminalCapability: GlassCapability {
             activate: { [runtime] in
                 _ = manager.selectSession(session.id, inWorkgroup: workgroupID)
                 runtime.enqueue(.showWorkgroup(workgroupID: workgroupID))
+                Self.reconnectIfDropped(session, runtime: runtime)
             },
             close: { _ = manager.closeSession(session.id, inWorkgroup: workgroupID) },
             closeTitle: Self.closeTitle(for: [session]),
@@ -905,12 +917,23 @@ public final class GlassTerminalCapability: GlassCapability {
 
     /// D44: a row says when its terminals are in tmux, and ending it is a detach when they all
     /// are — the sessions go on running on the machine, and Active lists them there.
+    ///
+    /// A terminal that is down says what the machine last said of its session (2026-10-24): where
+    /// it is, whether it is open elsewhere and when it was used, as the session's own row did
+    /// before the terminal's row stood for it — or that it has ended.
     static func subtitle(for live: [TerminalSession]) -> String {
         let inTmux = live.filter(\.survivesClose)
         if live.count == 1 {
-            guard let name = inTmux.first?.tmuxSessionName else { return live[0].state.displayName }
+            let state = live[0].state.displayName
+            guard let name = inTmux.first?.tmuxSessionName else { return state }
+            if live[0].isDown, let known = live[0].tmuxWhileDown {
+                switch known {
+                case .running(let tmux): return "\(state) · \(runningDetails(tmux))"
+                case .ended: return "\(state) · its tmux session has ended"
+                }
+            }
             let label = TerminalTmux.glassNumber(name).map { "Terminal \($0)" } ?? name
-            return "\(live[0].state.displayName) · in tmux (\(label))"
+            return "\(state) · in tmux (\(label))"
         }
         if inTmux.isEmpty { return "\(live.count) terminals" }
         return inTmux.count == live.count ? "\(live.count) terminals in tmux" : "\(live.count) terminals, \(inTmux.count) in tmux"
@@ -922,6 +945,14 @@ public final class GlassTerminalCapability: GlassCapability {
 
     static func closeSymbolName(for live: [TerminalSession]) -> String {
         closeTitle(for: live) == "Detach" ? "eject" : "xmark"
+    }
+
+    /// Choosing a terminal in tmux whose connection dropped takes you back into its session, as
+    /// its row says it will (2026-10-24). Not one someone disconnected, and not an iPhone slot,
+    /// which connects as it is shown (W4b).
+    static func reconnectIfDropped(_ session: TerminalSession, runtime: GlassTerminalRuntime) {
+        guard session.survivesClose, session.connectsOnShow, !session.isWorkgroupSlot else { return }
+        runtime.enqueue(.reconnect(sessionID: session.id))
     }
 
     /// The AI agent a terminal is running: from tmux's answer, read every few seconds off the
@@ -1304,6 +1335,8 @@ private final class GlassTerminalPortForward: GlassHostPortForward {
         self.owner = owner
     }
 
+    var refusal: String? { tunnel.refusal }
+
     func close() async {
         await tunnel.close()
         await transport.release(owner: owner)
@@ -1474,6 +1507,21 @@ final class GlassTerminalDirectoryLister: GlassHostDirectoryLister {
     func realPath(_ path: String) async throws -> String {
         try await sftp.realPath(path)
     }
+
+    /// The editor's `git` for a project here (2026-10-23): an exec channel on this connection,
+    /// counted against the server's sessions as the terminal's commands are (W21). A minute is
+    /// longer than any status or diff should take; a slower one is a machine in trouble.
+    func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+        guard let transport else { throw GlassPortForwardError.unavailable }
+        let output = try await transport.run(command, maxResponseBytes: Self.commandOutputCeiling, timeout: .seconds(60))
+        return GlassHostCommandOutput(exitStatus: output.exitStatus,
+                                      standardOutput: output.standardOutput,
+                                      standardError: output.standardError)
+    }
+
+    /// The most a command may answer with: a diff of a whole working tree can be large, and is
+    /// still read into memory to be shown.
+    private static let commandOutputCeiling = 32 * 1024 * 1024
 
     func close() async {
         try? await sftp.close()

@@ -53,11 +53,19 @@ public final class GlassEditorDocument: Identifiable {
     /// model is then empty and never dirty, so nothing that saves or searches reaches it.
     public let viewer: GlassEditorViewer?
 
+    /// Set for a project's **Changes** tab (2026-10-23): what git says changed, not a file. Its text
+    /// model is empty and never dirty, as a viewer's is.
+    public let changesOfProject: GlassEditorProject.ID?
+
+    /// Whether this is text to edit, find in and save: not a viewer, not Changes.
+    public var isText: Bool { viewer == nil && changesOfProject == nil }
+
     public init(model: GlassEditorModel, url: URL?, untitledName: String = "Untitled",
                 machine: String? = nil, session: RemoteDocumentSession? = nil,
-                viewer: GlassEditorViewer? = nil) {
+                viewer: GlassEditorViewer? = nil, changesOfProject: GlassEditorProject.ID? = nil) {
         self.model = model
         self.viewer = viewer
+        self.changesOfProject = changesOfProject
         self.url = url
         self.untitledName = untitledName
         self.machine = machine
@@ -182,6 +190,16 @@ public final class GlassEditorDocument: Identifiable {
         return GlassEditorDocument(model: model, url: nil, untitledName: name)
     }
 
+    /// A project's Changes tab.
+    static func changes(of project: GlassEditorProject.ID) -> GlassEditorDocument {
+        let snapshot = DocumentSnapshot(content: "",
+                                        encoding: .utf8(hadBOM: false),
+                                        lineEndings: LineEndingStyle.platformDefault,
+                                        origin: .ephemeral(id: UUID()))
+        return GlassEditorDocument(model: GlassEditorModel(snapshot: snapshot), url: nil,
+                                   untitledName: "Changes", changesOfProject: project)
+    }
+
     // MARK: Identity
 
     public var displayName: String { url?.lastPathComponent ?? untitledName }
@@ -205,7 +223,8 @@ public final class GlassEditorDocument: Identifiable {
     }
 
     public var isDirty: Bool { model.isDirty }
-    public var hasNeverBeenSaved: Bool { url == nil }
+    /// An untitled document's. Changes is never saved, so it never asks to be.
+    public var hasNeverBeenSaved: Bool { url == nil && changesOfProject == nil }
 
     /// Changing the language re-parses under the new grammar rather than waiting for the next edit.
     public func setLanguage(_ language: LanguageID) {

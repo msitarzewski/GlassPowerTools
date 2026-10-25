@@ -13,7 +13,7 @@ private func makeModel(shared: Bool = true) throws -> (GlassShellModel, URL) {
     let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                 sharedContainerURL: shared ? root.appendingPathComponent("group") : nil,
                                 resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                layers: GlassLayerStore())
+                                layers: GlassLayerStore.forTest())
     return (model, root)
 }
 
@@ -75,7 +75,7 @@ struct GlassShellModelTests {
         #expect(model.services(for: host.id) == [link])
         let (reloaded, _) = try (GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                                  sharedContainerURL: root.appendingPathComponent("group"),
-                                                 resolveSharedContainer: false, layers: GlassLayerStore()), root)
+                                                 resolveSharedContainer: false, layers: GlassLayerStore.forTest()), root)
         await reloaded.load()
         #expect(reloaded.services(for: host.id).map(\.displayName) == ["Postgres"])
         #expect(reloaded.catalogItems.first?.subtitle == "Database")
@@ -130,7 +130,7 @@ struct GlassShellModelTests {
         let writer = model.writerID
         let again = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
-                                    resolveSharedContainer: false, layers: GlassLayerStore())
+                                    resolveSharedContainer: false, layers: GlassLayerStore.forTest())
         await again.load()
         #expect(again.isFavorite(host.id))
         #expect(again.catalogItems.first?.isFavorite == true)
@@ -149,7 +149,7 @@ struct GlassShellModelTests {
         try Data("not json".utf8).write(to: app.appendingPathComponent("shell-preferences.json"))
         defer { try? FileManager.default.removeItem(at: root) }
         let model = GlassShellModel(storageDirectory: app, sharedContainerURL: root.appendingPathComponent("group"),
-                                    resolveSharedContainer: false, layers: GlassLayerStore())
+                                    resolveSharedContainer: false, layers: GlassLayerStore.forTest())
         #expect(model.preferencesProblem?.contains("could not be read") == true)
     }
 
@@ -184,6 +184,5 @@ struct GlassShellModelTests {
         await #expect(throws: GlassShellError.invalidName) { _ = try await model.addHost(displayName: "   ") }
         let host = try await model.addHost(displayName: "Ok")
         await #expect(throws: GlassShellError.invalidName) { _ = try await model.addService(kind: .ssh, displayName: " ", to: host.id) }
-        #expect(GlassTagList.adding(" a, b ,,c ", to: []) == ["a", "b", "c"], "the editor commits tokens through the kit tag list")
     }
 }

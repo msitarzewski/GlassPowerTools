@@ -546,10 +546,13 @@ struct AppleDisplaysClientTests {
 }
 
 /// Polls until `condition` holds, for up to two seconds.
-func waitUntil(_ condition: @Sendable () async -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(2)
+func waitUntil(_ condition: @Sendable () async -> Bool, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+    let deadline = ContinuousClock.now + .seconds(30)
     while !(await condition()) {
-        guard ContinuousClock.now < deadline else { throw RFBError.cancelled }
+        guard ContinuousClock.now < deadline else {
+            Issue.record("still not so after 30 seconds", sourceLocation: sourceLocation)
+            throw RFBError.cancelled
+        }
         try await Task.sleep(for: .milliseconds(10))
     }
 }

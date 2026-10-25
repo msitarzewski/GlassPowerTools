@@ -44,7 +44,7 @@
     ]},
     {"name": "Editor", "pages": [
       {"slug": "editor-opening", "title": "Open the Editor", "summary": "Ways into the Editor on each platform, what an editor window holds, new documents, and how to leave or close it."},
-      {"slug": "editor-projects", "title": "Work with Projects", "summary": "Open folders on this device or on a server as projects, manage the Projects list, and how it syncs between devices."},
+      {"slug": "editor-projects", "title": "Work with Projects", "summary": "Open folders on this device or on a server as projects, see what changed in git and commit it, manage the Projects list, and how it syncs between devices."},
       {"slug": "editor-files-and-tabs", "title": "Files, Folders and Tabs", "summary": "Browse a project's files, preview and keep tabs, create new files locally or on a server, and open files on their own."},
       {"slug": "editor-saving", "title": "Save Your Work", "summary": "Save with ⌘S or the toolbar, choose where a new document goes, handle files that changed, and close unsaved documents."},
       {"slug": "editor-languages", "title": "Languages, Find and the Status Bar", "summary": "The 15 highlighted languages and their extensions, changing a file's language, the status bar, Go to Line, and Find and Replace."},

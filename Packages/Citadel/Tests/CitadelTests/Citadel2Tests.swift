@@ -36,18 +36,20 @@ final class Citadel2Tests: XCTestCase {
         let hostKey = NIOSSHPrivateKey(p521Key: .init())
         let password = UUID().uuidString
         
+        // A free port on loopback: a fixed one could be another listener's, a tunnel to a real server.
         let server = try await SSHServer.host(
-            host: "0.0.0.0",
-            port: 2345,
+            host: "127.0.0.1",
+            port: 0,
             hostKeys: [
                 hostKey
             ],
             authenticationDelegate: AuthDelegate(password: password)
         )
+        let port = try XCTUnwrap(server.channel.localAddress?.port)
         
         let client = try await SSHClient.connect(
             host: "127.0.0.1",
-            port: 2345,
+            port: port,
             authenticationMethod: .passwordBased(
                 username: "test",
                 password: password
@@ -70,14 +72,13 @@ final class Citadel2Tests: XCTestCase {
         
         try await perform(server, client)
         
-        if #available(macOS 13, *) {
-            try await Task.sleep(for: .seconds(1))
-        } else {
-            sleep(1)
+        let deadline = Date().addingTimeInterval(30)
+        while await !helper.isClosed, Date() < deadline {
+            try await Task.sleep(nanoseconds: 5_000_000)
         }
-        
         let isClosed = await helper.isClosed
         XCTAssertTrue(isClosed, "Connection did not close")
+        try await server.close()
     }
     
     func testOnDisconnectClient() async throws {
@@ -193,20 +194,21 @@ final class Citadel2Tests: XCTestCase {
         let clientPrivateKey = NIOSSHPrivateKey(p521Key: clientKey)
         let clientPublicKey = clientPrivateKey.publicKey
         let server = try await SSHServer.host(
-            host: "0.0.0.0",
-            port: 2222,
+            host: "127.0.0.1",
+            port: 0,
             hostKeys: [
                 .init(p521Key: P521.Signing.PrivateKey())
             ],
             authenticationDelegate: AuthDelegate(supportedKey: clientPublicKey)
         )
+        let port = try XCTUnwrap(server.channel.localAddress?.port)
         
         let testData = TestData()
         server.enableSFTP(withDelegate: SFTP(testData: testData))
         
         let client = try await SSHClient.connect(
             host: "127.0.0.1",
-            port: 2222,
+            port: port,
             authenticationMethod: SSHAuthenticationMethod.p521(
                 username: "Joannis",
                 privateKey: clientKey
@@ -238,6 +240,11 @@ final class Citadel2Tests: XCTestCase {
     }
     
     func testRebex() async throws {
+        // Glass Power Tools: a public server on the internet, with any host key accepted — only
+        // when asked for (PATCHES.md, Tests).
+        guard ProcessInfo.processInfo.environment["CITADEL_INTERNET_TESTS"] == "1" else {
+            throw XCTSkip("connects to test.rebex.net over the internet: set CITADEL_INTERNET_TESTS=1")
+        }
         let client = try await SSHClient.connect(
             host: "test.rebex.net",
             authenticationMethod: .passwordBased(username: "demo", password: "password"),
@@ -413,26 +420,37 @@ extension Citadel2Tests {
         }
     }
 
-    func testExistingHardLinkTargetStatusFailsThePendingRequest() throws {
-        let (channel, client) = try makeEmbeddedSFTPClient()
-        let requestID: UInt32 = 109
-        let response = channel.eventLoop.makePromise(of: SFTPResponse.self)
-        client.responses.responses[requestID] = response
+    /// A hard link never replaces: the server's refusal for an existing target reaches the caller.
+    func testExistingHardLinkTargetStatusFailsTheHardLink() async throws {
+        let (channel, client) = try await makeAsyncTestingSFTPClient()
+        client.setServerExtensions([("hardlink@openssh.com", "1")])
+        let link = Task {
+            try await client.hardLink(at: "/retained.partial", to: "/existing-target")
+        }
+        defer { link.cancel() }
 
-        XCTAssertTrue(try channel.writeInbound(SFTPMessage.status(.init(
-            requestId: requestID,
+        let message = try await nextSFTPOutboundMessage(from: channel)
+        guard case .extended(let request) = message else {
+            throw EmbeddedSFTPTestError.unexpectedOutbound(message.debugDescription)
+        }
+        XCTAssertEqual(request.requestName, "hardlink@openssh.com")
+        let response = try await channel.writeInbound(SFTPMessage.status(.init(
+            requestId: request.requestId,
             errorCode: .failure,
             message: "File exists",
             languageTag: "en"
-        ))).isEmpty)
-        XCTAssertThrowsError(try response.futureResult.wait()) { error in
-            guard let status = error as? SFTPMessage.Status else {
-                return XCTFail("Expected SFTP status, got \(error)")
-            }
+        )))
+        XCTAssertTrue(response.isEmpty)
+        do {
+            try await link.value
+            XCTFail("a hard link onto an existing target succeeded")
+        } catch let status as SFTPMessage.Status {
             XCTAssertEqual(status.errorCode, .failure)
             XCTAssertEqual(status.message, "File exists")
         }
-        XCTAssertNoThrow(try channel.finish())
+        XCTAssertTrue(client.responses.responses.isEmpty)
+        let finishState = try await channel.finish()
+        XCTAssertTrue(finishState.isClean)
     }
 
     func testFStatAndLStatPacketsSerializeAndParseWithExactPayloads() throws {
@@ -739,12 +757,8 @@ extension Citadel2Tests {
         XCTAssertEqual(encoded.readInteger(as: UInt32.self), 91)
         XCTAssertEqual(encoded.readSSHString(), "/must-not-exist")
         let flags = try XCTUnwrap(encoded.readInteger(as: UInt32.self))
-        XCTAssertEqual(
-            flags,
-            SFTPOpenFileFlags.write.rawValue
-                | SFTPOpenFileFlags.create.rawValue
-                | SFTPOpenFileFlags.forceCreate.rawValue
-        )
+        // SSH_FXF_WRITE 0x02 | SSH_FXF_CREAT 0x08 | SSH_FXF_EXCL 0x20 (draft-ietf-secsh-filexfer-02 §6.3).
+        XCTAssertEqual(flags, 0x2A)
     }
 
     func testPipelinedFileReadsAreAllInFlightAndReturnedInRequestOrder() async throws {
@@ -929,6 +943,13 @@ extension Citadel2Tests {
         let message = SFTPMessage.attributes(.init(requestId: 88, attributes: attributes))
         var encoded = ByteBuffer()
         try SFTPMessageSerializer().encode(data: message, out: &encoded)
+        // The wire form (draft-ietf-secsh-filexfer-02 §5, §7), so the parser below is not only
+        // checked against its own serializer: length, SSH_FXP_ATTRS (105), the request id, flags
+        // SIZE | PERMISSIONS | EXTENDED, the size, the mode, one extension as two strings.
+        var expected: [UInt8] = [0, 0, 0, 58, 105, 0, 0, 0, 88, 0x80, 0, 0, 0x05]
+        expected += [0, 0, 0, 0, 0, 0, 0x10, 0x00, 0, 0, 0x81, 0xA0, 0, 0, 0, 1]
+        expected += [0, 0, 0, 15] + Array("vendor-checksum".utf8) + [0, 0, 0, 10] + Array("sha256:abc".utf8)
+        XCTAssertEqual(Array(encoded.readableBytesView), expected)
 
         let channel = EmbeddedChannel(handler: ByteToMessageHandler(SFTPMessageParser()))
         XCTAssertTrue(try channel.writeInbound(encoded).isFull)

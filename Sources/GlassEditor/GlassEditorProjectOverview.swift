@@ -14,9 +14,8 @@
 //  a human is meant to read first, what builds it, whether it is a git repository, and what you
 //  were last editing here.
 //
-//  **Not** `git status`. The editor reaches a project through `GlassEditorFileAccess`, which lists,
-//  reads, writes and stats — it cannot run a command, and a status that worked only for local
-//  folders would be a feature that quietly disappears over SSH.
+//  What git says changed is the project's repository's (`GlassEditorGitRepository`, 2026-10-23),
+//  run where the folder is; here it is the branch and a way to Changes.
 //
 
 import SwiftUI
@@ -150,9 +149,20 @@ struct GlassEditorProjectOverview: View {
                 if let reach = workspace.projectReach[project.id] {
                     Label(reach.badge, systemImage: reach.symbolName)
                 }
-                if landmarks.isGitRepository {
-                    // What it *is*, not what state it is in: the editor's file access can list and
-                    // read, and cannot run `git`.
+                if let repository = workspace.repositories[project.id], repository.state == .ready {
+                    // The branch and what differs from its last commit, opening Changes (2026-10-23).
+                    Button {
+                        workspace.showChanges(of: project.id)
+                    } label: {
+                        let count = repository.status.changes.count
+                        Label(count == 0 ? "\(repository.status.headName), no changes"
+                                : "\(repository.status.headName), \(count) changed file\(count == 1 ? "" : "s")",
+                              systemImage: "arrow.triangle.branch")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("editor-project-git")
+                } else if landmarks.isGitRepository {
+                    // Where this device has no git to run, or it has not answered yet.
                     Label("Git repository", systemImage: "arrow.triangle.branch")
                         .accessibilityIdentifier("editor-project-git")
                 }

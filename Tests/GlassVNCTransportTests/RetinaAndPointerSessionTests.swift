@@ -65,7 +65,7 @@ private final class Asked: @unchecked Sendable {
     func note(_ value: VNCConfiguration) { lock.withLock { list.append(value) } }
 }
 
-@Suite("Retina displays and a display's own connection, in the session")
+@Suite("Retina displays and a display's own connection, in the session", .timeLimit(.minutes(1)))
 struct RetinaSessionTests {
     @Test("a single Retina Mac is asked for 1x, and Native 2x asks for its own pixels again")
     func retinaAtOneX() async throws {
@@ -113,7 +113,7 @@ struct RetinaSessionTests {
     }
 }
 
-@Suite("A Mac's pointer, in the session")
+@Suite("A Mac's pointer, in the session", .timeLimit(.minutes(1)))
 struct ApplePointerSessionTests {
     /// Every pointer event, until the session ends.
     private func cursorEvents(_ session: GlassVNCSession) async -> [GlassRDPCursor] {

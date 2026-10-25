@@ -53,6 +53,20 @@ public enum SSHTransportEvent: Sendable, Equatable {
     case closed
 }
 
+/// How a command run with `SSHTransport.run` ended, and what it wrote to each stream.
+public struct SSHCommandOutput: Sendable, Equatable {
+    /// Nil when the server closed the channel without saying.
+    public let exitStatus: Int?
+    public let standardOutput: Data
+    public let standardError: Data
+
+    public init(exitStatus: Int?, standardOutput: Data, standardError: Data = Data()) {
+        self.exitStatus = exitStatus
+        self.standardOutput = standardOutput
+        self.standardError = standardError
+    }
+}
+
 /// One authenticated SSH connection to a route, shared by every session on that route.
 /// Moved from glas.sh `SharedSSHTransport` + the connection half of `SSHConnection`
 /// (Models.swift:1909-2320); the terminal-specific half became `SSHShellChannel`.
@@ -471,6 +485,27 @@ public actor SSHTransport: SSHPooledTransport {
         do {
             let buffer = try await client.executeCommand(command, maxResponseSize: maxResponseBytes, executionTimeout: TimeAmount(timeout))
             return String(buffer: buffer)
+        } catch where SSHTransportError.isSessionChannelRefused(error) {
+            Logger.sshConnections.notice("SSH: the server refused a command channel; \(self.ownership.owners.count, privacy: .public) owners on this connection")
+            throw SSHTransportError.sessionLimitReached
+        }
+    }
+
+    /// Runs one command and answers with how it ended and both its streams, apart (Citadel F12).
+    /// `execute` throws on the first byte of standard error; `git` writes warnings there while
+    /// succeeding, and says why it failed there too. The same permits and limits as `execute`.
+    public func run(_ command: String, maxResponseBytes: Int = SSHTransport.defaultMaximumResponseBytes, timeout: Duration = .seconds(3_600)) async throws -> SSHCommandOutput {
+        try await takeCommandPermit(waitingAtMost: timeout)
+        defer { returnCommandPermit() }
+        if let commandRunnerForTesting {
+            return SSHCommandOutput(exitStatus: 0, standardOutput: Data(try await commandRunnerForTesting(command).utf8))
+        }
+        guard let client, client.isConnected else { throw SSHTransportError.notConnected }
+        do {
+            let result = try await client.executeCommandCollecting(command, maxResponseSize: maxResponseBytes, executionTimeout: TimeAmount(timeout))
+            return SSHCommandOutput(exitStatus: result.exitStatus,
+                                    standardOutput: Data(result.standardOutput.readableBytesView),
+                                    standardError: Data(result.standardError.readableBytesView))
         } catch where SSHTransportError.isSessionChannelRefused(error) {
             Logger.sshConnections.notice("SSH: the server refused a command channel; \(self.ownership.owners.count, privacy: .public) owners on this connection")
             throw SSHTransportError.sessionLimitReached

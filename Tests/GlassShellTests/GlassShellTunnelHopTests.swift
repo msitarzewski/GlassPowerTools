@@ -35,7 +35,7 @@ import GlassLayers
     let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                 sharedContainerURL: root.appendingPathComponent("group"),
                                 resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                layers: GlassLayerStore())
+                                layers: GlassLayerStore.forTest())
     return (model, root)
 }
 

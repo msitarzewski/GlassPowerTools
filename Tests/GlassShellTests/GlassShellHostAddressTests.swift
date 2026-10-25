@@ -11,7 +11,7 @@ import GlassLayers
     let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                 sharedContainerURL: root.appendingPathComponent("group"),
                                 resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                layers: GlassLayerStore())
+                                layers: GlassLayerStore.forTest())
     return (model, root)
 }
 
@@ -57,7 +57,7 @@ struct GlassShellHostAddressTests {
         let reloaded = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                        sharedContainerURL: root.appendingPathComponent("group"),
                                        resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                       layers: GlassLayerStore())
+                                       layers: GlassLayerStore.forTest())
         await reloaded.load()
         #expect(reloaded.host(created.id)?.address == "golf.example.com")
     }

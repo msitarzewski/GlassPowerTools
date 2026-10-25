@@ -226,7 +226,7 @@ struct ClientTests {
                                source: source, sink: sink, close: { await source.close() })
         await #expect(throws: RFBError.self) { try await client.sendKey(keysym: 0x61, down: true) }
         let run = Task { try await client.run() }
-        for _ in 0..<400 where !client.isReady { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<6_000 where !client.isReady { try await Task.sleep(for: .milliseconds(5)) }
         #expect(client.isReady)
         _ = await sink.drain()
         try await client.sendKey(keysym: 0x61, down: true)

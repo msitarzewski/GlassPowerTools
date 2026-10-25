@@ -33,7 +33,7 @@ struct TerminalOpenTogetherTests {
 
     @Test("each running row carries what to attach to, and Open together is one request, in order")
     func rowsCarryTheirAttachment() throws {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let alpha = server("alpha"), bravo = server("bravo")
         runtime.sessionManager.serverManager.servers = [alpha, bravo]
@@ -70,7 +70,7 @@ struct TerminalOpenTogetherTests {
     /// new session into a group."
     @Test("Open as Tab In: the windows with room, by Active's names, newest first; one request for the window chosen")
     func openAsTabIn() throws {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let manager = runtime.sessionManager
         let alpha = server("alpha")
@@ -134,7 +134,6 @@ struct TerminalOpenTogetherTests {
             #expect(preset.sessionIntents.map(\.serverID) == [alpha.id, bravo.id, alpha.id])
             #expect(preset.sessionIntents.map(\.tmuxSession) == ["glass-1", "logs", "glass-3"])
             #expect(!TerminalConnectFlow.workgroupNeedsLegacyConsent(preset, servers: [alpha, bravo]))
-            #expect(settings.layoutPresets.isEmpty, "made for the moment: nothing is saved")
 
             let restoration = LayoutRestorationPlan(preset: preset, availableServers: [alpha, bravo])
             #expect(restoration.failures.isEmpty && restoration.targets.map(\.server?.id) == [alpha.id, bravo.id, alpha.id])
@@ -148,21 +147,14 @@ struct TerminalOpenTogetherTests {
         }
     }
 
-    @Test("on iPhone the same workgroup opens as slots, and only the one shown connects")
-    func iPhoneConnectsOnlyTheShownSlot() async throws {
-        final class RecordingManager: SessionManager {
-            var asked: [UUID] = []
-            override func connectWhenShown(_ session: TerminalSession, settingsManager: SettingsManager) async throws {
-                asked.append(session.id)
-                session.state = .connecting
-            }
-        }
+    @Test("on iPhone the same workgroup opens as slots, one per session, in order, none connected")
+    func iPhoneOpensItAsSlots() async throws {
         try await withSettings { settings, defaults in
             let alpha = server("alpha"), bravo = server("bravo")
             let servers = ServerManager(loadImmediately: false, defaults: defaults,
                                         passwordStore: ServerPasswordStore(retrieve: { _ in "unused" }, save: { _, _ in }, delete: { _ in }))
             servers.servers = [alpha, bravo]
-            let manager = RecordingManager(serverManager: servers, loadImmediately: false)
+            let manager = SessionManager(serverManager: servers, loadImmediately: false)
             let targets = [TerminalTmuxTarget(serverID: alpha.id, name: "glass-1"),
                            TerminalTmuxTarget(serverID: bravo.id, name: "logs"),
                            TerminalTmuxTarget(serverID: alpha.id, name: "glass-3")]
@@ -179,10 +171,7 @@ struct TerminalOpenTogetherTests {
             try #require(slots.count == 3)
             #expect(slots.map(\.tmuxSessionName) == ["glass-1", "logs", "glass-3"])
             #expect(slots.allSatisfy { $0.state == .disconnected }, "made, none connected")
-
-            try await TerminalWorkgroupOpening.connectShownSlot(in: workgroupID, sessionManager: manager, settingsManager: settings)
-            #expect(manager.asked == [slots[0].id], "only the one shown connects")
-            #expect(slots.map(\.connectsWhenShown) == [false, true, true])
+            // That only the one shown then connects is WorkgroupTmuxSessionsTests' to say.
         }
     }
 

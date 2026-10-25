@@ -53,7 +53,7 @@ struct D19StaleRepublishTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: nil, resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
         let backend = DeltaBackend()
         model.enableCatalogSync(backend)
         return (model, backend, root)

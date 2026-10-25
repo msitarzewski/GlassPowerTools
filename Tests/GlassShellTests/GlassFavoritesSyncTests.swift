@@ -41,7 +41,7 @@ struct GlassFavoritesSyncTests {
     private func makeModel(_ root: URL, _ name: String) -> GlassShellModel {
         GlassShellModel(storageDirectory: root.appendingPathComponent(name),
                         sharedContainerURL: nil, resolveSharedContainer: false,
-                        accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                        accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
     }
 
     @Test("the newest change per host wins; on a tie, the favourite; every order agrees")

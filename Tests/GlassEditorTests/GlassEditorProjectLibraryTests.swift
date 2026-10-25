@@ -506,10 +506,11 @@ struct GlassEditorFileAccessTests {
         let document = try #require(opened)
 
         try document.model.replaceAllContent(with: "mine\n")
-        // Something else writes the file. A whole second later, so a coarse modification time
-        // notices it rather than the test proving only that the digest tier works.
-        try await Task.sleep(for: .milliseconds(1_100))
+        // Something else writes the file, its modification time seconds on, so a coarse one notices
+        // it rather than the test proving only that the digest tier works. (A 1.1 s sleep stood for
+        // the later time until 2026-10-24.)
         try Data("theirs\n".utf8).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: url.path)
 
         await workspace.save(document.id)
         let conflict = try #require(workspace.pendingConflict, "the save did not stop to ask")

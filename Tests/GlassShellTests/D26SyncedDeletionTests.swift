@@ -56,7 +56,7 @@ struct D26SyncedDeletionTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: nil, resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
         let capability = RecordingCapability()
         model.registry.register(capability)
         return (model, capability, ScriptedBackend(), root)

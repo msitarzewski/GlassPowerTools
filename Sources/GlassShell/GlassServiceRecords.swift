@@ -74,9 +74,17 @@ public struct GlassServiceRecords<Record: Codable> {
     ///   exactly what it was asked, which is why the guard lives here, at the door all three
     ///   capabilities go through, rather than in each of them.
     ///
-    /// - Parameter preserving: stored records the caller could read but will not vouch for — the
-    ///   desktop's records that fail its validation — which are neither deleted nor rewritten.
-    public func replaceAll(with records: [Record], preserving: Set<EndpointID> = []) async throws {
+    /// - Parameters:
+    ///   - preserving: stored records the caller could read but will not vouch for — the desktop's
+    ///     records that fail its validation — which are neither deleted nor rewritten.
+    ///   - base: the list `records` was made from, when the caller knows it. Then only the
+    ///     difference is written — see `replaceAll(with:changedFrom:preserving:)`.
+    public func replaceAll(with records: [Record], changedFrom base: [Record]? = nil,
+                           preserving: Set<EndpointID> = []) async throws {
+        if let base {
+            try await write(records, changedFrom: base, preserving: preserving)
+            return
+        }
         guard store.isCatalogLoaded else { throw GlassServiceRecordsError.catalogNotRead }
         let wanted = Dictionary(records.map { (identify($0), $0) }, uniquingKeysWith: { first, _ in first })
         let current = store.configurations(ofKind: kind)
@@ -108,6 +116,39 @@ public struct GlassServiceRecords<Record: Codable> {
         encoder.outputFormatting = .sortedKeys
         for (endpointID, record) in wanted where !preserving.contains(endpointID) {
             let encoded = try encoder.encode(record)
+            if let stored = current[endpointID], Self.sameJSON(stored, encoded) { continue }
+            try await store.setConfiguration(encoded, for: endpointID)
+        }
+        shown.ids?.formUnion(wanted.keys)
+    }
+
+    /// Writes what the caller changed between `base` — the list it read, or last wrote — and
+    /// `records`, and nothing else: a record edited or added is written, one in `base` and gone
+    /// from `records` is removed.
+    ///
+    /// **A record the caller did not change is never written** (2026-10-22). Writing the whole list
+    /// put every copy the caller still held back over the stored one: a copy older than an edit
+    /// another device made and sync delivered, or one decoded by a build that predates a field and
+    /// so encoded without it. Web's MySQL lost its Database address that way, and a database added
+    /// on another device was deleted by the next "last connected" stamp here (the B-X14 guard below
+    /// never held for the database, whose rollback snapshot re-read the list before every save).
+    /// What another device changed or added since, and what this build cannot read, stays as stored.
+    private func write(_ records: [Record], changedFrom base: [Record], preserving: Set<EndpointID>) async throws {
+        guard store.isCatalogLoaded else { throw GlassServiceRecordsError.catalogNotRead }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        var before: [EndpointID: Data] = [:]
+        for record in base { before[identify(record)] = try encoder.encode(record) }
+        let wanted = Dictionary(records.map { (identify($0), $0) }, uniquingKeysWith: { first, _ in first })
+        let current = store.configurations(ofKind: kind)
+
+        for endpointID in before.keys where wanted[endpointID] == nil && !preserving.contains(endpointID) {
+            guard current[endpointID] != nil else { continue }
+            try await store.setConfiguration(nil, for: endpointID)
+        }
+        for (endpointID, record) in wanted where !preserving.contains(endpointID) {
+            let encoded = try encoder.encode(record)
+            if let unchanged = before[endpointID], Self.sameJSON(unchanged, encoded) { continue }
             if let stored = current[endpointID], Self.sameJSON(stored, encoded) { continue }
             try await store.setConfiguration(encoded, for: endpointID)
         }

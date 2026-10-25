@@ -55,12 +55,9 @@ struct MenuBarPlacementTests {
     /// The same key equivalent may appear more than once only when the items are mutually exclusive
     /// by focus. This checks the one that has actually bitten: ⌘T, the new-tab key.
     @Test func newTabShortcutHasOneOwnerPerCapability() throws {
-        var files: [String] = []
-        for file in try swiftSources() {
-            let text = try String(contentsOf: file, encoding: .utf8)
-            guard text.contains(#"keyboardShortcut("t", modifiers: .command)"#) else { continue }
-            files.append(file.lastPathComponent)
-        }
+        // Any spelling: `.command`, `[.command]`, or none at all, which SwiftUI reads as ⌘. These
+        // matched one spelling until 2026-10-24, so `keyboardShortcut("t")` would have got past.
+        let files = try owners(of: "t", modifiers: ["command"])
         // The macOS workspace owns ⌘T; visionOS's platform commands own it on that platform. Two
         // files, never the same platform twice.
         #expect(files.sorted() == ["MacWorkspaceCommands.swift", "glas_shApp.swift"],
@@ -74,12 +71,7 @@ struct MenuBarPlacementTests {
     /// library's old Add Host — makes which one fires depend on menu order and focus, and one of
     /// them will be wrong.
     @Test func commandNHasASingleOwner() throws {
-        var files: [String] = []
-        for file in try swiftSources() {
-            let text = try String(contentsOf: file, encoding: .utf8)
-            guard text.contains(#"keyboardShortcut("n", modifiers: .command)"#) else { continue }
-            files.append(file.lastPathComponent)
-        }
+        let files = try owners(of: "n", modifiers: ["command"])
         #expect(files == ["GlassShellFileCommands.swift"],
                 "⌘N is declared in \(files.sorted()). It belongs to the shell's one File ▸ New item; a window says what it makes by publishing \\.glassNewItem.")
     }
@@ -93,12 +85,7 @@ struct MenuBarPlacementTests {
     /// ⌘W is registered with `GlassCloseCommandRouter` instead, which intercepts the Close item
     /// itself. Re-declaring the shortcut here would break it again, invisibly.
     @Test func nothingDeclaresCommandWInSwiftUI() throws {
-        var files: [String] = []
-        for file in try swiftSources() {
-            let text = try String(contentsOf: file, encoding: .utf8)
-            guard text.contains(#"keyboardShortcut("w", modifiers: .command)"#) else { continue }
-            files.append(file.lastPathComponent)
-        }
+        let files = try owners(of: "w", modifiers: ["command"])
         #expect(files.isEmpty,
                 "⌘W is declared in \(files.sorted()). AppKit's File ▸ Close owns that key equivalent; declaring it either takes the key off Close or is dropped outright, and either way ⌘W stops working somewhere. Register the action with glassCloseCommandTarget(priority:) instead.")
     }
@@ -125,6 +112,8 @@ struct MenuBarPlacementTests {
                 onTheMac.append(file.lastPathComponent)
             }
         }
+        // The files from any spelling; the platform check below reads the usual one.
+        files = try owners(of: "o", modifiers: ["command"])
         #expect(files.sorted() == ["GlassEditorScenes.swift", "GlassEditorWorkspaceView.swift"],
                 "⌘O is declared in \(files.sorted()). It opens files and folders; a capability's own Open belongs on a modified key.")
         #expect(onTheMac == ["GlassEditorScenes.swift"],
@@ -135,13 +124,7 @@ struct MenuBarPlacementTests {
     /// decides by what was chosen. A second open command asked the user to know in advance what the
     /// panel would decide anyway.
     @Test func optionCommandOIsNotDeclared() throws {
-        var files: [String] = []
-        for file in try swiftSources() {
-            let text = try String(contentsOf: file, encoding: .utf8)
-            guard text.contains(#"keyboardShortcut("o", modifiers: [.command, .option])"#)
-                    || text.contains(#"keyboardShortcut("o", modifiers: [.option, .command])"#) else { continue }
-            files.append(file.lastPathComponent)
-        }
+        let files = try owners(of: "o", modifiers: ["command", "option"])
         #expect(files.isEmpty, "⌥⌘O is declared in \(files.sorted()). Open… (⌘O) opens folders as projects.")
     }
 
@@ -166,6 +149,7 @@ struct MenuBarPlacementTests {
                 editorOnTheMac = declarations(of: marker, in: text).contains { !excludesTheMac($0) }
             }
         }
+        files = try owners(of: "s", modifiers: ["command"])
         #expect(files.sorted() == ["Constants.swift", "GlassEditorWorkspaceView.swift", "GlassShellFileCommands.swift",
                                    "SFTPRemoteEditorView.swift"],
                 "⌘S is declared in \(files.sorted()). On a Mac it belongs to the shell's File ▸ Save; a window says what it saves by publishing \\.glassSaveItem.")
@@ -175,12 +159,7 @@ struct MenuBarPlacementTests {
     /// ⇧⌘E is New Editor Window, alone. Explain Plan shared it, and read out of the running app
     /// (2026-09-25) the Query menu's item had simply lost its key; Explain Plan moved to ⌥⌘E.
     @Test func shiftCommandEHasASingleOwner() throws {
-        var files: [String] = []
-        for file in try swiftSources() {
-            let text = try String(contentsOf: file, encoding: .utf8)
-            guard text.contains(#"keyboardShortcut("e", modifiers: [.command, .shift])"#) else { continue }
-            files.append(file.lastPathComponent)
-        }
+        let files = try owners(of: "e", modifiers: ["command", "shift"])
         #expect(files == ["GlassEditorScenes.swift"],
                 "⇧⌘E is declared in \(files.sorted()). It opens a new editor window; give anything else its own key.")
     }
@@ -216,15 +195,16 @@ struct MenuBarPlacementTests {
     }
 
     /// Every window with a find bar says so; one that stops publishing makes ⌘F, ⌘G and ⇧⌘G grey.
+    /// The editor's never did, and this held the terminal as the only one (2026-10-22).
     @Test func eachWorkspacePublishesWhatFindSearches() throws {
         var publishers: Set<String> = []
         for file in try swiftSources() {
             let text = try String(contentsOf: file, encoding: .utf8)
-            if text.contains(#"\.glassFindItem, GlassFindItemAction("#) {
+            if text.contains(#"focusedSceneValue(\.glassFindItem"#) {
                 publishers.insert(file.lastPathComponent)
             }
         }
-        #expect(publishers == ["MacWorkspaceView.swift"],
+        #expect(publishers == ["GlassEditorWorkspaceView.swift", "MacWorkspaceView.swift"],
                 "The windows publishing \\.glassFindItem changed: \(publishers.sorted()).")
     }
 

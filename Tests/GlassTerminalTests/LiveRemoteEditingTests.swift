@@ -57,7 +57,7 @@ struct TrustThisRun: SSHHostTrustDecider {
     func decide(_ challenge: SSHHostTrustChallenge) async -> SSHHostTrustDecision { .trust(remember: false) }
 }
 
-@Suite("The editor against a real server (gated)", .serialized)
+@Suite("The editor against a real server (gated)", .serialized, .enabled(if: LiveRemoteEnvironment.isConfigured, "no test host: set GPT_SSH_TEST_HOST, GPT_SSH_TEST_USER and GPT_SSH_TEST_KEY_PATH or GPT_SSH_TEST_PASSWORD"))
 struct LiveRemoteEditingTests {
 
     /// A connected lister over a real SFTP session, plus a directory to work in.
@@ -156,7 +156,7 @@ struct LiveRemoteEditingTests {
     func readingAfterTheConnectionEnded() async throws {
         guard let first = try await connect() else { return }
         let opened = OpenedConnections()
-        let lister = GlassTerminalReconnectingLister(machine: "scratch", first: first.lister) {
+        let lister = GlassTerminalReconnectingLister(machine: "alpha", first: first.lister) {
             guard let context = try await self.connect() else { throw SFTPSessionError.closed }
             opened.append(context)
             return context.lister

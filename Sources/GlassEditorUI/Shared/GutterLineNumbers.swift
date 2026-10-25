@@ -116,6 +116,65 @@ public enum GutterLineNumbers {
             )
             text.draw(at: origin, withAttributes: attributes)
         }
+        drawChangeMarks(model.lineChanges, beside: visible, in: bounds, offsetY: offsetY, model: model)
+    }
+
+    /// The bars beside lines changed since the last commit, and a wedge where lines were removed,
+    /// in the gap between the numbers and the text. A bar runs from its first line's top to the
+    /// top of the line after its last, so it covers a wrapped line's every row.
+    static func drawChangeMarks(_ changes: [LineChange], beside visible: [Label], in bounds: CGRect,
+                                offsetY: CGFloat, model: GlassEditorModel) {
+        guard !changes.isEmpty, let first = visible.first?.number, let last = visible.last?.number,
+              let context = currentContext() else { return }
+        var frames: [Int: CGRect] = [:]
+        for label in visible { frames[label.number - 1] = label.frame }
+        let firstLine = first - 1, lastLine = last - 1
+        let right = bounds.width - EditorMetrics.changeMarkTrailingInset
+        let left = right - EditorMetrics.changeMarkWidth
+        context.saveGState()
+        defer { context.restoreGState() }
+        for change in changes {
+            let color = AttributedAssembly.changeMarkColor(change.kind, theme: model.theme,
+                                                           surface: model.surfaceCondition,
+                                                           configuration: model.configuration)
+            context.setFillColor(color.cgColor)
+            if change.lines.isEmpty {
+                // Removed from just above this line, or from the end when there is no line after.
+                let line = change.lines.lowerBound
+                let y: CGFloat
+                if let frame = frames[line] {
+                    y = frame.minY
+                } else if let frame = frames[line - 1] {
+                    y = frame.maxY
+                } else {
+                    continue
+                }
+                let middle = y - offsetY, reach: CGFloat = 4
+                context.beginPath()
+                context.move(to: CGPoint(x: left - 1, y: middle - reach))
+                context.addLine(to: CGPoint(x: right + 2, y: middle))
+                context.addLine(to: CGPoint(x: left - 1, y: middle + reach))
+                context.closePath()
+                context.fillPath()
+                continue
+            }
+            let from = max(change.lines.lowerBound, firstLine), through = min(change.lines.upperBound - 1, lastLine)
+            guard from <= through,
+                  let top = (from...through).lazy.compactMap({ frames[$0] }).first?.minY,
+                  let bottom = frames[through + 1]?.minY
+                    ?? (from...through).reversed().lazy.compactMap({ frames[$0] }).first?.maxY
+            else { continue }
+            context.fill(CGRect(x: left, y: top - offsetY, width: EditorMetrics.changeMarkWidth,
+                                height: max(1, bottom - top)))
+        }
+    }
+
+    private static func currentContext() -> CGContext? {
+        #if canImport(AppKit) && os(macOS)
+        NSGraphicsContext.current?.cgContext
+        #else
+        UIGraphicsGetCurrentContext()
+        #endif
     }
 
     /// Labels for the logical lines laid out in `verticalRange`.

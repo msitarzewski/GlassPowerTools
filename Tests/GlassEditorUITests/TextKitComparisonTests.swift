@@ -46,8 +46,10 @@ struct TextKitComparisonTests {
         window.close()
     }
 
-    @Test func compare() throws {
-        guard let path = ProcessInfo.processInfo.environment["GPT_LARGE_FILE"] else { return }
+    /// A measurement of the system's text systems, printed, not a check: set GPT_LARGE_FILE.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["GPT_LARGE_FILE"] != nil, "a timing probe: set GPT_LARGE_FILE"))
+    func compare() throws {
+        let path = try #require(ProcessInfo.processInfo.environment["GPT_LARGE_FILE"])
         let text = try String(contentsOfFile: path, encoding: .utf8)
         run("1 non-contiguous, wrapped", textKit1: true, wraps: true, text: text)
         run("2, wrapped", textKit1: false, wraps: true, text: text)

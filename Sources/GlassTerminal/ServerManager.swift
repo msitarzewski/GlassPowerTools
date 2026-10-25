@@ -73,6 +73,9 @@ struct ServerPersistenceStore {
     /// until the shell has read it from disk, and reading it early returns "no saved servers" —
     /// which the next write then makes true. See `GlassServiceStore.isCatalogLoaded`.
     var isReadable: () -> Bool = { true }
+    /// Saves only what changed between the list last read or written (the second argument) and the
+    /// new one, when the store can (the catalog). Nil: `save` writes the whole list.
+    var saveChanges: ((_ data: Data, _ base: Data) async throws -> Void)?
 
     /// D26: the catalog is the one store for a connection.
     ///
@@ -99,7 +102,8 @@ struct ServerPersistenceStore {
             hasStoredValue: { !records.isStoreEmpty },
             save: { try await records.replaceAll(with: decode($0)) },
             restore: { try await records.replaceAll(with: decode($0)) },
-            isReadable: { records.isCatalogLoaded }
+            isReadable: { records.isCatalogLoaded },
+            saveChanges: { try await records.replaceAll(with: decode($0), changedFrom: decode($1)) }
         )
     }
 
@@ -248,6 +252,10 @@ private enum HostTrustMigrationError: LocalizedError {
 @Observable
 class ServerManager {
     var servers: [ServerConfiguration] = []
+    /// The list as this device last read or wrote it: a save writes only what differs from it, so a
+    /// server this device merely still holds never goes back over a newer copy, and one another
+    /// device added since is not deleted (2026-10-22, the database's lost address).
+    private var persisted: [ServerConfiguration] = []
     private(set) var serverCatalogLoadError: ServerManagerError?
 
     static let currentHostTrustMigrationVersion = 1
@@ -426,6 +434,7 @@ class ServerManager {
             }
             try Self.validateServerCatalog(loadedServers)
             servers = loadedServers
+            persisted = loadedServers
             serverCatalogLoadError = nil
             do {
                 if defaults.data(forKey: Self.credentialDeletionJournalDefaultsKey) != nil,
@@ -1113,17 +1122,37 @@ class ServerManager {
         guard data.count <= Self.maximumServerCatalogBytes else {
             throw ServerManagerError.invalidServerCatalog
         }
-        try await store.save(data)
+        let base = persisted
+        // Taken as written before the write, so a rollback after a failure here starts from what
+        // may have reached the store and puts back whatever differs.
+        persisted = candidateServers
+        if let saveChanges = store.saveChanges {
+            try await saveChanges(data, try JSONEncoder().encode(base))
+        } else {
+            try await store.save(data)
+        }
         // Compared by identity rather than as an ordered list. The catalog keeps configurations in
         // a dictionary keyed by endpoint id, so it has no insertion order to give back, and two
-        // orderings of the same servers are the same catalog. What the check still guarantees is
-        // the part that matters: every server that went in came back, unchanged, and nothing else
-        // came back with it.
+        // orderings of the same servers are the same catalog.
         guard let persistedData = store.load(),
-              let persistedServers = try? JSONDecoder().decode([ServerConfiguration].self, from: persistedData),
-              Dictionary(persistedServers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-                == Dictionary(candidateServers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) else {
+              let persistedServers = try? JSONDecoder().decode([ServerConfiguration].self, from: persistedData) else {
             throw ServerManagerError.persistenceReadbackMismatch
+        }
+        let stored = Dictionary(persistedServers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let wanted = Dictionary(candidateServers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        if store.saveChanges != nil {
+            // Only what this save changed is this save's to check: a server another device edited
+            // or added since stays as that device left it.
+            let before = Dictionary(base.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let written = wanted.filter { before[$0.key] != $0.value }
+            let removed = before.keys.filter { wanted[$0] == nil }
+            guard written.allSatisfy({ stored[$0.key] == $0.value }), removed.allSatisfy({ stored[$0] == nil }) else {
+                throw ServerManagerError.persistenceReadbackMismatch
+            }
+        } else {
+            // A store of one value: every server that went in came back, unchanged, and nothing
+            // else came back with it.
+            guard stored == wanted else { throw ServerManagerError.persistenceReadbackMismatch }
         }
         defaults.set(SharedDefaults.currentSchemaVersion, forKey: SharedDefaults.schemaVersionKey)
     }

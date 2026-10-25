@@ -33,8 +33,8 @@ struct D26SetupSheetSaveTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: nil, resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
-        let runtime = GlassTerminalRuntime()
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         model.registry.register(GlassTerminalCapability(runtime: runtime))
         runtime.connectToLibrary(
             store: model,
@@ -110,8 +110,11 @@ struct D26SetupSheetSaveTests {
         #expect(runtime.sessionManager.serverManager.server(for: endpoint.rawValue) != nil)
     }
 
-    /// A draft that cannot commit must leave no half-made machine behind.
-    @Test func aFailedCommitLeavesNoLinkBehind() async throws {
+    /// A terminal draft that isn't valid saves nothing — no machine, no link. It is refused before
+    /// anything is made; a commit that fails after the link exists, and its rollback, is
+    /// `GlassShellSetupTests.failedServiceRollsBackTheNewHost`'s. (This was called "a failed commit
+    /// leaves no link behind" until 2026-10-24, which it never reached.)
+    @Test func anInvalidDraftSavesNothing() async throws {
         let (model, runtime, root) = try makeShell()
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
@@ -120,12 +123,12 @@ struct D26SetupSheetSaveTests {
         setup.name = "golf"
         setup.address = "192.0.2.6"
         let draft = try #require(setup.draft(for: .ssh) as? TerminalServiceDraft)
-        draft.username = ""          // required; the draft refuses to commit
+        draft.username = ""          // required
         draft.port = "not a port"
 
         let hostID = await setup.save()
 
-        #expect(hostID == nil, "a save that could not commit reported success")
+        #expect(hostID == nil, "an invalid draft reported success")
         #expect(model.catalogHosts.flatMap(\.services).isEmpty,
                 "a service link outlived the record it was made for")
     }

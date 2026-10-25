@@ -181,8 +181,15 @@ struct DatabaseTransportPlanTests {
     @Test("A service set to tunnel with no forward available fails saying so, and connects nowhere")
     func tunnelWithoutAProviderFailsHonestly() async {
         let manager = DatabaseSessionManager(loadImmediately: false)
-        await #expect(throws: (any Error).self) {
+        // This refusal and no other: any error at all passed until 2026-10-24, so a build that ignored
+        // the tunnel, dialled the host and failed to find it passed too, reaching the network to do it.
+        do {
             _ = try await manager.connect(config: config(tunnel: true), password: "", openForward: nil)
+            Issue.record("connected with no tunnel to connect through")
+        } catch DatabaseSessionManager.SessionError.invalidConfiguration(let message) {
+            #expect(message.contains("no Terminal service is available to tunnel through"), "\(message)")
+        } catch {
+            Issue.record("expected the tunnel's refusal, got \(error)")
         }
         // The failed attempt leaves no session behind.
         #expect(manager.sessions.isEmpty)
@@ -207,16 +214,13 @@ struct TransportVerificationSummaryTests {
         }
         #expect(Set(summaries).count == DatabaseTLSVerification.allCases.count,
                 "two modes reading the same is the bug this guards")
-        // The weaker mode says so in the words a user reads, not only in the picker.
+        // The weaker mode says so in the words a user reads, not only in the picker; the stronger one
+        // doesn't. ("checked" alone matched "not checked" too, until 2026-10-24.)
         #expect(config(tls: true, verification: .pinnedCertificateAuthorityOnly)
-            .transportVerificationSummary.contains("not checked"))
+            .transportVerificationSummary == "Supplied certificate, server name not checked")
         #expect(config(tls: true, verification: .pinnedCertificate)
-            .transportVerificationSummary.contains("checked"))
-    }
-
-    @Test("TLS off is stated plainly rather than implied by omission")
-    func tlsOffIsExplicit() {
-        #expect(config(tls: false, verification: .systemTrust)
-            .transportVerificationSummary == "Not encrypted")
+            .transportVerificationSummary == "Supplied certificate, server name checked")
+        #expect(config(tls: true, verification: .systemTrust)
+            .transportVerificationSummary == "System authorities, server name checked")
     }
 }

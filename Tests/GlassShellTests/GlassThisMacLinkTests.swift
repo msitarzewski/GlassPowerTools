@@ -54,7 +54,7 @@ struct GlassThisMacLinkTests {
         return GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                sharedContainerURL: root.appendingPathComponent("group"),
                                resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                               layers: GlassLayerStore(), registry: registry)
+                               layers: GlassLayerStore.forTest(), registry: registry)
     }
 
     /// This Mac, and alpha: a machine with a Terminal and a database.

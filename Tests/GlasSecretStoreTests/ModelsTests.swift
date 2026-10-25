@@ -40,28 +40,6 @@ struct SecretStoreErrorTests {
     }
 }
 
-// MARK: - SSHKeyMaterial
-
-@Suite("SSHKeyMaterial")
-struct SSHKeyMaterialTests {
-
-    @Test("Init with privateKey and passphrase")
-    func initWithPassphrase() {
-        let pk = SecureBytes(Data("private".utf8))
-        let pp = SecureBytes(Data("pass".utf8))
-        let material = SSHKeyMaterial(privateKey: pk, passphrase: pp)
-        #expect(material.privateKey.toUTF8String() == "private")
-        #expect(material.passphrase?.toUTF8String() == "pass")
-    }
-
-    @Test("Init with nil passphrase")
-    func initNilPassphrase() {
-        let pk = SecureBytes(Data("key".utf8))
-        let material = SSHKeyMaterial(privateKey: pk, passphrase: nil)
-        #expect(material.passphrase == nil)
-    }
-}
-
 // MARK: - SSHKeyAlgorithmKind
 
 @Suite("SSHKeyAlgorithmKind")

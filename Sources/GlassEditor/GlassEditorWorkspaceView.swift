@@ -54,6 +54,10 @@ public struct GlassEditorWorkspaceView: View {
     @State private var closeCandidate: GlassEditorDocument?
     @State private var isGoingToLine = false
     @State private var goToLineText = ""
+    /// The find field, and the last request to put the keyboard there that it has answered: the
+    /// bar comes back when another document is chosen, and must not take the keyboard then.
+    @FocusState private var findFieldIsFocused: Bool
+    @State private var answeredFindFocusRequest = 0
     @State private var filter = ""
     @State private var settingsProject: GlassEditorProject?
     @Environment(\.colorScheme) private var colorScheme
@@ -192,6 +196,7 @@ public struct GlassEditorWorkspaceView: View {
         .modifier(MacEditorWindowBehaviour(
             actions: editorActions,
             saveItem: saveItem,
+            findItem: findItem,
             canCloseDocument: workspace.selectedDocument != nil,
             documentCount: workspace.documents.count,
             hasProjects: !workspace.projects.isEmpty,
@@ -216,7 +221,7 @@ public struct GlassEditorWorkspaceView: View {
     /// where a new file lives is a reason to save on its own. Nothing to save is a viewer, or no
     /// document at all.
     private var saveItem: GlassSaveItemAction? {
-        guard let document = workspace.selectedDocument, document.viewer == nil else { return nil }
+        guard let document = workspace.selectedDocument, document.isText else { return nil }
         return GlassSaveItemAction(title: document.hasNeverBeenSaved ? "Save…" : "Save",
                                    isEnabled: document.hasNeverBeenSaved || document.isDirty) {
             saveSelected()
@@ -231,8 +236,20 @@ public struct GlassEditorWorkspaceView: View {
             increaseFontSize: { workspace.adjustFontSize(by: 1) },
             decreaseFontSize: { workspace.adjustFontSize(by: -1) },
             resetFontSize: { workspace.resetFontSize() },
-            find: { workspace.findIsPresented = true },
-            goToLine: { goToLineText = ""; isGoingToLine = true })
+            goToLine: { goToLineText = ""; isGoingToLine = true },
+            showChanges: workspace.projects.first.flatMap { workspace.repositories[$0.id] }?.isRepository == true
+                ? { workspace.showChanges() } : nil)
+    }
+
+    /// Edit ▸ Find in this window (`GlassShellFindCommands`): ⌘F, ⌘G and ⇧⌘G. The editor never
+    /// published it, so all three were disabled in an editor window and its find bar was on ⌥⌘F
+    /// in the Editor menu (2026-10-22: "Command F should always Find right?"). Nothing to search
+    /// in a viewer, or with no document.
+    private var findItem: GlassFindItemAction {
+        GlassFindItemAction(isEnabled: workspace.selectedDocument?.isText ?? false,
+                            find: { workspace.presentFind() },
+                            findNext: { workspace.findAgain() },
+                            findPrevious: { workspace.findAgain(reverse: true) })
     }
     #endif
 
@@ -430,7 +447,7 @@ public struct GlassEditorWorkspaceView: View {
         // A field, not a button. The connections list and the schema browser both filter their
         // list from a real search field (`GlassLibraryResults`, `SchemaBrowserView`); the editor
         // had a magnifying-glass button that toggled the find bar, which is a different act
-        // entirely and is still on ⌥⌘F and in the Text menu.
+        // entirely and is Edit ▸ Find (⌘F).
         // `.sidebar` placement, so it is a field standing in the list — the "Filter" field the
         // connections window shows. Left to itself the modifier collapses into a magnifying glass
         // in the toolbar at this window width, which is the button this was meant to replace.
@@ -479,6 +496,11 @@ public struct GlassEditorWorkspaceView: View {
                         settingsProject = project
                     }
                     .accessibilityIdentifier("editor-project-settings")
+                    // The branch, and how many files differ from its last commit: Changes, a press
+                    // away (2026-10-23). Only in a repository, where there is a branch to name.
+                    if let repository = workspace.repositories[project.id], repository.isRepository {
+                        GlassEditorBranchButton(repository: repository) { workspace.showChanges(of: project.id) }
+                    }
                     Spacer(minLength: 0)
                     Button("Refresh", systemImage: "arrow.clockwise") {
                         workspace.refreshProject(project.id)
@@ -574,7 +596,8 @@ public struct GlassEditorWorkspaceView: View {
                             GlassWorkspaceTabItem(id: document.id,
                                                   title: document.isDirty ? "\(document.displayName) •" : document.displayName,
                                                   symbolName: document.viewer?.kind.symbolName
-                                                      ?? symbolName(for: document.model.language),
+                                                      ?? (document.changesOfProject != nil ? "arrow.triangle.branch"
+                                                          : symbolName(for: document.model.language)),
                                                   isProvisional: workspace.isPreview(document.id),
                                                   help: document.locationDescription ?? document.displayName)
                         },
@@ -588,14 +611,18 @@ public struct GlassEditorWorkspaceView: View {
                         })
                     .overlay(alignment: .bottom) { Divider() }
                 }
-                if workspace.findIsPresented, document.viewer == nil { findBar(document) ; Divider() }
+                if workspace.findIsPresented, document.isText { findBar(document) ; Divider() }
                 // **Identity, or the text never changes.** The engine deliberately observes its
                 // model rather than being pushed values through `updateNSView`, so handing this
                 // view a *different* model does not reach the text view that is already on screen —
                 // it keeps rendering the first document opened. Seen in the running app with three
                 // files open and the first one still showing. One identity per document, so
                 // switching documents builds the engine that belongs to it.
-                if let viewer = document.viewer {
+                if let project = document.changesOfProject {
+                    // What git says changed since the last commit (2026-10-23).
+                    GlassEditorChangesView(workspace: workspace, projectID: project)
+                        .id(document.id)
+                } else if let viewer = document.viewer {
                     // Not text: the file as what it is (`GlassEditorViewerView`).
                     GlassEditorViewerView(viewer: viewer) {
                         Task { await workspace.openAsText(document) }
@@ -634,8 +661,8 @@ public struct GlassEditorWorkspaceView: View {
             // row of a `VStack` with no surface of its own, so the gutter's line numbers showed
             // through it. This is the family's bottom bar — the shape the workgroup detail uses.
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                // A viewer has no lines, encoding or language to report.
-                if document.viewer == nil {
+                // A viewer, or Changes, has no lines, encoding or language to report.
+                if document.isText {
                     VStack(spacing: 0) {
                         Divider()
                         statusBar(document)
@@ -683,7 +710,14 @@ public struct GlassEditorWorkspaceView: View {
         HStack(spacing: 8) {
             TextField("Find", text: $workspace.findQuery)
                 .textFieldStyle(.roundedBorder)
+                .focused($findFieldIsFocused)
                 .onSubmit { workspace.findNext() }
+                // ⌘F puts the keyboard here, the bar showing already or not; it opened without it.
+                .task(id: workspace.findFocusRequest) {
+                    guard workspace.findFocusRequest != answeredFindFocusRequest else { return }
+                    answeredFindFocusRequest = workspace.findFocusRequest
+                    findFieldIsFocused = true
+                }
                 .accessibilityIdentifier("editor-find-field")
             Button("Previous", systemImage: "chevron.up") { workspace.findNext(reverse: true) }
                 .labelStyle(.iconOnly)
@@ -723,6 +757,9 @@ public struct GlassEditorWorkspaceView: View {
             .buttonStyle(.plain)
             .help("Go to line")
             .glassBarItem()
+            // There whenever a text document is open, which UI tests wait for: Save, which they
+            // waited for, goes into the toolbar's overflow menu on an iPhone.
+            .accessibilityIdentifier("editor-position")
 
             Menu {
                 ForEach(LanguageID.allCases, id: \.self) { language in
@@ -889,8 +926,9 @@ public struct GlassEditorWorkspaceView: View {
         // close button either. The same actions the Mac's menu calls.
         if let document = workspace.selectedDocument {
             ToolbarItem(placement: .editorTrailing) {
-                Button("Find", systemImage: "magnifyingglass") { workspace.findIsPresented.toggle() }
-                    .disabled(document.viewer != nil)
+                // Shows the bar and puts the keyboard in it, as the Mac's ⌘F does; Done closes it.
+                Button("Find", systemImage: "magnifyingglass") { workspace.presentFind() }
+                    .disabled(!document.isText)
                     .keyboardShortcut("f", modifiers: .command)
                     .accessibilityIdentifier("editor-find")
             }
@@ -978,7 +1016,7 @@ public struct GlassEditorWorkspaceView: View {
               let line = Int(goToLineText.trimmingCharacters(in: .whitespaces)), line >= 1 else { return }
         let index = min(line - 1, max(0, document.model.lineCount - 1))
         let range = document.model.lineRange(ofLine: index)
-        document.model.selectedRange = range.lowerBound..<range.lowerBound
+        document.model.reveal(range.lowerBound..<range.lowerBound)
     }
 
     // MARK: Small descriptions
@@ -1252,10 +1290,14 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
                 guard state == .key else { return }
                 runtime?.noteFrontmost(windowID)
                 checkForOutsideChange(workspace.selection)
+                // What git says may have changed while the window was behind (2026-10-23).
+                workspace.refreshRepositories()
             }
             #else
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { checkForOutsideChange(workspace.selection) }
+                guard phase == .active else { return }
+                checkForOutsideChange(workspace.selection)
+                workspace.refreshRepositories()
             }
             #endif
             // B-X2: the file in front is looked at again as its window comes forward and as it is
@@ -1333,6 +1375,7 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
 private struct MacEditorWindowBehaviour: ViewModifier {
     let actions: GlassEditorActions
     let saveItem: GlassSaveItemAction?
+    let findItem: GlassFindItemAction
     let canCloseDocument: Bool
     let documentCount: Int
     let hasProjects: Bool
@@ -1449,6 +1492,7 @@ private struct MacEditorWindowBehaviour: ViewModifier {
             .background { GlassWindowCloseGate(shouldClose: windowShouldClose) }
             .focusedSceneValue(\.glassEditorActions, actions)
             .focusedSceneValue(\.glassSaveItem, saveItem)
+            .focusedSceneValue(\.glassFindItem, findItem)
             .frame(minWidth: 820, minHeight: 520)
             .background { GlassEditorWindowFrameMemory(holder: windowHolder) }
     }
@@ -1715,6 +1759,15 @@ private struct GlassEditorFileRow: View {
                 ProgressView()
                     .controlSize(.small)
                     .accessibilityLabel("Reading \(node.name)")
+            } else if !node.isDirectory, let change = workspace.gitChange(at: node.path) {
+                // How it differs from the last commit, as Zed and VS Code mark it (2026-10-23).
+                GlassEditorGitMark(change: change)
+            } else if node.isDirectory, workspace.folderHasGitChanges(node.path) {
+                Circle()
+                    .fill(.orange)
+                    .frame(width: 6, height: 6)
+                    .help("Has changed files")
+                    .accessibilityLabel("Has changed files")
             } else if let loadError = node.loadError {
                 Image(systemName: "exclamationmark.triangle")
                     .foregroundStyle(.orange)

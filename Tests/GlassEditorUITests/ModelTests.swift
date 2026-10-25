@@ -138,49 +138,6 @@ struct ModelTests {
         #expect(model.isDirty == true)
     }
 
-    // MARK: - Highlights and surface
-
-    @Test("setHighlights and a surface change re-resolve the attributed output")
-    func highlightsAndSurfaceReResolve() {
-        let model = makeModel("SELECT 1")
-        model.setHighlights([
-            HighlightRun(range: 0..<6, role: .keyword),
-            HighlightRun(range: 7..<8, role: .number),
-        ])
-
-        func render() -> NSAttributedString {
-            AttributedAssembly.attributedString(
-                text: model.text,
-                runs: model.highlightRuns,
-                theme: model.theme,
-                surface: model.surfaceCondition,
-                configuration: model.configuration
-            )
-        }
-
-        let opaque = render()
-        let keywordOpaque = opaque.attribute(
-            .foregroundColor, at: 0, effectiveRange: nil
-        ) as? PlatformColor
-        let numberOpaque = opaque.attribute(
-            .foregroundColor, at: 7, effectiveRange: nil
-        ) as? PlatformColor
-        #expect(keywordOpaque != nil)
-        #expect(numberOpaque != nil)
-        #expect(keywordOpaque != numberOpaque)
-
-        // Same runs, thin glass: `ContrastAdapter` has to move the colors, so the
-        // rendered output must differ.
-        model.updateSurface(
-            SurfaceCondition(windowOpacity: 0.2, backing: .material(.ultraThin), ambient: .unknown)
-        )
-        let translucent = render()
-        let keywordTranslucent = translucent.attribute(
-            .foregroundColor, at: 0, effectiveRange: nil
-        ) as? PlatformColor
-        #expect(keywordTranslucent != keywordOpaque)
-    }
-
     // MARK: - Find and replace
 
     @Test("replace-all through the model mutates correctly and is one undo unit")

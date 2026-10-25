@@ -450,6 +450,15 @@ struct TerminalConnectFlow: ViewModifier {
             #else
             openWindow(id: "terminal", value: workgroupID)
             #endif
+        case .reconnect(let sessionID):
+            guard let session = sessionManager.session(for: sessionID), session.connectsOnShow else { return }
+            Task {
+                do {
+                    try await sessionManager.reconnect(session, settingsManager: settingsManager)
+                } catch {
+                    connectionFailureMessage = error.localizedDescription
+                }
+            }
         }
     }
 

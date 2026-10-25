@@ -19,6 +19,9 @@ import VNCKit
 import GlassEditor
 import GlassEditorCore
 import GlassWidgetData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// The app; on a Mac, also the background process that keeps local terminals running
 /// (`MacTmuxHost`), which must start nothing of the app's, so it is chosen before SwiftUI is.
@@ -296,6 +299,12 @@ struct GlassPowerToolsApp: App {
                         }
                     )
                 }
+            } command: { command in
+                // `git` for the project, on the same connection (2026-10-23).
+                let output = try await lister.runCommand(command)
+                return GlassEditorCommandOutput(exitStatus: output.exitStatus,
+                                                standardOutput: output.standardOutput,
+                                                standardError: output.standardError)
             } onClose: {
                 await lister.close()
             }
@@ -339,7 +348,7 @@ struct GlassPowerToolsApp: App {
             if let host = model.host(owningEndpoint: endpoint) { model.connect(hostID: host.id, endpointID: endpoint) }
         }
         // The + menu's running terminals (2026-10-15): Active's list, and its refresh when old.
-        terminal.runningSessions = { [weak model] in model?.runningSessions ?? [] }
+        terminal.runningSessions = { [weak model] in model?.listedRunningSessions ?? [] }
         terminal.refreshRunningSessionsIfDue = { [weak model] in await model?.refreshRunningSessionsIfDue() }
         // The ⚡ in every toolbar means one thing — the library's Active panel — so all four
         // runtimes get the same closure.
@@ -388,6 +397,15 @@ struct GlassPowerToolsApp: App {
         }
         // Favorites beyond machines (2026-10-13): the editor's and the terminal's stars ask the
         // shell, and the shell asks here how a project, a workgroup or a folder is named and opened.
+        #if canImport(UIKit)
+        // The library is locked with the device: a read while it is locked (a headset taken off) is
+        // made again as it unlocks, never taken for a build without the App Group (2026-10-21).
+        model.protectedDataAvailable = { UIApplication.shared.isProtectedDataAvailable }
+        NotificationCenter.default.addObserver(forName: UIApplication.protectedDataDidBecomeAvailableNotification,
+                                               object: nil, queue: .main) { [weak model] _ in
+            Task { @MainActor in await model?.protectedDataBecameAvailable() }
+        }
+        #endif
         terminal.favorites = model.favoritesAccess
         editor.favorites = model.favoritesAccess
         model.describeFavorite = { [weak model] item in
@@ -437,8 +455,9 @@ struct GlassPowerToolsApp: App {
         terminal.openLocalInEditor = { urls in
             GlassWindowOpener.shared.perform { editor.show(editor.open(urls: urls), with: $0) }
         }
-        #if os(macOS)
-        // A path a Mac terminal printed, previewed over it as the editor previews files (2026-10-16).
+        #if os(macOS) || os(visionOS)
+        // A path a terminal printed, previewed over it as the editor previews files (2026-10-16; the
+        // headset 2026-10-22).
         terminal.filePreview = { url in AnyView(GlassEditorQuickPreview(url: url)) }
         #endif
         // A Mermaid diagram a terminal shows as text, drawn from the mark beside it (2026-10-21).
@@ -779,6 +798,13 @@ struct GlassPowerToolsApp: App {
         }
         .defaultSize(width: 1280, height: 800)
         .restorationBehavior(.disabled)
+        // All Windows around the person (2026-10-21): the same cards in an arc at arm's length, the
+        // room cleared of other apps, the passthrough kept (`GlassAllWindowsAround`).
+        ImmersiveSpace(id: GlassAllWindowsAround.spaceID) {
+            allWindowsAroundContent
+        }
+        .immersionStyle(selection: .constant(.mixed), in: .mixed)
+        .restorationBehavior(.disabled)
         #endif
     }
 
@@ -792,6 +818,22 @@ struct GlassPowerToolsApp: App {
                 GlassDesktopBootstrap(runtime: desktop) {
                     GlassEditorBootstrap(runtime: editor) {
                         GlassAllWindowsWindow(model: model)
+                    }
+                }
+            }
+        }
+        .glassLayers(layers)
+        .environment(model.registry)
+        .glassRegistersWindowOpener()
+    }
+
+    /// The arc inside every capability's bootstrap, as the window is, for the same reason.
+    private var allWindowsAroundContent: some View {
+        GlassTerminalBootstrap(runtime: terminal) {
+            GlassDatabaseBootstrap(runtime: database) {
+                GlassDesktopBootstrap(runtime: desktop) {
+                    GlassEditorBootstrap(runtime: editor) {
+                        GlassAllWindowsAroundView(model: model)
                     }
                 }
             }

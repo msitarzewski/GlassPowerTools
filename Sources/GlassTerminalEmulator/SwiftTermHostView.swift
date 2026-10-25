@@ -450,7 +450,7 @@ public final class SwiftTermHostModel: ObservableObject {
     public var revealPathTitle = "Show in Files"
     /// The file a printed path names, ready to show on this Mac — the file, or a copy fetched from
     /// the terminal's machine — for Quick Look over the terminal (`TerminalPreviewFile`); nil when
-    /// there is none to show. Set by the window for each of its panes; Mac only.
+    /// there is none to show. Set by the window for each of its panes, on the Mac and Vision Pro.
     public var previewFile: (@MainActor (String) async -> TerminalPreviewFile?)?
     /// What a file looks like in that preview: the editor's preview, from the composition root.
     public var previewContent: (@MainActor (URL) -> AnyView)?
@@ -686,6 +686,7 @@ public final class SwiftTermHostModel: ObservableObject {
     }
     #endif
 
+
     fileprivate func updateRendererDiagnostics(_ diagnostics: SwiftTermRendererDiagnostics) {
         publishRendererDiagnosticsIfChanged(diagnostics)
     }
@@ -695,6 +696,17 @@ public final class SwiftTermHostModel: ObservableObject {
     ) {
         guard rendererDiagnostics != diagnostics else { return }
         rendererDiagnostics = diagnostics
+    }
+
+    /// The terminal took the keyboard, or its window became the key one (the owner, 2026-10-22: "do
+    /// the focus claim"): a tmux session it shows is sized to it (`TmuxControlClient.claim`).
+    public var onTerminalFocused: (@MainActor () -> Void)?
+
+    /// The grid to show a tmux pane at (`TmuxControlAction.showGrid`, 2026-10-22): another client's
+    /// while it has the session's window — the same session on another device — so the program's
+    /// lines break where it broke them, the space past it dotted; the terminal's own again after.
+    public func showTmuxGrid(columns: Int, rows: Int, own: Bool) {
+        terminalEngine?.showTmuxGrid(columns: columns, rows: rows, own: own)
     }
 
     public func focus() {
@@ -713,6 +725,7 @@ public final class SwiftTermHostModel: ObservableObject {
                 guard self.allowsFocusOwnership,
                       let engine = self.terminalEngine else { return }
                 if engine.focusIfActive() {
+                    self.onTerminalFocused?()
                     return
                 }
                 try? await Task.sleep(for: .milliseconds(50))
@@ -1581,6 +1594,9 @@ private protocol TerminalEngine: AnyObject {
     /// Under Scale, the window resized by `factor`, or to the font's own size for nil.
     func zoomWindow(by factor: CGFloat?) -> Bool
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? { get set }
+    /// The grid to show a tmux pane at (`TmuxControlAction.showGrid`): another client's while it
+    /// has the window, the space past it dotted; the terminal's own frame either way.
+    func showTmuxGrid(columns: Int, rows: Int, own: Bool)
 }
 
 public enum SwiftTermHardwareKeyPolicy {
@@ -2224,6 +2240,32 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         installHoldToSelect()
         #endif
         onWindowAttachmentChanged?()
+        watchKeyWindow()
+    }
+
+    /// Holding the keyboard, or its window made the key one with it doing so: a tmux session it
+    /// shows is sized to it (`SwiftTermHostModel.onTerminalFocused`, 2026-10-22).
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { hostModel()?.onTerminalFocused?() }
+        return became
+    }
+
+    private weak var observedWindow: UIWindow?
+
+    private func watchKeyWindow() {
+        if let observedWindow {
+            NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeKeyNotification, object: observedWindow)
+        }
+        observedWindow = window
+        guard let window else { return }
+        NotificationCenter.default.addObserver(self, selector: #selector(windowBecameKey),
+                                               name: UIWindow.didBecomeKeyNotification, object: window)
+    }
+
+    @objc private func windowBecameKey() {
+        guard isFirstResponder else { return }
+        hostModel()?.onTerminalFocused?()
     }
 
     /// **While there is a selection, the program does not get the mouse** (the owner on the
@@ -2302,6 +2344,38 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     /// **As Apple's text does** (Apple Vision Pro User Guide: pinch and hold text and "the word you
     /// tap is highlighted"; pinch and drag either end of a selection to change it): a hold selects
     /// the word it lands on, and dragging while held grows the selection by words.
+    /// A printed path's file over the terminal (`VisionTerminalPathPreviewer`, 2026-10-22).
+    lazy var pathPreviewer = VisionTerminalPathPreviewer(view: self) { [weak self] in self?.hostModel() }
+
+    /// **A pointer resting on a path previews its file** — a trackpad's or a mouse's: the eyes
+    /// send an app nothing until they pinch.
+    private lazy var pointerHover: UIHoverGestureRecognizer = {
+        UIHoverGestureRecognizer(target: self, action: #selector(pointerHovered(_:)))
+    }()
+
+    @objc private func pointerHovered(_ gesture: UIHoverGestureRecognizer) {
+        switch gesture.state {
+        case .began, .changed:
+            let point = gesture.location(in: self)
+            let path: String? = bufferCell(at: point).flatMap { cell in
+                guard case .path(let path)? = TerminalLinkLookup.target(at: cell, in: getTerminal()) else { return nil }
+                return path
+            }
+            pathPreviewer.pointer(at: point, over: path)
+        default:
+            pathPreviewer.pointerLeft()
+        }
+    }
+
+    /// Where the held link's menu stands, for its Quick Look.
+    private var heldLinkPoint: CGPoint = .zero
+
+    /// Space with the pointer resting on a path, under Mouseover + Space: the preview, not a space.
+    /// A key command offered only then (`keyCommands`): SwiftTerm's own presses can't be overridden.
+    @objc fileprivate func previewSpacePressed() {
+        _ = pathPreviewer.spacePressed()
+    }
+
     private lazy var holdToSelect: UILongPressGestureRecognizer = {
         let recognizer = UILongPressGestureRecognizer(target: self, action: #selector(holdToSelectChanged(_:)))
         recognizer.minimumPressDuration = 0.4
@@ -2400,6 +2474,7 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         addGestureRecognizer(doublePinch)
         addGestureRecognizer(triplePinch)
         addGestureRecognizer(endDrag)
+        addGestureRecognizer(pointerHover)
         addGestureRecognizer(pointerDrag)
         addGestureRecognizer(secondaryClick)
         doublePinch.require(toFail: triplePinch)
@@ -2673,8 +2748,8 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         guard terminal.cols > 0, terminal.rows > 0 else { return }
         let size = getOptimalFrameSize()
         let width = size.width / CGFloat(terminal.cols), height = size.height / CGFloat(terminal.rows)
-        selectionMenu.presentEditMenu(with: UIEditMenuConfiguration(
-            identifier: nil, sourcePoint: CGPoint(x: (CGFloat(cell.col) + 0.5) * width, y: CGFloat(cell.row) * height)))
+        heldLinkPoint = CGPoint(x: (CGFloat(cell.col) + 0.5) * width, y: CGFloat(cell.row) * height)
+        selectionMenu.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: heldLinkPoint))
     }
 
     /// Within reach of a selection's end for a hold aimed by the eyes: SwiftTerm's own drag asks
@@ -2710,7 +2785,20 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     func editMenuInteraction(_ interaction: UIEditMenuInteraction, menuFor configuration: UIEditMenuConfiguration,
                              suggestedActions: [UIMenuElement]) -> UIMenu? {
         guard let heldLink else { return UIMenu(children: suggestedActions) }
-        return UIMenu(children: TerminalLinkLookup.menuElements(for: heldLink, model: hostModel()))
+        var elements = TerminalLinkLookup.menuElements(for: heldLink, model: hostModel())
+        // Quick Look first on a path, as on the Mac (2026-10-22): the file, over the terminal.
+        if case .path = heldLink {
+            let model = hostModel()
+            os.Logger(subsystem: "sh.glas", category: "path-preview").notice(
+                "event=menu model=\(model != nil, privacy: .public) file=\(model?.previewFile != nil, privacy: .public) content=\(model?.previewContent != nil, privacy: .public)")
+        }
+        if case .path(let path) = heldLink, pathPreviewer.canPreview {
+            let point = heldLinkPoint
+            elements.insert(UIAction(title: "Quick Look", image: UIImage(systemName: "eye")) { [weak self] _ in
+                Task { await self?.pathPreviewer.show(path: path, at: point, explicit: true) }
+            }, at: 0)
+        }
+        return UIMenu(children: elements)
     }
     #endif
 
@@ -2724,6 +2812,13 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             commands += Self.arrowCommands
             commands.append(Self.deleteCommand)
         }
+        #if os(visionOS)
+        if pathPreviewer.mode == .mouseoverAndSpace, pathPreviewer.pointerPath != nil {
+            let space = UIKeyCommand(input: " ", modifierFlags: [], action: #selector(previewSpacePressed))
+            space.wantsPriorityOverSystemBehavior = true
+            commands.append(space)
+        }
+        #endif
         return commands
     }
 
@@ -2834,6 +2929,28 @@ private final class TerminalHardwareKeyContainerView: UIView {
     func install(_ terminalView: ReviewingTerminalView) {
         self.terminalView = terminalView
         scaler.addSubview(terminalView)
+        scaler.addSubview(unusedArea)
+    }
+
+    /// The space past a tmux pane shown at another client's size, dotted (`TmuxUnusedAreaView`).
+    private let unusedArea = TmuxUnusedAreaView()
+    /// The pane's grid while it is another client's size; nil while it is the terminal's own.
+    private var tmuxGrid: (columns: Int, rows: Int)?
+
+    func markTmuxGrid(_ grid: (columns: Int, rows: Int)?) {
+        tmuxGrid = grid
+        placeUnusedArea()
+    }
+
+    private func placeUnusedArea() {
+        guard let terminalView else { return }
+        unusedArea.frame = terminalView.frame
+        guard let grid = tmuxGrid, let cell = terminalView.cellSize else {
+            unusedArea.used = nil
+            return
+        }
+        unusedArea.cell = cell
+        unusedArea.used = CGSize(width: CGFloat(grid.columns) * cell.width, height: CGFloat(grid.rows) * cell.height)
     }
 
     func setScaling(_ enabled: Bool) {
@@ -2852,6 +2969,7 @@ private final class TerminalHardwareKeyContainerView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let terminalView else { return }
+        defer { placeUnusedArea() }
         if wantsScaling, kept == nil, terminalView.window != nil, bounds.width > 0, bounds.height > 0 {
             // Laid out as Resize lays it out first, so the grid taken is the window's own.
             fill(terminalView)
@@ -2928,6 +3046,7 @@ private final class TerminalHardwareKeyContainerView: UIView {
     private var raisedGeneration = 0
     #endif
 
+
     /// Resize: the terminal fills the container, unscaled.
     private func fill(_ terminalView: ReviewingTerminalView) {
         let wasScaled = !scaler.transform.isIdentity
@@ -2982,6 +3101,19 @@ private final class TerminalHardwareKeyContainerView: UIView {
         guard ProcessInfo.processInfo.arguments.contains("--ui-testing") else { return }
         let renderer = terminalView.isUsingMetalRenderer ? "metal" : "coreGraphics"
         accessibilityIdentifier = "terminal-drawing-\(renderer)-\(terminalView.contentScaleFactor)"
+    }
+    #endif
+
+    #if DEBUG && os(visionOS)
+    /// UI tests only: the grid SwiftTerm reports, as `terminal-grid-<columns>x<rows>` on the terminal's
+    /// container, for checking that showing the sidebar leaves the terminal's rows and columns alone.
+    /// Marked as SwiftTerm reports it: it re-grids after the container's layout, so a mark made there
+    /// is the grid before.
+    static func markGridForUITests(_ terminalView: UIView, columns: Int, rows: Int) {
+        guard ProcessInfo.processInfo.arguments.contains("--ui-testing") else { return }
+        var view = terminalView.superview
+        while let candidate = view, !(candidate is TerminalHardwareKeyContainerView) { view = candidate.superview }
+        view?.accessibilityIdentifier = "terminal-grid-\(columns)x\(rows)"
     }
     #endif
 
@@ -3202,6 +3334,16 @@ private final class SwiftTermEngine: TerminalEngine {
     }
 
     func zoomWindow(by factor: CGFloat?) -> Bool { containerView.zoomWindow(by: factor) }
+    func showTmuxGrid(columns: Int, rows: Int, own: Bool) {
+        // The grid alone: SwiftTerm fits it to its frame again only when the frame changes, and its
+        // own size goes on to tmux then.
+        let terminal = terminalView.getTerminal()
+        if terminal.cols != columns || terminal.rows != rows {
+            terminal.resize(cols: columns, rows: rows)
+            terminalView.setNeedsDisplay()
+        }
+        containerView.markTmuxGrid(own ? nil : (columns, rows))
+    }
     var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
     var keptGrid: SwiftTermScaledGrid? { containerView.kept }
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
@@ -3535,6 +3677,9 @@ private final class SwiftTermEngine: TerminalEngine {
         terminal.setCursorStyle(cursorStyle)
         terminal.changeScrollback(settings.scrollbackLines)
         terminalView.optionAsMetaKey = settings.optionAsMetaKey
+        #if os(visionOS)
+        terminalView.pathPreviewer.mode = settings.pathPreviews
+        #endif
     }
 }
 
@@ -3814,6 +3959,12 @@ public struct SwiftTermHostView: UIViewRepresentable {
         }
 
         public func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+            #if DEBUG && os(visionOS)
+            TerminalHardwareKeyContainerView.markGridForUITests(source, columns: newCols, rows: newRows)
+            #endif
+            // What VoiceOver reads is the lines on screen, and a new grid breaks them differently:
+            // it kept the old size's lines until the next output (a larger text size, a rotation).
+            model?.retainedRenderer()?.refreshAccessibilityViewport()
             // Under Scale (D75) the host hears only the kept grid.
             if let kept = model?.keptGrid, !kept.keeps(columns: newCols, rows: newRows) { return }
             onResize(newCols, newRows)
@@ -3912,6 +4063,9 @@ private protocol TerminalEngine: AnyObject {
     /// Under Scale, the window resized by `factor`, or to the font's own size for nil.
     func zoomWindow(by factor: CGFloat?) -> Bool
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? { get set }
+    /// The grid to show a tmux pane at (`TmuxControlAction.showGrid`): another client's while it
+    /// has the window, the space past it dotted; the terminal's own frame either way.
+    func showTmuxGrid(columns: Int, rows: Int, own: Bool)
 }
 
 @MainActor
@@ -4028,6 +4182,27 @@ private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHo
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         onWindowAttachmentChanged?()
+        watchKeyWindow()
+    }
+
+    /// Its window made the key one with this terminal holding the keyboard: a tmux session it shows
+    /// is sized to it (`SwiftTermHostModel.onTerminalFocused`). SwiftTerm's own first-responder
+    /// changes can't be overridden here; a pane's focus comes through the model's `focus`.
+    private weak var observedWindow: NSWindow?
+
+    private func watchKeyWindow() {
+        if let observedWindow {
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: observedWindow)
+        }
+        observedWindow = window
+        guard let window else { return }
+        NotificationCenter.default.addObserver(self, selector: #selector(windowBecameKey),
+                                               name: NSWindow.didBecomeKeyNotification, object: window)
+    }
+
+    @objc private func windowBecameKey() {
+        guard window?.firstResponder === self else { return }
+        hostModelProvider()?.onTerminalFocused?()
     }
 
     override func paste(_ sender: Any) {
@@ -4119,6 +4294,16 @@ private final class MacSwiftTermEngine: TerminalEngine {
     private lazy var scaleView = MacTerminalScaleView(terminalView: terminalView)
     func setScaling(_ enabled: Bool) { scaleView.setScaling(enabled) }
     func zoomWindow(by factor: CGFloat?) -> Bool { scaleView.zoomWindow(by: factor) }
+    func showTmuxGrid(columns: Int, rows: Int, own: Bool) {
+        // The grid alone: SwiftTerm fits it to its frame again only when the frame changes, and its
+        // own size goes on to tmux then.
+        let terminal = terminalView.getTerminal()
+        if terminal.cols != columns || terminal.rows != rows {
+            terminal.resize(cols: columns, rows: rows)
+            terminalView.needsDisplay = true
+        }
+        scaleView.markTmuxGrid(own ? nil : (columns, rows))
+    }
     var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
     var keptGrid: SwiftTermScaledGrid? { scaleView.kept }
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
@@ -4459,6 +4644,8 @@ public struct SwiftTermHostView: NSViewRepresentable {
         }
 
         public func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+            // VoiceOver's lines follow the new grid (see the other coordinator's).
+            model?.retainedRenderer()?.refreshAccessibilityViewport()
             // Under Scale (D75) the host hears only the kept grid.
             if let kept = model?.keptGrid, !kept.keeps(columns: newCols, rows: newRows) { return }
             onResize(newCols, newRows)
@@ -4757,6 +4944,27 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         onWindowAttachmentChanged?()
+        watchKeyWindow()
+    }
+
+    /// Its window made the key one with this terminal holding the keyboard: a tmux session it shows
+    /// is sized to it (`SwiftTermHostModel.onTerminalFocused`). SwiftTerm's own first-responder
+    /// changes can't be overridden here; a pane's focus comes through the model's `focus`.
+    private weak var observedWindow: NSWindow?
+
+    private func watchKeyWindow() {
+        if let observedWindow {
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: observedWindow)
+        }
+        observedWindow = window
+        guard let window else { return }
+        NotificationCenter.default.addObserver(self, selector: #selector(windowBecameKey),
+                                               name: NSWindow.didBecomeKeyNotification, object: window)
+    }
+
+    @objc private func windowBecameKey() {
+        guard window?.firstResponder === self else { return }
+        hostModelProvider()?.onTerminalFocused?()
     }
 
     override func paste(_ sender: Any) {
@@ -4806,7 +5014,7 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
                 onProcessOutput?(ArraySlice(bytes), start.duration(to: clock.now))
             case .transport(let bytes):
                 writeToTmux(bytes)
-            case .live, .exited:
+            case .live, .exited, .showGrid:
                 onTmuxControlEvent?(action)
             }
         }
@@ -4819,7 +5027,13 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
         guard tmuxControl != nil else { return }
         let terminal = getTerminal()
         if let actions = tmuxControl?.resize(columns: terminal.cols, rows: terminal.rows) {
-            for case .transport(let bytes) in actions { writeToTmux(bytes) }
+            for action in actions {
+                switch action {
+                case .transport(let bytes): writeToTmux(bytes)
+                case .showGrid: onTmuxControlEvent?(action)
+                default: break
+                }
+            }
         }
     }
 
@@ -5113,6 +5327,16 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     private lazy var scaleView = MacTerminalScaleView(terminalView: terminalView)
     func setScaling(_ enabled: Bool) { scaleView.setScaling(enabled) }
     func zoomWindow(by factor: CGFloat?) -> Bool { scaleView.zoomWindow(by: factor) }
+    func showTmuxGrid(columns: Int, rows: Int, own: Bool) {
+        // The grid alone: SwiftTerm fits it to its frame again only when the frame changes, and its
+        // own size goes on to tmux then.
+        let terminal = terminalView.getTerminal()
+        if terminal.cols != columns || terminal.rows != rows {
+            terminal.resize(cols: columns, rows: rows)
+            terminalView.needsDisplay = true
+        }
+        scaleView.markTmuxGrid(own ? nil : (columns, rows))
+    }
     var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
     var keptGrid: SwiftTermScaledGrid? { scaleView.kept }
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
@@ -5224,9 +5448,21 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         terminalView.tmuxControl = TmuxControlClient(columns: terminal.cols, rows: terminal.rows, overPipe: true)
         terminalView.tmuxWriter = { [weak pipe] data in pipe?.write(data) }
         terminalView.onTmuxControlEvent = { [weak self] action in
-            guard case .exited = action else { return }
-            self?.delegateProxy.hostModel?.isTmuxControlClient = false
+            switch action {
+            case .exited:
+                self?.delegateProxy.hostModel?.isTmuxControlClient = false
+                // Its own size again, whatever another client had.
+                if let terminal = self?.terminalView.getTerminal() {
+                    self?.showTmuxGrid(columns: terminal.cols, rows: terminal.rows, own: true)
+                }
+            case .showGrid(let columns, let rows, let own):
+                self?.showTmuxGrid(columns: columns, rows: rows, own: own)
+            default:
+                break
+            }
         }
+        // In front on this Mac while the headset has the session's size: this pane takes it.
+        delegateProxy.hostModel?.onTerminalFocused = { [weak self] in self?.claimTmuxWindow() }
         pipe.onOutput = { [weak self] data in self?.terminalView.receiveTmuxBytes(data) }
         pipe.onExit = { [weak self] status in self?.controlPipeExited(status: status) }
         controlPipe = pipe
@@ -5275,11 +5511,18 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         if terminalView.tmuxControl != nil, terminalView.isFeedingControlOutput { return }
         recordInput(byteCount: bytes.count)
         emitBounded(Data(bytes), to: onInputData)
+        claimTmuxWindow()
         if let actions = terminalView.tmuxControl?.input(Data(bytes)) {
             sendToTmux(actions)
         } else {
             terminalView.send(source: terminalView, data: bytes)
         }
+    }
+
+    /// tmux's window for this pane's session, sized to this pane when another client has it
+    /// (`TmuxControlClient.claim`).
+    private func claimTmuxWindow() {
+        if let actions = terminalView.tmuxControl?.claim() { sendToTmux(actions) }
     }
 
     /// What the control-mode client has for tmux, written to the PTY tmux runs on.

@@ -47,8 +47,9 @@ final class TmuxControlPipe {
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
-        // None of the app's descriptors: a tmux server this starts keeps what its first client had.
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+        // None of the app's descriptors, nor its thread's blocked signals: a tmux server this starts
+        // keeps what its first client had, and so does every pane it starts (`GlassSpawn`).
+        GlassSpawn.prepare(&attributes)
         let argv = ([executable] + arguments).map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
         let envp = (environment ?? ProcessInfo.processInfo.environment.map { "\($0.key)=\($0.value)" }).map { strdup($0) } + [nil]

@@ -34,7 +34,7 @@ struct GlassShellPaletteConnectionsTests {
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
                                     resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                    layers: GlassLayerStore(), registry: registry)
+                                    layers: GlassLayerStore.forTest(), registry: registry)
         let services = [
             HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha"),
             HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on alpha"),
@@ -62,7 +62,7 @@ struct GlassShellPaletteConnectionsTests {
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
                                     resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                    layers: GlassLayerStore(), registry: registry)
+                                    layers: GlassLayerStore.forTest(), registry: registry)
         let store = HostCatalogStore(fileURL: root.appendingPathComponent("group/GlassHostCatalog/hosts.json"))
         try await store.upsert(try HostProfile(displayName: "bravo", services: [
             HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo"),
@@ -91,7 +91,7 @@ struct GlassShellPaletteConnectionsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"), sharedContainerURL: nil,
                                     resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                    layers: GlassLayerStore())
+                                    layers: GlassLayerStore.forTest())
         await model.load()
         let project = UUID(), gone = UUID()
         let logs = GlassFavorite.folder(endpoint: EndpointID(), path: "/var/log")

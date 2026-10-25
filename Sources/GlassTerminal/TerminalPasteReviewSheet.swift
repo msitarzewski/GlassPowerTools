@@ -86,7 +86,12 @@ struct TerminalPasteReviewSheet: View {
                 }
             }
         }
+        // A Mac sheet's minimum. On an iPhone it made the sheet 560 points wide on a 402-point
+        // screen, clipped on both sides with Cancel, Paste and the switch off its edges (found by
+        // TerminalPasteUITests, 2026-10-24); a phone or iPad sheet takes the size it is given.
+        #if os(macOS)
         .frame(minWidth: 560, minHeight: 420)
+        #endif
         .interactiveDismissDisabled()
         .onAppear {
             guard let repair, settingsManager.joinsWrappedPastes else { return }

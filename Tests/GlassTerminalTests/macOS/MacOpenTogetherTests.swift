@@ -27,7 +27,7 @@ struct MacOpenTogetherTests {
 
     @Test("three running sessions on two machines open as one window: three tabs, the right sessions and machines, in order")
     func threeOnTwoMachines() throws {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let alpha = server("alpha"), bravo = server("bravo")
         runtime.sessionManager.serverManager.servers = [alpha, bravo]

@@ -73,7 +73,10 @@ struct SecurityReviewFixTests {
             return out
         }
         #expect(errors.count == 3)
-        #expect(!errors.contains("transport:connectionFailed"), "no caller is rejected merely for arriving during an in-flight connect")
+        // Every caller gets the one attempt's own outcome, so none was turned away for arriving while
+        // it was under way. (It looked for one error, which `connect` no longer gives for that.)
+        #expect(Set(errors).count == 1, "the callers were answered differently: \(errors)")
+        #expect(!errors.contains("connected"), "the port refuses: \(errors)")
         #expect(!(await transport.isConnected))
     }
 

@@ -54,7 +54,7 @@ struct TerminalWithoutTmuxTests {
         #expect(GlassTerminalRuntime.machineTitle(serverName: "Terminal on alpha", hostName: nil) == "alpha",
                 "no catalog: the default prefix a host sheet gives it comes off")
         #expect(GlassTerminalRuntime.machineTitle(serverName: "bravo", hostName: "  ") == "bravo")
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         var server = ServerConfiguration(name: "Terminal on alpha", host: "alpha.example.com", username: "ann")
         runtime.hostName = { $0 == server.id ? "Alpha Lab" : nil }
         #expect(runtime.machineTitle(of: server) == "Alpha Lab",
@@ -72,7 +72,7 @@ struct TerminalWithoutTmuxTests {
 
     @Test("Connect without tmux and a plain local terminal reach the connect flow as asked")
     func requests() {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let serverID = UUID()
         runtime.requestConnect(serverID: serverID, withoutTmux: true)
         runtime.requestConnect(serverID: serverID)

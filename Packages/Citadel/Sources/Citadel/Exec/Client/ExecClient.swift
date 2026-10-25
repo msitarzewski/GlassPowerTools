@@ -210,3 +210,162 @@ extension SSHClient {
         }
     }
 }
+
+/// What a command said and how it ended: `executeCommandCollecting`'s answer (Glass Power Tools F12).
+public struct ExecCommandResult: Sendable {
+    /// The command's exit status; nil when the server closed the channel without sending one.
+    public let exitStatus: Int?
+    public let standardOutput: ByteBuffer
+    public let standardError: ByteBuffer
+}
+
+/// Keeps standard output and standard error apart, with the exit status, rather than failing on
+/// the first byte of standard error as `TTYHandler` does: a command that warns and succeeds still
+/// succeeded. Bounded as `TTYHandler` is, both streams counting toward the limit.
+final class CollectingExecHandler: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = SSHChannelData
+
+    let maxResponseSize: Int
+    private let promise: EventLoopPromise<ExecCommandResult>
+    private let completed = NIOLockedValueBox(false)
+    private var standardOutput = ByteBuffer()
+    private var standardError = ByteBuffer()
+    private var exitStatus: Int?
+    private var receivedByteCount = 0
+    private var isIgnoringInput = false
+
+    init(maxResponseSize: Int, promise: EventLoopPromise<ExecCommandResult>) {
+        self.maxResponseSize = max(0, maxResponseSize)
+        self.promise = promise
+    }
+
+    func fail(_ error: Error) {
+        guard completed.withLockedValue({ completed in
+            guard !completed else { return false }
+            completed = true
+            return true
+        }) else { return }
+        promise.fail(error)
+    }
+
+    private func succeed() {
+        guard completed.withLockedValue({ completed in
+            guard !completed else { return false }
+            completed = true
+            return true
+        }) else { return }
+        promise.succeed(ExecCommandResult(exitStatus: exitStatus,
+                                          standardOutput: standardOutput,
+                                          standardError: standardError))
+    }
+
+    func handlerAdded(context: ChannelHandlerContext) {
+        let channel = context.channel
+        channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
+            channel.pipeline.fireErrorCaught(error)
+        }
+    }
+
+    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        switch event {
+        case let status as SSHChannelRequestEvent.ExitStatus:
+            exitStatus = status.exitStatus
+        default:
+            context.fireUserInboundEventTriggered(event)
+        }
+    }
+
+    // The exit status arrives after the output and before the channel closes.
+    func handlerRemoved(context: ChannelHandlerContext) {
+        succeed()
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let data = self.unwrapInboundIn(data)
+        guard case .byteBuffer(var bytes) = data.data, !isIgnoringInput else { return }
+        switch data.type {
+        case .channel, .stdErr:
+            guard bytes.readableBytes <= maxResponseSize - receivedByteCount else {
+                isIgnoringInput = true
+                fail(CitadelError.commandOutputTooLarge)
+                context.close(promise: nil)
+                return
+            }
+            receivedByteCount += bytes.readableBytes
+            if data.type == .channel {
+                standardOutput.writeBuffer(&bytes)
+            } else {
+                standardError.writeBuffer(&bytes)
+            }
+        default:
+            ()
+        }
+    }
+
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        fail(error)
+        context.close(promise: nil)
+    }
+}
+
+extension SSHClient {
+    /// Runs a command and answers with its exit status, standard output and standard error, kept
+    /// apart (Glass Power Tools F12). Unlike `executeCommand`, a non-zero status or output on
+    /// standard error is an answer rather than an error, so the caller can say what the command
+    /// said. The limits are `executeCommand`'s: the channel must open within 15 seconds, the
+    /// command must end within `executionTimeout`, both streams together stay under
+    /// `maxResponseSize`, and cancelling the task closes the channel.
+    public func executeCommandCollecting(
+        _ command: String,
+        maxResponseSize: Int = .max,
+        executionTimeout: TimeAmount = .seconds(3_600)
+    ) async throws -> ExecCommandResult {
+        let promise = eventLoop.makePromise(of: ExecCommandResult.self)
+        let handler = CollectingExecHandler(maxResponseSize: maxResponseSize, promise: promise)
+
+        let channel: Channel
+        do {
+            channel = try await eventLoop.flatSubmit { [eventLoop, sshHandler = session.sshHandler] in
+                let createChannel = eventLoop.makePromise(of: Channel.self)
+                sshHandler.value.createChannel(createChannel) { channel, _ in
+                    do {
+                        try channel.pipeline.syncOperations.addHandler(handler)
+                        return channel.eventLoop.makeSucceededVoidFuture()
+                    } catch {
+                        return channel.eventLoop.makeFailedFuture(error)
+                    }
+                }
+                let creationTimeout = eventLoop.scheduleTask(in: .seconds(15)) {
+                    createChannel.fail(CitadelError.channelCreationFailed)
+                }
+                createChannel.futureResult.whenComplete { _ in creationTimeout.cancel() }
+                return createChannel.futureResult
+            }.get()
+        } catch {
+            handler.fail(error)
+            throw error
+        }
+
+        let executionTimeoutTask = channel.eventLoop.scheduleTask(in: executionTimeout) {
+            handler.fail(CitadelError.commandExecutionTimedOut)
+            channel.close(promise: nil)
+        }
+        defer { executionTimeoutTask.cancel() }
+
+        let execRequest = SSHChannelRequestEvent.ExecRequest(command: command, wantReply: true)
+        return try await withTaskCancellationHandler {
+            try await eventLoop.flatSubmit {
+                channel.triggerUserOutboundEvent(execRequest).whenFailure { [channel] error in
+                    handler.fail(error)
+                    channel.close(promise: nil)
+                }
+                return promise.futureResult
+            }.get()
+        } onCancel: {
+            channel.eventLoop.execute {
+                handler.fail(CancellationError())
+                channel.close(promise: nil)
+            }
+        }
+    }
+}

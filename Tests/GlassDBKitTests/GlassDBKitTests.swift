@@ -466,6 +466,42 @@ import Testing
         try await connection.close()
     }
 
+    /// 2026-10-24, found by the test audit: `sqlite3_interrupt` reaches only a statement already
+    /// running. A Cancel or a timeout that came while a query waited its turn behind another, or was
+    /// being prepared, was lost, and the query ran to its end — here, a billion rows.
+    @Test("Cancel reaches a query still waiting its turn, and a timeout one that hasn't started",
+          .timeLimit(.minutes(1)))
+    func cancelAndTimeoutReachAQueryNotYetRunning() async throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("glassdb-sqlite-\(UUID().uuidString).sqlite").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let connection = try #require(try await SQLiteEngine().connect(path: path) as? SQLiteDatabaseConnection)
+        defer { Task { try? await connection.close() } }
+        let billion = """
+            WITH RECURSIVE counter(value) AS (
+                VALUES(0) UNION ALL SELECT value + 1 FROM counter WHERE value < 1000000000
+            ) SELECT sum(value) FROM counter
+            """
+
+        let running = Task { try await connection.execute(billion) }
+        while connection.queriesInFlight < 1 { await Task.yield() }
+        let waiting = Task { try await connection.execute(billion) }
+        while connection.queriesInFlight < 2 { await Task.yield() }
+        try await connection.cancelCurrentQuery()
+        await #expect(throws: CancellationError.self) { try await running.value }
+        await #expect(throws: CancellationError.self, "the one waiting its turn") { try await waiting.value }
+
+        // A timeout that passes before the query has its turn.
+        let holding = Task { try await connection.execute(billion) }
+        while connection.queriesInFlight < 1 { await Task.yield() }
+        let timed = Task { try await connection.execute(billion, parameters: [], timeout: .milliseconds(1)) }
+        while connection.queriesInFlight < 2 { await Task.yield() }
+        try await Task.sleep(for: .milliseconds(20))
+        holding.cancel()
+        _ = try? await holding.value
+        await #expect(throws: DatabaseError.self, "timed out before it ran") { try await timed.value }
+    }
+
     @Test func realFileRoundTripMetadataTransactionsTimeoutAndCancellation() async throws {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("glassdb-sqlite-\(UUID().uuidString).sqlite")
@@ -627,7 +663,11 @@ private enum LiveDatabaseEnvironment {
         } else {
             port = 13_306
         }
-        let username = environment["GPT_DB_TEST_MYSQL_PASSWORDLESS_USER"] ?? "root"
+        // A test user made for this, never root: root is not a credential the tests use, and the
+        // old default reached root on whatever MySQL listened on this Mac's 13306.
+        let username = try #require(environment["GPT_DB_TEST_MYSQL_PASSWORDLESS_USER"],
+                                    "set GPT_DB_TEST_MYSQL_PASSWORDLESS_USER to a passwordless test user")
+        try #require(username != "root", "not root: a passwordless test user made for this")
         let engine = MySQLEngine()
         let connection = try await engine.connect(
             host: host,

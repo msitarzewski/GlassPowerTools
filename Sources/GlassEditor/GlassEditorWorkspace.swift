@@ -379,6 +379,7 @@ public final class GlassEditorWorkspace {
                 previewModes[document.id] = .previewOnly
             }
             if machine != nil { documentAccess[document.id] = access }
+            updateLineMarkers()
             selection = document.id
             // Recents are this device's list of files it can reopen. A file on another machine is
             // reopened through its project, so putting it here would offer a path that resolves to
@@ -411,7 +412,7 @@ public final class GlassEditorWorkspace {
 
     /// The preview a document offers, if any. Viewers offer none: they already are the picture.
     public func previewKind(for document: GlassEditorDocument) -> GlassEditorPreviewKind? {
-        guard document.viewer == nil else { return nil }
+        guard document.isText else { return nil }
         return GlassEditorPreviewKind.kind(language: document.model.language, fileName: document.url?.lastPathComponent)
     }
 
@@ -491,12 +492,14 @@ public final class GlassEditorWorkspace {
     public func close(_ id: GlassEditorDocument.ID, force: Bool = false) -> Bool {
         guard let index = documents.firstIndex(where: { $0.id == id }) else { return true }
         if documents[index].isDirty, !force { return false }
+        if let project = documents[index].changesOfProject { repositories[project]?.showsDiffs = false }
         documentAccess[id] = nil
         seenOnReturn[id] = nil
         previewModes[id] = nil
         if let scoped = securityScopedURLs.removeValue(forKey: id) { securityScope.stop(scoped) }
         if previewDocumentID == id { previewDocumentID = nil }
         documents.remove(at: index)
+        updateLineMarkers()
         if selection == id {
             // The neighbour, not the first: closing a tab should leave you where you were looking.
             selection = documents.indices.contains(index) ? documents[index].id : documents.last?.id
@@ -578,7 +581,7 @@ public final class GlassEditorWorkspace {
     public func checkForOutsideChange(_ id: GlassEditorDocument.ID) async {
         guard pendingConflict == nil, !writing.contains(id),
               let document = documents.first(where: { $0.id == id }),
-              document.viewer == nil, let baseline = document.session, let path = document.path
+              document.isText, let baseline = document.session, let path = document.path
         else { return }
         let access = access(for: document)
         guard let now = try? await access.stat(path), now != seenOnReturn[id] else { return }
@@ -629,6 +632,7 @@ public final class GlassEditorWorkspace {
                        expecting: RemoteStat?) async {
         do {
             try await document.save(through: access, expecting: expecting)
+            if let path = document.path { refreshRepository(owning: path) }
         } catch {
             message = "\(document.displayName) could not be saved: \(error.localizedDescription)"
         }
@@ -639,6 +643,8 @@ public final class GlassEditorWorkspace {
         do {
             try await document.save(to: url)
             preferences.noteRecent(url)
+            refreshRepository(owning: url.path(percentEncoded: false))
+            updateLineMarkers()
         } catch {
             message = "\(document.displayName) could not be saved: \(error.localizedDescription)"
         }
@@ -651,7 +657,10 @@ public final class GlassEditorWorkspace {
             guard document.url != nil else { continue }
             let access = access(for: document)
             writing.insert(document.id); defer { writing.remove(document.id) }
-            do { try await document.save(through: access) } catch {
+            do {
+                try await document.save(through: access)
+                if let path = document.path { refreshRepository(owning: path) }
+            } catch {
                 failures.append(document.displayName)
             }
         }
@@ -686,7 +695,24 @@ public final class GlassEditorWorkspace {
             return
         }
         guard let found = match else { return }
-        document.model.selectedRange = found
+        document.model.reveal(found)
+    }
+
+    /// Bumped by each request to put the keyboard in the find field; the bar's field follows it.
+    public private(set) var findFocusRequest = 0
+
+    /// ⌘F: the find bar, with the keyboard in its field.
+    public func presentFind() {
+        findIsPresented = true
+        findFocusRequest &+= 1
+    }
+
+    /// ⌘G and ⇧⌘G: the next match of the last term, with the bar open to show it, or the bar and
+    /// its field when there is no term yet.
+    public func findAgain(reverse: Bool = false) {
+        guard !findQuery.isEmpty else { presentFind(); return }
+        findIsPresented = true
+        findNext(reverse: reverse)
     }
 
     @discardableResult
@@ -786,6 +812,7 @@ public final class GlassEditorWorkspace {
         root.beginLoadingChildrenIfNeeded(using: access)
         projectRoots[project.id] = root
         projectReach[project.id] = .thisMachine
+        startRepository(for: project, access: access)
         // Open Recent lists folders too (decided 2026-10-08), so a project is one menu away as a
         // file is. Only this device's: a folder on a server is reopened through Projects.
         preferences.noteRecent(URL(filePath: project.path, directoryHint: .isDirectory))
@@ -820,6 +847,7 @@ public final class GlassEditorWorkspace {
         root.beginLoadingChildrenIfNeeded(using: access)
         projectRoots[project.id] = root
         projectReach[project.id] = reach
+        startRepository(for: project, access: access)
         return project
     }
 
@@ -858,6 +886,7 @@ public final class GlassEditorWorkspace {
         guard !siblings.contains(where: { $0.name == name }) else { throw CreateFileError.exists(name) }
         try await access.write(Data(), to: path, expecting: nil)
         refreshFolder(at: folderPath)
+        refreshRepository(owning: path)
         return await open(path: path)
     }
 
@@ -881,6 +910,8 @@ public final class GlassEditorWorkspace {
         makePermanent(id)
         if machine == nil { preferences.noteRecent(URL(filePath: path)) }
         refreshFolder(at: folderPath)
+        refreshRepository(owning: path)
+        updateLineMarkers()
     }
 
     /// Every folder a new document could be saved into: each project's root and the folders
@@ -997,8 +1028,12 @@ public final class GlassEditorWorkspace {
     }
 
     public func closeProject(_ id: GlassEditorProject.ID) {
+        // Its Changes tab is about a project that is no longer here.
+        for document in documents where document.changesOfProject == id { close(document.id, force: true) }
+        repositories[id] = nil
         if let root = projectRoots[id] { forget(root) }
         projects.removeAll { $0.id == id }
+        updateLineMarkers()
         projectRoots[id] = nil
         // Closing the project is what ends the connection it opened. A local reader's close does
         // nothing, so there is no branch here.
@@ -1035,6 +1070,107 @@ public final class GlassEditorWorkspace {
         guard let root = projectRoots[id] else { return }
         root.invalidate()
         root.beginLoadingChildrenIfNeeded(using: projectAccess[id] ?? GlassEditorLocalFileAccess())
+        repositories[id]?.refresh()
+    }
+
+    // MARK: Git
+
+    /// Each open project's git, where its machine has one to run (`GlassEditorFileAccess.gitRunner`).
+    public private(set) var repositories: [GlassEditorProject.ID: GlassEditorGitRepository] = [:]
+
+    private func startRepository(for project: GlassEditorProject, access: any GlassEditorFileAccess) {
+        guard let runner = access.gitRunner else { return }
+        let repository = GlassEditorGitRepository(projectPath: project.path, machine: machineName(of: project.id),
+                                                  runner: runner, access: access)
+        repositories[project.id] = repository
+        repository.refresh()
+        updateLineMarkers()
+    }
+
+    /// The marks beside each open file's lines (`GlassEditorLineMarker`), one for every text
+    /// document in a project with git, started and stopped as documents and projects come and go.
+    @ObservationIgnored private var lineMarkers: [GlassEditorDocument.ID: GlassEditorLineMarker] = [:]
+
+    func updateLineMarkers() {
+        var wanted: [GlassEditorDocument.ID: (document: GlassEditorDocument, repository: GlassEditorGitRepository,
+                                              path: String)] = [:]
+        for document in documents where document.isText {
+            guard let path = document.path, let owner = project(owning: path),
+                  document.machine == machineName(of: owner.id),
+                  let repository = repositories[owner.id] else { continue }
+            wanted[document.id] = (document, repository, path)
+        }
+        for (id, marker) in lineMarkers {
+            if let still = wanted[id], still.repository === marker.repository, still.path == marker.path { continue }
+            marker.stop()
+            lineMarkers[id] = nil
+        }
+        for (id, want) in wanted where lineMarkers[id] == nil {
+            let marker = GlassEditorLineMarker(document: want.document, repository: want.repository, path: want.path)
+            lineMarkers[id] = marker
+            marker.start()
+        }
+    }
+
+    /// Waits for a document's marks to catch up (tests).
+    func lineMarksSettled(_ id: GlassEditorDocument.ID) async {
+        await lineMarkers[id]?.settled()
+    }
+
+    /// The git of the project a path is in, when it is in a repository.
+    public func repository(owning path: String) -> GlassEditorGitRepository? {
+        project(owning: GlassEditorProject.normalized(path)).flatMap { repositories[$0.id] }
+    }
+
+    /// How a file differs from the last commit, for its row in the tree.
+    public func gitChange(at path: String) -> GlassEditorGitChange? {
+        repository(owning: path)?.change(atPath: path)
+    }
+
+    /// Whether a folder has a changed file anywhere under it.
+    public func folderHasGitChanges(_ path: String) -> Bool {
+        repository(owning: path)?.folderHasChanges(path) ?? false
+    }
+
+    /// Asks every project's git again: the window came forward, and anything may have changed
+    /// while it was behind — a build, a checkout, a commit in a terminal.
+    public func refreshRepositories() {
+        for repository in repositories.values { repository.refresh() }
+    }
+
+    func refreshRepository(owning path: String) {
+        repository(owning: path)?.refresh()
+    }
+
+    /// The project's **Changes** tab: every changed file's lines since the last commit. Opened
+    /// once per project and chosen again after that; it reads the lines while it is open.
+    @discardableResult
+    public func showChanges(of id: GlassEditorProject.ID? = nil) -> GlassEditorDocument? {
+        guard let id = id ?? projects.first?.id, let repository = repositories[id],
+              repository.state != .notARepository else { return nil }
+        if let open = documents.first(where: { $0.changesOfProject == id }) {
+            selection = open.id
+            repository.refresh()
+            return open
+        }
+        let document = GlassEditorDocument.changes(of: id)
+        documents.append(document)
+        selection = document.id
+        repository.showsDiffs = true
+        return document
+    }
+
+    /// A changed file, opened from Changes — at `line` of it as it is now, when one was chosen. A
+    /// line goes to the provisional tab, as a single click in the tree does, so stepping through
+    /// the changes leaves one tab behind rather than one per file.
+    public func openChangedFile(_ repositoryPath: String, in id: GlassEditorProject.ID, line: Int? = nil,
+                                asPreview: Bool = false) async {
+        guard let path = repositories[id]?.absolutePath(repositoryPath),
+              let document = await open(path: path, asPreview: asPreview), document.isText else { return }
+        guard let line else { return }
+        let index = min(max(line - 1, 0), max(0, document.model.lineCount - 1))
+        let start = document.model.lineRange(ofLine: index).lowerBound
+        document.model.reveal(start..<start)
     }
 
     // MARK: Recents

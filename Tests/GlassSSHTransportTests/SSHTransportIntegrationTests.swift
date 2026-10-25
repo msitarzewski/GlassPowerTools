@@ -14,13 +14,16 @@ enum IntegrationEnvironment {
     static var password: String? { ProcessInfo.processInfo.environment["GPT_SSH_TEST_PASSWORD"] }
     static var keyPath: String? { ProcessInfo.processInfo.environment["GPT_SSH_TEST_KEY_PATH"] }
     static var isConfigured: Bool { host != nil && user != nil && (password != nil || keyPath != nil) }
+    /// The host's own address and SSH port as it sees itself, for a tunnel that ends at a network
+    /// address on the far side: not `host` and `port` when those are this Mac's end of a tunnel to
+    /// the test VM (BUILDING.md). The same when unset.
+    static var farHost: String? { ProcessInfo.processInfo.environment["GPT_SSH_TEST_FAR_HOST"] ?? host }
+    static var farPort: Int { Int(ProcessInfo.processInfo.environment["GPT_SSH_TEST_FAR_PORT"] ?? "") ?? port }
 
-    static func skipUnlessConfigured() throws {
-        guard isConfigured else { throw XCTSkipEquivalent.notRun("no host configured: set GPT_SSH_TEST_HOST, GPT_SSH_TEST_USER and GPT_SSH_TEST_PASSWORD or GPT_SSH_TEST_KEY_PATH") }
-    }
+    /// Why the gated suites are skipped, as the run reports it. They were reported as passed, having
+    /// returned early, until 2026-10-24.
+    static let notConfigured: Comment = "no host configured: set GPT_SSH_TEST_HOST, GPT_SSH_TEST_USER and GPT_SSH_TEST_PASSWORD or GPT_SSH_TEST_KEY_PATH"
 }
-
-enum XCTSkipEquivalent: Error { case notRun(String) }
 
 /// Resolves the test credential from the environment: a key file read into secure memory, or a
 /// password. The engine never sees a path or string beyond this resolver.
@@ -49,10 +52,9 @@ enum IntegrationTransport {
     }
 }
 
-@Suite("Real host (gated)", .serialized)
+@Suite("Real host (gated)", .serialized, .enabled(if: IntegrationEnvironment.isConfigured, IntegrationEnvironment.notConfigured))
 struct SSHTransportIntegrationTests {
     @Test func connectsAndRunsACommand() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let transport = IntegrationTransport.make()
         let owner = UUID()
         #expect(await transport.acquire(owner: owner))
@@ -66,7 +68,6 @@ struct SSHTransportIntegrationTests {
     }
 
     @Test func interactiveShellRoundTripsAndReportsCleanExit() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let transport = IntegrationTransport.make()
         try await transport.connect()
         let shell = try await transport.openShell(pty: SSHPTYRequest(columns: 100, rows: 30))
@@ -85,7 +86,6 @@ struct SSHTransportIntegrationTests {
     }
 
     @Test func sftpListsAndRoundTripsInATemporaryDirectory() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let transport = IntegrationTransport.make()
         try await transport.connect()
         let sftp = try await transport.openSFTP()
@@ -130,7 +130,6 @@ struct SSHTransportIntegrationTests {
     }
 
     @Test func tunnelReachesTheHostsOwnSSHPort() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let transport = IntegrationTransport.make()
         try await transport.connect()
         let consumer = DatabaseTunnelConsumer(transport: transport)   // the Stage 3 consumer, on the real engine
@@ -153,11 +152,11 @@ struct SSHTransportIntegrationTests {
     /// SSH machine sees it, not at its loopback. The test host's own address stands in for the
     /// private database server, so nothing about the network is written here.
     @Test func tunnelReachesANetworkAddressNotOnlyLoopback() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let transport = IntegrationTransport.make()
         try await transport.connect()
         let consumer = DatabaseTunnelConsumer(transport: transport)
-        let endpoint = try await consumer.localEndpoint(forDatabaseAt: IntegrationEnvironment.host!, port: IntegrationEnvironment.port)
+        let endpoint = try await consumer.localEndpoint(forDatabaseAt: IntegrationEnvironment.farHost!,
+                                                        port: IntegrationEnvironment.farPort)
         let client = try await TCPClient.connect(port: endpoint.port)
         let banner = try await client.executeThenClose { inbound, _ in
             var received = Data()
@@ -173,7 +172,6 @@ struct SSHTransportIntegrationTests {
     }
 
     @Test func poolSharesOneConnectedTransportPerRoute() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let pool = SSHTransportPool { _ in IntegrationTransport.make() }
         let route = IntegrationTransport.make().route
         let a = UUID(), b = UUID()

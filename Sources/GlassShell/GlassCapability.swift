@@ -125,8 +125,16 @@ public enum GlassHostTrustOutcome: Sendable, Equatable {
 public protocol GlassHostPortForward: AnyObject, Sendable {
     /// The port on this device to connect to. Always a real bound port, never a request.
     var localPort: Int { get }
+    /// Why the machine would not connect the latest client on to the service, in its own words;
+    /// nil while none has been refused. The client sees only its socket close, and a database
+    /// driver may not notice even that (2026-10-22), so the caller asks here.
+    var refusal: String? { get }
     /// Tears the forward down. Calling it more than once is harmless.
     func close() async
+}
+
+public extension GlassHostPortForward {
+    var refusal: String? { nil }
 }
 
 /// A live listing of one machine's folders, over whatever connection the capability that owns SSH
@@ -149,8 +157,32 @@ public protocol GlassHostDirectoryLister: AnyObject, Sendable {
     func stat(_ path: String) async throws -> GlassHostFileStamp?
     /// The path a relative one is resolved against — the account's home directory, usually.
     func realPath(_ path: String) async throws -> String
+    /// Runs a command on the machine, over the same connection, and answers with how it ended and
+    /// what it wrote: the editor's `git` for a project there (2026-10-23). Default: this lister
+    /// cannot run anything.
+    func runCommand(_ command: String) async throws -> GlassHostCommandOutput
     /// Drops the connection. Calling it more than once is harmless.
     func close() async
+}
+
+public extension GlassHostDirectoryLister {
+    func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+        throw GlassPortForwardError.unavailable
+    }
+}
+
+/// How a command run on a machine ended, and what it wrote to each stream.
+public struct GlassHostCommandOutput: Sendable, Equatable {
+    /// Nil when the machine did not say.
+    public var exitStatus: Int?
+    public var standardOutput: Data
+    public var standardError: Data
+
+    public init(exitStatus: Int?, standardOutput: Data, standardError: Data = Data()) {
+        self.exitStatus = exitStatus
+        self.standardOutput = standardOutput
+        self.standardError = standardError
+    }
 }
 
 /// What a file looked like when it was last looked at. Every field optional, because servers

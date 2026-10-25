@@ -69,10 +69,9 @@ struct GlassOpenSessionTests {
         registry.register(terminal)
         registry.registerSessionProvider(id: "editor") { [self] in [session("editor:1")] }
 
-        let ids = registry.openSessions().map(\.id)
-        #expect(ids.last == "editor:1", "a standalone provider comes after the capabilities")
-        #expect(ids.contains("terminal:1") && ids.contains("database:1"))
-        #expect(ids.count == 3)
+        // The kinds' own order (rdp, ssh, database), whatever the order they registered in, and the
+        // standalone providers after. (It checked only the last and that the others were there.)
+        #expect(registry.openSessions().map(\.id) == ["terminal:1", "database:1", "editor:1"])
     }
 
     @Test func aProviderIsAskedAgainEveryTime() {

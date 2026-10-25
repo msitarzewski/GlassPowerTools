@@ -46,9 +46,9 @@ struct SSHSharedConnectionLossTests {
 
     /// Against the test host (gated as the other real-host tests), through a relay that cuts the
     /// connection — a server going down, or the network dropping it.
-    @Test("Two shells on a connection that drops both end as a loss, not an exit (gated)")
+    @Test("Two shells on a connection that drops both end as a loss, not an exit (gated)",
+          .enabled(if: IntegrationEnvironment.isConfigured, IntegrationEnvironment.notConfigured))
     func bothShellsOnADroppedConnectionReportALoss() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let relay = try await SilenceableRelay.start(to: IntegrationEnvironment.host!, port: IntegrationEnvironment.port)
         defer { relay.stop() }
         let endpoint = SSHEndpoint(host: "127.0.0.1", port: relay.port, username: IntegrationEnvironment.user!)

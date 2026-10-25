@@ -3,16 +3,19 @@
 //  Glass Power Tools — GlassDesktopTests
 //
 //  Ported from glassDT `Tests/GlassDesktopCoreTests/GPUPresentationTests.swift` on 2026-09-27.
-//  Adapted: the `GlassDesktopUI` import became `GlassDesktop`. The tests and assertions are
-//  unchanged. The renderer's `Uniforms` has gained fields since (opacity, offset, key colour,
-//  source rectangle), all defaulted to the whole, opaque texture, so the original initialiser call
-//  still describes the same draw. Like the original, each test requires a real Metal device and
-//  fails, rather than skips, without one.
+//  Adapted: the `GlassDesktopUI` import became `GlassDesktop`. The assertions are unchanged.
+//  Since 2026-10-24 each draw goes through the renderer itself (`drawTexture`), with the wallpaper
+//  loaded from a file as the app loads it; the tests had built a pipeline and uniforms of their own,
+//  a copy of the renderer's that its own bindings could drift from unnoticed. Like the original,
+//  each test requires a real Metal device and fails, rather than skips, without one.
 //
 
 import Foundation
+import ImageIO
 import Metal
 import Testing
+import UniformTypeIdentifiers
+import GlassRDPTransport
 @testable import GlassDesktop
 
 @Suite("Metal presentation readback") @MainActor
@@ -21,34 +24,34 @@ struct GPUPresentationTests {
     private let pixels: [UInt8] = [0,0,0,255, 0,0,255,255, 0,255,0,255, 255,0,0,255]
 
     @Test func originalPreservesColorsAndOrientation() throws {
-        let output = try render(mode: 0)
+        let output = try render(mode: .original)
         #expect(output == pixels)
     }
 
     @Test func blackMaskOnlyChangesPresentationAlpha() throws {
         let original = pixels
-        let output = try render(mode: 1)
+        let output = try render(mode: .removeBlack)
         #expect(Array(output[0..<4]) == [0,0,0,0])
         #expect(Array(output[4...]) == Array(pixels[4...]))
         #expect(pixels == original)
     }
 
     @Test func matchingWallpaperRemovesAllMatchedPixels() throws {
-        let output = try render(mode: 2, wallpaper: pixels)
+        let output = try render(mode: .removeWallpaper, wallpaper: pixels)
         #expect(output.allSatisfy { $0 == 0 })
     }
 
     @Test func wallpaperDifferencePreservesForeground() throws {
         var reference = pixels
         reference.replaceSubrange(4..<8, with: [0,0,0,255])
-        let output = try render(mode: 2, wallpaper: reference)
+        let output = try render(mode: .removeWallpaper, wallpaper: reference)
         #expect(Array(output[4..<8]) == [0,0,255,255])
         #expect(Array(output[0..<4]) == [0,0,0,0])
         #expect(output[11] == 0 && output[15] == 0)
     }
 
     @Test func aspectFitLeavesTransparentLetterboxes() throws {
-        let output = try render(mode: 0, width: 4, height: 2)
+        let output = try render(mode: .original, width: 4, height: 2)
         for row in 0..<2 {
             #expect(Array(output[(row * 16)..<(row * 16 + 4)]) == [0,0,0,0])
             #expect(Array(output[(row * 16 + 12)..<(row * 16 + 16)]) == [0,0,0,0])
@@ -56,48 +59,24 @@ struct GPUPresentationTests {
         }
     }
 
-    private func render(mode: UInt32, wallpaper: [UInt8]? = nil, width: Int = 2, height: Int = 2) throws -> [UInt8] {
+    private func render(mode: TransparencyMode, wallpaper: [UInt8]? = nil, width: Int = 2, height: Int = 2) throws -> [UInt8] {
         let device = try #require(MTLCreateSystemDefaultDevice(), "A real Metal device is required for shader readback")
-        let queue = try #require(device.makeCommandQueue())
-        let library = try device.makeLibrary(source: DesktopMetalRenderer.shader, options: nil)
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexFunction = library.makeFunction(name: "desktopVertex")
-        descriptor.fragmentFunction = library.makeFunction(name: "desktopFragment")
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        let pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
-        func texture(width: Int, height: Int, usage: MTLTextureUsage) throws -> any MTLTexture {
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
-            descriptor.usage = usage
-            descriptor.storageMode = .shared
-            return try #require(device.makeTexture(descriptor: descriptor))
+        let renderer = try DesktopMetalRenderer(device: device, pixelFormat: .bgra8Unorm) { Issue.record("\($0)") }
+        renderer.frame = try GlassRDPFrame(width: 2, height: 2, bytesPerRow: 8, pixels: Data(pixels), sequence: 1)
+        renderer.settings.mode = mode
+        if let wallpaper {
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("gpu-wallpaper-\(UUID().uuidString).png")
+            defer { try? FileManager.default.removeItem(at: file) }
+            try writePNG(wallpaper, to: file)
+            renderer.setWallpaper(file)
         }
-        let input = try texture(width: 2, height: 2, usage: .shaderRead)
-        let reference = try texture(width: 2, height: 2, usage: .shaderRead)
-        for (target, bytes) in [(input, pixels), (reference, wallpaper ?? pixels)] {
-            bytes.withUnsafeBytes { raw in
-                target.replace(region: MTLRegionMake2D(0, 0, 2, 2), mipmapLevel: 0,
-                               withBytes: raw.baseAddress!, bytesPerRow: 8)
-            }
-        }
-        let output = try texture(width: width, height: height, usage: .renderTarget)
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = output
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].storeAction = .store
-        pass.colorAttachments[0].clearColor = .init(red: 0, green: 0, blue: 0, alpha: 0)
-        let command = try #require(queue.makeCommandBuffer())
-        let encoder = try #require(command.makeRenderCommandEncoder(descriptor: pass))
-        let scale = min(Float(width) / 2, Float(height) / 2)
-        var uniforms = DesktopMetalRenderer.Uniforms(contentScale: .init(2 * scale / Float(width), 2 * scale / Float(height)),
-                                                     threshold: 0.04, feather: 0.02, mode: mode)
-        encoder.setRenderPipelineState(pipeline)
-        encoder.setVertexBytes(&uniforms, length: MemoryLayout<DesktopMetalRenderer.Uniforms>.stride, index: 0)
-        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<DesktopMetalRenderer.Uniforms>.stride, index: 0)
-        encoder.setFragmentTexture(input, index: 0)
-        encoder.setFragmentTexture(reference, index: 1)
-        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
-        encoder.endEncoding()
-        command.commit()
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .shared
+        let output = try #require(device.makeTexture(descriptor: descriptor))
+        var submitted: (any MTLCommandBuffer)?
+        #expect(try renderer.drawTexture { submitted = $0; return output })
+        let command = try #require(submitted)
         command.waitUntilCompleted()
         if let error = command.error { throw error }
         #expect(command.status == .completed)
@@ -107,5 +86,18 @@ struct GPUPresentationTests {
                             from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
         }
         return bytes
+    }
+
+    /// A 2 × 2 BGRA picture as a PNG, the form a wallpaper reaches the renderer in.
+    private func writePNG(_ bgra: [UInt8], to url: URL) throws {
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let info = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+        let provider = try #require(CGDataProvider(data: Data(bgra) as CFData))
+        let image = try #require(CGImage(width: 2, height: 2, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 8,
+                                         space: space, bitmapInfo: CGBitmapInfo(rawValue: info), provider: provider,
+                                         decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
     }
 }

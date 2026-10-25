@@ -3,11 +3,12 @@ import Foundation
 import Testing
 
 extension RDPConnectionConfiguration {
+    /// Trusts the mock server's certificate and nothing more: the configuration otherwise stays as
+    /// the app sends it, with cross-host redirection and auxiliary input channels off. A test of either
+    /// turns it on itself.
     func trustFixtureCertificate() -> Self {
         var configuration = self
         configuration.certificatePolicy = MockKRDPTLS.certificatePolicy(host: host, port: port)
-        configuration.allowServerRedirection = true
-        configuration.allowsAuxiliaryInputChannels = true
         return configuration
     }
 }

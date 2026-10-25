@@ -103,7 +103,7 @@ struct GlassEditorWindowSettingsTests {
 
     @Test("a document follows its file, then its project, then its window, then the editor")
     func theWindowSitsBetweenTheEditorAndTheProject() async throws {
-        let runtime = GlassEditorRuntime(defaults: defaults())
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: defaults())
         runtime.preferences.fontSize = 13
         runtime.preferences.wrapsLines = false
         let root = try folder()
@@ -136,7 +136,7 @@ struct GlassEditorWindowSettingsTests {
 
     @Test("⌘+, ⌘− and ⌘0 change the size a window follows: its own, else every window's")
     func textSizeKeysChangeTheSizeInFront() {
-        let runtime = GlassEditorRuntime(defaults: defaults())
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: defaults())
         runtime.preferences.fontSize = 13
         let workspace = runtime.workspace(for: UUID())
 
@@ -167,13 +167,13 @@ struct GlassEditorWindowSettingsTests {
         let storage = defaults()
         let root = try folder()
         do {
-            let runtime = GlassEditorRuntime(defaults: storage)
+            let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: storage)
             let id = try #require(runtime.openProject(root))
             runtime.workspace(for: id).setWindowSettings(mine)
         }
 
         // A new runtime over the same storage is the next launch.
-        let relaunched = GlassEditorRuntime(defaults: storage)
+        let relaunched = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: storage)
         let id = try #require(relaunched.openProject(root))
         let workspace = relaunched.workspace(for: id)
         #expect(workspace.windowSettings == mine)
@@ -189,7 +189,7 @@ struct GlassEditorWindowSettingsTests {
 
     @Test("a window on another machine's project takes what it kept, once connected")
     func aRemoteProjectsWindowComesBack() async throws {
-        let runtime = GlassEditorRuntime(defaults: defaults())
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: defaults())
         runtime.remoteAccess = { @MainActor _ in
             GlassEditorRemoteFileAccess(listing: { _ in [] }, read: { _ in Data() },
                                         write: { _, _, _ in nil }, stat: { _ in nil })
@@ -208,12 +208,12 @@ struct GlassEditorWindowSettingsTests {
         let storage = defaults()
         let root = try folder()
         do {
-            let runtime = GlassEditorRuntime(defaults: storage)
+            let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: storage)
             let id = try #require(runtime.openProject(root))
             runtime.workspace(for: id).setWindowSettings(mine)
         }
 
-        let runtime = GlassEditorRuntime(defaults: storage)
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: storage)
         let blank = runtime.prepareNewEditorWindow()
         runtime.noteFrontmost(blank)
         var chosenHere = GlassWindowOverrides()
@@ -232,7 +232,7 @@ struct GlassEditorWindowSettingsTests {
     @Test("a window with no project keeps its settings while it is open, and stores nothing")
     func aWindowWithoutAProjectStoresNothing() {
         let storage = defaults()
-        let runtime = GlassEditorRuntime(defaults: storage)
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: storage)
         let workspace = runtime.workspace(for: runtime.prepareNewEditorWindow())
         workspace.setWindowSettings(mine)
         #expect(workspace.windowSettings == mine)
@@ -248,7 +248,7 @@ struct GlassEditorWindowSettingsTests {
         library.rename(known.id, to: "Shop Front")
         library.setTextOverrides(GlassEditorTextOverrides(fontSize: 11), for: known.id)
 
-        let runtime = GlassEditorRuntime(defaults: storage)
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: storage)
         let id = try #require(runtime.openProject(root))
         let opened = try #require(runtime.workspace(for: id).projects.first)
         #expect(opened.id == known.id, "the window and the list name two different projects")
@@ -263,7 +263,7 @@ struct GlassEditorWindowSettingsTests {
     @Test("a machine's project opened on that machine stays one project, on that machine")
     func aMachinesProjectOpenedHereIsOneProject() throws {
         let root = try folder()
-        let runtime = GlassEditorRuntime(defaults: defaults())
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: defaults())
         let host = HostID()
         let listed = runtime.projects.remember(GlassEditorProject.local(root, hostID: host))
 
@@ -328,7 +328,7 @@ struct GlassEditorWindowSettingsTests {
 
     @Test("\"Default\" names the window when the window sets the text, and only then")
     func defaultNamesTheWindow() async throws {
-        let runtime = GlassEditorRuntime(defaults: defaults())
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: defaults())
         let root = try folder()
         let id = try #require(runtime.openProject(root))
         let workspace = runtime.workspace(for: id)
@@ -357,7 +357,7 @@ struct GlassEditorWindowSettingsTests {
     /// opened later — and a workspace no window has told stays on the theme's own ground.
     @Test("Every document in a window is drawn on the surface its window says, including later ones")
     func documentsFollowTheWindowsTextSurface() {
-        let runtime = GlassEditorRuntime(defaults: defaults())
+        let runtime = GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: defaults())
         let workspace = runtime.workspace(for: UUID())
         let open = workspace.newDocument()
         #expect(workspace.textSurface == .opaque, "off the headset the theme's own ground, as always")

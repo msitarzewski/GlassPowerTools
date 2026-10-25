@@ -47,8 +47,8 @@ The diff shows the files listed below, this file, and nothing else.
 | N8 | An ECDSA signature whose `r` or `s` is wider than the curve's point size is refused with `invalidSSHMessage`. Upstream's own fix (apple/swift-nio-ssh 31cdc3c, released in 0.14.1), with its two tests. | **GHSA-998x-vgvp-xwpc / CVE-2026-43798, critical:** the signature in the server's key-exchange reply is parsed before the host key is checked, and an oversized component made a negative offset and an out-of-bounds write into stack memory — any server, or anyone between the app and it, could crash the app or worse. A trap in a debug build; in the Release build the app ships, the write. Found by the 2026-10-12 advisory scan of upstream security advisories. | `Keys And Signatures/NIOSSHSignature.swift` | `testOversizedECDSARComponentIsRejected`, `testOversizedECDSASComponentIsRejected` |
 
 The tests above are added in an `extension` at the end of each upstream test file; no upstream test
-was changed. With these changes the package's own suite runs 363 tests (356 upstream, 7 added), all
-passing.
+was changed. With these changes the package's own suite runs 367 tests (356 upstream, 11 added), all
+passing (2026-10-24).
 
 A seventh change, rejecting key-exchange messages that arrive after the peer's NEWKEYS, was carried
 until 2026-09-27 and then dropped: upstream's `default:` branch already throws a protocol violation

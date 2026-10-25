@@ -211,7 +211,7 @@ struct MacWorkspaceNewTabTests {
         let request = MacWorkspaceLaunchRequest(startsEmpty: true)
         defer { forget(request) }
         let sessionManager = SessionManager(loadImmediately: false)
-        let settingsManager = SettingsManager(loadImmediately: false)
+        let settingsManager = SettingsManager.forTest()
         let renders = RenderCount()
         func scene(_ request: MacWorkspaceLaunchRequest, generation: Int) -> AnyView {
             AnyView(SceneHost(request: request, generation: generation, renders: renders)
@@ -224,10 +224,14 @@ struct MacWorkspaceNewTabTests {
         window.isReleasedWhenClosed = false
         window.contentView = view
         defer { window.contentView = nil }
+        // Turned by the main actor's own turns, not by running the run loop from inside the test:
+        // that ran other tests' main-actor work nested in this one's frame (2026-10-24).
         func settle() async throws {
             for _ in 0..<5 {
-                turnRunLoop(view)
+                view.layoutSubtreeIfNeeded()
+                for _ in 0..<5 { await Task.yield() }
                 try await Task.sleep(for: .milliseconds(20))
+                view.layoutSubtreeIfNeeded()
             }
         }
         try await settle()
@@ -275,13 +279,6 @@ struct MacWorkspaceNewTabTests {
             #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults) == [window.windowID],
                     "once its window has closed, it opens again")
         }
-    }
-
-    /// Synchronous so it can turn the run loop, which SwiftUI needs to apply an observed change.
-    private func turnRunLoop(_ view: NSView) {
-        view.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
-        view.layoutSubtreeIfNeeded()
     }
 
     private func brightness(_ image: NSBitmapImageRep, x: Int, y: Int) -> Double {

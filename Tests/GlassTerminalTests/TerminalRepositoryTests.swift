@@ -304,38 +304,42 @@ struct TerminalRepositoryTests {
     /// Repositories git made, asked through `sh` as a host would be. Git's own configuration is
     /// left out — no system or global files — so the owner's settings never apply.
     @Test("live: the host's command, run by sh in repositories git made", .enabled(if: TerminalRepositoryTests.hasGit))
-    func remoteLive() throws {
+    func remoteLive() async throws {
         let root = try scratch()
         defer { try? FileManager.default.removeItem(atPath: root) }
         let home = try folder(root + "/home")
         let environment = ["PATH": "/usr/bin:/bin", "HOME": home, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"]
-        @discardableResult func git(_ arguments: [String], in folder: String) -> (output: String, status: Int32) {
-            LiveProcess.run("/usr/bin/git", ["-C", folder, "-c", "user.name=ann", "-c", "user.email=ann@example.com"] + arguments,
-                            environment: environment)
+        // Each run off the main actor (`LiveProcess.runDetached`).
+        @discardableResult func git(_ arguments: [String], in folder: String) async -> (output: String, status: Int32) {
+            await LiveProcess.runDetached("/usr/bin/git", ["-C", folder, "-c", "user.name=ann", "-c", "user.email=ann@example.com"] + arguments,
+                                          environment: environment)
         }
-        func ask(_ folder: String) -> TerminalRepositoryAnswer {
-            TerminalRepository.parseRemote(LiveProcess.run("/bin/sh", ["-c", TerminalRepository.remoteCommand(folder: folder)],
-                                                           environment: environment).output)
+        func ask(_ folder: String) async -> TerminalRepositoryAnswer {
+            let command = TerminalRepository.remoteCommand(folder: folder)
+            return TerminalRepository.parseRemote(await LiveProcess.runDetached("/bin/sh", ["-c", command], environment: environment).output)
         }
         let name = "it's a \"repo\""
         let app = try folder(root + "/src/" + name)
-        try #require(git(["init", "-q", "-b", "main"], in: app).status == 0)
-        try #require(git(["commit", "-q", "--allow-empty", "-m", "one"], in: app).status == 0)
+        try #require(await git(["init", "-q", "-b", "main"], in: app).status == 0)
+        try #require(await git(["commit", "-q", "--allow-empty", "-m", "one"], in: app).status == 0)
         let sources = try folder(app + "/Sources")
 
-        #expect(ask(app).repository.map { [$0.name, $0.branch] } == [name, "main"])
-        #expect(ask(sources).repository.map { [$0.name, $0.branch] } == [name, "main"], "a folder inside it")
-        try #require(git(["worktree", "add", "-q", "../app-fix", "-b", "feature/x"], in: app).status == 0)
-        #expect(ask(root + "/src/app-fix").repository.map { [$0.name, $0.branch] } == [name, "feature/x"],
+        #expect(await ask(app).repository.map { [$0.name, $0.branch] } == [name, "main"])
+        #expect(await ask(sources).repository.map { [$0.name, $0.branch] } == [name, "main"], "a folder inside it")
+        try #require(await git(["worktree", "add", "-q", "../app-fix", "-b", "feature/x"], in: app).status == 0)
+        #expect(await ask(root + "/src/app-fix").repository.map { [$0.name, $0.branch] } == [name, "feature/x"],
                 "a worktree is its repository's, with its own branch")
-        try #require(git(["checkout", "-q", "--detach"], in: app).status == 0)
-        let commit = git(["rev-parse", "--short=7", "HEAD"], in: app).output.trimmingCharacters(in: .whitespacesAndNewlines)
-        #expect(ask(app).repository?.branch == commit && commit.count == 7)
-        #expect(ask(try folder(root + "/notes")) == .none, "outside a repository")
-        #expect(ask(root + "/gone") == .none, "a folder that is gone")
-        #expect(ask("") == .none && ask("Sources") == .none, "no folder, or not a full path, is not where the shell started")
-        try #require(git(["init", "-q", "-b", "main"], in: home).status == 0)
-        #expect(ask(try folder(home + "/notes")) == .none, "a repository at home holds dotfiles")
+        try #require(await git(["checkout", "-q", "--detach"], in: app).status == 0)
+        let commit = await git(["rev-parse", "--short=7", "HEAD"], in: app).output.trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(await ask(app).repository?.branch == commit && commit.count == 7)
+        let notes = try folder(root + "/notes")
+        #expect(await ask(notes) == .none, "outside a repository")
+        #expect(await ask(root + "/gone") == .none, "a folder that is gone")
+        #expect(await ask("") == .none, "no folder is not where the shell started")
+        #expect(await ask("Sources") == .none, "nor is a folder that isn't a full path")
+        try #require(await git(["init", "-q", "-b", "main"], in: home).status == 0)
+        let homeNotes = try folder(home + "/notes")
+        #expect(await ask(homeNotes) == .none, "a repository at home holds dotfiles")
     }
 
     // MARK: Active, on every device
@@ -383,31 +387,33 @@ struct TerminalRepositoryTests {
     /// the owner's sessions, is never reached (rule 63).
     @Test("live: a repository kept on a session through each builder reads back in the listing",
           .enabled(if: TerminalTmuxTests.tmux != nil))
-    func listingLive() throws {
+    func listingLive() async throws {
         let tmux = try #require(TerminalTmuxTests.tmux)
         let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8).lowercased())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let socket = folder.appendingPathComponent("s").path
         let environment = ["PATH": "/usr/bin:/bin", "HOME": folder.path]
-        @discardableResult func run(_ arguments: [String]) -> (output: String, status: Int32) {
-            LiveProcess.run(tmux, ["-S", socket] + arguments, environment: environment)
+        // Each run off the main actor (`LiveProcess.runDetached`).
+        @discardableResult func run(_ arguments: [String]) async -> (output: String, status: Int32) {
+            await LiveProcess.runDetached(tmux, ["-S", socket] + arguments, environment: environment)
         }
-        defer { run(["kill-server"]) }
-        func listed() -> TerminalTmux.Session? {
+        defer { _ = LiveProcess.run(tmux, ["-S", socket, "kill-server"], environment: environment) }
+        func listed() async -> TerminalTmux.Session? {
             let script = TerminalTmux.listScript(tmux: TerminalTmux.quoted(tmux), serverArguments: ["-S", socket])
-            guard case .sessions(let sessions) = TerminalTmux.parse(LiveProcess.run("/bin/sh", ["-c", script], environment: environment).output)
-            else { return nil }
+            let output = await LiveProcess.runDetached("/bin/sh", ["-c", script], environment: environment).output
+            guard case .sessions(let sessions) = TerminalTmux.parse(output) else { return nil }
             return sessions.first { $0.name == "glass-1" }
         }
-        #expect(run(["-u", "-f", "/dev/null", "new-session", "-d", "-s", "glass-1", "-c", folder.path, "-x", "80", "-y", "10",
+        #expect(await run(["-u", "-f", "/dev/null", "new-session", "-d", "-s", "glass-1", "-c", folder.path, "-x", "80", "-y", "10",
                      "/bin/sleep", "600"]).status == 0)
-        #expect(listed() != nil && listed()?.repository == nil)
+        let first = await listed()
+        #expect(first != nil && first?.repository == nil)
 
         // As a local tab keeps it: argv.
         let odd = TerminalRepository(name: "it's \"app\" $HOME", branch: "fix;")
-        #expect(run(try #require(TerminalTmux.repositoryArguments(session: "glass-1", repository: odd))).status == 0)
-        #expect(listed()?.repository == odd)
+        #expect(await run(try #require(TerminalTmux.repositoryArguments(session: "glass-1", repository: odd))).status == 0)
+        #expect(await listed()?.repository == odd)
 
         // As an SSH tab does: the exact command, through sh, with a tmux on the PATH that names the socket.
         let bin = folder.appendingPathComponent("bin")
@@ -418,11 +424,11 @@ struct TerminalRepositoryTests {
         let throughShim = ["PATH": "\(bin.path):/usr/bin:/bin", "HOME": folder.path]
         let app = TerminalRepository(name: "app", branch: "feature/x")
         let command = try #require(TerminalTmux.repositoryCommand(session: "glass-1", repository: app))
-        #expect(LiveProcess.run("/bin/sh", ["-c", command], environment: throughShim).status == 0)
-        #expect(listed()?.repository == app)
+        #expect(await LiveProcess.runDetached("/bin/sh", ["-c", command], environment: throughShim).status == 0)
+        #expect(await listed()?.repository == app)
 
-        #expect(run(try #require(TerminalTmux.repositoryArguments(session: "glass-1", repository: nil))).status == 0)
-        #expect(listed()?.repository == nil, "nothing found takes them away")
+        #expect(await run(try #require(TerminalTmux.repositoryArguments(session: "glass-1", repository: nil))).status == 0)
+        #expect(await listed()?.repository == nil, "nothing found takes them away")
     }
 
     // MARK: An SSH tab

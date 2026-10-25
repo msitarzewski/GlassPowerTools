@@ -539,6 +539,92 @@ import Testing
     }
 }
 
+// MARK: - MS-NLMP 4.2.4, NTLMv2 Authentication: the specification's own example
+//
+// The mock server derives its keys with this same code, so a mistake made on both sides passes
+// every handshake test; these answers come from the specification instead. Common values (4.2.1):
+// User, Domain, Password, workstation COMPUTER, RandomSessionKey 0x55 × 16, Time 0,
+// ClientChallenge 0xaa × 8, ServerChallenge 01 23 45 67 89 ab cd ef.
+
+private let specServerChallenge = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF])
+private let specClientChallenge = Data(repeating: 0xAA, count: 8)
+private let specRandomSessionKey = Data(repeating: 0x55, count: 16)
+private let specCredentials = RDPCredentials(username: "User", domain: "Domain", password: "Password")
+
+private func specHex(_ value: String) -> Data {
+    Data(value.split(whereSeparator: { $0.isWhitespace }).compactMap { UInt8($0, radix: 16) })
+}
+
+@Test func ntlmV2CalculationsMatchTheSpecificationsExample() {
+    // 4.2.4.1.1
+    let hash = RDPCredSSPNTLMContext.ntlmV2Hash(credentials: specCredentials)
+    #expect(hash == specHex("0c 86 8a 40 3b fd 7a 93 a3 00 1e f2 2e f0 2e 3f"))
+
+    // 4.2.4.1.3's temp ends with the server's AV pairs (Domain, Server, MsvAvEOL) and Z(4).
+    let serverName = specHex("""
+        02 00 0c 00 44 00 6f 00 6d 00 61 00 69 00 6e 00
+        01 00 0c 00 53 00 65 00 72 00 76 00 65 00 72 00
+        00 00 00 00
+        """)
+    let response = RDPCredSSPNTLMContext.ntlmV2Response(
+        serverChallenge: specServerChallenge,
+        clientChallenge: specClientChallenge,
+        targetInfo: serverName + Data(count: 4),
+        timestamp: 0,
+        ntlmV2Hash: hash
+    )
+    // 4.2.4.2.2, then 4.2.4.1.3 after it.
+    #expect(response.response.prefix(16) == specHex("68 cd 0a b8 51 e5 1c 96 aa bc 92 7b eb ef 6a 1c"))
+    #expect(response.response.dropFirst(16) == specHex("""
+        01 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+        aa aa aa aa aa aa aa aa 00 00 00 00
+        02 00 0c 00 44 00 6f 00 6d 00 61 00 69 00 6e 00
+        01 00 0c 00 53 00 65 00 72 00 76 00 65 00 72 00
+        00 00 00 00 00 00 00 00
+        """))
+    // 4.2.4.1.2
+    #expect(response.keyExchangeKey == specHex("8d e4 0c ca db c1 4a 82 f1 5c b0 ad 0d e9 5c a3"))
+    // 4.2.4.2.3
+    #expect(RDPNTLMRC4(key: response.keyExchangeKey).process(specRandomSessionKey)
+            == specHex("c5 da d2 54 4f c9 79 90 94 ce 1c e9 0b c9 d0 3e"))
+}
+
+/// The whole context, given the specification's CHALLENGE_MESSAGE (4.2.4.3): its LMv2 response
+/// (4.2.4.2.1) and its first sealed message (4.2.4.4). Its NTProofStr is not the example's, rightly:
+/// it adds MsvAvFlags to the target info, as a client sending a MIC must.
+@Test func ntlmContextAnswersTheSpecificationsChallengeAndSealsItsExample() throws {
+    let context = RDPCredSSPNTLMContext(
+        credentials: specCredentials,
+        workstationName: "COMPUTER",
+        randomBytes: { count in count == 8 ? specClientChallenge : specRandomSessionKey.prefix(count) },
+        currentFileTime: { 0 }
+    )
+    _ = try context.initialize(inputToken: nil)
+    let challenge = specHex("""
+        4e 54 4c 4d 53 53 50 00 02 00 00 00 0c 00 0c 00
+        38 00 00 00 33 82 8a e2 01 23 45 67 89 ab cd ef
+        00 00 00 00 00 00 00 00 24 00 24 00 44 00 00 00
+        06 00 70 17 00 00 00 0f 53 00 65 00 72 00 76 00
+        65 00 72 00 02 00 0c 00 44 00 6f 00 6d 00 61 00
+        69 00 6e 00 01 00 0c 00 53 00 65 00 72 00 76 00
+        65 00 72 00 00 00 00 00
+        """)
+    let token = try #require(try context.initialize(inputToken: challenge).outputToken)
+
+    #expect(securityBuffer(token, at: 12) == specHex("""
+        86 c3 50 97 ac 9c ec 10 25 54 76 4a 57 cc cc 19
+        aa aa aa aa aa aa aa aa
+        """))
+    #expect(securityBuffer(token, at: 28) == utf16LittleEndian("Domain"))
+    #expect(securityBuffer(token, at: 36) == utf16LittleEndian("User"))
+    #expect(securityBuffer(token, at: 44) == utf16LittleEndian("COMPUTER"))
+
+    // 4.2.4.4: "Plaintext", sequence number 0, sealed and signed with the client-to-server keys.
+    let sealed = try context.wrap(utf16LittleEndian("Plaintext"))
+    #expect(sealed.prefix(16) == specHex("01 00 00 00 7f b3 8e c5 c5 5d 49 76 00 00 00 00"))
+    #expect(sealed.dropFirst(16) == specHex("54 e5 01 65 bf 19 36 dc 99 60 20 c1 81 1b 0f 06 fb 5f"))
+}
+
 private func sspiRSNegotiateToken() -> Data {
     Data([
         0x4E, 0x54, 0x4C, 0x4D, 0x53, 0x53, 0x50, 0x00,

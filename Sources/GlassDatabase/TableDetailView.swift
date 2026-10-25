@@ -4998,7 +4998,7 @@ enum TableSchemaSQL {
             }
             return " DEFAULT NULL"
         case .literal:
-            return " DEFAULT \(try literalExpression(literal, type: newType))"
+            return " DEFAULT \(try literalExpression(literal, type: newType, escapingBackslashes: true))"
         case .currentTimestamp:
             guard isTemporalType(newType) else {
                 throw TableSchemaEditError.unsupported("CURRENT_TIMESTAMP requires a temporal column type.")
@@ -5051,7 +5051,8 @@ enum TableSchemaSQL {
             || (trimmed.hasPrefix("(") && trimmed.hasSuffix(")")) {
             return try rejectingClauseEscape(trimmed, type: type)
         }
-        return try literalExpression(trimmed, type: type)
+        // MySQL is the only dialect that carries a server default forward (Keep Current).
+        return try literalExpression(trimmed, type: type, escapingBackslashes: true)
     }
 
     /// Refuses a default expression that could close its own clause and begin another.
@@ -5153,7 +5154,13 @@ enum TableSchemaSQL {
         return digits > 0
     }
 
-    private static func literalExpression(_ value: String, type: String) throws -> String {
+    /// A text default as a quoted literal. `escapingBackslashes` for MySQL, whose literals treat a
+    /// backslash as an escape unless the server runs with NO_BACKSLASH_ESCAPES (off by default):
+    /// with quotes doubled alone, `x\', DROP COLUMN secret #` ended its own literal and began a
+    /// clause, and a server default `a\b` went back as a backspace — and Keep Current carries the
+    /// server's string, which anyone with DDL rights on the table chooses (2026-10-24). PostgreSQL's
+    /// and SQLite's literals take a backslash as it is.
+    private static func literalExpression(_ value: String, type: String, escapingBackslashes: Bool = false) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw TableSchemaEditError.unsupported("Enter a default literal before reviewing SQL.")
@@ -5172,7 +5179,8 @@ enum TableSchemaSQL {
                 throw TableSchemaEditError.unsupported("The default must be true, false, 1, or 0 for \(type).")
             }
         }
-        return "'\(trimmed.replacingOccurrences(of: "'", with: "''"))'"
+        let escaped = escapingBackslashes ? trimmed.replacingOccurrences(of: "\\", with: "\\\\") : trimmed
+        return "'\(escaped.replacingOccurrences(of: "'", with: "''"))'"
     }
 
     private static func baseType(_ type: String) -> String {

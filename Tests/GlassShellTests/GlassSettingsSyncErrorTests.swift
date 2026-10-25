@@ -82,16 +82,24 @@ struct GlassSettingsSyncErrorTests {
         await service.start(onMerge: { _ in })
         await #expect(throws: GlassSettingsSyncError.self) { try await service.push(GlassFavoritesPayload()) }
 
-        let logStore = try OSLogStore(scope: .currentProcessIdentifier)
+        // A deadline, not a count: one read of the process's log takes about a second, so it is read
+        // off the main actor — this suite's, and every other main-actor test's (2026-10-24).
         var messages: [String] = []
-        // A deadline, not a count: one read of the process's log takes about a second.
-        let deadline = ContinuousClock.now + .seconds(5)
+        let deadline = ContinuousClock.now + .seconds(30)
         while ContinuousClock.now < deadline {
-            messages = try logStore.getEntries(
-                at: logStore.position(date: started),
-                matching: NSPredicate(format: "subsystem == %@ AND category == %@", "com.glasspowertools", "settings"))
-                .compactMap { ($0 as? OSLogEntryLog)?.composedMessage }
-                .filter { $0.contains(key) }
+            messages = try await withCheckedThrowingContinuation { continuation in
+                // A Dispatch thread, not one of concurrency's few: the read blocks for its second.
+                DispatchQueue.global(qos: .userInitiated).async {
+                    continuation.resume(with: Result {
+                        let logStore = try OSLogStore(scope: .currentProcessIdentifier)
+                        return try logStore.getEntries(
+                            at: logStore.position(date: started),
+                            matching: NSPredicate(format: "subsystem == %@ AND category == %@", "com.glasspowertools", "settings"))
+                            .compactMap { ($0 as? OSLogEntryLog)?.composedMessage }
+                            .filter { $0.contains(key) }
+                    })
+                }
+            }
             if messages.count >= 2 { break }
             try await Task.sleep(for: .milliseconds(20))
         }

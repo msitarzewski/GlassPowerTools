@@ -86,16 +86,23 @@ public final class SSHTunnel: Sendable {
     private let registry: SSHTunnelChildRegistry
     private let task: Task<Void, Never>
     private let closed = OSAllocatedUnfairLock(initialState: false)
+    private let refusalState: OSAllocatedUnfairLock<String?>
 
-    init(kind: Kind, localPort: Int, listener: any Channel, registry: SSHTunnelChildRegistry, task: Task<Void, Never>) {
+    init(kind: Kind, localPort: Int, listener: any Channel, registry: SSHTunnelChildRegistry, task: Task<Void, Never>,
+         refusal: OSAllocatedUnfairLock<String?> = OSAllocatedUnfairLock(initialState: nil)) {
         self.kind = kind
         self.localPort = localPort
         self.listener = listener
         self.registry = registry
         self.task = task
+        self.refusalState = refusal
     }
 
     public var isClosed: Bool { closed.withLock { $0 } }
+    /// Why the server would not connect this forward's latest client on to its target, in the
+    /// server's words ("Connection refused"); nil until one is refused, and again once one opens.
+    /// The client itself sees only its socket close, and a driver may not notice even that.
+    public var refusal: String? { refusalState.withLock { $0 } }
     /// Accepted client connections currently open.
     public var activeConnectionCount: Int { registry.count }
 
@@ -145,6 +152,7 @@ enum SSHTunnelFactory {
     static func bind(
         kind: SSHTunnel.Kind,
         localPort: Int,
+        refusal: OSAllocatedUnfairLock<String?> = OSAllocatedUnfairLock(initialState: nil),
         handle: @escaping @Sendable (NIOAsyncChannel<ByteBuffer, ByteBuffer>) async -> Void
     ) async throws -> SSHTunnel {
         let registry = SSHTunnelChildRegistry()
@@ -186,7 +194,8 @@ enum SSHTunnelFactory {
                 group.cancelAll()
             }
         }
-        return SSHTunnel(kind: kind, localPort: boundPort, listener: listener, registry: registry, task: task)
+        return SSHTunnel(kind: kind, localPort: boundPort, listener: listener, registry: registry, task: task,
+                         refusal: refusal)
     }
 
     /// `NIOAsyncChannel` must be created on the channel's own event loop (NIOCore
@@ -203,10 +212,24 @@ enum SSHTunnelFactory {
         localClient: NIOAsyncChannel<ByteBuffer, ByteBuffer>,
         remoteHost: String,
         remotePort: Int,
-        provider: any SSHDirectChannelProvider
+        provider: any SSHDirectChannelProvider,
+        refusal: OSAllocatedUnfairLock<String?>? = nil
     ) async {
+        let remote: NIOAsyncChannel<ByteBuffer, ByteBuffer>
         do {
-            let remote = try await provider.openDirectAsyncChannel(toHost: remoteHost, port: remotePort)
+            remote = try await provider.openDirectAsyncChannel(toHost: remoteHost, port: remotePort)
+            refusal?.withLock { $0 = nil }
+        } catch {
+            // Nothing listening at the target, a firewall, or the server's sshd not allowing the
+            // forward. Kept for the forward's owner and said at error level: at debug it vanished,
+            // and a MySQL connect through it waited without a word (2026-10-22).
+            let reason = refusalReason(error)
+            logger.error("A forward's server refused to connect on to port \(remotePort, privacy: .public): \(reason, privacy: .public)")
+            refusal?.withLock { $0 = reason }
+            try? await localClient.channel.close()
+            return
+        }
+        do {
             try await localClient.executeThenClose { localInbound, localOutbound in
                 try await remote.executeThenClose { remoteInbound, remoteOutbound in
                     try await withThrowingTaskGroup(of: Void.self) { group in
@@ -225,6 +248,23 @@ enum SSHTunnelFactory {
             logger.debug("Port forward connection ended")
             try? await localClient.channel.close()
         }
+    }
+
+    /// The server's own words for a refused forward. OpenSSH sends a reason code and text with the
+    /// refusal — "Connection refused", or "open failed" for a forward its configuration forbids,
+    /// which is said here by the code's name — and NIOSSH carries them only in its description ("…channelSetupRejected: Reason: 2
+    /// Connection refused"). The text comes from the server, so it is cut to a line of printable
+    /// characters before anyone sees it.
+    static func refusalReason(_ error: Error) -> String {
+        let description = String(describing: error)
+        guard let match = description.firstMatch(of: /Reason: (\d+) ([^\n]+)/) else {
+            return "the SSH connection could not open a channel to it"
+        }
+        // SSH_OPEN_ADMINISTRATIVELY_PROHIBITED (RFC 4254 §5.1): the server's configuration, not the target.
+        if match.1 == "1" { return "administratively prohibited" }
+        let words = String(String.UnicodeScalarView(match.2.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }))
+            .trimmingCharacters(in: .whitespaces)
+        return words.isEmpty ? "the server gave no reason" : String(words.prefix(120))
     }
 
     /// Perform a SOCKS5 handshake on a local client, then tunnel to the requested target.
@@ -339,8 +379,11 @@ enum SSHTunnelFactory {
     // MARK: Public constructors used by SSHTransport and by tests
 
     static func localForward(localPort: Int, remoteHost: String, remotePort: Int, provider: any SSHDirectChannelProvider) async throws -> SSHTunnel {
-        try await bind(kind: .local(remoteHost: remoteHost, remotePort: remotePort), localPort: localPort) { client in
-            await pipe(localClient: client, remoteHost: remoteHost, remotePort: remotePort, provider: provider)
+        let refusal = OSAllocatedUnfairLock<String?>(initialState: nil)
+        return try await bind(kind: .local(remoteHost: remoteHost, remotePort: remotePort), localPort: localPort,
+                              refusal: refusal) { client in
+            await pipe(localClient: client, remoteHost: remoteHost, remotePort: remotePort, provider: provider,
+                       refusal: refusal)
         }
     }
 

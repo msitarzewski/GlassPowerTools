@@ -36,10 +36,16 @@ final class TerminalPasteUITests: XCTestCase {
         • Joined again, each paragraph is one line, and the blank line between them stays where it was.
         """
 
+    private var clipboard: UITestClipboard?
+
+    override func setUp() async throws {
+        try await MainActor.run { clipboard = try UITestClipboard() }
+    }
+
     override func tearDown() async throws {
         await MainActor.run {
             app?.terminate()
-            UIPasteboard.general.string = ""
+            clipboard?.restore()
         }
     }
 
@@ -60,7 +66,10 @@ final class TerminalPasteUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
-                                "--demo-open", "terminal"]
+                                "--demo-open", "terminal",
+                                // A blinking cursor is a repeating animation, so the app is never
+                                // idle and every step waited XCUITest's 60 seconds for it: 693 s.
+                                "-blinkingCursor", "NO"]
         app.launch()
         self.app = app
         XCTAssertTrue(terminal.waitForExistence(timeout: 30), "the terminal")
@@ -75,6 +84,10 @@ final class TerminalPasteUITests: XCTestCase {
         // Still more than one line: reviewed, joined, the checkbox on.
         paste(twoParagraphs)
         XCTAssertTrue(join.waitForExistence(timeout: 10), "the review offers to join the lines")
+        let review = XCTAttachment(screenshot: app.screenshot())
+        review.name = "paste-review"
+        review.lifetime = .keepAlways
+        add(review)
         XCTAssertEqual(join.value as? String, "1", "on until someone turns it off")
         XCTAssertEqual(text.value as? String, twoParagraphsJoined)
         // Off: the lines as they came.

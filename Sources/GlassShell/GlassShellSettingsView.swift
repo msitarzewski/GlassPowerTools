@@ -191,7 +191,7 @@ public struct GlassShellSettingsView: View {
         case .general: general
         case .appearance:
             GlassLayerControls()
-            #if os(macOS)
+            #if os(macOS) || os(visionOS)
             showAllWindowsSection
             #endif
         case .privacy: privacy
@@ -216,6 +216,25 @@ public struct GlassShellSettingsView: View {
             Toggle("Blur previews", isOn: $blursShowAllWindowsPreviews)
                 .accessibilityIdentifier("settings-show-all-windows-blur")
             Text("Softens what each window shows in Show All Windows (⇧⌘\\), so a screenshot of it can be shared. Names stay sharp. This Mac only.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    #endif
+
+    #if os(visionOS)
+    @AppStorage(GlassAllWindowsAround.opensAroundKey, store: GlassUITestRun.settingsDefaults)
+    private var showAllWindowsOpensAround = false
+
+    /// Where the ⚡ held shows every window (2026-10-21): in a window, or around the person.
+    private var showAllWindowsSection: some View {
+        Section(GlassShowAllWindows.title) {
+            Picker("Opens", selection: $showAllWindowsOpensAround) {
+                Text("In a Window").tag(false)
+                Text("Around You").tag(true)
+            }
+            .accessibilityIdentifier("settings-show-all-windows-opens")
+            Text("Pinch and hold ⚡ to see every window. Around You clears other apps from the room while it is open; pinch out with both hands, or choose In a Window, to step back.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

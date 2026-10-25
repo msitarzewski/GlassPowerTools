@@ -11,6 +11,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// When the file a printed path names shows by itself, under the pointer. Quick Look on a path's
 /// right-click menu shows it whatever this says.
@@ -41,5 +42,36 @@ public struct TerminalPreviewFile {
     public init(url: URL, discard: (@MainActor () -> Void)? = nil) {
         self.url = url
         self.discard = discard
+    }
+}
+
+/// The bar over a preview, on the Mac and the headset alike: the file's name, Show in Finder or
+/// Files, Open in Editor.
+struct TerminalPreviewBar: View {
+    let name: String
+    let open: (@MainActor () -> Void)?
+    let revealTitle: String
+    let reveal: (@MainActor () -> Void)?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(name)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            if let reveal {
+                Button(revealTitle, systemImage: "folder") { reveal() }
+                    .labelStyle(.iconOnly)
+                    .help(revealTitle)
+            }
+            if let open {
+                Button("Open in Editor", systemImage: "pencil") { open() }
+                    .help("Open in Editor")
+            }
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }

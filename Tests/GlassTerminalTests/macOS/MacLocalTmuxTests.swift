@@ -706,8 +706,9 @@ struct MacLocalTmuxTests {
     }
 
     /// Waits up to two seconds for `condition`.
+    /// Until `condition` holds, for up to 30 s (2 until 2026-10-24, which a busy run outlasted).
     private func eventually(_ condition: () -> Bool) async -> Bool {
-        for _ in 0..<100 {
+        for _ in 0..<1_500 {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(20))
         }
@@ -736,7 +737,7 @@ struct MacLocalTmuxTests {
             MacLocalTmux.noteShown("glass-1")
             defer { MacLocalTmux.noteHidden("glass-1") }
 
-            let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+            let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
             let capability = GlassTerminalCapability(runtime: runtime)
             var alpha = ServerConfiguration(name: "alpha", host: "alpha.example.com", username: "ann")
             alpha.tmux = true
@@ -854,8 +855,9 @@ struct MacLocalTmuxTests {
             #expect(await eventually { tab.windowIdentity(servers: []).title == "shop" })
 
             tab.rename(to: nil)
+            let applied = MacLocalTmux.contextReads.applied
             tab.refreshLocalTmuxContext()
-            try await Task.sleep(for: .milliseconds(200))
+            #expect(await eventually { MacLocalTmux.contextReads.applied > applied }, "the read after it is applied")
             #expect(tab.windowIdentity(servers: []).title == MacWorkspaceTabNaming.tmuxDisplayName(session),
                     "the automatic name, chosen here, is not replaced by the session's old one")
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
@@ -913,6 +915,9 @@ struct MacLocalTmuxTests {
         var repository: (top: String, branch: String)? = ("/home/ann/src/app", "main")
         /// How long a read takes on the host.
         var delay: Duration = .zero
+        /// Reads answered. The terminal applies an answer as the read returns, on the main actor, as
+        /// this runs: once the count is up, the answer has been taken or refused.
+        var answered = 0
         /// Names a tab here may give the session: one sent shows in the reads after it.
         var nameable: [String?] = [nil]
         let read = TerminalTmux.paneStateCommand(session: "glass-5")!
@@ -931,6 +936,7 @@ struct MacLocalTmuxTests {
                 [TerminalRepository.remoteMarker, $0.top, "../.git", $0.branch, "/home/ann"].joined(separator: "\n") + "\n"
             } ?? "")
             if delay > .zero { try await Task.sleep(for: delay) }
+            answered += 1
             return answer
         }
     }
@@ -1025,15 +1031,19 @@ struct MacLocalTmuxTests {
             fake.contextReadDelay = 0.3
             tab.refreshLocalTmuxContext()
             #expect(await eventually { fake.contextReads == 2 }, "a read is on its way, and will say \"old\"")
+            let applied = MacLocalTmux.contextReads.applied
             tab.rename(to: "new")
-            try await Task.sleep(for: .milliseconds(600))
+            // Until that read's answer has been handed to the tab: a fixed 600 ms stood for it, and a busy
+            // run checked before the stale answer arrived, passing without the race (2026-10-24).
+            #expect(await eventually { MacLocalTmux.contextReads.applied > applied }, "the read on its way is applied")
             #expect(tab.tabLabel == "new", "the read begun before the rename is not taken over it")
             #expect(fake.givenNames.map(\.name) == ["new"] && fake.contexts[session]?.givenName == "new")
 
             fake.contextReadDelay = 0
             tab.refreshLocalTmuxContext()
+            let appliedBefore = MacLocalTmux.contextReads.applied
             #expect(await eventually { fake.contextReads == 3 })
-            try await Task.sleep(for: .milliseconds(100))
+            #expect(await eventually { MacLocalTmux.contextReads.applied > appliedBefore })
             #expect(tab.tabLabel == "new", "the next read finds it on the session")
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
         }
@@ -1175,11 +1185,14 @@ struct MacLocalTmuxTests {
             window.renameTab(tab.workspaceID, to: "build")
             let named = try #require(TerminalTmux.givenNameCommand(session: "glass-5", name: "build"))
             #expect(await eventually { host.commands.contains(named) })
-            try await Task.sleep(for: .milliseconds(500))
+            // Until the read begun before the rename has answered: fixed sleeps stood for that, and a
+            // busy run checked before the stale answer arrived, passing without the race (2026-10-24).
+            #expect(await eventually { host.answered >= reads + 1 }, "the read on its way answers")
             #expect(tab.tabLabel == "build" && host.given == "build", "the read begun before the rename is not taken over it")
             host.delay = .zero
+            let answered = host.answered
             await settle(session)
-            try await Task.sleep(for: .milliseconds(100))
+            #expect(await eventually { host.answered > answered }, "the next read answers")
             #expect(tab.tabLabel == "build" && savedLabel(window, defaults) == .some("build"))
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
         }
@@ -1219,7 +1232,7 @@ struct MacLocalTmuxTests {
             let host = HostSession()
             let (window, tab, session) = await sshTab(host, defaults)
             #expect(await eventually { tab.windowIdentity(servers: [host.server]).title == "✳ Claude Code" })
-            let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+            let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
             runtime.sessionManager.serverManager.servers = [host.server]
             runtime.sessionManager.registerSession(session)
             let capability = GlassTerminalCapability(runtime: runtime)
@@ -1318,7 +1331,7 @@ struct MacLocalTmuxTests {
                 Self.line("glass-2", server: thisMac, directory: root + "/notes"),
             ].joined(separator: "\n") + "\n"
 
-            let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+            let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
             let capability = GlassTerminalCapability(runtime: runtime)
             var bravo = ServerConfiguration(name: "bravo", host: "bravo.example.com", username: "ann")
             bravo.tmux = true

@@ -78,10 +78,24 @@ final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
     func noteProbe(_ view: UIView) { probes.add(view) }
     func forgetProbe(_ view: UIView) { probes.remove(view) }
 
+    /// Only a ⚡ on the screen in front counts. A sheet leaves the screen it covers in the window,
+    /// ⚡ and all, and a hold on the Add Host sheet's bar, where the library's ⚡ lay underneath,
+    /// opened All Windows over the sheet (the iPhone and the Duo's outer display, 2026-10-25).
     private func isOnProbe(_ point: CGPoint, in window: UIWindow) -> Bool {
-        probes.allObjects.contains { view in
+        let front = Self.frontmostController(in: window)?.view
+        return probes.allObjects.contains { view in
             view.window === window && view.convert(view.bounds, to: window).contains(point)
+                && (front.map { view.isDescendant(of: $0) } ?? true)
         }
+    }
+
+    /// The view controller presented last in `window`: the screen a touch reaches.
+    static func frontmostController(in window: UIWindow) -> UIViewController? {
+        var controller = window.rootViewController
+        while let presented = controller?.presentedViewController, !presented.isBeingDismissed {
+            controller = presented
+        }
+        return controller
     }
 
     private var installed = false

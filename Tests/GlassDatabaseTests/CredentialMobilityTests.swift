@@ -71,12 +71,11 @@ struct CredentialMobilityTests {
     /// product that cannot save a password at all.
     @Test("The services these configurations write to are eligible to synchronize")
     func writtenServicesAreEligible() {
+        // Against the list the validator itself reads, `synchronizableServices`: it built its own list
+        // from the same names and checked they were on it until 2026-10-24.
         for config in [KeychainManager.appOnlyConfig, KeychainManager.sharedConfig] {
-            let eligible = [config.passwordsService, config.sshPasswordsService,
-                            config.rdpCredentialsService, config.sshKeysPrivateService,
-                            config.sshKeysPassphraseService]
-            #expect(eligible.contains(config.passwordsService))
-            #expect(eligible.contains(config.sshPasswordsService))
+            #expect(config.synchronizableServices.contains(config.passwordsService), "\(config.passwordsService)")
+            #expect(config.synchronizableServices.contains(config.sshPasswordsService), "\(config.sshPasswordsService)")
         }
     }
 }

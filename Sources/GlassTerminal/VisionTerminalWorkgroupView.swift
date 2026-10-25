@@ -167,18 +167,17 @@ private struct VisionTerminalPreview: View {
     }
 }
 
-/// A terminal window's sidebar beside its terminals, from the second terminal on (the owner,
-/// 2026-10-21), laid out as the headset's database, editor, Files and Connections lay theirs
-/// (`GlassSpatialSplitView`, W33): Apple's split view draws glass behind every column that nothing
-/// clears, and a Glass window is completely clear at Glass 0. The sidebar has Apple's glass of its
-/// own, as the system's sidebar column does; the terminal beside it keeps the window's.
+/// A terminal window's sidebar, from the second terminal on (the owner, 2026-10-21), **beside the
+/// window, not in it**: an ornament on its leading edge, in Apple's glass, as tall as the window, on
+/// the window's own plane a few points from its edge. The window never changes for it, so the terminal neither moves nor redraws as it is shown or hidden
+/// (the owner: "The terminal content should not move or redraw"). In the window it took the
+/// terminal's room or, with the window widened for it, moved the terminal by half its width: visionOS
+/// keeps a resized window centred, and no app can move one.
 ///
-/// The window widens by the sidebar as its second terminal arrives and narrows as the last but one
-/// leaves (`glassAdditiveSidebar`), as a Mac window does, and as its toggle in the window's bar shows
-/// and hides it (the owner, 2026-10-21: "We need a sidebar/tabs toggle in the bottom ornaments").
-/// The grid, the carousel and the orb hide it and keep the window's size, as the Mac's overview does.
+/// Apple's own tab bar stands there too; this is the same place with the rows a Mac window's sidebar
+/// has. Hidden in the grid, the carousel and the orb, and by its toggle in the window's bar.
 private struct VisionTerminalSidebarLayout<Sidebar: View, Detail: View>: View {
-    /// Two or more terminals: the window has the sidebar's room.
+    /// Two or more terminals.
     let hasTabs: Bool
     /// The window's toggle leaves it shown.
     let wanted: Bool
@@ -188,23 +187,37 @@ private struct VisionTerminalSidebarLayout<Sidebar: View, Detail: View>: View {
     @ViewBuilder let detail: Detail
 
     @Environment(\.glassSessionOrb) private var orb
-    @State private var visibility = NavigationSplitViewVisibility.detailOnly
+    /// The window's height, which the sidebar stands as tall as.
+    @State private var height: CGFloat = 600
+
+    static var width: CGFloat { GlassSpatialColumns.sidebarMinimumWidth }
+    /// Between the sidebar and the window's edge: a few points, as the owner asked (2026-10-22: "put
+    /// only a few pixels between them").
+    static var gap: CGFloat { 4 }
+    /// How far visionOS stands an ornament in front of its window, in the ornament's points: the
+    /// sidebar is pushed back by this onto the window's plane (the owner, 2026-10-22: "put the tab
+    /// bar on the same plane as the terminal window"). Measured in the visionOS 27 simulator, in the
+    /// shared space's coordinates while an immersive space was open (1.874 units a point): the
+    /// window's glass at the front of its depth, z −2544.2; the ornament's at −2515.6. 109.5 first,
+    /// to the back of the window's depth, stood it "pretty far behind" on the headset; at this, the
+    /// sidebar and the window show the same height in a capture, as two things on one plane do. An
+    /// anchor's own depth (`.scene(UnitPoint3D)`, front or back) didn't move it.
+    static var ornamentDepth: CGFloat { 15.3 }
 
     var body: some View {
         let shown = hasTabs && wanted && showsTabs && orb?.isOrb != true
-        // The sidebar in its own glass, apart from the terminal, which keeps the window's (the owner's
-        // choice, 2026-10-21: "Ours, in its own glass").
-        GlassSpatialSplitView(visibility: $visibility, showsToggle: false, sidebarHasGlass: true) {
-            sidebar
-        } content: {
-            detail
-        }
-        .onChange(of: shown, initial: true) { _, shown in
-            withAnimation(.easeInOut(duration: 0.25)) { visibility = shown ? .all : .detailOnly }
-        }
-        // Its room, given and taken back as the second terminal comes and goes and as its toggle
-        // shows and hides it.
-        .glassAdditiveSidebar(isOpen: hasTabs && wanted, width: GlassSpatialColumns.sidebarIdealWidth)
+        detail
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .ornament(visibility: shown ? .visible : .hidden, attachmentAnchor: .scene(.leading),
+                      contentAlignment: .trailing) {
+                sidebar
+                    .frame(width: Self.width, height: max(320, height))
+                    .glassBackgroundEffect(in: RoundedRectangle(cornerRadius: GlassWindowShape.spatialWindowCornerRadius,
+                                                                style: .continuous))
+                    .padding(.trailing, Self.gap)
+                    // Back onto the window's own plane: an ornament stands in front of its window.
+                    .offset(z: -Self.ornamentDepth)
+            }
     }
 }
 
@@ -287,6 +300,8 @@ struct VisionTerminalWorkgroupView: View {
     @State private var dropTargetSessionID: UUID?
     /// Whether the window shows its sidebar, as its bar's toggle leaves it.
     @State private var showsSidebar = true
+    /// A sidebar row's corners, where it is tinted and highlighted.
+    private static var sidebarRowCornerRadius: CGFloat { 16 }
 
     private var presentation: VisionTerminalPresentation {
         get { spatialPresentation.mode }
@@ -338,6 +353,17 @@ struct VisionTerminalWorkgroupView: View {
             connectShownSlot()
             #if DEBUG && os(visionOS)
             if Self.demoOpensGrid.remove(workgroupID) != nil { presentation = .grid }
+            // Screenshots only: `--demo-sidebar-toggle` in a `--ui-testing` run hides the sidebar a
+            // few seconds in and shows it again, for the window following it (2026-10-21).
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--ui-testing"), arguments.contains("--demo-sidebar-toggle") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(12))
+                    showsSidebar = false
+                    try? await Task.sleep(for: .seconds(10))
+                    showsSidebar = true
+                }
+            }
             #endif
         }
         // A link held on a path (2026-10-15): Open in Editor, Show in Files and Watch Log File for
@@ -772,21 +798,47 @@ struct VisionTerminalWorkgroupView: View {
     /// menu, and moving the hand drags it — onto another terminal window to move it there, onto
     /// another row here to take that place, or into empty space for a window of its own.
     private func terminalSidebar(workgroup: TerminalWorkgroup, sessions: [TerminalSession]) -> some View {
-        List(selection: $selectedSessionID) {
-            ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
-                VisionTerminalSidebarRow(session: session, color: windowLook.tintColor ?? workgroup.colorTag.color)
-                    .glassSpatialListRow()
+        // **Rows of our own, not a `List`** (the owner, 2026-10-22: "drag tabs to reorder should
+        // work, too. doens't."). A `List` takes no drop of a row dragged from inside it, whether on
+        // a row, through `onMove` or through the list's own drop (seen in the visionOS simulator, in
+        // the ornament and in the window alike: the row lifted, followed the hand, and nothing
+        // moved), as others have found on iOS (Apple's forums, "dropDestination does not work
+        // inside List"). Each row is a button, highlighted when looked at and tinted when shown, as
+        // the family's own tab rows are (`GlassWorkspaceTabBar`).
+        ScrollView {
+            VStack(spacing: 2) {
+                ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
+                    let shown = selectedSessionID == session.id
+                    let shape = RoundedRectangle(cornerRadius: Self.sidebarRowCornerRadius, style: .continuous)
+                    Button {
+                        selectedSessionID = session.id
+                    } label: {
+                        VisionTerminalSidebarRow(session: session, color: windowLook.tintColor ?? workgroup.colorTag.color)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(shown ? AnyShapeStyle(Color.primary.opacity(0.12)) : AnyShapeStyle(Color.clear), in: shape)
+                            .contentShape(.hoverEffect, shape)
+                            .contentShape(shape)
+                    }
+                    .buttonStyle(.plain)
+                    .hoverEffect(.highlight)
                     .contextMenu { tabActions(for: session) }
                     .onDrag {
                         TerminalTabDrag.itemProvider(TerminalTabTransfer(workgroupID: workgroupID, sessionID: session.id))
                     }
+                    // Let go on a row, it takes that row's place, as on a Mac's sidebar: a row of
+                    // this window to reorder, or a tab from another.
                     .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
                         acceptDroppedTabs(tabs, at: index)
                     }
+                    .accessibilityAddTraits(shown ? .isSelected : [])
                     .accessibilityIdentifier("vision-terminal-sidebar-row-\(session.id.uuidString)")
+                }
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
         }
-        .glassSpatialList()
         // A tab from another window let go below the rows joins after the last.
         .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
             acceptDroppedTabs(tabs, at: nil)
@@ -1343,3 +1395,4 @@ struct TerminalTabMoveActions: View {
     }
 }
 #endif
+

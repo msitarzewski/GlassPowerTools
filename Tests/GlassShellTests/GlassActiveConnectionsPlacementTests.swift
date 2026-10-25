@@ -21,14 +21,25 @@ struct GlassActiveConnectionsPlacementTests {
         window.contentView = NSHostingView(rootView: view)
         window.orderBack(nil)
         defer { window.close() }
-        for _ in 0..<20 {
+        func items() -> [(label: String, x: CGFloat)] {
+            (window.toolbar?.items ?? []).compactMap { item in
+                guard !item.label.isEmpty, let view = item.view else { return nil }
+                return (item.label, view.convert(view.bounds, to: nil).minX)
+            }
+        }
+        // Until SwiftUI has put a labelled item in the toolbar, for up to 10 s, then a few more
+        // passes so the rest arrive and the positions settle. A fixed second stood for all of it,
+        // and an empty toolbar passed the test that looks for an absence (2026-10-24).
+        let deadline = ContinuousClock.now + .seconds(10)
+        while items().isEmpty, ContinuousClock.now < deadline {
             window.contentView?.layoutSubtreeIfNeeded()
             try? await Task.sleep(for: .milliseconds(50))
         }
-        return (window.toolbar?.items ?? []).compactMap { item in
-            guard !item.label.isEmpty, let view = item.view else { return nil }
-            return (item.label, view.convert(view.bounds, to: nil).minX)
+        for _ in 0..<10 {
+            window.contentView?.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(50))
         }
+        return items()
     }
 
     private func pane() -> some View {
@@ -74,6 +85,7 @@ struct GlassActiveConnectionsPlacementTests {
     @Test("without a route there is no ⚡")
     func noRouteNoBolt() async {
         let items = await layout(NavigationSplitView { Text("schema") } detail: { pane() })
+        #expect(items.contains { $0.label == "Refresh" }, "the pane's own buttons are there: \(items)")
         #expect(!items.contains { $0.label == "Active Connections" }, "\(items)")
     }
 }

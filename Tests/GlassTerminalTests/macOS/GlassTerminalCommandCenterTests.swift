@@ -27,14 +27,14 @@ struct GlassTerminalCommandCenterTests {
 
     @Test("a machine's terminal is the library's entry; the terminal adds its own windows and panels")
     func titles() {
-        let titles = entries(GlassTerminalRuntime(layers: GlassLayerStore()), Recorder()).map(\.title)
+        let titles = entries(GlassTerminalRuntime(layers: GlassLayerStore.forTest()), Recorder()).map(\.title)
         #expect(Array(titles.prefix(4)) == ["New Connection", "Open Local Terminal", "Open Basic Local Terminal", "Workgroups"])
         #expect(!titles.contains { $0.hasPrefix("Connect to ") && !$0.hasSuffix(" without tmux") })
     }
 
     @Test("New Connection opens Connections when none is open, and leaves it the request to carry out")
     func newConnectionFromATerminalWindow() throws {
-        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let recorder = Recorder()
         try #require(entries(runtime, recorder).first { $0.title == "New Connection" }).action()
         #expect(recorder.openedConnections == 1)
@@ -50,7 +50,7 @@ struct GlassTerminalCommandCenterTests {
     @Test("the local terminals open their own windows, with no Connections window")
     func localTerminals() throws {
         let recorder = Recorder()
-        let list = entries(GlassTerminalRuntime(layers: GlassLayerStore()), recorder)
+        let list = entries(GlassTerminalRuntime(layers: GlassLayerStore.forTest()), recorder)
         try #require(list.first { $0.title == "Open Local Terminal" }).action()
         try #require(list.first { $0.title == "Open Basic Local Terminal" }).action()
         #expect(recorder.openedConnections == 0)

@@ -9,11 +9,14 @@ import GlassTerminalEmulator
 struct TerminalRemotePreviewTests {
     @Test("kept under its own name in a folder of its own, which closing the preview removes")
     func savedAndDiscarded() throws {
-        let file = try #require(TerminalRemotePreview.save(Data("# Notes\n".utf8), named: "README.md"))
+        // A caches folder of the test's own, not the one the app keeps previews in (2026-10-24).
+        let caches = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-previews-\(UUID().uuidString.prefix(8))")
+        defer { try? FileManager.default.removeItem(at: caches) }
+        let file = try #require(TerminalRemotePreview.save(Data("# Notes\n".utf8), named: "README.md", caches: caches))
         #expect(file.url.lastPathComponent == "README.md", "a viewer that goes by the name sees what it is")
         #expect(try String(contentsOf: file.url, encoding: .utf8) == "# Notes\n")
         let folder = file.url.deletingLastPathComponent()
-        let other = try #require(TerminalRemotePreview.save(Data([1, 2, 3]), named: "README.md"))
+        let other = try #require(TerminalRemotePreview.save(Data([1, 2, 3]), named: "README.md", caches: caches))
         #expect(other.url.deletingLastPathComponent() != folder, "each preview its own folder")
 
         file.discard?()
@@ -25,6 +28,6 @@ struct TerminalRemotePreviewTests {
 
     @Test("a file with no name is not saved")
     func noName() {
-        #expect(TerminalRemotePreview.save(Data([1]), named: "") == nil)
+        #expect(TerminalRemotePreview.save(Data([1]), named: "", caches: FileManager.default.temporaryDirectory) == nil)
     }
 }

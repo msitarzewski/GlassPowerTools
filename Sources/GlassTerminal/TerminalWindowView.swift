@@ -1713,6 +1713,13 @@ struct TerminalWindowView: View {
         #endif
 
             if showsFooterWorkspaceNavigationActions {
+                #if os(visionOS)
+                // The ⚡, as every other window has it (the owner, 2026-10-22: "switch it to the
+                // lightning bolt and send it to active"): Connections, on Active; held, every
+                // window, in a window or around the person as Settings says.
+                GlassActiveConnectionsButton(action: { terminalRuntime?.showActiveConnections?() })
+                    .accessibilityIdentifier("terminal-active-connections")
+                #else
                 Button {
                     showConnections()
                 } label: {
@@ -1725,6 +1732,7 @@ struct TerminalWindowView: View {
 #endif
                 .accessibilityLabel("Connections")
                 .help("Connections")
+                #endif
             }
 
             // In Tools on Vision Pro, whose bar had grown to eleven (the owner, 2026-10-21).

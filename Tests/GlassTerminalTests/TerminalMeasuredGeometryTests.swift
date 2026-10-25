@@ -9,7 +9,6 @@ struct TerminalMeasuredGeometryTests {
     @Test("a configured size keeps its floor; a measured one is the truth down to 2 rows")
     func ranges() {
         #expect(TerminalGeometry(rows: 4, columns: 60).rows == 8)
-        #expect(TerminalGeometry(measuredRows: 4, columns: 60) == TerminalGeometry(measuredRows: 4, columns: 60))
         #expect(TerminalGeometry(measuredRows: 4, columns: 60).rows == 4)
         #expect(TerminalGeometry(measuredRows: 0, columns: 3).rows == 2)
         #expect(TerminalGeometry(measuredRows: 0, columns: 3).columns == 10)

@@ -77,9 +77,11 @@ struct DesktopRetinaWindowTests {
             return session
         }
 
-        /// Lets the display connection's opening task run.
-        func settle(until condition: () -> Bool) async {
-            for _ in 0..<200 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
+        /// Lets the display connection's opening task run: up to `within`, gone as soon as it holds —
+        /// 30 s to wait for something to happen, and a second's chance for one that shouldn't.
+        func settle(within: Duration = .seconds(30), until condition: () -> Bool) async {
+            let deadline = ContinuousClock.now + within
+            while !condition(), ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
         }
     }
 
@@ -146,7 +148,7 @@ struct DesktopRetinaWindowTests {
                                      wallpaperRoot: fixture.root).opensDisplayConnections, "off unless a test turns it on")
         let second = session.displayViewport(for: 1)
         session.attach(second)
-        await fixture.settle { fixture.connects.count > 1 }
+        await fixture.settle(within: .seconds(1)) { fixture.connects.count > 1 }   // a chance to open one it shouldn't
         #expect(session.displayConnections.isEmpty && fixture.connects.count == 1, "one connection")
         #expect(session.currentRequestedRegions == [GlassRemoteRegion(x: 0, y: 0, width: 3200, height: 1800),
                                                     GlassRemoteRegion(x: 3200, y: 0, width: 1280, height: 800)],

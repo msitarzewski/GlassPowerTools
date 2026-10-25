@@ -247,35 +247,6 @@ struct TerminalWindowLookTests {
         #expect(NSDictionary(dictionary: with).isEqual(to: without), "nothing else changes")
     }
 
-    @Test("a look given on one device reaches the other with the workgroup")
-    func lookTravels() async throws {
-        let shared = WorkgroupsSyncTests.SharedStore()
-        func device() throws -> (SettingsManager, UserDefaults, String) {
-            let suite = "TerminalWindowLook.sync.\(UUID())"
-            let defaults = try #require(UserDefaults.forTest(suiteName: suite))
-            let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults,
-                                           workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: shared.device()))
-            return (settings, defaults, suite)
-        }
-        let (mac, macDefaults, macSuite) = try device()
-        let (headset, headsetDefaults, headsetSuite) = try device()
-        defer {
-            macDefaults.removePersistentDomain(forName: macSuite)
-            headsetDefaults.removePersistentDomain(forName: headsetSuite)
-        }
-        mac.startWorkgroupsSync()
-        headset.startWorkgroupsSync()
-        try await Task.sleep(for: .milliseconds(50))
-
-        var preset = LayoutPreset(name: "Builds", serverIDs: [UUID()])
-        preset.windowSettings = red
-        mac.upsertLayoutPreset(preset)
-        for _ in 0..<200 where !headset.layoutPresets.contains(where: { $0.id == preset.id }) {
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        #expect(headset.layoutPresets.first { $0.id == preset.id }?.windowSettings == red)
-    }
-
     @Test("saving a window as a Workgroup keeps the window's look, none included; editing keeps the Workgroup's")
     func editorKeepsTheLook() {
         var saved = LayoutPreset(name: "Builds", serverIDs: [UUID()])

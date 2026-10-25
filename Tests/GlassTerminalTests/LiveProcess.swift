@@ -1,4 +1,5 @@
 import Foundation
+import GlassTerminalEmulator
 
 /// Runs a program for a live test: what it printed, and how it exited.
 ///
@@ -25,7 +26,9 @@ enum LiveProcess {
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+        // As the app's own spawns: none of the test process's descriptors, and signals unblocked
+        // whatever thread runs this (`GlassSpawn`) — `runDetached` runs it off the main one.
+        GlassSpawn.prepare(&attributes)
         let argv = ([executable] + arguments).map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
         let envp = environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
@@ -41,5 +44,24 @@ enum LiveProcess {
         // WIFEXITED / WEXITSTATUS, which Swift does not import.
         let exitStatus = status & 0x7f == 0 ? (status >> 8) & 0xff : -1
         return (String(decoding: data, as: UTF8.self), exitStatus)
+    }
+
+    /// The same, waited for off the caller's actor. This target's tests are on the main actor by
+    /// default, and a test waiting there for a program held it from every other test in the run:
+    /// a full run's main thread was held 14.7 s at a stretch, and tests polling to a deadline failed
+    /// inside it (2026-10-24).
+    nonisolated static func runDetached(_ executable: String, _ arguments: [String], environment: [String: String],
+                                        includingErrors: Bool = false) async -> (output: String, status: Int32) {
+        await offMainActor { run(executable, arguments, environment: environment, includingErrors: includingErrors) }
+    }
+}
+
+/// Blocking work — a program run, a wait on something outside the process — done off the caller's
+/// actor, for the same reason as `LiveProcess.runDetached`. On a Dispatch queue, not in a detached
+/// task: blocking work holds a thread for as long as it waits, and Swift's concurrency has only a
+/// few, which every other async test in the run shares; Dispatch adds threads as its threads block.
+nonisolated func offMainActor<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+    await withCheckedContinuation { continuation in
+        DispatchQueue.global(qos: .userInitiated).async { continuation.resume(returning: work()) }
     }
 }

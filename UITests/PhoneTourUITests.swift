@@ -71,6 +71,9 @@ final class PhoneTourUITests: XCTestCase {
         summary.lifetime = .keepAlways
         add(summary)
         print("TOUR not reached: \(missing)")
+        // The tour goes on past a page it cannot reach, so one run photographs everything; the run
+        // still fails, at the end, naming them.
+        XCTAssertTrue(missing.isEmpty, "not reached: \(missing.joined(separator: ", "))")
     }
 
     // MARK: - Helpers

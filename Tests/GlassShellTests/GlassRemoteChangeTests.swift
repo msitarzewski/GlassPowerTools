@@ -11,6 +11,8 @@ private final class RecordingBackend: GlassCatalogSyncBackend, @unchecked Sendab
     var subscribed = false
     var saved: [HostProfile] = []
     var subscribeError: (any Error)?
+    /// Asked to subscribe, whether or not it could.
+    var subscribeAttempts = 0
 
     func fetchChanges(since token: Data?) async throws -> (profiles: [HostProfile], token: Data?) {
         fetchCount += 1
@@ -18,6 +20,7 @@ private final class RecordingBackend: GlassCatalogSyncBackend, @unchecked Sendab
     }
     func save(_ profiles: [HostProfile]) async throws { saved.append(contentsOf: profiles) }
     func subscribeToChanges() async throws {
+        subscribeAttempts += 1
         if let subscribeError { throw subscribeError }
         subscribed = true
     }
@@ -35,8 +38,16 @@ struct GlassRemoteChangeTests {
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
                                     resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                    layers: GlassLayerStore())
+                                    layers: GlassLayerStore.forTest())
         return (model, root)
+    }
+
+    /// Until `condition` holds, for up to 30 s. These waited a fixed 150 ms, and a run whose other
+    /// tests held the main actor longer than that failed them (2026-10-24).
+    private func until(_ condition: () -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + .seconds(30)
+        while !condition(), ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(20)) }
+        return condition()
     }
 
     /// The defect this pins: a subscription can be registered and nothing listen for it, which is
@@ -47,8 +58,7 @@ struct GlassRemoteChangeTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let backend = RecordingBackend()
         model.enableCatalogSync(backend)
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(backend.subscribed, "a backend that is never asked to subscribe will never push")
+        #expect(await until { backend.subscribed }, "a backend that is never asked to subscribe will never push")
     }
 
     @Test("A remote change notification reconciles the library")
@@ -57,13 +67,16 @@ struct GlassRemoteChangeTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let backend = RecordingBackend()
         model.enableCatalogSync(backend)
-        try await Task.sleep(for: .milliseconds(150))
+        #expect(await until { backend.subscribed })
         let before = backend.fetchCount
 
-        NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: nil)
-        try await Task.sleep(for: .milliseconds(300))
-
-        #expect(backend.fetchCount > before, "the push is only useful if something syncs on it")
+        // Posted until a sync follows: the model starts listening a moment after it subscribes, and
+        // a notification before that is not heard — as a push at launch isn't, before the library
+        // reconciles on coming to the front.
+        #expect(await until {
+            NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: nil)
+            return backend.fetchCount > before
+        }, "the push is only useful if something syncs on it")
     }
 
     /// Push is best-effort on every Apple platform. A device that cannot register must still be a
@@ -75,7 +88,7 @@ struct GlassRemoteChangeTests {
         let backend = RecordingBackend()
         backend.subscribeError = Boom()
         model.enableCatalogSync(backend)
-        try await Task.sleep(for: .milliseconds(150))
+        #expect(await until { backend.subscribeAttempts > 0 }, "asked, and refused")
         #expect(!backend.subscribed)
 
         await model.synchronizeCatalog()

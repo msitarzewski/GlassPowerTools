@@ -140,21 +140,36 @@ struct TerminalTmuxTests {
 
     /// The command as the host's `sh` runs it: tmux's history moves, and leaves at the bottom.
     @Test("the scroll command works through sh against a real tmux", .enabled(if: TerminalTmuxTests.tmux != nil))
-    func scrollingLive() throws {
+    func scrollingLive() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tmux-scroll-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        // A private tmux server: TMUX_TMPDIR moves its default socket.
-        func sh(_ command: String) -> String { Self.shell(command, ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]) }
+        // A private tmux server: TMUX_TMPDIR moves its default socket. Run off the main actor (`offMainActor`).
+        let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
+        func sh(_ command: String) async -> String { await offMainActor { Self.shell(command, environment) } }
         let tmux = TerminalTmuxTests.tmux!
-        _ = sh("\(tmux) -f /dev/null new-session -d -s glass-7 -x 80 -y 10 'seq 1 200; sleep 600'")
+        _ = await sh("\(tmux) -f /dev/null new-session -d -s glass-7 -x 80 -y 10 'seq 1 200; sleep 600'")
         // The private server by its socket: named, tmux never falls back to the default one.
-        defer { _ = sh("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server") }
-        Thread.sleep(forTimeInterval: 0.3)
-        _ = sh(TerminalTmux.scrollCommand(name: "glass-7", lines: 5))
-        #expect(sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode} #{scroll_position}'") == "1 5\n")
-        _ = sh(TerminalTmux.scrollCommand(name: "glass-7", lines: -9))
-        #expect(sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode}'") == "0\n", "past the bottom: out of copy mode")
+        defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
+        // Once seq has printed its last line, not after a guess at how long that takes.
+        #expect(await Self.waitForPane(of: "glass-7", toShow: "200", tmux: tmux, environment: environment))
+        _ = await sh(TerminalTmux.scrollCommand(name: "glass-7", lines: 5))
+        #expect(await sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode} #{scroll_position}'") == "1 5\n")
+        _ = await sh(TerminalTmux.scrollCommand(name: "glass-7", lines: -9))
+        #expect(await sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode}'") == "0\n", "past the bottom: out of copy mode")
+    }
+
+    /// Until a private server's pane shows `text` as a line of its own, up to 30 s.
+    nonisolated static func waitForPane(of session: String, toShow text: String, tmux: String,
+                                        environment: [String: String]) async -> Bool {
+        await offMainActor {
+            for _ in 0..<600 {
+                let screen = shell("\(tmux) capture-pane -p -t '=\(session):'", environment)
+                if screen.split(separator: "\n").contains(Substring(text)) { return true }
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+            return false
+        }
     }
 
     /// The owner (2026-10-11): "I can't drag select past the current screen buffer so I can't copy
@@ -182,17 +197,18 @@ struct TerminalTmuxTests {
     /// The command as the host's `sh` runs it, against a private tmux: every line, history first.
     @Test("the history command reads every line of a real tmux session, wrapped lines joined",
           .enabled(if: TerminalTmuxTests.tmux != nil))
-    func historyLive() throws {
+    func historyLive() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tmux-history-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        func sh(_ command: String) -> String { Self.shell(command, ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]) }
+        let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
+        func sh(_ command: String) async -> String { await offMainActor { Self.shell(command, environment) } }
         let tmux = TerminalTmuxTests.tmux!
         let long = String(repeating: "x", count: 100)
-        _ = sh("\(tmux) -f /dev/null new-session -d -s glass-8 -x 40 -y 10 'seq 1 300; echo \(long); sleep 600'")
-        defer { _ = sh("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server") }
-        Thread.sleep(forTimeInterval: 0.3)
-        let lines = TerminalTmux.historyText(sh(TerminalTmux.historyCommand(name: "glass-8"))).split(separator: "\n").map(String.init)
+        _ = await sh("\(tmux) -f /dev/null new-session -d -s glass-8 -x 40 -y 10 'seq 1 300; echo \(long); echo D''ONE; sleep 600'")
+        defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
+        #expect(await Self.waitForPane(of: "glass-8", toShow: "DONE", tmux: tmux, environment: environment))
+        let lines = TerminalTmux.historyText(await sh(TerminalTmux.historyCommand(name: "glass-8"))).split(separator: "\n").map(String.init)
         #expect(Array(lines.prefix(300)) == (1...300).map(String.init), "the history before the screen, from the first line")
         #expect(lines.dropFirst(300).first == long, "a line wider than the pane, joined")
     }
@@ -237,18 +253,19 @@ struct TerminalTmuxTests {
     /// The list command as a Mac host runs it over SSH: `sh`, the system PATH, and no locale.
     @Test("the list command reads a real tmux with no locale; no server is no sessions; an error is a failure",
           .enabled(if: TerminalTmuxTests.tmux != nil))
-    func listingLive() throws {
+    func listingLive() async throws {
         // Short: a socket path has a length limit, and some temporary folders are long.
         let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
+        func sh(_ command: String) async -> String { await offMainActor { Self.shell(command, environment) } }
         let tmux = TerminalTmuxTests.tmux!
-        #expect(TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) == .sessions([]),
+        #expect(TerminalTmux.parse(await sh(TerminalTmux.listCommand)) == .sessions([]),
                 "no server running: nothing runs, which is not a failure")
-        _ = Self.shell("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 'sleep 600'", environment)
+        _ = await sh("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 'sleep 600'")
         defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
-        guard case .sessions(let sessions) = TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) else {
+        guard case .sessions(let sessions) = TerminalTmux.parse(await sh(TerminalTmux.listCommand)) else {
             Issue.record("not read as a list")
             return
         }
@@ -258,7 +275,7 @@ struct TerminalTmuxTests {
     /// A tmux that fails in some way other than "no server running" — never a real one: given a
     /// folder it cannot use, tmux falls back to the default server.
     @Test("a tmux that fails for any other reason is a failure, not an empty host")
-    func listingFailure() throws {
+    func listingFailure() async throws {
         let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -266,7 +283,8 @@ struct TerminalTmuxTests {
         try Data("#!/bin/sh\necho 'server exited unexpectedly' >&2\nexit 1\n".utf8).write(to: tmux)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tmux.path)
         let environment = ["PATH": "\(folder.path):/usr/bin:/bin"]
-        #expect(TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) == .failed)
+        let command = TerminalTmux.listCommand
+        #expect(TerminalTmux.parse(await offMainActor { Self.shell(command, environment) }) == .failed)
     }
 
     nonisolated static func shell(_ command: String, _ environment: [String: String]) -> String {
@@ -623,7 +641,7 @@ struct TerminalTmuxTests {
     /// the owner's sessions, is never reached (rule 63).
     @Test("W6, live: the listing gives the active pane's title and folder and the server; a name set through each builder reads back",
           .enabled(if: TerminalTmuxTests.tmux != nil))
-    func namingLive() throws {
+    func namingLive() async throws {
         let tmux = try #require(TerminalTmuxTests.tmux)
         let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8).lowercased())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -638,31 +656,32 @@ struct TerminalTmuxTests {
             return String(cString: resolved)
         })
         let environment = ["PATH": "/usr/bin:/bin", "HOME": home]
-        @discardableResult func run(_ arguments: [String]) -> (output: String, status: Int32) {
-            LiveProcess.run(tmux, ["-S", socket] + arguments, environment: environment)
+        // Each run off the main actor (`LiveProcess.runDetached`).
+        @discardableResult func run(_ arguments: [String]) async -> (output: String, status: Int32) {
+            await LiveProcess.runDetached(tmux, ["-S", socket] + arguments, environment: environment)
         }
-        defer { run(["kill-server"]) }
-        func listing() -> [TerminalTmux.Session] {
+        defer { _ = LiveProcess.run(tmux, ["-S", socket, "kill-server"], environment: environment) }
+        func listing() async -> [TerminalTmux.Session] {
             let script = TerminalTmux.listScript(tmux: TerminalTmux.quoted(tmux), serverArguments: ["-S", socket])
-            guard case .sessions(let sessions) = TerminalTmux.parse(LiveProcess.run("/bin/sh", ["-c", script], environment: environment).output)
-            else { return [] }
+            let output = await LiveProcess.runDetached("/bin/sh", ["-c", script], environment: environment).output
+            guard case .sessions(let sessions) = TerminalTmux.parse(output) else { return [] }
             return sessions
         }
 
-        #expect(run(["-u", "-f", "/dev/null", "new-session", "-d", "-s", "glass-1", "-c", work.path, "-x", "80", "-y", "10",
-                     "/bin/sleep", "600"]).status == 0)
-        #expect(run(["-u", "new-session", "-d", "-s", "glass-2", "-c", home, "/bin/sleep", "600"]).status == 0)
+        #expect(await run(["-u", "-f", "/dev/null", "new-session", "-d", "-s", "glass-1", "-c", work.path, "-x", "80", "-y", "10",
+                           "/bin/sleep", "600"]).status == 0)
+        #expect(await run(["-u", "new-session", "-d", "-s", "glass-2", "-c", home, "/bin/sleep", "600"]).status == 0)
         // A second window, now the active one: a session's line is its active pane's.
-        #expect(run(["-u", "new-window", "-t", "=glass-1:", "-c", "/usr", "/bin/sleep", "600"]).status == 0)
-        #expect(run(["-u", "select-pane", "-t", "=glass-1:", "-T", "✳ Claude Code: fix"]).status == 0)
+        #expect(await run(["-u", "new-window", "-t", "=glass-1:", "-c", "/usr", "/bin/sleep", "600"]).status == 0)
+        #expect(await run(["-u", "select-pane", "-t", "=glass-1:", "-T", "✳ Claude Code: fix"]).status == 0)
 
-        let sessions = listing()
+        let sessions = await listing()
         let first = try #require(sessions.first { $0.name == "glass-1" })
         #expect(first.title == "✳ Claude Code: fix")
         #expect(first.directory == "/usr", "the active window's pane, not the first one")
         #expect(first.command == "sleep")
         #expect(first.home == home)
-        let pid = Int(run(["display-message", "-p", "#{pid}"]).output.trimmingCharacters(in: .whitespacesAndNewlines))
+        let pid = Int(await run(["display-message", "-p", "#{pid}"]).output.trimmingCharacters(in: .whitespacesAndNewlines))
         #expect(first.server?.pid == pid && first.server?.socketPath == socket)
         #expect(Set(sessions.compactMap(\.server)).count == 1, "one server, the same on every line")
         let second = try #require(sessions.first { $0.name == "glass-2" })
@@ -670,8 +689,8 @@ struct TerminalTmuxTests {
 
         // As a local tab names its session: argv.
         let name = "it's \"$HOME\" `id` build;"
-        #expect(run(try #require(TerminalTmux.givenNameArguments(session: "glass-1", name: name))).status == 0)
-        #expect(listing().first { $0.name == "glass-1" }?.givenName == name)
+        #expect(await run(try #require(TerminalTmux.givenNameArguments(session: "glass-1", name: name))).status == 0)
+        #expect(await listing().first { $0.name == "glass-1" }?.givenName == name)
 
         // As an SSH tab does: the exact command, through sh, with a tmux on the PATH that names the socket.
         let bin = folder.appendingPathComponent("bin")
@@ -681,12 +700,12 @@ struct TerminalTmuxTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shim.path)
         let throughShim = ["PATH": "\(bin.path):/usr/bin:/bin", "HOME": home]
         let command = try #require(TerminalTmux.givenNameCommand(session: "glass-2", name: name))
-        #expect(LiveProcess.run("/bin/sh", ["-c", command], environment: throughShim).status == 0)
-        #expect(listing().first { $0.name == "glass-2" }?.givenName == name)
+        #expect(await LiveProcess.runDetached("/bin/sh", ["-c", command], environment: throughShim).status == 0)
+        #expect(await listing().first { $0.name == "glass-2" }?.givenName == name)
         let query = try #require(TerminalTmux.givenNameQuery(session: "glass-2"))
-        #expect(LiveProcess.run("/bin/sh", ["-c", query], environment: throughShim).output == name + "\n")
+        #expect(await LiveProcess.runDetached("/bin/sh", ["-c", query], environment: throughShim).output == name + "\n")
 
-        #expect(run(try #require(TerminalTmux.givenNameArguments(session: "glass-1", name: nil))).status == 0)
-        #expect(listing().first { $0.name == "glass-1" }?.givenName == nil, "the automatic name takes it away")
+        #expect(await run(try #require(TerminalTmux.givenNameArguments(session: "glass-1", name: nil))).status == 0)
+        #expect(await listing().first { $0.name == "glass-1" }?.givenName == nil, "the automatic name takes it away")
     }
 }

@@ -187,6 +187,10 @@ final class SQLiteDatabaseConnection: DatabaseConnection, @unchecked Sendable {
     private let operationLock = NSLock()
     private let stateLock = NSLock()
     private var database: OpaquePointer?
+    /// The queries running or waiting their turn, so Cancel reaches one that hasn't begun.
+    private var inFlight: [ObjectIdentifier: SQLiteQueryStop] = [:]
+    /// How many: for tests, which start one behind another.
+    var queriesInFlight: Int { stateLock.withLock { inFlight.count } }
     private var connected = false
 
     init(path: String, readOnly: Bool) throws {
@@ -232,7 +236,9 @@ final class SQLiteDatabaseConnection: DatabaseConnection, @unchecked Sendable {
         guard !query.utf8.contains(0) else {
             throw DatabaseError.unexpectedResult("SQLite query text cannot contain NUL bytes.")
         }
-        let timeoutState = SQLiteTimeoutState()
+        let timeoutState = SQLiteQueryStop()
+        stateLock.withLock { inFlight[ObjectIdentifier(timeoutState)] = timeoutState }
+        defer { _ = stateLock.withLock { inFlight.removeValue(forKey: ObjectIdentifier(timeoutState)) } }
         let timeoutTask: DispatchWorkItem?
         if let timeout {
             let nanoseconds = Self.timeoutNanoseconds(timeout)
@@ -261,12 +267,14 @@ final class SQLiteDatabaseConnection: DatabaseConnection, @unchecked Sendable {
             }.value
             try Task.checkCancellation()
             return result
-        } onCancel: { [weak self] in
+        } onCancel: { [weak self, timeoutState] in
+            timeoutState.markCancelled()
             self?.interrupt()
         }
     }
 
     func cancelCurrentQuery() async throws {
+        stateLock.withLock { for query in inFlight.values { query.markCancelled() } }
         interrupt()
     }
 
@@ -479,12 +487,22 @@ final class SQLiteDatabaseConnection: DatabaseConnection, @unchecked Sendable {
     private func executeSynchronously(
         _ query: String,
         parameters: [DatabaseValue],
-        timeoutState: SQLiteTimeoutState
+        timeoutState: SQLiteQueryStop
     ) throws -> QueryResult {
         try operationLock.withLock {
             guard let database = stateLock.withLock({ self.database }) else {
                 throw DatabaseError.unexpectedResult("The SQLite connection is closed.")
             }
+            // A timeout or a Cancel that came while this waited its turn or was being prepared:
+            // `sqlite3_interrupt` reaches only a statement already running, and one called before
+            // the step began was lost — the query then ran to its end (2026-10-24). The progress
+            // handler asks again every thousand steps of SQLite's machine for as long as it runs.
+            if timeoutState.shouldStop { throw timeoutState.didFire ? DatabaseError.queryTimedOut : CancellationError() }
+            sqlite3_progress_handler(database, 1_000, { context in
+                guard let context else { return 0 }
+                return Unmanaged<SQLiteQueryStop>.fromOpaque(context).takeUnretainedValue().shouldStop ? 1 : 0
+            }, Unmanaged.passUnretained(timeoutState).toOpaque())
+            defer { sqlite3_progress_handler(database, 0, nil, nil) }
             let start = ContinuousClock.now
             var statement: OpaquePointer?
             var trailingSQL = ""
@@ -507,6 +525,11 @@ final class SQLiteDatabaseConnection: DatabaseConnection, @unchecked Sendable {
                 return status
             }
             guard prepareStatus == SQLITE_OK, let statement else {
+                // Interrupted while it was being prepared: a cancel or a timeout, as one while it runs
+                // is — it was reported as the error "interrupted" (2026-10-24).
+                if prepareStatus == SQLITE_INTERRUPT || timeoutState.shouldStop {
+                    throw timeoutState.didFire ? DatabaseError.queryTimedOut : CancellationError()
+                }
                 throw Self.sqliteError(database)
             }
             defer { sqlite3_finalize(statement) }
@@ -674,12 +697,16 @@ final class SQLiteDatabaseConnection: DatabaseConnection, @unchecked Sendable {
     }
 }
 
-private final class SQLiteTimeoutState: @unchecked Sendable {
+/// Whether a query should stop, and why: its timeout passed, or it was cancelled.
+private final class SQLiteQueryStop: @unchecked Sendable {
     private let lock = NSLock()
     private var fired = false
+    private var cancelled = false
 
     var didFire: Bool { lock.withLock { fired } }
+    var shouldStop: Bool { lock.withLock { fired || cancelled } }
     func markFired() { lock.withLock { fired = true } }
+    func markCancelled() { lock.withLock { cancelled = true } }
 }
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)

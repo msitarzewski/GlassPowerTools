@@ -115,7 +115,7 @@ window). `MenuBarPlacementTests` holds a single-owner guard for ⌘N, ⌘S, ⌘W
 | ⇧⌘O | database's Open SQL Document… | |
 | ⇧⌘E | editor's New Editor Window — opens on a blank document | |
 | ⌥⌘E | database's Explain Plan (moved from ⇧⌘E, 2026-09-25) | |
-| ⌘F / ⌘G / ⇧⌘G | shell's Edit ▸ Find ▸ Find… / Find Next / Find Previous (`\.glassFindItem`, `GlassShellFindCommands`, 2026-10-08) | the terminal workspace only, today; ⌘G was Terminal Grid |
+| ⌘F / ⌘G / ⇧⌘G | shell's Edit ▸ Find ▸ Find… / Find Next / Find Previous (`\.glassFindItem`, `GlassShellFindCommands`, 2026-10-08) | published by the terminal workspace and, from 2026-10-22, the editor (its find bar was ⌥⌘F in the Editor menu, now removed); ⌘G was Terminal Grid |
 | ⌥⌘G / ⌥⇧⌘G | terminal's Terminal Grid / Terminal Carousel (`MacWorkspaceCommands`, moved from ⌘G 2026-10-08) | |
 | ⌘T | terminal (Mac workspace; visionOS platform commands) | |
 | ⌃⌘T | terminal's New Basic Terminal Tab — a local shell outside tmux (`MacWorkspaceCommands`, 2026-10-12) | |

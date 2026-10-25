@@ -3,18 +3,6 @@ import Testing
 
 @Suite("Shared contract types")
 struct ContractTests {
-    @Test("TokenRole carries all ten SQLTokenKind cases distinctly")
-    func tokenRoleSQLFidelity() {
-        // The ten cases of glassdb's SQLTokenKind (SQLHighlighter.swift:19–32).
-        // Each must map to a distinct TokenRole — this is the fidelity half of
-        // D-008, held as a compile-and-test guarantee.
-        let sqlTen: [TokenRole] = [
-            .keyword, .function, .string, .number, .comment,
-            .identifier, .operator, .punctuation, .plain, .error,
-        ]
-        #expect(Set(sqlTen).count == 10)
-    }
-
     @Test("TextEdit length math")
     func textEditLengths() {
         let insert = TextEdit.insert("héllo", at: 3)

@@ -26,7 +26,7 @@ struct GlassActiveLauncherTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
-                                    resolveSharedContainer: false, layers: GlassLayerStore())
+                                    resolveSharedContainer: false, layers: GlassLayerStore.forTest())
         let store = HostCatalogStore(fileURL: root.appendingPathComponent("group/GlassHostCatalog/hosts.json"))
         return (model, root, store)
     }

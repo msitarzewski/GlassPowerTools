@@ -113,13 +113,15 @@ final class GlassShellLibraryUITests: XCTestCase {
         let byTitle = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ AND (elementType == %d OR elementType == %d)", title, XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.tab.rawValue)).firstMatch
         return byTitle
         #else
-        return element("glass-library-scope-\(id)")
+        return app.libraryScope(id)
         #endif
     }
 
     /// iPhone shows scopes first; everything else shows results beside them.
     private func enterAllConnections() {
         let scope = scopeElement("all-connections", title: "All")
+        // Only where the scopes are showing: after a save an iPhone is already on the results.
+        // Callers check where they arrived (the row they look for next).
         if scope.waitForExistence(timeout: 5) { press(scope) }
     }
 
@@ -135,7 +137,7 @@ final class GlassShellLibraryUITests: XCTestCase {
     /// — reported as *"the sheet closes after Save"*, which reads like a dismissal bug and is the
     /// opposite: validation working. They had been failing on macOS too, unnoticed since the rule
     /// landed, because the suite was not re-run.
-    private func addHost(named name: String, address: String = "10.9.8.7", terminalUser: String? = "tester") {
+    private func addHost(named name: String, address: String = "192.0.2.87", terminalUser: String? = "tester") {
         let empty = element("connection-library-add-host-empty")
         if empty.waitForExistence(timeout: 3) { press(empty) } else { tap("connection-library-add-host") }
         let field = element("host-editor-name")
@@ -171,7 +173,11 @@ final class GlassShellLibraryUITests: XCTestCase {
             type("not-a-real-password", into: password)
             #endif
         }
+        #if os(iOS)
+        app.tapUntilSheetCloses("host-editor-save")
+        #else
         tap("host-editor-save")
+        #endif
         dismissSystemPasswordPrompt()
         XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 15), "the sheet closes after Save")
     }
@@ -358,18 +364,18 @@ final class GlassShellLibraryUITests: XCTestCase {
         // address and no SSH section (D7).
         let sections = element("setup-sections")
         let databaseTab = sections.buttons["Database"].exists ? sections.buttons["Database"] : sections.radioButtons["Database"]
-        if databaseTab.waitForExistence(timeout: 3) {
-            press(databaseTab)
-            XCTAssertFalse(element("setup-enable-database").exists, "the tab is the toggle; there is no second one")
-            XCTAssertTrue(element("add-database-engine").waitForExistence(timeout: 5), "the engine picker")
-            XCTAssertTrue(element("add-database-database").exists, "the database field")
-            XCTAssertTrue(element("add-database-username").exists, "the username field")
-            XCTAssertTrue(element("add-database-password").exists, "the password field")
-            snap("02-database-tab-live")
-            // Back to Terminal: choosing another tab replaces the choice, never adds a second.
-            let terminalTab = sections.buttons["Terminal"].exists ? sections.buttons["Terminal"] : sections.radioButtons["Terminal"]
-            press(terminalTab)
-        }
+        // Was `if databaseTab.waitForExistence(timeout: 3) { … }`: with no Database tab the checks
+        // below were skipped and the test passed.
+        XCTAssertTrue(databaseTab.waitForExistence(timeout: 10), "the Database tab")
+        press(databaseTab)
+        XCTAssertTrue(element("add-database-engine").waitForExistence(timeout: 5), "the engine picker")
+        XCTAssertTrue(element("add-database-database").exists, "the database field")
+        XCTAssertTrue(element("add-database-username").exists, "the username field")
+        XCTAssertTrue(element("add-database-password").exists, "the password field")
+        snap("02-database-tab-live")
+        // Back to Terminal: choosing another tab replaces the choice, never adds a second.
+        let terminalTab = sections.buttons["Terminal"].exists ? sections.buttons["Terminal"] : sections.radioButtons["Terminal"]
+        press(terminalTab)
         tap("host-editor-cancel")
         XCTAssertTrue(element("host-editor-name").waitForNonExistence(timeout: 10))
 
@@ -378,15 +384,13 @@ final class GlassShellLibraryUITests: XCTestCase {
         let detailConnect = reveal("host-service-connect-ssh")
         XCTAssertTrue(detailConnect.exists || element("host-service-ssh").exists,
                       "the terminal exists on the host right after the one save")
-        XCTAssertFalse(app.buttons["Set Up…"].exists, "no pending state anywhere")
         snap("03-host-with-terminal")
 
         // Connect: the saved terminal connects (and fails, there is no such machine); what must
         // not happen is any setup form.
         tap("host-service-connect-ssh")
         XCTAssertFalse(element("add-server-username").waitForExistence(timeout: 5), "Connect never opens a setup form")
-        let failure = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'Connection Failed' OR value CONTAINS[c] 'Connection Failed' OR label CONTAINS[c] 'Connecting' OR value CONTAINS[c] 'Connecting'")).firstMatch
-        _ = failure.waitForExistence(timeout: 20)
+        XCTAssertTrue(connectAttempt().waitForExistence(timeout: 30), "the terminal tried to connect")
         snap("04-connect-attempt")
     }
 
@@ -398,8 +402,8 @@ final class GlassShellLibraryUITests: XCTestCase {
         snap("05-favorited")
 
         #if os(iOS)
-        press(app.navigationBars.buttons.element(boundBy: 0))   // back to results
-        press(app.navigationBars.buttons.element(boundBy: 0))   // back to scopes
+        press(app.backButton)   // back to results
+        press(app.backButton)   // back to scopes
         #endif
         let favorites = scopeElement("favorites", title: "Favorites")
         XCTAssertTrue(favorites.waitForExistence(timeout: 10), "favorites scope")
@@ -432,12 +436,16 @@ final class GlassShellLibraryUITests: XCTestCase {
         addHost(named: "Searchable Host")
         #if os(iOS)
         if element("host-add-service").waitForExistence(timeout: 5) {
-            press(app.navigationBars.buttons.element(boundBy: 0))   // detail → results
+            press(app.backButton)   // detail → results
         }
         #endif
         enterAllConnections()
         XCTAssertTrue(element("host-row-Searchable Host").waitForExistence(timeout: 10))
         var search = app.searchFields.firstMatch
+        // On the Duo's outer display search is a button in iOS's own column; the field comes with it.
+        if !search.waitForExistence(timeout: 5), app.buttons["Search"].firstMatch.exists {
+            press(app.buttons["Search"].firstMatch)
+        }
         if !search.waitForExistence(timeout: 5) {
             search = app.descendants(matching: .any).matching(NSPredicate(
                 format: "placeholderValue == %@ OR label == %@ OR value == %@",
@@ -471,7 +479,7 @@ final class GlassShellLibraryUITests: XCTestCase {
     /// Material is the control used now: it is a `Picker` rather than a slider, and slider drags
     /// synthesize on iOS alone (the visionOS simulator and macOS refuse them), so this is the one
     /// appearance control whose change can be driven on all three platforms.
-    func testAppearanceOpacityPersistsAcrossRelaunch() {
+    func testAppearanceMaterialPersistsAcrossRelaunch() {
         openSettings()
         selectSettingsPage("Appearance")
 
@@ -560,10 +568,10 @@ final class GlassShellLibraryUITests: XCTestCase {
 
     /// The row's control carries no words: a play glyph that opens every service, and its own
     /// chevron that picks one. The chevron is a hit region on every platform, not a long press.
-    func testRowConnectControlIsSplitAndCarriesNoLabel() {
+    func testRowConnectControlIsSplitAndCarriesNoLabel() throws {
         app.terminate()
         runID = UUID()
-        app = launch(extraArguments: ["--ui-testing-seed-hosts", "alpha@10.9.8.7:rdp+ssh+database"])
+        app = launch(extraArguments: ["--ui-testing-seed-hosts", "alpha@192.0.2.87:rdp+ssh+database"])
         enterAllConnections()
         let row = element("host-row-alpha")
         XCTAssertTrue(row.waitForExistence(timeout: 15), "alpha row")
@@ -577,9 +585,14 @@ final class GlassShellLibraryUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Connect"].exists, "the control is a glyph, not a word")
         snap("10a-row-icons-and-split-control")
 
-        // The chevron is exercised from the detail: on macOS the kit row combines its children
-        // into one element, so controls inside a row are not addressable there.
-        press(row)
+        // The chevron is in the row only: the detail's own Connect went on 2026-09-13 (D24), when
+        // it became a third way to start the same session; the detail has Edit alone and a
+        // Connect on each service. This pressed the row and looked for it in the detail.
+        #if os(macOS)
+        // The kit row combines its children into one element on the Mac, so a control inside it
+        // cannot be addressed there.
+        throw XCTSkip("on the Mac the row is one element; its chevron is checked on touch platforms")
+        #else
         let chevron = element("host-connect-menu")
         XCTAssertTrue(chevron.waitForExistence(timeout: 10), "the chevron is its own control")
         XCTAssertTrue(chevron.isHittable, "and a real hit region, not a long press")
@@ -588,9 +601,12 @@ final class GlassShellLibraryUITests: XCTestCase {
         XCTAssertTrue(terminalItem.waitForExistence(timeout: 10), "the menu lists each service")
         snap("10-row-connect-menu")
         press(terminalItem)
-        // The terminal capability owns .ssh, so choosing it opens a terminal rather than the
-        // shell's "not part of this build" message that .rdp would raise.
-        XCTAssertFalse(app.staticTexts["Desktop is not part of this build yet. Nothing was connected."].exists,
-                       "the chosen service connected, not another one")
+        XCTAssertTrue(connectAttempt().waitForExistence(timeout: 30), "the chosen service, the terminal, tried to connect")
+        #endif
+    }
+
+    /// A terminal connecting, or failing to: these hosts' addresses reach no machine.
+    private func connectAttempt() -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'Connection Failed' OR value CONTAINS[c] 'Connection Failed' OR label CONTAINS[c] 'Connecting' OR value CONTAINS[c] 'Connecting'")).firstMatch
     }
 }

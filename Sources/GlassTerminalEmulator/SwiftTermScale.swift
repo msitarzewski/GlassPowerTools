@@ -103,6 +103,27 @@ final class MacTerminalScaleView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
         terminalView.autoresizingMask = []
         addSubview(terminalView)
+        addSubview(unusedArea)
+    }
+
+    /// The space past a tmux pane shown at another client's size, dotted (`TmuxUnusedAreaView`).
+    private let unusedArea = TmuxUnusedAreaView()
+    /// The pane's grid while it is another client's size; nil while it is the terminal's own.
+    private var tmuxGrid: (columns: Int, rows: Int)?
+
+    func markTmuxGrid(_ grid: (columns: Int, rows: Int)?) {
+        tmuxGrid = grid
+        placeUnusedArea()
+    }
+
+    private func placeUnusedArea() {
+        unusedArea.frame = terminalView.frame
+        guard let grid = tmuxGrid, let cell = cellSize else {
+            unusedArea.used = nil
+            return
+        }
+        unusedArea.cell = cell
+        unusedArea.used = CGSize(width: CGFloat(grid.columns) * cell.width, height: CGFloat(grid.rows) * cell.height)
     }
 
     @available(*, unavailable)
@@ -153,6 +174,7 @@ final class MacTerminalScaleView: NSView {
     }
 
     private func layoutTerminal() {
+        defer { placeUnusedArea() }
         if wantsScaling, kept == nil, window != nil, frame.width > 0, frame.height > 0 {
             // Laid out as Resize lays it out first, so the grid taken is the window's own.
             fill()

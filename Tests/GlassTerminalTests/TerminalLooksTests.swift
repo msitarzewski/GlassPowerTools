@@ -214,6 +214,18 @@ struct TerminalLooksTests {
 
     // MARK: - Readability
 
+    @Test("contrast is WCAG 2's: AA is 4.5:1, and the published answers come out")
+    func wcagContrast() {
+        #expect(TerminalReadability.minimumContrast == 4.5)
+        #expect(TerminalReadability.minimumDimContrast == 2.5)
+        #expect(TerminalReadability.contrast(1, 0) == 21)
+        // #767676 is the lightest grey that passes AA on white (4.54:1); #777777 does not (4.48:1).
+        let passing = TerminalReadability.luminance(red: 118 / 255, green: 118 / 255, blue: 118 / 255)
+        let failing = TerminalReadability.luminance(red: 119 / 255, green: 119 / 255, blue: 119 / 255)
+        #expect(abs(TerminalReadability.contrast(1, passing) - 4.54) < 0.005)
+        #expect(abs(TerminalReadability.contrast(1, failing) - 4.48) < 0.005)
+    }
+
     @Test("the scrim is the window's own unless the text would fall below 4.5:1, then just enough")
     func readability() {
         let white = 1.0, black = 0.0

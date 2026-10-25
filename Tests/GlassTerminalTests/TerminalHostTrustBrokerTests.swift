@@ -12,8 +12,10 @@ import Testing
 import GlassSSHTransport
 @testable import GlassTerminal
 
+/// A minute each: a caller left waiting is the failure here, and it hung the whole run rather than
+/// failing one test (2026-10-24).
 @MainActor
-@Suite("Host trust broker")
+@Suite("Host trust broker", .timeLimit(.minutes(1)))
 struct TerminalHostTrustBrokerTests {
 
     private func challenge(host: String = "10.0.0.9",
@@ -57,8 +59,8 @@ struct TerminalHostTrustBrokerTests {
         #expect(broker.pending?.challenge.host == "first")
 
         async let second = broker.ask(challenge(host: "second"))
-        // The second must not displace the first on screen.
-        await Task.yield()
+        // Queued, and not displacing the first on screen.
+        while broker.waitingCount < 2 { await Task.yield() }
         #expect(broker.pending?.challenge.host == "first")
 
         broker.answer(.trust(remember: true))
@@ -86,7 +88,9 @@ struct TerminalHostTrustBrokerTests {
         async let first = broker.ask(challenge(host: "first"))
         while broker.pending == nil { await Task.yield() }
         async let second = broker.ask(challenge(host: "second"))
-        await Task.yield()
+        // Both waiting before everything is cancelled. One yield stood for that; a second caller not
+        // yet queued was queued after the cancel, never answered, and the run never ended.
+        while broker.waitingCount < 2 { await Task.yield() }
 
         broker.cancelAll()
         #expect(await first == .reject)

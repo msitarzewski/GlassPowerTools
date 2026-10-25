@@ -23,7 +23,10 @@ struct BuiltInHighlightingTests {
     /// Waits on real time, not on a count of yields. The reparse after an edit is debounced
     /// (75 ms by default), and 80 yields took longer than that only on a busy machine — the edit
     /// test passed under load and failed on a quiet one (2026-09-23).
-    private func settle(until condition: () -> Bool, timeout: Duration = .seconds(10)) async {
+    /// Up to 30 s, gone as soon as it holds. Ten failed one run in three in a whole run: a first parse
+    /// compiles its language's highlight query on the main actor, a second or two in a debug build,
+    /// and this target's other tests share that actor (2026-10-24).
+    private func settle(until condition: () -> Bool, timeout: Duration = .seconds(30)) async {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
             if condition() { return }

@@ -76,17 +76,21 @@ public struct DesktopRepository {
     private func persist(_ connection: DesktopConnection, expected: DesktopConnection?,
                          compare: Bool) async throws -> [DesktopConnection] {
         let value = try connection.validated()
-        var current = try load()
+        let base = try load()
+        var current = base
         let index = current.firstIndex { $0.id == value.id }
         if compare, index.map({ current[$0] }) != expected { throw DesktopError.connectionChanged }
         if let index { current[index] = value } else { current.append(value) }
-        try await records.replaceAll(with: current, preserving: rejected())
+        // Only the record changed is written: the others, re-encoded by this build, would lose any
+        // field a newer one added (2026-10-22).
+        try await records.replaceAll(with: current, changedFrom: base, preserving: rejected())
         return try load()
     }
 
     public func delete(_ id: EndpointID) async throws -> [DesktopConnection] {
-        let remaining = try load().filter { $0.id != id }
-        try await records.replaceAll(with: remaining, preserving: rejected())
+        let base = try load()
+        let remaining = base.filter { $0.id != id }
+        try await records.replaceAll(with: remaining, changedFrom: base, preserving: rejected())
         return try load()
     }
 
@@ -96,7 +100,8 @@ public struct DesktopRepository {
                                  expectedConnection: DesktopConnection? = nil) async throws -> [DesktopConnection] {
         guard date.timeIntervalSinceReferenceDate.isFinite else { throw DesktopError.invalidDocument }
         let expected = try expectedConnection?.validated()
-        var current = try load()
+        let base = try load()
+        var current = base
         guard let index = current.firstIndex(where: { $0.id == id }) else {
             throw DesktopError.missingConnection
         }
@@ -110,7 +115,7 @@ public struct DesktopRepository {
         }
         // `max` because a reconnect that finished out of order must not move the stamp backwards.
         current[index].lastConnectedAt = max(existing.lastConnectedAt ?? date, date)
-        try await records.replaceAll(with: current, preserving: rejected())
+        try await records.replaceAll(with: current, changedFrom: base, preserving: rejected())
         return try load()
     }
 }

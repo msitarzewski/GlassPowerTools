@@ -212,14 +212,18 @@ class DatabaseSessionManager {
             )
             session.state = .connecting(stage: .authenticating)
             Logger.database.info("Connecting to \(config.engine.displayName, privacy: .public) at \(transportPlan.databaseHost):\(transportPlan.databasePort) as \(config.username) (config host: \(config.host):\(config.port))")
-            let connection = try await engine.connect(
-                host: transportPlan.databaseHost,
-                port: transportPlan.databasePort,
-                username: config.username,
-                password: password,
-                database: config.defaultDatabase,
-                tlsPolicy: transportPlan.tlsPolicy
-            )
+            let username = config.username
+            let database = config.defaultDatabase
+            let connection = try await connectWatched(forward: session.hostTunnel) {
+                try await engine.connect(
+                    host: transportPlan.databaseHost,
+                    port: transportPlan.databasePort,
+                    username: username,
+                    password: password,
+                    database: database,
+                    tlsPolicy: transportPlan.tlsPolicy
+                )
+            }
             session.engine = engine
             session.connection = Self.applyingReadOnly(connection, config: config)
             session.state = .connected
@@ -248,6 +252,50 @@ class DatabaseSessionManager {
         }
 
         return sessionID
+    }
+
+    /// How long a connect may take, tunnel and sign-in included, before it is given up and said so.
+    var connectTimeout: Duration = .seconds(30)
+
+    /// Runs the driver's connect, and gives it up when the tunnel's machine refuses to connect on
+    /// to the database or `connectTimeout` passes.
+    ///
+    /// mysql-nio fails only its queued commands when its channel closes, never the handshake it is
+    /// waiting on, so a connection that closes before the server's greeting — all a refused tunnel
+    /// looks like from here — left its connect waiting for ever: the owner pressed Connect on a
+    /// MySQL service and saw nothing at all (2026-10-22). The driver runs in a task of its own
+    /// because a hung connect cannot be cancelled (`EventLoopFuture.get()` ignores cancellation);
+    /// one that finishes after it was given up is closed, not leaked.
+    func connectWatched(
+        forward: (any GlassHostPortForward)?,
+        _ connect: @escaping @Sendable () async throws -> any DatabaseConnection
+    ) async throws -> any DatabaseConnection {
+        let outcome = WatchedConnect()
+        let timeout = connectTimeout
+        return try await withCheckedThrowingContinuation { continuation in
+            outcome.wait(continuation)
+            Task.detached {
+                do {
+                    let connection = try await connect()
+                    if !outcome.finish(.success(connection)) { try? await connection.close() }
+                } catch {
+                    // A driver that did notice the close says less than the machine did.
+                    outcome.finish(.failure(forward?.refusal.map { DatabaseConnectAbandoned.refused($0) } ?? error))
+                }
+            }
+            Task { @MainActor in
+                let deadline = ContinuousClock.now.advanced(by: timeout)
+                while !outcome.isFinished {
+                    if let reason = forward?.refusal {
+                        outcome.finish(.failure(DatabaseConnectAbandoned.refused(reason)))
+                    } else if ContinuousClock.now >= deadline {
+                        outcome.finish(.failure(DatabaseConnectAbandoned.timedOut(timeout)))
+                    } else {
+                        try? await Task.sleep(for: .milliseconds(100))
+                    }
+                }
+            }
+        }
     }
 
     /// Wraps a freshly opened connection when the service is read-only, so every later caller
@@ -346,6 +394,10 @@ class DatabaseSessionManager {
     /// Re-establishes the transport behind an existing logical session. Keeping
     /// the `DatabaseSession` instance intact means every workspace window over
     /// that session recovers together without losing tabs, history, or AI context.
+    /// Where a reconnect reads the saved password: the Keychain. A test gives its own, because a
+    /// test password written there would synchronize to the owner's devices (D18).
+    var retrieveSavedPassword: (DatabaseConnectionConfig) throws -> String = KeychainManager.retrievePassword
+
     func reconnect(sessionID: UUID) async throws {
         guard let session = sessions[sessionID] else {
             throw SessionError.notConnected
@@ -358,7 +410,7 @@ class DatabaseSessionManager {
         session.state = .connecting(stage: .resolvingHost)
 
         do {
-            let credentials = try Self.storedCredentials(for: config)
+            let credentials = try Self.storedCredentials(for: config, retrieve: retrieveSavedPassword)
             let replacementID = try await connect(
                 config: config,
                 password: credentials.database,
@@ -999,9 +1051,10 @@ class DatabaseSessionManager {
     /// The database password only. A reconnect needs no second secret: the tunnel, when there
     /// is one, is opened by the capability that owns the host's SSH service, with its own.
     private static func storedCredentials(
-        for config: DatabaseConnectionConfig
+        for config: DatabaseConnectionConfig,
+        retrieve: (DatabaseConnectionConfig) throws -> String
     ) throws -> (database: String, ssh: String?) {
-        (try storedDatabasePassword(for: config), nil)
+        (try storedDatabasePassword(for: config, retrieve: retrieve), nil)
     }
 
     /// The password a saved service connects with, for the first connect and every reconnect.
@@ -1075,6 +1128,36 @@ class DatabaseSessionManager {
                 return "No saved password was found for \(name). Open the service and enter it again."
             }
         }
+    }
+}
+
+/// The one answer a watched connect gives, whichever comes first: the driver, the tunnel's
+/// refusal or the clock.
+private final class WatchedConnect: Sendable {
+    private struct State {
+        var continuation: CheckedContinuation<any DatabaseConnection, any Error>?
+        var finished = false
+    }
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var isFinished: Bool { state.withLock { $0.finished } }
+
+    func wait(_ continuation: CheckedContinuation<any DatabaseConnection, any Error>) {
+        state.withLock { $0.continuation = continuation }
+    }
+
+    /// False when another answer came first.
+    @discardableResult
+    func finish(_ result: Result<any DatabaseConnection, any Error>) -> Bool {
+        let continuation = state.withLock { state -> CheckedContinuation<any DatabaseConnection, any Error>? in
+            guard !state.finished else { return nil }
+            state.finished = true
+            defer { state.continuation = nil }
+            return state.continuation
+        }
+        guard let continuation else { return false }
+        continuation.resume(with: result)
+        return true
     }
 }
 

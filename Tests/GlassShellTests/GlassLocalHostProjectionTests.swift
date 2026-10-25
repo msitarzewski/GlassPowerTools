@@ -44,7 +44,7 @@ struct GlassLocalHostProjectionTests {
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
                                     resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
         let backend = ScriptedBackend()
         model.enableCatalogSync(backend)
         return (model, backend, root)

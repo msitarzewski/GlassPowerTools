@@ -30,14 +30,8 @@ struct GrammarCoverageTests {
         let registry = GrammarRegistry()
         let loaded = try registry.grammar(for: language)
         #expect(loaded.isParsable, "\(language.rawValue) has no grammar")
-        #expect(loaded.highlightQuery != nil, "\(language.rawValue) has no compiled highlight query")
-    }
-
-    /// plaintext stays what it is: a real language with no grammar, and not an error.
-    @Test func plaintextIsDeliberatelyGrammarless() throws {
-        let loaded = try GrammarRegistry().grammar(for: .plaintext)
-        #expect(!loaded.isParsable)
-        #expect(loaded.highlightQuery == nil)
+        let query = try #require(loaded.highlightQuery, "\(language.rawValue) has no compiled highlight query")
+        #expect(query.patternCount > 0, "\(language.rawValue)'s highlight query has no patterns")
     }
 
     /// The two added 2026-09-17, and the files a developer on this platform actually opens.

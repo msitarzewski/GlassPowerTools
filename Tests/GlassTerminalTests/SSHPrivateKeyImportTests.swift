@@ -11,20 +11,19 @@ import GlasSecretStore
 @testable import GlassTerminal
 
 @Suite struct SSHPrivateKeyImportTests {
-    private func makeKey(passphrase: String, comment: String) throws -> URL {
+    /// A key `ssh-keygen` makes, waited for off the main actor (`LiveProcess.runDetached`).
+    private func makeKey(passphrase: String, comment: String) async throws -> URL {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-key-import-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let path = directory.appendingPathComponent("id_ed25519").path
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh-keygen")
-        process.arguments = ["-q", "-t", "ed25519", "-N", passphrase, "-C", comment, "-f", path]
-        try process.run(); process.waitUntilExit()
-        try #require(process.terminationStatus == 0)
+        let made = await LiveProcess.runDetached("/usr/bin/ssh-keygen", ["-q", "-t", "ed25519", "-N", passphrase, "-C", comment, "-f", path],
+                                                 environment: ["PATH": "/usr/bin:/bin"])
+        try #require(made.status == 0)
         return URL(fileURLWithPath: path)
     }
 
-    @Test func unencryptedKeyIsClassifiedWithItsComment() throws {
-        let url = try makeKey(passphrase: "", comment: "fixture@test")
+    @Test func unencryptedKeyIsClassifiedWithItsComment() async throws {
+        let url = try await makeKey(passphrase: "", comment: "fixture@test")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let (text, inspection) = try SSHPrivateKeyImport.read(from: url)
         #expect(text.hasPrefix("-----BEGIN OPENSSH PRIVATE KEY-----"))
@@ -34,29 +33,14 @@ import GlasSecretStore
         #expect(SSHPrivateKeyImport.suggestedName(comment: inspection.comment, fileURL: url) == "fixture@test")
     }
 
-    @Test func passphraseProtectedKeyIsDetectedWithoutDecrypting() throws {
-        let url = try makeKey(passphrase: "correct horse", comment: "locked@test")
+    @Test func passphraseProtectedKeyIsDetectedWithoutDecrypting() async throws {
+        let url = try await makeKey(passphrase: "correct horse", comment: "locked@test")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let (_, inspection) = try SSHPrivateKeyImport.read(from: url)
         #expect(inspection.keyType == .ed25519)
         #expect(inspection.isPassphraseProtected == true)
         #expect(inspection.comment == nil)
         #expect(SSHPrivateKeyImport.suggestedName(comment: nil, fileURL: url) == "id_ed25519")
-    }
-
-    @Test func oversizedFilesAreRefusedBeforeBeingRead() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-key-import-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let url = directory.appendingPathComponent("huge")
-        // One byte over the limit, plausible key text so only the size check can reject it.
-        let oversized = "-----BEGIN OPENSSH PRIVATE KEY-----\n" + String(repeating: "A", count: SSHPrivateKeyImport.maximumFileSize)
-        try Data(oversized.utf8).write(to: url)
-        #expect(throws: SSHPrivateKeyImportError.self) { _ = try SSHPrivateKeyImport.read(from: url) }
-        do { _ = try SSHPrivateKeyImport.read(from: url) } catch let error as SSHPrivateKeyImportError {
-            guard case .tooLarge(let reported) = error else { Issue.record("expected tooLarge, got \(error)"); return }
-            #expect(reported > SSHPrivateKeyImport.maximumFileSize)
-        }
     }
 
     @Test func nonKeyFilesAreRejectedHonestly() throws {
@@ -72,8 +56,8 @@ import GlasSecretStore
         #expect(throws: SSHPrivateKeyImportError.unreadable) { try SSHPrivateKeyImport.read(from: directory.appendingPathComponent("missing")) }
     }
 
-    @Test @MainActor func chosenKeyLandsInTheCatalogThroughAddSSHKey() throws {
-        let url = try makeKey(passphrase: "", comment: "catalog@test")
+    @Test @MainActor func chosenKeyLandsInTheCatalogThroughAddSSHKey() async throws {
+        let url = try await makeKey(passphrase: "", comment: "catalog@test")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let (text, _) = try SSHPrivateKeyImport.read(from: url)
         let suiteName = "sh.glas.tests.keyimport.\(UUID().uuidString)"

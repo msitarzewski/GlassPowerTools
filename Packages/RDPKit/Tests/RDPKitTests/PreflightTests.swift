@@ -78,7 +78,7 @@ import Testing
 @Test func connectionConfigurationBuildsFromValidatedTargetAndDesktopSize() throws {
     let target = try RDPConnectionTarget(host: " example.test ", portText: "3390")
     let desktopSize = try RDPDesktopSize(widthText: "1920", heightText: "1080")
-    let credentials = RDPCredentials(username: "anees", password: "secret")
+    let credentials = RDPCredentials(username: "casey", password: "secret")
 
     let configuration = RDPConnectionConfiguration(
         target: target,
@@ -104,9 +104,9 @@ import Testing
     #expect(configuration.identity == RDPConnectionIdentity(
         host: "example.test",
         port: 3390,
-        username: "anees"
+        username: "casey"
     ))
-    #expect(configuration.displayName == "anees@example.test:3390")
+    #expect(configuration.displayName == "casey@example.test:3390")
 }
 
 @Test func connectionConfigurationBuildsRequestedStaticVirtualChannels() {

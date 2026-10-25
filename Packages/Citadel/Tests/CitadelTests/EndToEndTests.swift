@@ -60,19 +60,21 @@ final class EndToEndTests: XCTestCase {
                 promise.succeed(.failure)
             }
         }
+        // A free port on loopback: a fixed one could be another listener's, a tunnel to a real server.
         let server = try await SSHServer.host(
-            host: "localhost",
-            port: 2222,
+            host: "127.0.0.1",
+            port: 0,
             hostKeys: [
                 hostKey
             ],
             authenticationDelegate: authDelegate
         )
+        let port = try XCTUnwrap(server.channel.localAddress?.port)
 
         do {
             let client = try await SSHClient.connect(
-                host: "localhost",
-                port: 2222,
+                host: "127.0.0.1",
+                port: port,
                 authenticationMethod: credentials,
                 hostKeyValidator: hostKeyValidator,
                 reconnect: .never
@@ -136,7 +138,7 @@ final class EndToEndTests: XCTestCase {
         )
     }
 
-    func testClientRejectsWrongHostKey() async throws {
+    func testClientAcceptsATrustedHostKey() async throws {
         let hostKey = NIOSSHPrivateKey(p521Key: .init())
         try await runTest(
             hostKey: hostKey,

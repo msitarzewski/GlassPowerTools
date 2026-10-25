@@ -8,10 +8,12 @@
 //  Gated on the launch environment: GPT_SSH_TEST_HOST, GPT_SSH_TEST_USER, GPT_SSH_TEST_KEY_PATH
 //  (an OpenSSH private key file). Pass them to `xcodebuild test` as TEST_RUNNER_GPT_SSH_TEST_*.
 //  Without them every test skips with a reason. Key material is read by the runner at run time,
-//  handed to the app through the pasteboard, and never written anywhere.
+//  handed to the app through the pasteboard — kept to this device, marked concealed, and cleared
+//  once pasted — and never written anywhere.
 //
 
 import XCTest
+import UniformTypeIdentifiers
 
 @MainActor
 final class GlassTerminalUITests: XCTestCase {
@@ -59,6 +61,9 @@ final class GlassTerminalUITests: XCTestCase {
     private func launch(extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["--ui-testing", runID.uuidString] + extraArguments
+        // A blinking caret never lets the app go still, and XCUITest waits 60 s for that before
+        // each action once a terminal is up (three times in one test, 2026-10-25, iPhone).
+        app.launchArguments += ["-blinkingCursor", "NO"]
         #if os(macOS)
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
@@ -174,7 +179,9 @@ final class GlassTerminalUITests: XCTestCase {
     }
 
     private func enterAllConnections() {
-        let scope = element("glass-library-scope-all-connections")
+        let scope = app.libraryScope("all-connections")
+        // Only where the scopes are showing: after a save an iPhone is already on the results.
+        // Callers check where they arrived (the row they look for next).
         if scope.waitForExistence(timeout: 5) { press(scope) }
     }
 
@@ -208,7 +215,11 @@ final class GlassTerminalUITests: XCTestCase {
             setField("add-server-password", to: "not-a-real-password")
         }
         snap(fixture == nil ? "02-add-host" : "04-add-host-terminal-filled")
+        #if os(iOS)
+        app.tapUntilSheetCloses("host-editor-save")
+        #else
         press("host-editor-save")
+        #endif
         // visionOS offers to save the typed password to iCloud Keychain once the sheet commits, and
         // that system alert covers the app: every later assertion then fails against an app it
         // cannot see. This helper only started typing a password when Add Host began requiring a
@@ -268,7 +279,7 @@ final class GlassTerminalUITests: XCTestCase {
             dumpTree("after-add-ssh-key")
         }
         XCTAssertTrue(keyFormShown, "Add SSH Key form")
-        press(keyName); keyName.typeText("scratch-vm-key")
+        press(keyName); keyName.typeText("test-key")
         pastePrivateKey(fromFile: fixture.keyPath)
         snap("03-add-key-sheet")
         let saveKey = app.buttons["Save"].firstMatch
@@ -276,9 +287,9 @@ final class GlassTerminalUITests: XCTestCase {
         press(saveKey)
         XCTAssertTrue(keyName.waitForNonExistence(timeout: 10), "Add SSH Key form closes after Save")
         #if os(macOS)
-        let keyPicker = app.popUpButtons.matching(NSPredicate(format: "value CONTAINS[c] 'scratch-vm-key'")).firstMatch
+        let keyPicker = app.popUpButtons.matching(NSPredicate(format: "value CONTAINS[c] 'test-key'")).firstMatch
         #else
-        let keyPicker = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'scratch-vm-key'")).firstMatch
+        let keyPicker = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'test-key'")).firstMatch
         #endif
         if !keyPicker.waitForExistence(timeout: 5) { dumpTree("key-not-selected") }
         XCTAssertTrue(keyPicker.exists, "the newly added key is selected in the SSH Key picker")
@@ -352,16 +363,24 @@ final class GlassTerminalUITests: XCTestCase {
         let field = element(identifier)
         XCTAssertTrue(field.waitForExistence(timeout: 10), "missing \(identifier)")
         if (field.value as? String) == value { return }
+        #if os(iOS)
+        field.replaceText(with: value, in: app)
+        if field.elementType != .secureTextField {
+            XCTAssertEqual(field.value as? String, value, "\(identifier) reads what was typed")
+        }
+        #else
         press(field)
         #if os(macOS)
-        selectAll()
+        app.typeKey("a", modifierFlags: .command)
         #else
         if let current = field.value as? String, !current.isEmpty {
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
         }
         #endif
         field.typeText(value)
+        #endif
     }
+
 
     private func selectAll() {
         #if os(macOS)
@@ -399,16 +418,31 @@ final class GlassTerminalUITests: XCTestCase {
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 10), "private key editor")
         press(editor)
+        // A private key on the owner's clipboard (2026-10-24, the test audit): it was left there, where
+        // Universal Clipboard hands the clipboard to his other devices. Kept to this device, marked
+        // concealed for clipboard managers, and replaced by what the clipboard held before once the
+        // editor has it.
+        let saved: UITestClipboard
+        do { saved = try UITestClipboard() } catch { XCTFail(error.localizedDescription); return }
         #if os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(key, forType: .string)
+        let pasteboard = NSPasteboard.general
+        pasteboard.prepareForNewContents(with: .currentHostOnly)
+        pasteboard.setString(key, forType: .string)
+        pasteboard.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
+        defer { saved.restore() }
         app.typeKey("v", modifierFlags: .command)
         #else
-        UIPasteboard.general.string = key
+        UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: key]],
+                                      options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(120)])
+        defer { saved.restore() }
         editor.doubleTap()
         let paste = app.menuItems["Paste"].firstMatch
         if paste.waitForExistence(timeout: 3) { paste.tap() } else { editor.typeText(key) }
         #endif
+        // The paste landed before the clipboard is put back.
+        let landed = NSPredicate { _, _ in (editor.value as? String)?.contains("PRIVATE KEY") == true }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: landed, object: nil)], timeout: 10),
+                       .completed, "the key reached the editor")
     }
 
     /// Accepts the D14 host-key prompt. This is the only automated coverage the prompt has, and
@@ -570,19 +604,23 @@ final class GlassTerminalUITests: XCTestCase {
         press("host-editor-save")
         XCTAssertTrue(element("host-editor-address-validation").waitForExistence(timeout: 5) || element("host-editor-save").exists,
                       "Save refuses without the address")
-        press(addressField); addressField.typeText("10.9.8.7")
+        press(addressField); addressField.typeText("192.0.2.87")
         setField("add-server-username", to: "probe")
         _ = reveal("add-server-password")
         // `setField`, not a raw press-and-type: it calls `selectAll()` between the two, which is
         // what guarantees focus. A bare `typeText` into a SecureTextField lands only when the sheet
         // happens to be warm, so this passed and failed on alternate runs for no visible reason.
         setField("add-server-password", to: "not-a-real-password")
+        #if os(iOS)
+        app.tapUntilSheetCloses("host-editor-save")
+        #else
         press("host-editor-save")
+        #endif
         dismissSystemPasswordPrompt()
         XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 15))
         // Read the value as a static text: macOS keeps the row's earlier text in the accessibility
         // tree for a while, so the identifier's first match can lag behind what is on screen.
-        let shown = detailShowsAddress("10.9.8.7")
+        let shown = detailShowsAddress("192.0.2.87")
         if !shown { dumpTree("detail-address") }
         snap("21-detail-after-add-service")
         XCTAssertTrue(shown, "the detail shows the address saved on the host")
@@ -615,7 +653,6 @@ final class GlassTerminalUITests: XCTestCase {
         let user = element("edit-server-username")
         XCTAssertTrue(user.waitForExistence(timeout: 10))
         XCTAssertEqual(user.value as? String, "probe", "the saved terminal's fields are loaded")
-        XCTAssertFalse(element("setup-enable-ssh").exists, "the tab is the toggle; there is no second one")
         let advanced = element("setup-advanced-ssh")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5), "Advanced disclosure")
         expandDisclosure(advanced)
@@ -640,9 +677,12 @@ final class GlassTerminalUITests: XCTestCase {
         try addHost(named: "golf", address: fixture.host, terminal: fixture)
         openDetail(of: "golf")
 
-        // Files is a tool on the service, not a service of its own: `host-tool-open-files-<id>`.
-        let files = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH 'host-tool-open-files-'")).firstMatch
+        // Files is a tool on the service, not a service of its own: its Open button is
+        // `host-tool-open-files-<id>`. On iOS the row's own identifier, `host-tool-files-<id>`,
+        // reaches every child and replaces the button's (the 2026-10-25 tree), as `libraryScope`
+        // describes; the button is the one to press either way.
+        let files = app.buttons.matching(NSPredicate(format:
+            "identifier BEGINSWITH 'host-tool-open-files-' OR identifier BEGINSWITH 'host-tool-files-'")).firstMatch
         XCTAssertTrue(files.waitForExistence(timeout: 15), "the service offers no Files tool")
         press(files)
         acceptTrustPromptIfShown()
@@ -708,22 +748,29 @@ final class GlassTerminalUITests: XCTestCase {
             return
         }
 
-        // Round trip: type a marker command and look for its echo in the accessibility tree.
+        // D44: the first connection to a server with tmux offers it, in an alert over the terminal
+        // (the test server has tmux, and every run starts with a new library). Typing raced the alert: the
+        // keys went nowhere, or the alert held the keyboard and typing failed (2026-10-25, iPhone).
+        // Not Now keeps the plain shell this test types into.
+        let notNow = app.buttons["Not Now"].firstMatch
+        if notNow.waitForExistence(timeout: 10) { press(notNow) }
+
+        // Round trip: the shell works out the marker, so the output differs from what was typed
+        // and only a command the server ran can produce it. The terminal publishes the lines on
+        // screen as its accessibility value, what VoiceOver reads.
         #if os(macOS)
-        let terminalWindow = app.windows.matching(NSPredicate(format: "title CONTAINS[c] 'scratch'")).firstMatch
+        let terminalWindow = app.windows.matching(NSPredicate(format: "title CONTAINS[c] 'golf'")).firstMatch
         if terminalWindow.exists { press(terminalWindow) }
         #endif
-        let marker = "GPT_OK_\(runID.uuidString.prefix(8))"
-        app.typeText("echo \(marker)\n")
+        let id = runID.uuidString.prefix(8)
+        app.typeText("echo GPT_OK_$((6*7))_\(id)\n")
         let echoed = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", marker, marker)).firstMatch
+            .matching(NSPredicate(format: "value CONTAINS %@", "GPT_OK_42_\(id)")).firstMatch
         let sawEcho = echoed.waitForExistence(timeout: 15)
         snap("07-echo")
         if !sawEcho {
             dumpTree("echo")
-            // Not a failure of the connection: SwiftTerm's buffer may not be exposed to
-            // accessibility. Connected state is the proven signal; record the limit.
-            XCTContext.runActivity(named: "terminal output not visible to accessibility; Connected state verified") { _ in }
+            XCTFail("the terminal never showed the shell's answer GPT_OK_42_\(id)")
         }
     }
 }

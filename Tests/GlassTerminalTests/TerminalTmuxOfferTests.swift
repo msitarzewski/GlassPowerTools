@@ -14,7 +14,7 @@ struct TerminalTmuxOfferTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TmuxOffer-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"), sharedContainerURL: nil,
-                                    resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                                    resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
         await model.load()
         let servers = ServerManager(loadImmediately: false,
                                     defaults: UserDefaults.forTest(suiteName: "tmux.\(UUID().uuidString)")!,

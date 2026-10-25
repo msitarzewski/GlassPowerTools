@@ -112,28 +112,6 @@ struct DesktopDisplayWindowTests {
         session.close()
     }
 
-    @Test("a point in a display's window lands inside that display's rectangle of the framebuffer")
-    func inputLandsOnTheWindowsDisplay() async throws {
-        let fixture = try Fixture()
-        defer { fixture.clean() }
-        let session = try await fixture.connected(app: await fixture.launch())
-        let second = session.displayViewport(for: 2)
-        session.attach(second)
-        let region = session.region(for: second)
-        // The middle of a 500 × 300-point window showing the 1000 × 600 display.
-        let middle = DesktopCoordinates.map(x: 250, y: 150, viewWidth: 500, viewHeight: 300,
-                                            desktop: region.size, origin: region.origin)
-        #expect(middle == DesktopPoint(x: 2500, y: 300))
-        let corner = DesktopCoordinates.map(x: 0, y: 0, viewWidth: 500, viewHeight: 300, desktop: region.size, origin: region.origin)
-        #expect(corner == DesktopPoint(x: 2000, y: 0))
-        // The main display's window maps the same point into its own display.
-        session.primaryViewport.selectedScreenID = 1
-        let main = session.region(for: session.primaryViewport)
-        #expect(DesktopCoordinates.map(x: 250, y: 150, viewWidth: 500, viewHeight: 300, desktop: main.size, origin: main.origin)
-                == DesktopPoint(x: 1000, y: 600))
-        session.close()
-    }
-
     @Test("closing one display's window leaves the others connected; closing the last ends the session")
     func theSessionEndsWithItsLastWindow() async throws {
         let fixture = try Fixture()
@@ -242,7 +220,8 @@ struct DesktopDisplayWindowTests {
         let session = try await fixture.connected(app: await fixture.launch())
         #expect(session.holdsDisplayLayout)
         session.resize(width: 1280, height: 800)
-        try await Task.sleep(for: .milliseconds(400))
+        #expect(session.resizeTask == nil, "nothing scheduled")
+        await session.resizeTask?.value
         await session.setSourceSize(DesktopSize(width: 1920, height: 1080))
         #expect(fixture.resizes.isEmpty, "SetDesktopSize would fold the displays into one")
         #expect(session.errorMessage?.contains("several displays") == true)

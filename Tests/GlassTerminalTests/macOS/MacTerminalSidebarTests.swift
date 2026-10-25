@@ -162,7 +162,7 @@ struct MacTerminalSidebarTests {
         }
         window.contentView = NSHostingView(rootView: MacWorkspaceSceneRoot(request: request)
             .environment(SessionManager(loadImmediately: false))
-            .environment(SettingsManager(loadImmediately: false)))
+            .environment(SettingsManager.forTest()))
         window.setFrame(NSRect(x: 400, y: 300, width: 1000, height: 600), display: true)
         window.alphaValue = 0
         window.orderFrontRegardless()

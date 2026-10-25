@@ -59,10 +59,10 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Open Connections")).firstMatch
     }
 
-    /// A terminal window's own Connections control: `openWindow.openConnections()`, as every
-    /// "Open Connections" in the app is.
+    /// A terminal window's own ⚡ (2026-10-22; it was a Connections control): Connections, on
+    /// Active, through `openWindow.openConnections()` as every "Open Connections" in the app is.
     private var terminalsConnections: XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier == %@ AND label == %@", "server.rack", "Connections")).firstMatch
+        app.buttons.matching(identifier: "terminal-active-connections").firstMatch
     }
 
     private var bravoRows: XCUIElementQuery { app.staticTexts.matching(identifier: "host-row-bravo") }
@@ -200,6 +200,14 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         }
     }
 
+    /// One Connections window on Active: a ⚡ opens Active, where the library's rows aren't shown.
+    private func assertOneActiveWindow(file: StaticString = #filePath, line: UInt = #line) {
+        let active = app.descendants(matching: .any).matching(identifier: "active-connections")
+        let one = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 1"), object: active)
+        XCTAssertEqual(XCTWaiter().wait(for: [one], timeout: 10), .completed,
+                       "\(active.count) Connections windows on Active", file: file, line: line)
+    }
+
     private func assertOneConnectionsWindow(file: StaticString = #filePath, line: UInt = #line) {
         let one = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 1"), object: bravoRows)
         XCTAssertEqual(XCTWaiter().wait(for: [one], timeout: 10), .completed,
@@ -260,8 +268,8 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         attachTree("display-orb-up")
     }
 
-    /// Asking for Connections from anywhere else — a terminal's own control — grows the orb back
-    /// into the library as it was, rather than leaving a second window beside the first.
+    /// Asking for Connections from anywhere else — a terminal's own ⚡ — grows the orb back into
+    /// the same window, on Active, rather than leaving a second window beside the first.
     func testAskingForConnectionsElsewhereBringsTheSameWindowBack() {
         launch(idleSeconds: 6)
         selectBravo()
@@ -272,10 +280,10 @@ final class GlassConnectionsOrbUITests: XCTestCase {
 
         terminalsConnections.tap()
         assertOrbGoes()
-        // The same window, not a second one beside it, at the size it had.
+        // The same window, not a second one beside it, at the size it had, on Active.
         assertConnectionsIsBack(library)
-        assertOneConnectionsWindow()
-        XCTAssertTrue(bravoIsShowing(), "Connections came back without bravo selected")
+        XCTAssertTrue(element("active-connections").waitForExistence(timeout: 10), "Connections came back without Active")
+        assertOneActiveWindow()
         attachTree("restored-from-terminal")
     }
 
@@ -313,13 +321,12 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         launch(idleSeconds: 600)
         waitForTerminals()
         for press in 1...2 {
-            let control = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label == %@",
-                                                           "server.rack", "Connections"))
+            let control = app.buttons.matching(identifier: "terminal-active-connections")
                 .allElementsBoundByIndex.first { $0.isHittable }
             guard let control else { return XCTFail("press \(press): the terminal's Connections control is out of reach") }
             control.tap()
             Thread.sleep(forTimeInterval: 3)
-            assertOneConnectionsWindow()
+            assertOneActiveWindow()
         }
         attachTree("one-window-from-terminal")
     }

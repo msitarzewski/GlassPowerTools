@@ -13,6 +13,7 @@
 
 import Foundation
 import Testing
+import GlassLayers
 import GlassConnectionKit
 @testable import GlassEditor
 
@@ -23,7 +24,7 @@ struct GlassEditorWindowRoutingTests {
     // MARK: Fixtures
 
     private func runtime() -> GlassEditorRuntime {
-        GlassEditorRuntime(defaults: UserDefaults.forTest(suiteName: "editor.routing.\(UUID().uuidString)")!)
+        GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: UserDefaults.forTest(suiteName: "editor.routing.\(UUID().uuidString)")!)
     }
 
     private func folder(_ name: String = "project") throws -> URL {

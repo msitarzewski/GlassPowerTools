@@ -41,6 +41,10 @@ struct ConnectionPersistenceStore: @unchecked Sendable {
     /// shell has read it, and reading early answers "no saved connections" — which the next write
     /// then makes true. See `GlassServiceStore.isCatalogLoaded`.
     var isReadable: () -> Bool = { true }
+    /// Saves only what changed between the list last read or written (the second argument) and the
+    /// new one, when the store can (the catalog). Nil: `save` writes the whole list, as a store of
+    /// one value has to.
+    var saveChanges: ((_ data: Data, _ base: Data) async throws -> Void)?
 
     /// D26: the catalog is the one store for a connection.
     ///
@@ -61,7 +65,8 @@ struct ConnectionPersistenceStore: @unchecked Sendable {
             },
             save: { try await records.replaceAll(with: decode($0)) },
             restore: { try await records.replaceAll(with: decode($0)) },
-            isReadable: { records.isCatalogLoaded }
+            isReadable: { records.isCatalogLoaded },
+            saveChanges: { try await records.replaceAll(with: decode($0), changedFrom: decode($1)) }
         )
     }
 
@@ -195,6 +200,9 @@ class ConnectionManager {
     private(set) var familyCatalogLoaded = false
     private var hasLoaded = false
     private var persistenceStore: ConnectionPersistenceStore
+    /// The list as this device last read or wrote it: a save writes only what differs from it, so
+    /// a record this device merely still holds never goes back over a newer one (2026-10-22).
+    private var persisted: [DatabaseConnectionConfig] = []
 
     init(
         loadImmediately: Bool = true,
@@ -226,12 +234,14 @@ class ConnectionManager {
         familyCatalogLoaded = false
         guard let data = persistenceStore.load() else {
             connections = []
+            persisted = []
             familyCatalogLoaded = true
             return
         }
 
         do {
             connections = try JSONDecoder().decode([DatabaseConnectionConfig].self, from: data)
+            persisted = connections
             familyCatalogLoaded = true
         } catch {
             Logger.connections.error("Failed to load connections: \(error)")
@@ -355,7 +365,12 @@ class ConnectionManager {
         let data = try JSONEncoder().encode(candidate)
         let previousData = persistenceStore.load()
         do {
-            try await persistenceStore.save(data)
+            if let saveChanges = persistenceStore.saveChanges {
+                try await saveChanges(data, try JSONEncoder().encode(persisted))
+            } else {
+                try await persistenceStore.save(data)
+            }
+            persisted = candidate
         } catch {
             do {
                 try await persistenceStore.restore(previousData)

@@ -11,10 +11,14 @@ import SwiftTerm
 ///
 /// Off the main actor: its reads wait on the PTY, and on the main actor they starved the suite's
 /// timing tests running beside them.
-@Suite("tmux control mode against this Mac's tmux (live)", .serialized)
+@Suite("tmux control mode against this Mac's tmux (live)", .serialized, .enabled(if: MacTmuxServiceTests.tmux != nil, "no tmux on this Mac"))
 nonisolated struct LiveTmuxControlTests {
     static let tmux = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
         .first { FileManager.default.isExecutableFile(atPath: $0) }
+    /// Where tmux keeps a `-L` server's socket, for the environment above (no TMUX_TMPDIR). A server
+    /// that ended left it there: 360 had gathered by 2026-10-24, so each test now removes its own.
+    static func socketPath(_ name: String) -> String { "/private/tmp/tmux-\(getuid())/\(name)" }
+
     static let environment = ["PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", "TERM": "xterm-256color",
                               "HOME": NSTemporaryDirectory(), "LANG": "en_US.UTF-8", "SHELL": "/bin/sh"]
 
@@ -43,7 +47,7 @@ nonisolated struct LiveTmuxControlTests {
             var attributes: posix_spawnattr_t?
             posix_spawnattr_init(&attributes)
             defer { posix_spawnattr_destroy(&attributes) }
-            posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+            GlassSpawn.prepare(&attributes)
             let argv = arguments.map { strdup($0) } + [nil]
             defer { argv.forEach { free($0) } }
             let envp = LiveTmuxControlTests.environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
@@ -112,8 +116,8 @@ nonisolated struct LiveTmuxControlTests {
             var attributes: posix_spawnattr_t?
             posix_spawnattr_init(&attributes)
             defer { posix_spawnattr_destroy(&attributes) }
-            // A session of its own, and none of the test process's descriptors (`LiveProcess`).
-            posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT) | Int16(0x0400))
+            // A session of its own (POSIX_SPAWN_SETSID), as the app spawns otherwise (`GlassSpawn`).
+            GlassSpawn.prepare(&attributes, flags: 0x0400)
             let argv = arguments.map { strdup($0) } + [nil]
             defer { argv.forEach { free($0) } }
             let envp = LiveTmuxControlTests.environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
@@ -188,6 +192,7 @@ nonisolated struct LiveTmuxControlTests {
                 case .transport(let data): process.write(data)
                 case .live: live = true
                 case .exited: exited = true
+                case .showGrid(let columns, let rows, _): terminal.resize(cols: columns, rows: rows)
                 }
             }
         }
@@ -234,8 +239,13 @@ nonisolated struct LiveTmuxControlTests {
     private func server() -> (socket: String, kill: () -> Void)? {
         guard let tmux = Self.tmux else { return nil }
         let socket = "glass-cc-\(UUID().uuidString.prefix(8))"
-        // `kill-session`: tmux 3.8's `kill-server` answered success and left this server running.
-        return (socket, { _ = LiveProcess.run(tmux, ["-L", socket, "kill-session", "-t", "cc"], environment: Self.environment) })
+        // `kill-session`: its last session ending ends the server. `kill-server` once answered success and
+        // left the server running — not tmux's doing: the server had started with the spawning thread's
+        // blocked signals, which the spawns no longer pass on (`GlassSpawn`, 2026-10-24).
+        return (socket, {
+            _ = LiveProcess.run(tmux, ["-L", socket, "kill-session", "-t", "cc"], environment: Self.environment)
+            unlink(Self.socketPath(socket))
+        })
     }
 
     private func attach(_ socket: String, columns: Int = 80, rows: Int = 24) -> Tab? {
@@ -244,9 +254,40 @@ nonisolated struct LiveTmuxControlTests {
                    columns: columns, rows: rows)
     }
 
-    @Test("over pipes, as a local pane runs it: 2,000 lines at once, every one, in order, once")
+    /// The Mac and the headset on one session (2026-10-22, the owner: "do the focus claim"): tmux sizes
+    /// the window to the client that switched to it last; the terminal in front switches to it again.
+    @Test("two clients of one session: the one in front takes the window back")
+    func twoClients() throws {
+        let (socket, kill) = try #require(server())
+        let tmux = try #require(Self.tmux)
+        defer { kill() }
+        let mac = try #require(attach(socket, columns: 166, rows: 53))
+        #expect(mac.pump { mac.live }, "the first client attached")
+        let headset = try #require(attach(socket, columns: 127, rows: 53))
+        #expect(headset.pump { headset.live }, "the second client attached")
+        func window() -> String {
+            LiveProcess.run(tmux, ["-L", socket, "display", "-p", "-t", "cc:", "#{window_width}x#{window_height}"],
+                            environment: Self.environment).output.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        #expect(window() == "127x53", "the window is the latest client's")
+        // Each until what is waited for has happened, up to 10 s: fixed pumps of 2 and 3 s stood for
+        // them, five seconds every run, and no promise on a slow one (2026-10-24).
+        mac.pump(seconds: 10) { mac.terminal.cols == 127 }
+        #expect(mac.terminal.cols == 127, "the first client's terminal isn't at the window's size: \(mac.terminal.cols)")
+        mac.apply(mac.client.claim())
+        mac.pump(seconds: 10) { window() == "166x53" && mac.terminal.cols == 166 }
+        #expect(window() == "166x53", "the claim didn't take the window back")
+        #expect(mac.terminal.cols == 166, "the first client's terminal isn't its own size again: \(mac.terminal.cols)")
+        headset.detach()
+        mac.detach()
+    }
+
+    /// The client over pipes, read by this test's own reader. The app's local pane reads through
+    /// `TmuxControlPipe` instead, whose drain-to-EAGAIN reader `LiveTmuxControlPaneTests.localPane` drives.
+    @Test("over pipes: 2,000 lines at once, every one, in order, once")
     func overPipes() throws {
-        guard let (socket, kill) = server(), let tmux = Self.tmux else { print("NOT RUN: no tmux on this Mac"); return }
+        let (socket, kill) = try #require(server())
+        let tmux = try #require(Self.tmux)
         defer { kill() }
         let tab = try #require(Tab([tmux, "-L", socket, "-f", "/dev/null", "-u", "-C", "new-session", "-A", "-s", "cc", "/bin/sh"],
                                    overPipe: true))
@@ -259,7 +300,7 @@ nonisolated struct LiveTmuxControlTests {
 
     @Test("2,000 lines printed at once: every one in the terminal's history, in order, once")
     func everyLine() throws {
-        guard let (socket, kill) = server() else { print("NOT RUN: no tmux on this Mac"); return }
+        let (socket, kill) = try #require(server())
         defer { kill() }
         let tab = try #require(attach(socket))
         #expect(tab.pump { tab.live }, "attached and drawn")
@@ -273,7 +314,7 @@ nonisolated struct LiveTmuxControlTests {
 
     @Test("text with a quote, a backslash, a semicolon and a tilde reaches the program as typed")
     func typedExactly() throws {
-        guard let (socket, kill) = server() else { print("NOT RUN: no tmux on this Mac"); return }
+        let (socket, kill) = try #require(server())
         defer { kill() }
         let tab = try #require(attach(socket))
         #expect(tab.pump { tab.live })
@@ -284,7 +325,7 @@ nonisolated struct LiveTmuxControlTests {
 
     @Test("leaving and coming back: the history and the screen are read back in")
     func reattach() throws {
-        guard let (socket, kill) = server() else { print("NOT RUN: no tmux on this Mac"); return }
+        let (socket, kill) = try #require(server())
         defer { kill() }
         let first = try #require(attach(socket))
         #expect(first.pump { first.live })
@@ -304,7 +345,7 @@ nonisolated struct LiveTmuxControlTests {
 
     @Test("a program on the alternate screen is still on it after coming back, the shell behind it")
     func alternateScreen() throws {
-        guard let (socket, kill) = server() else { print("NOT RUN: no tmux on this Mac"); return }
+        let (socket, kill) = try #require(server())
         defer { kill() }
         let first = try #require(attach(socket))
         #expect(first.pump { first.live })

@@ -47,7 +47,7 @@ private func makeModel(registry: GlassCapabilityRegistry) throws -> (GlassShellM
     let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                 sharedContainerURL: root.appendingPathComponent("group"),
                                 resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                layers: GlassLayerStore(), registry: registry)
+                                layers: GlassLayerStore.forTest(), registry: registry)
     return (model, root)
 }
 

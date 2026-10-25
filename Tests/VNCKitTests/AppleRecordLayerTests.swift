@@ -159,9 +159,11 @@ struct AppleRecordLayerTests {
         let run = Task { try await client.run() }
 
         // The viewer's answer: version, type, then 128 bytes of credentials and its public key.
-        for _ in 0..<200 where await sink.written.count < 13 + 256 { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<6_000 where await sink.written.count < 13 + 256 { try await Task.sleep(for: .milliseconds(5)) }
         let answer = await sink.written
         #expect(Array(answer.prefix(12)) == Array("RFB 003.889\n".utf8), "answered in its own revision")
+        // Required before slicing: a short answer was an out-of-range crash, which ended the whole run.
+        try #require(answer.count >= 13 + 256, "the viewer's answer: \(answer.count) bytes")
         let clientPublic = Array(answer[(13 + 128)..<(13 + 256)])
         let shared = RFBSecurity.fit(try group.power(baseBigEndian: clientPublic, exponentBigEndian: serverPrivate), to: 128)
         let wrap = Array(Insecure.MD5.hash(data: shared))
@@ -173,8 +175,11 @@ struct AppleRecordLayerTests {
         after += UInt16(4).bigEndianBytes + UInt16(4).bigEndianBytes + RFBPixelFormat.client.wireBytes
         after += UInt32(name.count).bigEndianBytes + name
         await source.append(after)
-        for _ in 0..<200 where await sink.written.count < 13 + 256 + 1 + 66 + 4 + 8 + 12 + 8 { try await Task.sleep(for: .milliseconds(5)) }
-        let prelude = Array((await sink.written)[(13 + 256)...])
+        for _ in 0..<6_000 where await sink.written.count < 13 + 256 + 1 + 66 + 4 + 8 + 12 + 8 { try await Task.sleep(for: .milliseconds(5)) }
+        let afterAnswer = await sink.written
+        let preludeLength: Int = 13 + 256 + 1 + 66 + 4 + 8 + 12 + 8
+        try #require(afterAnswer.count >= preludeLength, "the prelude: \(afterAnswer.count) bytes")
+        let prelude = Array(afterAnswer[(13 + 256)...])
         #expect(prelude.first == 0x81, "shared, and the enhanced ServerInit asked for")
         #expect(Array(prelude.dropFirst()) == RFBAppleMessages.viewerInfo + RFBAppleMessages.setModeControl
                 + RFBApplePasteboard.autoPasteboard(true) + RFBAppleMessages.setEncryptionStart + RFBAppleMessages.enableInboundDecryption,
@@ -191,7 +196,7 @@ struct AppleRecordLayerTests {
         let update: [UInt8] = [0, 0, 0, 1] + UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes + UInt16(1).bigEndianBytes
             + UInt16(1).bigEndianBytes + Int32(0).bigEndianBytes + [1, 2, 3, 0]
         await source.append(try RFBAppleRecords.frame(update, with: toClient))
-        for _ in 0..<200 where frames.lock.withLock({ frames.count }) == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<6_000 where frames.lock.withLock({ frames.count }) == 0 { try await Task.sleep(for: .milliseconds(5)) }
         #expect(frames.lock.withLock { frames.count } >= 1, "the picture arrived through the record layer")
         #expect(client.isEncrypted)
         // Its ServerInit lists the second event message: a scroll goes as a distance, in its own record.
@@ -210,21 +215,24 @@ struct AppleRecordLayerTests {
         let reply: [UInt8] = [0x1f, 0, 0, 0] + UInt32(7).bigEndianBytes + UInt32(archive.count).bigEndianBytes
             + UInt32(compressed.count).bigEndianBytes + compressed
         await source.append(try RFBAppleRecords.frame(reply, with: toClient))
-        for _ in 0..<200 where frames.lock.withLock({ frames.texts.isEmpty }) { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<6_000 where frames.lock.withLock({ frames.texts.isEmpty }) { try await Task.sleep(for: .milliseconds(5)) }
         #expect(frames.lock.withLock { frames.texts } == ["copied on the Mac ✓"], "the text flavor, as UTF-8")
         try await client.sendCutText("pasted on the headset é")
-        for _ in 0..<100 { try await Task.sleep(for: .milliseconds(5)) }
 
         // What the viewer sent after the prelude: records, one message each, SetPixelFormat first.
-        let written = await sink.written
+        // Records reach the sink after the send returns, so read until this client's pasteboard is in.
         var offset = 13 + 256 + 1 + 66 + 4 + 8 + 12 + 8
         let fromClient = try RFBAppleRecordCipher(Self.keys, encrypting: false)
         var messages: [[UInt8]] = []
-        while offset + 2 <= written.count {
-            let length = Int(UInt16(written[offset]) << 8 | UInt16(written[offset + 1]))
-            guard offset + 2 + length <= written.count else { break }
-            messages.append(Array(try RFBAppleRecords.open(Array(written[(offset + 2)..<(offset + 2 + length)]), with: fromClient)))
-            offset += 2 + length
+        for _ in 0..<6_000 where !messages.contains(where: { $0.first == 0x1f }) {
+            let written = await sink.written
+            while offset + 2 <= written.count {
+                let length = Int(UInt16(written[offset]) << 8 | UInt16(written[offset + 1]))
+                guard offset + 2 + length <= written.count else { break }
+                messages.append(Array(try RFBAppleRecords.open(Array(written[(offset + 2)..<(offset + 2 + length)]), with: fromClient)))
+                offset += 2 + length
+            }
+            if !messages.contains(where: { $0.first == 0x1f }) { try await Task.sleep(for: .milliseconds(5)) }
         }
         #expect(messages.first?.first == 0 && messages.first?.count == 20, "SetPixelFormat, alone in its record")
         #expect(messages.dropFirst().first?.first == 2, "then SetEncodings")

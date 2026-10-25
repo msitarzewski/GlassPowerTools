@@ -35,6 +35,8 @@ struct GlassShowAllWindowsOverview: View {
     let done: @MainActor () -> Void
     /// Closes the overview, leaves the screen it was opened from, then runs what was chosen.
     let open: @MainActor (_ chosen: @escaping @MainActor () -> Void) -> Void
+    /// Vision Pro: the same cards around the person (`GlassAllWindowsAround`).
+    var around: (@MainActor () -> Void)? = nil
     @State private var search = ""
 
     var body: some View {
@@ -60,6 +62,19 @@ struct GlassShowAllWindowsOverview: View {
             #endif
             .searchable(text: $search, prompt: "Machines and sessions")
             .toolbar {
+                if let around {
+                    ToolbarItem(placement: .primaryAction) {
+                        // Its words as well as its symbol: a toolbar shows a symbol alone.
+                        Button(action: around) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "pano")
+                                Text("Around You")
+                            }
+                        }
+                        .help("Show every window around you")
+                            .accessibilityIdentifier("all-windows-around-you")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: done)
                         .accessibilityIdentifier("all-windows-done")

@@ -53,7 +53,7 @@ struct DatabaseConnectionFailureTests {
     func noRouteOnTheLocalNetwork() {
         // What both drivers threw, measured from a process without Local Network access.
         let noRoute = IOError(errnoCode: EHOSTUNREACH, reason: "connect(descriptor:addr:size:)")
-        let local = DatabaseConnectionFailure.message(for: noRoute, config: config(.mysql, host: "192.168.1.20", port: 3306))
+        let local = DatabaseConnectionFailure.message(for: noRoute, config: config(.mysql, host: "10.0.0.20", port: 3306))
         #expect(local.contains("Privacy & Security > Local Network"))
         #expect(!local.contains("Terminal service"))
 
@@ -63,14 +63,14 @@ struct DatabaseConnectionFailureTests {
         #expect(remote.contains("Terminal service"))
 
         // Through a tunnel the database is on this device's loopback; the setting is not in the way.
-        let tunnelled = DatabaseConnectionFailure.message(for: noRoute, config: config(.mysql, host: "192.168.1.20", port: 3306, tunnel: true))
+        let tunnelled = DatabaseConnectionFailure.message(for: noRoute, config: config(.mysql, host: "10.0.0.20", port: 3306, tunnel: true))
         #expect(!tunnelled.contains("Local Network"))
     }
 
     @Test("A server's refusal is passed on in its own words")
     func serverRefusal() {
         let refusal = DatabaseError.server("password authentication failed for user \"reader\"")
-        let message = DatabaseConnectionFailure.message(for: refusal, config: config(.postgresql, host: "192.168.1.20", port: 5432))
+        let message = DatabaseConnectionFailure.message(for: refusal, config: config(.postgresql, host: "10.0.0.20", port: 5432))
         #expect(message == "password authentication failed for user \"reader\"")
     }
 }

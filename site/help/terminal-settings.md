@@ -22,7 +22,7 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 - **Initial Terminal Size**: **Columns** and **Rows** for a new terminal before its window is measured.
 - **On Vision Pro, Mac and iPad**, **Resizing**: **When a window is resized**, choose **Change Rows and Columns** (the starting setting), where a smaller window holds fewer and the program redraws to fit, or **Scale the Text**, where the terminal keeps its rows and columns and its text grows and shrinks with the window. **Scale Text** in a window's bar switches that window alone. See [Scale the text with the window](terminal-sessions.md#scale-the-text-with-the-window).
 - **Cursor Style** (**Block**, **Underline** or **Bar**) and **Blinking cursor**.
-- **On Mac**, **Previews**: **Show previews**, **Never**, **Mouseover** (the starting setting) or **Mouseover + Space**, for the file a path in a terminal names. See [Preview a file over the terminal](terminal-sessions.md#preview-a-file-over-the-terminal).
+- **On Mac and Vision Pro**, **Previews**: **Show previews**, **Never**, **Mouseover** (the starting setting) or **Mouseover + Space**, for the file a path in a terminal names. See [Preview a file over the terminal](terminal-sessions.md#preview-a-file-over-the-terminal).
 - **On Mac**, **tmux**: **Keep local terminals running with tmux** keeps local terminals running when you quit, update or force quit the app. **Running in the background** shows whether they are running and how many there are, and **End All Local Terminals…** ends them all. See [Local terminals on a Mac](terminal-tmux.md#local-terminals-on-a-mac). Each saved host has its own tmux setting, in its Terminal service; see [Turn it on](terminal-tmux.md#turn-it-on).
 
 ## Edit a theme
@@ -47,7 +47,7 @@ Anything about how a terminal window looks and behaves can be set for that windo
 - **Look** and **Text**: a background behind the text (a picture, **Digital Rain**, **Synthwave** or **Phosphor Screen**), **Readability**, a **Text Palette** and a **Text Glow**, or a whole look from **Start From**. See [Backgrounds and glowing text](terminal-looks.md).
 - **Cursor**: **Cursor Style** and **Blinking cursor**.
 - **When resized** (**on Vision Pro, Mac and iPad**): **Change Rows and Columns** or **Scale the Text**. **Scale Text** in the window's bar changes this setting.
-- **Show previews** (**on Mac**): **Never**, **Mouseover** or **Mouseover + Space**.
+- **Show previews** (**on Mac and Vision Pro**): **Never**, **Mouseover** or **Mouseover + Space**.
 - **Bell and Scrollback**: **Bell enabled**, **Visual bell**, **Keep scrollback during session** and **Max scrollback lines**.
 - **Activity** (**on Vision Pro**): **Auto-focus on activity**. While a terminal in this window prints, **Grid** and **Carousel** bring it forward, and the window's orb pulses (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)). Until you change it here, it follows the saved Workgroup the window was opened from, and is otherwise off.
 

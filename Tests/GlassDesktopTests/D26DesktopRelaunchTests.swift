@@ -32,8 +32,13 @@ struct D26DesktopRelaunchTests {
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
                                     resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
-        let desktop = GlassDesktopRuntime(layers: GlassLayerStore())
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
+        // The real shell and catalog, as the app wires them; the desktop model's own folder,
+        // credentials and window settings the test's, not the app's folder, the Keychain and the
+        // runner's shared defaults (2026-10-24).
+        let desktop = GlassDesktopRuntime(layers: GlassLayerStore.forTest(),
+                                          app: DesktopAppModel(storageDirectory: root.appendingPathComponent("desktop"),
+                                                               credentialAccess: .inMemory()))
         await desktop.connectToLibrary(store: model)
         model.registry.register(GlassDesktopCapability(runtime: desktop))
         return (model, desktop)

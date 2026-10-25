@@ -138,7 +138,10 @@ struct EncodingTests {
     /// The native fast path (2026-10-11) against the per-pixel reference, tile kind by tile kind,
     /// edges included: a rectangle off the grid, partial tiles at its right and bottom.
     @Test func zrleNativePathMatchesTheReference() throws {
-        var random = SystemRandomNumberGenerator()
+        // Seeded, and the seed printed, so a failure can be run again (2026-10-24).
+        let seed = UInt64.random(in: 0...UInt64.max)
+        print("zrleNativePathMatchesTheReference seed: \(seed)")
+        var random = SeededGenerator(seed: seed)
         let rect = RFBRectangle(x: 3, y: 5, width: 150, height: 70)
         var tiles: [UInt8] = []
         var y = rect.y
@@ -224,5 +227,18 @@ struct EncodingTests {
         #expect(RFBProtocolVersion(major: 3, minor: 8).wireBytes == Array("RFB 003.008\n".utf8))
         #expect(throws: RFBError.self) { try RFBProtocolVersion.parse(Array("HTTP/1.1 200\n".utf8)) }
         #expect(throws: RFBError.self) { try RFBProtocolVersion.parse(Array("RFB 004.000\n".utf8)) }
+    }
+}
+
+/// SplitMix64: a generator a seed repeats.
+struct SeededGenerator: RandomNumberGenerator {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed }
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
     }
 }

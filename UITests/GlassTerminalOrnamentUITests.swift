@@ -27,11 +27,11 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         await MainActor.run { app?.terminate() }
     }
 
-    private func launch(_ surface: String) {
+    private func launch(_ surface: String, _ more: [String] = []) {
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
-                                "--demo-open", surface]
+                                "--demo-open", surface] + more
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
     }
@@ -47,9 +47,9 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         add(tree)
     }
 
-    /// The terminal's own Connections control, found as `GlassConnectionsOrbUITests` finds it.
+    /// The terminal's own ⚡ (2026-10-22; it was a Connections control), as `GlassConnectionsOrbUITests` finds it.
     private var terminalsConnections: XCUIElementQuery {
-        app.buttons.matching(NSPredicate(format: "identifier == %@ AND label == %@", "server.rack", "Connections"))
+        app.buttons.matching(identifier: "terminal-active-connections")
     }
 
     /// Two terminals in one window, one bar: each control once, every one still reachable by the
@@ -207,6 +207,61 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         XCTAssertTrue(elements("terminal-footer-new-tab").firstMatch.waitForExistence(timeout: 40),
                       "the terminal's bar did not appear")
         XCTAssertFalse(elements("vision-terminal-sidebar").firstMatch.exists, "a sidebar for one terminal")
+    }
+
+    /// Quick Look leads a held path's menu on the headset, and shows its preview over the terminal
+    /// (the owner, 2026-10-22: "add Quick Look on the headset"). The demo is connected to nothing,
+    /// so the preview says the file couldn't be read; a real host's is checked on the headset.
+    func testQuickLookOnAHeldPath() {
+        launch("terminal-path")
+        let terminal = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Terminal")).firstMatch
+        XCTAssertTrue(terminal.waitForExistence(timeout: 40), "no terminal")
+        sleep(2)
+        // The runner holds the terminal's middle whatever point is asked for (as
+        // `GlassTerminalSelectionUITests` found), so the demo prints the path all over the screen.
+        terminal.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 24, dy: 9)).press(forDuration: 1.0)
+        // A menu's entries are menu items to the runner, not buttons.
+        let quickLook = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Quick Look")).firstMatch
+        let offered = quickLook.waitForExistence(timeout: 5)
+        attachTree("path-menu")
+        // Quick Look is offered on a path alone, so its being there says the hold found the path.
+        XCTAssertTrue(offered, "no Quick Look in the held path's menu")
+        quickLook.tap()
+        XCTAssertTrue(elements("terminal-path-preview").firstMatch.waitForExistence(timeout: 15), "Quick Look showed nothing")
+        attachTree("path-preview")
+    }
+
+    /// The grid the terminal shows (`terminal-grid-<columns>x<rows>`, a UI-test mark).
+    private var shownGrid: XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "terminal-grid-")).firstMatch
+    }
+
+    /// Showing and hiding the sidebar leaves the terminal as it was (2026-10-22: "The terminal
+    /// content should not move or redraw"): the sidebar stands beside the window, which keeps its
+    /// size, so the grid and the terminal's place in the window stay.
+    func testTheSidebarLeavesTheTerminalWhereItIs() {
+        launch("terminal-tabs")
+        let sidebar = elements("vision-terminal-sidebar").firstMatch
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 40), "two terminals and no sidebar")
+        XCTAssertTrue(shownGrid.waitForExistence(timeout: 20), "the terminal has no grid")
+        sleep(3)
+        let grid = shownGrid.identifier
+        let frame = shownGrid.frame
+        let toggle = elements("vision-terminal-sidebar-toggle").firstMatch
+        XCTAssertTrue(toggle.exists, "no sidebar toggle in the bar")
+
+        toggle.tap()
+        let hidden = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: sidebar)
+        XCTAssertEqual(XCTWaiter().wait(for: [hidden], timeout: 10), .completed, "the toggle didn't hide the sidebar")
+        sleep(3)
+        XCTAssertEqual(shownGrid.identifier, grid, "hiding the sidebar changed the terminal's rows and columns")
+        XCTAssertEqual(shownGrid.frame, frame, "hiding the sidebar moved the terminal")
+
+        toggle.tap()
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 10), "the toggle didn't show the sidebar again")
+        sleep(3)
+        XCTAssertEqual(shownGrid.identifier, grid, "showing the sidebar changed the terminal's rows and columns")
+        XCTAssertEqual(shownGrid.frame, frame, "showing the sidebar moved the terminal")
     }
 }
 #endif

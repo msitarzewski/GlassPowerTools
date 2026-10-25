@@ -89,6 +89,23 @@ public final class GlassEditorModel {
     /// Current selection in UTF-16 code units; an empty range is a caret.
     public var selectedRange: Range<Int> = 0..<0
 
+    /// A selection the text view is to take and scroll into sight: the view's own selection
+    /// reaches `selectedRange`, and this is the other direction. The find bar and Go to Line set
+    /// `selectedRange` alone, which nothing on screen followed (2026-10-22: Return in the find
+    /// bar selected nothing). A serial, as `keyboardRequest` is, so the same range asked for
+    /// twice is shown twice.
+    public private(set) var revealRequest = 0
+
+    /// Selects `range` in the text view and scrolls it into sight.
+    public func reveal(_ range: Range<Int>) {
+        selectedRange = range
+        revealRequest &+= 1
+    }
+
+    /// The lines that differ from the file's last commit, marked beside them in the gutter. Set by
+    /// whoever knows the file's history — the editor, from git — and empty otherwise.
+    public var lineChanges: [LineChange] = []
+
     /// The remote conflict decision, surfaced and never auto-resolved
     /// (projectRules.md, Data Safety). `indeterminate` stays `indeterminate`.
     public var conflictState: ConflictState = .noConflict

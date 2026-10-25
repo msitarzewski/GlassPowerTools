@@ -77,7 +77,10 @@ final class LargeTextUITests: XCTestCase {
     func testTheOverviewsFiguresAreWholeAtTheLargestText() throws {
         launch()
         guard element("library-overview").waitForExistence(timeout: 10) else {
-            throw XCTSkip("the overview is beside the list only where there is room, as on an iPad")
+            // Beside the list only where there is room: a phone shows the list, and that is checked.
+            XCTAssertEqual(UIDevice.current.userInterfaceIdiom, .phone, "an iPad shows the overview beside the list")
+            XCTAssertTrue(app.libraryScope("all-connections").exists, "a phone shows the library's list instead")
+            return
         }
         let figure = { (name: String) in
             self.app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
@@ -95,7 +98,6 @@ final class LargeTextUITests: XCTestCase {
 
     /// The phone's bar above a table's rows: Filter and More, one line, icons only.
     func testTheDatabasesFilterBarIsOneLineAtTheLargestText() throws {
-        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .phone, "the phone's bar; an iPad's is icons at any size")
         launch("database")
         let filter = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Filter'")).firstMatch
         XCTAssertTrue(filter.waitForExistence(timeout: 10), "Filter")
@@ -158,21 +160,37 @@ final class LargeTextUITests: XCTestCase {
         let candidates = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Terminal'"))
         XCTAssertTrue(candidates.firstMatch.waitForExistence(timeout: 10), "the terminal")
         let terminal = candidates.allElementsBoundByIndex.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
-        let lines = (terminal?.value as? String ?? "").split(separator: "\n")
+        let text = terminal?.value as? String ?? ""
+        let shown = XCTAttachment(string: text)
+        shown.name = "terminal-value"
+        shown.lifetime = .keepAlways
+        add(shown)
+        let lines = text.split(separator: "\n")
         return lines.map(\.count).max() ?? 0
     }
 
     /// The editor's file list on an iPad is wider at an accessibility size, so a file's name is
-    /// whole: it broke "com-pose.yaml" at 340 points.
+    /// whole: it broke "com-pose.yaml" at 340 points. A phone's list is a screen of its own, and
+    /// whole there too.
     func testTheEditorsFileNamesAreWholeAtTheLargestText() throws {
-        try XCTSkipIf(UIDevice.current.userInterfaceIdiom != .pad, "a phone shows the list a screen of its own")
         launch("editor")
+        // A phone shows the list as a screen of its own, behind the file: back to it.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let back = app.backButton
+            if back.waitForExistence(timeout: 5) { back.tap() }
+        }
         // The list's, not the tab's: the leftmost.
         let names = app.staticTexts.matching(NSPredicate(format: "label == 'compose.yaml'")).allElementsBoundByIndex
         let name = names.filter(\.exists).min { $0.frame.minX < $1.frame.minX }
         XCTAssertNotNil(name, "compose.yaml in the file list")
-        XCTAssertLessThan(name?.frame.height ?? .infinity, 100,
-                          "\"compose.yaml\" is one line: \(String(describing: name?.frame))")
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // A phone's list is the screen's width, and at the largest size a name wraps, as the
+            // Files app's do; whole, never cut off.
+            XCTAssertEqual(try clipped().filter { $0 == "compose.yaml" }, [], "\"compose.yaml\" is whole")
+        } else {
+            XCTAssertLessThan(name?.frame.height ?? .infinity, 100,
+                              "\"compose.yaml\" is one line: \(String(describing: name?.frame))")
+        }
     }
 
     func testTheLibrarysICloudFooterIsNotClippedAtTheLargestText() throws {

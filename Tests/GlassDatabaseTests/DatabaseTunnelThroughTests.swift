@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import GlassShell
 import GlassConnectionKit
+import NIOCore
 @testable import GlassDatabase
 
 /// A database on a private address, reached through another machine's Terminal service — an app
@@ -85,6 +86,27 @@ struct DatabaseTunnelThroughTests {
         draft.tunnelTargetHost = "10.0.0.12"
         draft.route = .direct
         #expect(draft.configuration(id: UUID(), address: "203.0.113.5", name: "P").tunnelTargetHost == nil)
+    }
+
+    /// The overview showed the machine's address for a database at a Database address behind it
+    /// (2026-10-22), so a lost address could not be seen there.
+    @Test("the Endpoint and a failure name where the connection ends, not the machine's address")
+    func endpointIsWhereTheConnectionEnds() {
+        let behind = DatabaseConnectionConfig(name: "Web", host: "203.0.113.5", port: 13306, username: "app",
+                                              usesHostTunnel: true, tunnelTargetHost: "10.0.0.12")
+        let onItself = DatabaseConnectionConfig(name: "Local", host: "203.0.113.5", port: 3306, username: "app",
+                                                usesHostTunnel: true)
+        let through = DatabaseConnectionConfig(name: "Production", host: "10.0.0.12", port: 3306, username: "app",
+                                               usesHostTunnel: true, tunnelServiceID: UUID())
+        let direct = DatabaseConnectionConfig(name: "Direct", host: "203.0.113.5", port: 5432, username: "app")
+        #expect(behind.endpointDescription == "10.0.0.12:13306")
+        #expect(onItself.endpointDescription == "Port 3306 on this machine")
+        #expect(through.endpointDescription == "10.0.0.12:3306")
+        #expect(direct.endpointDescription == "203.0.113.5:5432")
+
+        let reset = IOError(errnoCode: ECONNRESET, reason: "read")
+        let message = DatabaseConnectionFailure.message(for: reset, config: behind)
+        #expect(message.hasPrefix("Web didn't answer at 10.0.0.12:13306."), "\(message)")
     }
 
     @Test("connecting goes through the chosen machine to the database's own address")

@@ -54,6 +54,12 @@ private enum LiveDB {
         engine == .postgresql ? postgresScratchDatabase : mysqlScratchDatabase
     }
 
+    /// The ports as the SSH host sees them, which a tunnelled connection forwards to: not the ports
+    /// above when those are this Mac's ends of tunnels to the test VM, as they are where the test
+    /// runner cannot reach the VM itself (BUILDING.md). The same ports when unset.
+    static var mysqlFarPort: Int { value("GPT_DB_TEST_MYSQL_FAR_PORT").flatMap(Int.init) ?? mysqlPort }
+    static var postgresFarPort: Int { value("GPT_DB_TEST_PG_FAR_PORT").flatMap(Int.init) ?? postgresPort }
+
     static var hasMySQL: Bool { mysqlPassword != nil }
     static var hasPostgres: Bool { postgresPassword != nil }
 
@@ -70,12 +76,13 @@ private enum LiveDB {
                        usesHostTunnel: Bool = false) -> DatabaseConnectionConfig {
         switch engine {
         case .mysql:
-            DatabaseConnectionConfig(name: "Live MySQL", engine: .mysql, host: host, port: mysqlPort,
+            DatabaseConnectionConfig(name: "Live MySQL", engine: .mysql, host: host,
+                                     port: usesHostTunnel ? mysqlFarPort : mysqlPort,
                                      username: mysqlUser, defaultDatabase: mysqlDatabase,
                                      usesHostTunnel: usesHostTunnel, isReadOnly: readOnly)
         case .postgresql:
             DatabaseConnectionConfig(name: "Live PostgreSQL", engine: .postgresql, host: host,
-                                     port: postgresPort, username: postgresUser,
+                                     port: usesHostTunnel ? postgresFarPort : postgresPort, username: postgresUser,
                                      defaultDatabase: postgresDatabase,
                                      usesHostTunnel: usesHostTunnel, isReadOnly: readOnly)
         case .sqlite:
@@ -108,25 +115,16 @@ struct LiveDatabaseIntegrationTests {
     /// **Nothing had ever exercised `reconnect`** — there was no test of it anywhere, tunnelled or
     /// direct — so this exists to say which of the two is broken when one of them is. It is the
     /// discriminator for the tunnelled case in `LiveTunnelIntegrationTests`.
-    /// **Disabled deliberately — read the reason before enabling it.**
     ///
-    /// `reconnect` does not reuse the password it was given; it re-reads one from the Keychain via
-    /// `storedCredentials`. These tests pass the password straight to `connect` and never store it,
-    /// so reconnect authenticates with an **empty** password — `storedCredentials` catches
-    /// `SecretStoreError.notFound` and substitutes `""` rather than reporting it
-    /// (`DatabaseSessionManager.swift:994-996`). PostgreSQL then rejects the login and PostgresNIO
-    /// trips its own "PostgresConnection deinitialized before being closed" assertion, which
-    /// **aborts the process** instead of failing the test.
-    ///
-    /// Making this runnable means writing a credential to the real Keychain, and since 2026-09-13
-    /// credentials synchronize (D18/D21) — a test password would propagate to the user's own
-    /// devices. That is not a side effect a test may have. The honest options are a fake credential
-    /// store behind the `store:` seam that already exists on the mutation entry points, or running
-    /// this by hand against a connection the user has saved.
-    @Test("A direct connection reconnects", .disabled("needs a stored credential; see the note above"),
-          .enabled(if: LiveDB.hasPostgres))
+    /// `reconnect` re-reads the saved password rather than reusing the one it was given. A test
+    /// password must not go into the Keychain, where it would synchronize to the owner's devices
+    /// (D18/D21), so the manager reads it from `retrieveSavedPassword` here. Disabled until
+    /// 2026-10-24 for want of that seam: with nothing saved, a reconnect sends an empty password,
+    /// as a passwordless service should, and the test server refused it.
+    @Test("A direct connection reconnects", .enabled(if: LiveDB.hasPostgres))
     func directReconnect() async throws {
         let (manager, sessionID, _) = try await connect(.postgresql)
+        manager.retrieveSavedPassword = { _ in LiveDB.password(.postgresql) }
         try await manager.reconnect(sessionID: sessionID)
 
         let session = try #require(manager.sessions[sessionID])
@@ -274,10 +272,11 @@ struct LiveDatabaseIntegrationTests {
         #expect(!toTeams.referencedColumn.isEmpty)
     }
 
+    /// Each engine whose server is configured; one that isn't is not a case at all, rather than a
+    /// case that passed having returned early (2026-10-24).
     @Test("The schema diagram reads the seeded tables and draws members → teams", .enabled(if: LiveDB.hasMySQL || LiveDB.hasPostgres),
-          arguments: [DatabaseEngineType.mysql, .postgresql])
+          arguments: [DatabaseEngineType.mysql, .postgresql].filter { $0 == .mysql ? LiveDB.hasMySQL : LiveDB.hasPostgres })
     func schemaDiagramOnRealServers(engine: DatabaseEngineType) async throws {
-        guard engine == .mysql ? LiveDB.hasMySQL : LiveDB.hasPostgres else { return }
         let (manager, sessionID, connection) = try await connect(engine)
         defer { Task { await manager.disconnect(sessionID: sessionID) } }
         let namespace = engine == .postgresql ? "public" : LiveDB.fixtureNamespace(.mysql)
@@ -752,6 +751,7 @@ private final class LiveForward: GlassHostPortForward {
         self.transport = transport
         self.owner = owner
     }
+    var refusal: String? { tunnel.refusal }
     func close() async {
         closed.withLock { $0 = true }
         await tunnel.close()
@@ -775,6 +775,49 @@ struct LiveTunnelIntegrationTests {
         try await transport.connect()
         let tunnel = try await transport.forward(localPort: 0, toHost: "127.0.0.1", port: port)
         return LiveForward(tunnel: tunnel, transport: transport, owner: owner)
+    }
+
+    /// A tunnel whose far end has nothing listening (2026-10-22, the owner, connecting to a machine's
+    /// MySQL through its tunnel: "I don't see anything"). The far machine refuses at once and the tunnel
+    /// closes the local socket within a tenth of a second, but mysql-nio fails only queued commands
+    /// when its channel goes, never the handshake it is waiting on, so its connect waited for ever.
+    /// The app's connect has to end in the machine's own reason, promptly. Port 9 on the VM:
+    /// nothing listens there.
+    @Test("MySQL through a tunnel to a port nothing listens on: the machine's reason, promptly",
+          .enabled(if: LiveTunnel.isConfigured))
+    func mysqlTunnelToNothingFails() async throws {
+        let manager = DatabaseSessionManager(loadImmediately: false)
+        nonisolated(unsafe) var opened: (any GlassHostPortForward)?
+        let config = DatabaseConnectionConfig(name: "Nothing There", engine: .mysql, host: "192.0.2.10",
+                                              port: 9, username: "nobody", usesHostTunnel: true)
+        // Watched from here rather than awaited: a connect that never returns would hold the test
+        // with it.
+        let result = OSAllocatedUnfairLock<String?>(initialState: nil)
+        let started = ContinuousClock.now
+        Task { @MainActor in
+            let outcome: String
+            do {
+                _ = try await manager.connect(config: config, password: "nothing", openForward: { [self] _, port in
+                    let forward = try await openForward(to: port)
+                    opened = forward
+                    return forward
+                })
+                outcome = "connected"
+            } catch {
+                outcome = "failed: " + DatabaseConnectionFailure.message(for: error, config: config)
+            }
+            result.withLock { $0 = outcome }
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(40))
+        while ContinuousClock.now < deadline, result.withLock({ $0 }) == nil {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        let elapsed = ContinuousClock.now - started
+        let outcome = result.withLock { $0 } ?? "still waiting after 40 s"
+        await opened?.close()
+        #expect(outcome.hasPrefix("failed"), "\(outcome)")
+        #expect(outcome.contains("nothing on the machine is listening on port 9"), "the machine's reason: \(outcome)")
+        #expect(elapsed < .seconds(10), "promptly, not at a timeout: \(elapsed)")
     }
 
     /// A measurement, not a pass mark (2026-10-05: 100 rows of serialized cache values took 9.5 s
@@ -827,7 +870,7 @@ struct LiveTunnelIntegrationTests {
             openForward: { [self] remoteHost, port in
                 // D7 asks for loopback as the host's machine sees it.
                 #expect(remoteHost == "127.0.0.1")
-                #expect(port == LiveDB.postgresPort)
+                #expect(port == LiveDB.postgresFarPort)
                 let forward = try await openForward(to: port)
                 opened = forward
                 return forward
@@ -863,16 +906,14 @@ struct LiveTunnelIntegrationTests {
     /// closes its listener via deinit but never runs `close()`, so the capability's
     /// `release(owner:)` never fires and the forward outlives the session that authorised it.
     /// Counting the forwards this test opens is what proves the superseded one was closed.
-    /// Disabled for the same reason as `directReconnect` — `reconnect` re-reads the password from
-    /// the Keychain and these tests never store one, so it authenticates with `""` and PostgresNIO
-    /// aborts the process. The fixes this test was written for are real and landed regardless:
-    /// `DatabaseSession.openForward` is now assigned, and both the superseded connection and the
-    /// superseded forward are closed before being replaced.
+    /// The saved password comes from `retrieveSavedPassword`, as in `directReconnect`. What it was
+    /// written for: `DatabaseSession.openForward` is assigned, and both the superseded connection
+    /// and the superseded forward are closed before being replaced.
     @Test("A tunnelled database reconnects, and the superseded forward is closed",
-          .disabled("needs a stored credential; see directReconnect"),
           .enabled(if: LiveTunnel.isConfigured && LiveDB.hasPostgres))
     func tunnelledReconnectOpensASecondForwardAndClosesTheFirst() async throws {
         let manager = DatabaseSessionManager(loadImmediately: false)
+        manager.retrieveSavedPassword = { _ in LiveDB.password(.postgresql) }
         nonisolated(unsafe) var opened: [LiveForward] = []
 
         let sessionID = try await manager.connect(

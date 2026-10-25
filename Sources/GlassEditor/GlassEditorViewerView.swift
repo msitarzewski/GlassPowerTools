@@ -117,7 +117,7 @@ struct GlassQuickLookView: NSViewRepresentable {
 }
 #else
 /// An image fitted to the tab, with pinch to zoom and a double tap between fit and twice size.
-private struct GlassZoomableImage: View {
+struct GlassZoomableImage: View {
     let url: URL
     @State private var zoom: CGFloat = 1
     @GestureState private var pinch: CGFloat = 1
@@ -145,7 +145,7 @@ private struct GlassZoomableImage: View {
     }
 }
 
-private struct GlassPDFView: UIViewRepresentable {
+struct GlassPDFView: UIViewRepresentable {
     let url: URL
 
     func makeUIView(context: Context) -> PDFView {

@@ -203,9 +203,14 @@ Local Network permission is blocking the test runner. Tunnel through loopback an
 the tunnel, keeping the other SSH variables as they were:
 
 ```sh
-ssh -N -L 2222:localhost:22 user@<test VM>     # in another terminal
-GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2222 swift test --filter LiveRemoteEditing
+ssh -N -L 2223:localhost:22 user@<test VM>     # in another terminal
+GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2223 swift test --filter LiveRemoteEditing
 ```
+
+The databases can come through the same tunnel (`-L 23306:localhost:3306 -L 15432:localhost:5432`, with
+`GPT_DB_TEST_HOST=127.0.0.1` and those ports). A test that tunnels *from* the VM then needs the VM's own view:
+`GPT_SSH_TEST_FAR_HOST` (its network address) and `GPT_SSH_TEST_FAR_PORT` (22), and
+`GPT_DB_TEST_MYSQL_FAR_PORT` and `GPT_DB_TEST_PG_FAR_PORT` (3306, 5432). Unset, they are the same as the others.
 
 ### Vendored packages
 

@@ -23,6 +23,7 @@
 import SwiftUI
 import GlassConnectionKit
 import GlassConnectionUI
+import GlassLayers
 #if os(macOS)
 import AppKit
 #endif
@@ -61,7 +62,7 @@ public extension GlassShellModel {
             machines.append(GlassActiveMachine(id: key, name: owner.displayName, sessions: []))
             return machines.count - 1
         }
-        for session in runningSessions {
+        for session in listedRunningSessions {
             guard let index = machineIndex(owning: session.endpointID) else { continue }
             machines[index].running.append(session)
         }
@@ -70,6 +71,13 @@ public extension GlassShellModel {
             machines[index].notChecked = unchecked.reason
         }
         return machines
+    }
+
+    /// The running sessions as Active lists them: less those something open here holds
+    /// (`isHeldHere`), which is listed instead. Read in a view body, so a session comes back the
+    /// moment what held it is closed.
+    var listedRunningSessions: [GlassRunningSession] {
+        runningSessions.filter { !$0.isHeldHere() }
     }
 
     /// What All Windows off the Mac shows: every open session, a window's tabs each on its own,
@@ -1083,6 +1091,12 @@ public struct GlassActiveConnectionsButton: View {
     private let hold: (@MainActor () -> Void)?
     @Environment(\.openWindow) private var openWindow
     @Environment(\.glassActiveConnectionsRoute) private var route
+    #if os(visionOS)
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    /// Settings ▸ Appearance ▸ Show All Windows ▸ Opens: around the person rather than in a window.
+    @AppStorage(GlassAllWindowsAround.opensAroundKey, store: GlassUITestRun.settingsDefaults) private var opensAround = false
+    #endif
     /// The hold opened All Windows, so the release that ends it is not also a tap.
     @State private var held = false
 
@@ -1150,7 +1164,8 @@ public struct GlassActiveConnectionsButton: View {
     }
     #elseif os(visionOS)
     private func showAllWindows() {
-        GlassShowAllWindows.presentOverview(openWindow: openWindow)
+        GlassAllWindowsAround.show(around: opensAround, openWindow: openWindow, open: openImmersiveSpace,
+                                   dismiss: dismissImmersiveSpace)
     }
     #endif
 }

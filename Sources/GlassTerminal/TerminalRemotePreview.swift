@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import os
 import NIOCore
 import NIOFoundationCompat
 import GlassSSHTransport
@@ -21,7 +22,13 @@ enum TerminalRemotePreview {
     /// The file at `path` — absolute, on `session`'s host — copied here, or nil when it can't be
     /// read, isn't a regular file, or is larger than `byteLimit`.
     static func fetch(_ path: String, from session: TerminalSession) async -> TerminalPreviewFile? {
-        guard let client = try? await TerminalRemoteDrops.openClient(for: session) else { return nil }
+        let client: SFTPClient
+        do {
+            client = try await TerminalRemoteDrops.openClient(for: session)
+        } catch {
+            Logger.pathPreview.error("event=fetch result=sftp-unavailable error=\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
         let data = await read(path, through: client)
         try? await client.close()
         guard let data else { return nil }
@@ -29,19 +36,40 @@ enum TerminalRemotePreview {
     }
 
     private static func read(_ path: String, through client: SFTPClient) async -> Data? {
-        guard let size = (try? await client.getAttributes(at: path))?.size, size <= byteLimit,
-              let file = try? await client.openFile(filePath: path, flags: .read) else { return nil }
-        let buffer = try? await file.readAll()
-        try? await file.close()
-        guard let buffer, UInt64(buffer.readableBytes) <= byteLimit else { return nil }
-        return Data(buffer: buffer)
+        let size: UInt64?
+        do {
+            size = try await client.getAttributes(at: path).size
+        } catch {
+            Logger.pathPreview.error("event=fetch result=stat-failed error=\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+        guard let size, size <= byteLimit else {
+            Logger.pathPreview.notice("event=fetch result=too-large size=\(size ?? 0, privacy: .public)")
+            return nil
+        }
+        do {
+            let file = try await client.openFile(filePath: path, flags: .read)
+            let buffer = try? await file.readAll()
+            try? await file.close()
+            guard let buffer, UInt64(buffer.readableBytes) <= byteLimit else {
+                Logger.pathPreview.error("event=fetch result=read-failed")
+                return nil
+            }
+            return Data(buffer: buffer)
+        } catch {
+            Logger.pathPreview.error("event=fetch result=open-failed error=\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     /// Into a folder of its own in the caches, under its own name, so a viewer that goes by the
     /// name — Quick Look does — sees what it is.
-    static func save(_ data: Data, named name: String) -> TerminalPreviewFile? {
+    /// - Parameter caches: the caches folder; the user's, unless a test gives one of its own.
+    static func save(_ data: Data, named name: String,
+                     caches: URL? = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first)
+        -> TerminalPreviewFile? {
         let manager = FileManager.default
-        guard let caches = manager.urls(for: .cachesDirectory, in: .userDomainMask).first, !name.isEmpty else { return nil }
+        guard let caches, !name.isEmpty else { return nil }
         let folder = caches.appending(path: "GlassTerminalPreviews", directoryHint: .isDirectory)
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let url = folder.appending(path: name)

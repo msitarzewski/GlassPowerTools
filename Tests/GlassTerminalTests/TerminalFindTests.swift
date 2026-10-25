@@ -51,12 +51,16 @@ struct TerminalFindTests {
             await Task.yield()
         }
 
+        /// Fed, and drawn: up to 30 s for the renderer to take it, and a test that goes on without
+        /// it is stopped there. It gave up after a second and returned as if fed, so a check that the
+        /// output didn't disturb something passed without the output having arrived (2026-10-24).
         func feed(_ text: String) async {
             nonce += 1
             model.ingest(data: Data(text.utf8), nonce: nonce)
-            for _ in 0..<100 where model.pendingRendererByteCount != 0 {
+            for _ in 0..<3_000 where model.pendingRendererByteCount != 0 {
                 try? await Task.sleep(for: .milliseconds(10))
             }
+            #expect(model.pendingRendererByteCount == 0, "the terminal never drew what it was fed")
         }
 
         func close() {
@@ -388,9 +392,10 @@ struct TerminalFindTests {
 
     /// A tmux server of its own: a short folder in /tmp (a socket path over about 104 characters
     /// fails), and `-S` on every command. The `tmux` the builders find on the PATH is a wrapper that
-    /// adds the same `-S`, and refuses to run once the socket is gone.
-    @MainActor
-    private final class PrivateTmux {
+    /// adds the same `-S`, and refuses to run once the socket is gone. Its runs block, so the test asks
+    /// it off the main actor (`offMainActor`): fifteen to twenty runs a case held it from every other
+    /// test in the run (2026-10-24).
+    private nonisolated final class PrivateTmux: @unchecked Sendable {
         let folder: String
         let socket: String
         let wrapper: String
@@ -422,8 +427,9 @@ struct TerminalFindTests {
             return result.status == 0 ? result.output : nil
         }
 
+        /// Up to 30 s for the seed's last line: off the main actor, a generous wait costs no one.
         func waitForSeed(_ marker: String) {
-            for _ in 0..<60 where !raw(["capture-pane", "-p", "-t", "=glass-7:"]).contains(marker) {
+            for _ in 0..<600 where !raw(["capture-pane", "-p", "-t", "=glass-7:"]).contains(marker) {
                 Thread.sleep(forTimeInterval: 0.05)
             }
         }
@@ -460,11 +466,15 @@ struct TerminalFindTests {
             + "printf 'needle 3\\n'; seq 61 65; sleep 60"
         let tmux = try PrivateTmux(tmux: TerminalTmuxTests.tmux!, modeKeys: modeKeys, seed: seed)
         defer { tmux.stop() }
-        tmux.waitForSeed("65")
+        await offMainActor { tmux.waitForSeed("65") }
         let target = TerminalTmuxFindTarget(session: "glass-7", failure: "tmux didn't answer.") { request in
             switch form {
-            case .sh: tmux.sh(TerminalTmux.findCommand(name: "glass-7", request: request))
-            case .argv: MacLocalTmux.run(tmux.wrapper, MacLocalTmux.findArguments(session: "glass-7", request: request))
+            case .sh:
+                let command = TerminalTmux.findCommand(name: "glass-7", request: request)
+                return await offMainActor { tmux.sh(command) }
+            case .argv:
+                let arguments = MacLocalTmux.findArguments(session: "glass-7", request: request)
+                return await offMainActor { MacLocalTmux.run(tmux.wrapper, arguments) }
             }
         }
         let source = TmuxFindSource(target)
@@ -472,14 +482,14 @@ struct TerminalFindTests {
         var older: [String] = []
         for _ in 0..<3 {
             #expect(await source.step("needle", .older) == .found(count: 3, index: nil))
-            older.append(tmux.cursorLine)
+            older.append(await offMainActor { tmux.cursorLine })
         }
         #expect(older == ["needle 3", "needle 2", "needle 1"], "each match once, newest first")
 
         var newer: [String] = []
         for _ in 0..<2 {
             #expect(await source.step("needle", .newer) == .found(count: 3, index: nil))
-            newer.append(tmux.cursorLine)
+            newer.append(await offMainActor { tmux.cursorLine })
         }
         #expect(newer == ["needle 2", "needle 3"], "turning round reaches a different match each step")
 
@@ -487,13 +497,18 @@ struct TerminalFindTests {
         #expect(await source.step("it's", .older) == .found(count: 1, index: nil))
 
         #expect(await source.step("not-in-this-pane", .older) == .notFound)
-        #expect(tmux.inMode == "0", "a miss leaves copy mode")
+        #expect(await offMainActor { tmux.inMode } == "0", "a miss leaves copy mode")
 
         #expect(await source.step("needle", .older) == .found(count: 3, index: nil))
-        #expect(tmux.inMode == "1")
+        #expect(await offMainActor { tmux.inMode } == "1")
         source.end()
-        for _ in 0..<100 where tmux.inMode != "0" { try await Task.sleep(for: .milliseconds(10)) }
-        #expect(tmux.inMode == "0", "closing the bar returns to the live prompt")
+        // Closing leaves copy mode in a task of its own: up to 10 s for it.
+        var mode = await offMainActor { tmux.inMode }
+        for _ in 0..<200 where mode != "0" {
+            try await Task.sleep(for: .milliseconds(50))
+            mode = await offMainActor { tmux.inMode }
+        }
+        #expect(mode == "0", "closing the bar returns to the live prompt")
     }
     #endif
 }

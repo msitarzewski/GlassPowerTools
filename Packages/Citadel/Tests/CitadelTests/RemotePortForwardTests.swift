@@ -5,6 +5,23 @@ import NIOSSH
 import XCTest
 
 final class RemotePortForwardTests: XCTestCase {
+    /// The forwards the server opened. Counted, because a check inside the callback alone passes when
+    /// the callback never runs.
+    private final class Opened: @unchecked Sendable {
+        private let lock = NSLock()
+        private var forwards: [SSHRemotePortForward] = []
+        func add(_ forward: SSHRemotePortForward) { lock.withLock { forwards.append(forward) } }
+        var all: [SSHRemotePortForward] { lock.withLock { forwards } }
+    }
+
+    /// Waits up to 30 seconds for `count` forwards to open.
+    private func wait(for count: Int, in opened: Opened) async throws {
+        let deadline = Date().addingTimeInterval(30)
+        while opened.all.count < count, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
     /// Test that remote port forward request is sent correctly
     func testRemotePortForwardRequest() async throws {
         // This test requires an SSH server that supports remote port forwarding
@@ -38,14 +55,14 @@ final class RemotePortForwardTests: XCTestCase {
 
         // Request remote port forward on a random high port
         // Use port 0 to let the server choose
+        let opened = Opened()
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
                 try await client.withRemotePortForward(
                     host: "127.0.0.1",
                     port: 0 // Let server choose port
                 ) { forward in
-                    XCTAssertGreaterThan(forward.boundPort, 0, "Server should have bound to a port")
-                    XCTAssertEqual(forward.host, "127.0.0.1")
+                    opened.add(forward)
                 } handleChannel: { channel, forwardedInfo in
                     print("Received forwarded connection from \(forwardedInfo.originatorAddress)")
 
@@ -54,9 +71,12 @@ final class RemotePortForwardTests: XCTestCase {
                 }
             }
 
-            try await Task.sleep(for: .seconds(1))
+            try await self.wait(for: 1, in: opened)
             group.cancelAll()
         }
+        XCTAssertEqual(opened.all.count, 1, "the forward opened")
+        XCTAssertGreaterThan(opened.all.first?.boundPort ?? 0, 0, "Server should have bound to a port")
+        XCTAssertEqual(opened.all.first?.host, "127.0.0.1")
     }
 
     /// Test that we can create and cancel multiple forwards
@@ -83,7 +103,7 @@ final class RemotePortForwardTests: XCTestCase {
             }
         }
 
-        // TODO: Confirmation from swift-testing
+        let opened = Opened()
         try await withThrowingTaskGroup(of: Void.self) { group in
             for _ in 0..<3 {
                 group.addTask {
@@ -91,8 +111,7 @@ final class RemotePortForwardTests: XCTestCase {
                         host: "127.0.0.1",
                         port: 0
                     ) { forward in
-                        XCTAssertGreaterThan(forward.boundPort, 0, "Server should have bound to a port")
-                        XCTAssertEqual(forward.host, "127.0.0.1")
+                        opened.add(forward)
                     } handleChannel: { channel, forwardedInfo in
                         print("Received forwarded connection from \(forwardedInfo.originatorAddress)")
 
@@ -102,16 +121,11 @@ final class RemotePortForwardTests: XCTestCase {
                 }
             }
 
-            try await Task.sleep(for: .seconds(1))
+            try await self.wait(for: 3, in: opened)
             group.cancelAll()
         }
-    }
-
-    /// Test that the SSHRemotePortForward struct works correctly
-    func testSSHRemotePortForwardStruct() {
-        let forward = SSHRemotePortForward(host: "0.0.0.0", boundPort: 8080)
-
-        XCTAssertEqual(forward.host, "0.0.0.0")
-        XCTAssertEqual(forward.boundPort, 8080)
+        XCTAssertEqual(opened.all.count, 3, "all three forwards opened")
+        XCTAssertTrue(opened.all.allSatisfy { $0.boundPort > 0 && $0.host == "127.0.0.1" })
+        XCTAssertEqual(Set(opened.all.map(\.boundPort)).count, 3, "each on a port of its own")
     }
 }

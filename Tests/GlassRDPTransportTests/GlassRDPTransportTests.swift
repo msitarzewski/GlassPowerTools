@@ -55,18 +55,24 @@ import Testing
     await session.disconnect()
 }
 
-@Test func connectionFailureIsAnActualTerminalEvent() async throws {
+/// A minute at most: a stream that never ends hung the run (2026-10-24).
+@Test(.timeLimit(.minutes(1)))
+func connectionFailureIsAnActualTerminalEvent() async throws {
     let session = GlassRDPSession()
     try await session.connect(.init(host: "127.0.0.1", port: 1, username: "fixture-user", password: "fixture"))
     var connected = false
+    var failed = false
     for await event in session.events {
         if case .state(.connected) = event { connected = true }
         if case let .state(.failed(message)) = event {
             #expect(!message.isEmpty)
-            #expect(!connected)
+            failed = true
             break
         }
     }
+    // A failure, said: a stream that just ended passed here, having checked nothing, until 2026-10-24.
+    #expect(failed, "the refused connection ended without saying it failed")
+    #expect(!connected)
     await session.disconnect()
 }
 

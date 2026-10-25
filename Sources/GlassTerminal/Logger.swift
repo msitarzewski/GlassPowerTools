@@ -17,4 +17,7 @@ extension Logger {
     nonisolated static let tailscale = Logger(subsystem: "sh.glas", category: "tailscale")
     nonisolated static let recording = Logger(subsystem: "sh.glas", category: "recording")
     nonisolated static let immersive = Logger(subsystem: "sh.glas", category: "immersive")
+    /// Where a printed path's preview, Open in Editor or Show in Files stopped: the reason, never
+    /// the path.
+    nonisolated static let pathPreview = Logger(subsystem: "sh.glas", category: "path-preview")
 }

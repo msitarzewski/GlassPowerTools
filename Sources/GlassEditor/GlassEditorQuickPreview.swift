@@ -14,17 +14,23 @@
 //  - Any other text, whatever it is called: in the editor's own text view, read-only, highlighted
 //    as the editor highlights its language (the owner, 2026-10-16: "I just previewed a .swift file
 //    and it was plain text, not formatted/highlighted"); plain only where the editor won't open it.
-//  - Pictures, PDFs, video and audio: Quick Look, in the one view the editor keeps safe.
+//  - Pictures, PDFs, video and audio: Quick Look, in the one view the editor keeps safe, on the
+//    Mac; the editor's own viewers on Vision Pro (2026-10-22), where Quick Look only takes over the
+//    whole window.
 //  - A 3D model: RealityKit, turned with the pointer (`GlassModelView`, D78).
 //  - Anything else: what it is, and its size; Open in Editor is beside it.
 //
 
-#if os(macOS)
-import AppKit
+#if os(macOS) || os(visionOS)
 import SwiftUI
 import UniformTypeIdentifiers
 import GlassEditorCore
 import GlassEditorUI
+#if os(macOS)
+import AppKit
+#else
+import AVKit
+#endif
 
 public struct GlassEditorQuickPreview: View {
     let url: URL
@@ -44,9 +50,12 @@ public struct GlassEditorQuickPreview: View {
         /// Text in the editor's view, highlighted for its language, not to be changed here.
         case code(GlassEditorDocument)
         case text(String, size: UInt64)
+        #if os(macOS)
         /// A picture whose name doesn't say so: Quick Look would go by the name.
         case image(NSImage)
-        case quickLook
+        #endif
+        /// A picture, a PDF, video or audio.
+        case media(GlassEditorFileKind)
         case model
         case nothing(GlassEditorFileKind, size: UInt64)
     }
@@ -63,14 +72,23 @@ public struct GlassEditorQuickPreview: View {
                     .onChange(of: colorScheme) { _, scheme in document.model.theme = Self.theme(for: scheme) }
             case .text(let text, let size):
                 textView(text, size: size)
+            #if os(macOS)
             case .image(let image):
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
                     .padding(10)
-            case .quickLook:
+            case .media:
                 // One view for one file, as everywhere Quick Look is shown (`GlassQuickLookView`).
                 GlassQuickLookView(url: url).id(url)
+            #else
+            case .media(let kind):
+                switch kind {
+                case .image: GlassZoomableImage(url: url)
+                case .pdf: GlassPDFView(url: url)
+                default: VideoPlayer(player: AVPlayer(url: url))
+                }
+            #endif
             case .model:
                 GlassModelView(url: url).id(url)
             case .nothing(let kind, let size):
@@ -116,7 +134,11 @@ public struct GlassEditorQuickPreview: View {
     static func decide(_ url: URL) async -> Shown {
         let name = url.lastPathComponent
         guard let head = try? await GlassEditorLocalFileAccess.head(atPath: url.path, length: textLimit) else {
-            return .quickLook
+            #if os(macOS)
+            return .media(.image)
+            #else
+            return .nothing(.binary, size: 0)
+            #endif
         }
         let kind = GlassEditorFileKind.classify(name: name, prefix: head.head.prefix(GlassEditorFileKind.sniffLength))
         switch kind {
@@ -139,13 +161,15 @@ public struct GlassEditorQuickPreview: View {
             guard let decoded = try? EncodingDetector.decode(bytes) else { return .nothing(.binary, size: head.size) }
             return .text(decoded.content, size: head.size)
         case .image:
+            #if os(macOS)
             if UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) != true,
                let image = NSImage(contentsOf: url) {
                 return .image(image)
             }
-            return .quickLook
+            #endif
+            return .media(.image)
         case .pdf, .video, .audio:
-            return .quickLook
+            return .media(kind)
         case .model3D:
             return .model
         case .binary:

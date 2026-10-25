@@ -1,4 +1,5 @@
 import Testing
+import GlassLayers
 import Foundation
 @testable import GlassEditor
 
@@ -15,7 +16,7 @@ struct GlassEditorProjectKeepingTests {
 
     private func runtime() -> GlassEditorRuntime {
         let defaults = UserDefaults.forTest(suiteName: "glass-editor-keeping-\(UUID().uuidString)")!
-        return GlassEditorRuntime(defaults: defaults)
+        return GlassEditorRuntime(layers: GlassLayerStore.forTest(), defaults: defaults)
     }
 
     @Test func openProjectInAWindowLeavesItOutOfTheList() throws {

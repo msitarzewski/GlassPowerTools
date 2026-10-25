@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GlassLayers
 import GlasSecretStore
 @testable import GlassTerminal
 
@@ -93,7 +94,7 @@ struct GlassSentFilesTests {
 struct DroppedTerminalWindowTests {
     @Test("a reservation is taken once, by its own server; a released one is gone")
     func reservations() {
-        let runtime = GlassTerminalRuntime()
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let alpha = UUID(), bravo = UUID()
         let window = runtime.reserveWindow(forServer: alpha)
         #expect(runtime.takeReservedWindow(forServer: bravo) == nil)
@@ -113,7 +114,7 @@ struct DroppedTerminalWindowTests {
 struct TerminalHandoffTests {
     @Test("in tmux, it attaches to that session by name — never a new one; outside tmux, it connects")
     func attachesByName() {
-        let runtime = GlassTerminalRuntime()
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let server = UUID()
         #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == .connecting)
         let attached = runtime.takeRequests().contains { request in
@@ -143,7 +144,7 @@ struct TerminalHandoffTests {
 struct ThisMacHandoffTests {
     private func withThisMac(pinned: Set<String>, tabShowsIt: Bool,
                              _ body: (GlassTerminalRuntime, UUID) -> Void) {
-        let runtime = GlassTerminalRuntime()
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let mac = ServerConfiguration(name: "This Mac over SSH", host: "mac.example.com", username: "ann")
         runtime.sessionManager.serverManager.servers = [mac]
         let saved = (GlassTerminalRuntime.localHostKeys, GlassTerminalRuntime.pinnedHostKeys,

@@ -14,7 +14,7 @@ private func makeModel() throws -> (GlassShellModel, URL, HostCatalogStore) {
     let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                 sharedContainerURL: root.appendingPathComponent("group"),
                                 resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                layers: GlassLayerStore())
+                                layers: GlassLayerStore.forTest())
     // Another app's writer, as glas.sh and glassDT are today.
     let sibling = HostCatalogStore(fileURL: root.appendingPathComponent("group/GlassHostCatalog/hosts.json"))
     return (model, root, sibling)
@@ -77,7 +77,7 @@ struct GlassShellConsolidationTests {
     func aliasOverlapGroups() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        try await sibling.upsert(try record("Max Foxtrot", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0))
+        try await sibling.upsert(try record("Alpha Foxtrot", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0))
         try await sibling.upsert(try record("bravo-desktop", aliases: ["10.0.0.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
         await model.load()
         #expect(model.catalogHosts.count == 1)
@@ -131,7 +131,7 @@ struct GlassShellConsolidationTests {
         _ = model
         let fresh = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
-                                    resolveSharedContainer: false, layers: GlassLayerStore())
+                                    resolveSharedContainer: false, layers: GlassLayerStore.forTest())
         await fresh.load()
         #expect(fresh.isFavorite(older.id))
         #expect(fresh.isFavorite(newer.id), "member id resolves to the canonical preference")

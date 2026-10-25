@@ -269,37 +269,3 @@ public enum GlassAdditiveSidebars {
     }
 }
 #endif
-
-#if os(visionOS)
-import SwiftUI
-
-public extension View {
-    /// **The headset's additive sidebar** (2026-10-21, a terminal window's): as `isOpen` changes the
-    /// window widens or narrows by `width`, so what stands beside the sidebar keeps its size, as a
-    /// Mac window's sidebar does above (HIG: "In visionOS, a window typically expands to accommodate a
-    /// sidebar"). Asked of visionOS through the window's sizer (`GlassWindowSizer`), as an orb's size
-    /// is; a window visionOS won't widen (at its widest, or held to a shape) gives the sidebar its
-    /// room from its content instead. Only a change is followed: a window that opens with its sidebar
-    /// opens at its own size.
-    func glassAdditiveSidebar(isOpen: Bool, width: CGFloat) -> some View {
-        modifier(GlassSpatialAdditiveSidebar(isOpen: isOpen, width: width))
-    }
-}
-
-private struct GlassSpatialAdditiveSidebar: ViewModifier {
-    let isOpen: Bool
-    let width: CGFloat
-
-    @State private var sizer = GlassWindowSizer()
-
-    func body(content: Content) -> some View {
-        content
-            .background { GlassWindowSizerView(sizer: sizer).accessibilityHidden(true) }
-            .onChange(of: isOpen) { _, open in
-                guard let size = sizer.windowSize else { return }
-                sizer.resize(to: CGSize(width: max(width, size.width + (open ? width : -width)), height: size.height),
-                             event: open ? "sidebar-open" : "sidebar-close")
-            }
-    }
-}
-#endif

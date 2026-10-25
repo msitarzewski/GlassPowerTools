@@ -84,6 +84,19 @@ struct ReadOnlyServiceTests {
         }
     }
 
+    /// The gate splits a script itself, rather than trusting its caller to have: a read followed by a
+    /// write is refused whole, and the driver sees neither. (SQLSafetyClassificationTests split the
+    /// script in the test and checked their own copy of the policy, so this path had no test until
+    /// 2026-10-24.)
+    @Test("A write after a read in one script is refused, and nothing reaches the driver")
+    func aWriteHiddenAfterAReadIsRefused() async {
+        let (recorder, connection) = guarded()
+        await #expect(throws: ReadOnlyServiceError.self) {
+            _ = try await connection.execute("SELECT 1; DELETE FROM members", parameters: [])
+        }
+        #expect(recorder.executed.isEmpty, "\(recorder.executed)")
+    }
+
     @Test("A statement the classifier cannot read is refused, not assumed safe")
     func unknownIsRefused() async {
         let (recorder, connection) = guarded()

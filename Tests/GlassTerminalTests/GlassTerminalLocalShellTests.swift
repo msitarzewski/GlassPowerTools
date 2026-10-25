@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GlassLayers
 import GlassConnectionKit
 import GlassShell
 @testable import GlassTerminal
@@ -11,7 +12,7 @@ import GlassShell
 struct GlassTerminalLocalShellTests {
     @Test("The Mac offers a local shell; iPhone, iPad and Vision Pro offer none rather than a dead row")
     func builtInServiceIsPlatformHonest() {
-        let capability = GlassTerminalCapability(runtime: GlassTerminalRuntime())
+        let capability = GlassTerminalCapability(runtime: GlassTerminalRuntime(layers: GlassLayerStore.forTest()))
         let services = capability.builtInLocalServices()
         #if os(macOS)
         #expect(services.map(\.endpointID) == [GlassTerminalCapability.localShellEndpointID])
@@ -24,17 +25,10 @@ struct GlassTerminalLocalShellTests {
                 "its local service is the built-in shell; a second way to make one would be a worse one")
     }
 
-    @Test("The endpoint id is a constant, because nothing is stored for a built-in service")
-    func endpointIDIsStable() {
-        let first = GlassTerminalCapability(runtime: GlassTerminalRuntime()).builtInLocalServices()
-        let second = GlassTerminalCapability(runtime: GlassTerminalRuntime()).builtInLocalServices()
-        #expect(first.map(\.endpointID) == second.map(\.endpointID))
-    }
-
     #if os(macOS)
     @Test("Connecting it asks for a local terminal and waits for the process before reporting")
     func openAsksForALocalTerminal() throws {
-        let runtime = GlassTerminalRuntime()
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let host = try HostProfile(id: GlassLocalHost.id, displayName: GlassLocalHost.displayName)
         let service = try #require(capability.builtInLocalServices().first)
@@ -55,7 +49,7 @@ struct GlassTerminalLocalShellTests {
 
     @Test("Each click asks for another shell, and the answers are matched to the requests in order")
     func everyClickOpensAnother() throws {
-        let runtime = GlassTerminalRuntime()
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
         let host = try HostProfile(id: GlassLocalHost.id, displayName: GlassLocalHost.displayName)
         let service = try #require(capability.builtInLocalServices().first)
@@ -75,7 +69,7 @@ struct GlassTerminalLocalShellTests {
 
     @Test("A shell nobody asked for reports to nobody")
     func unrequestedShellReportsNothing() {
-        let runtime = GlassTerminalRuntime()
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         // The toolbar's own Local Terminal button, and a pane split inside the workspace, both
         // arrive here with no request outstanding. Nothing must be popped, and nothing crashes.
         runtime.reportLocalShell(.connected)

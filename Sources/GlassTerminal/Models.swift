@@ -373,6 +373,7 @@ class TerminalSession: Identifiable, Hashable {
     var state: SessionState = .disconnected {
         didSet {
             if oldValue != .connected, state == .connected {
+                tmuxWhileDown = nil
                 if usesTmux { attachTmux() } else { dispatchStartupCommandIfNeeded(); checkTmuxAvailability() }
             }
             // A connection's control-mode client ends with it; the next one reads the pane afresh.
@@ -442,6 +443,10 @@ class TerminalSession: Identifiable, Hashable {
     /// The tmux session this terminal lives in. Claimed on the first connect, or given by Active
     /// when attaching to a session already running; every reconnect attaches to it again.
     var tmuxSessionName: String?
+    /// What the machine last said of `tmuxSessionName` while this terminal's connection was down
+    /// (2026-10-24): still running there, or ended. Active's row for the terminal says so, in
+    /// place of a second row for the session. Forgotten once it connects again.
+    var tmuxWhileDown: TerminalTmuxWhileDown?
     /// The first attach detaches any other client — Active's "Take Over".
     var tmuxTakesOver = false
     /// The host had no tmux when this terminal connected: it is an ordinary shell.
@@ -593,15 +598,19 @@ class TerminalSession: Identifiable, Hashable {
         tmuxPaneObserved?(pane, first)
     }
 
+    /// Not connected and not on its way: never connected, dropped, failed or disconnected.
+    var isDown: Bool {
+        switch state {
+        case .disconnected, .error: true
+        case .connecting, .connected, .reconnecting: false
+        }
+    }
+
     /// A slot just shown should connect: it never has, or it lost its connection while hidden or
     /// failed to open. Not one someone disconnected, one already on its way, or one waiting for a
     /// host-key answer.
     var connectsOnShow: Bool {
-        guard purpose == .terminal, !userInitiatedDisconnect, pendingHostKeyChallenge == nil else { return false }
-        switch state {
-        case .disconnected, .error: return true
-        case .connecting, .connected, .reconnecting: return false
-        }
+        purpose == .terminal && !userInitiatedDisconnect && pendingHostKeyChallenge == nil && isDown
     }
 
     init(
@@ -631,6 +640,9 @@ class TerminalSession: Identifiable, Hashable {
             self?.scrollTmux(deltaY: deltaY, precise: precise) ?? false
         }
         terminalHostModel.onFullHistory = { [weak self] in await self?.tmuxHistory() }
+        // In front — focused, its window the key one — while another device has the session's
+        // size: this terminal takes it (2026-10-22).
+        terminalHostModel.onTerminalFocused = { [weak self] in self?.claimTmuxWindow() }
     }
 
     // MARK: Scrolling in tmux (2026-10-08)
@@ -1334,8 +1346,19 @@ class TerminalSession: Identifiable, Hashable {
                 tmuxControlStartTask?.cancel()
             case .exited:
                 terminalHostModel.isTmuxControlClient = false
+                terminalHostModel.showTmuxGrid(columns: latestTerminalColumns, rows: latestTerminalRows, own: true)
+            case .showGrid(let columns, let rows, let own):
+                // What was drawn so far first: it was drawn for the size before.
+                flushPendingTerminalOutputNow()
+                terminalHostModel.showTmuxGrid(columns: columns, rows: rows, own: own)
             }
         }
+    }
+
+    /// tmux's window for this terminal's session, sized to this terminal when another client — the
+    /// same session on another device — has it (`TmuxControlClient.claim`).
+    private func claimTmuxWindow() {
+        if let actions = tmuxControl?.claim(), !actions.isEmpty { applyTmuxControl(actions) }
     }
 
     /// What the terminal, a snippet or the startup command types: through tmux's client while there
@@ -1343,6 +1366,8 @@ class TerminalSession: Identifiable, Hashable {
     private func writeInput(_ data: Data, presentsFailure: Bool) {
         // Input from the keyboard bar and other controls as well as the terminal's own (time in use).
         terminalHostModel.noteInputActivity()
+        // Typed in: the window follows whoever is typing.
+        claimTmuxWindow()
         if let actions = tmuxControl?.input(data) {
             applyTmuxControl(actions)
         } else {

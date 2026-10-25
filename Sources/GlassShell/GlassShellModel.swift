@@ -126,6 +126,13 @@ public final class GlassShellModel: GlassServiceStore {
     public private(set) var records: [HostProfile] = []
     public private(set) var isLoaded = false
     public var errorMessage: String?
+    /// Whether this device's protected files can be read now: false while an iPhone, iPad or Vision
+    /// Pro is locked, a headset taken off included. The library is kept locked with the device
+    /// (`HostCatalogStore`, complete protection). Set by the composition root; a Mac's are always
+    /// readable.
+    @ObservationIgnored public var protectedDataAvailable: @MainActor () -> Bool = { true }
+    /// A read refused while the device was locked, to make again as it unlocks.
+    @ObservationIgnored private var readsAgainWhenUnlocked = false
     public private(set) var hasSharedContainer: Bool
     public private(set) var hostLibraryStatus: String
     public private(set) var preferencesProblem: String?
@@ -274,20 +281,58 @@ public final class GlassShellModel: GlassServiceStore {
             notifyCapabilitiesCatalogLoaded()
             await adoptKnownAddresses()
         } catch {
-            isLoaded = true
-            notifyCapabilitiesCatalogLoaded()
-            if hasSharedContainer, Self.isPermissionDenied(error) {
-                // The container resolves but the sandbox refuses it: the App Group entitlement is
-                // not granted by this build's provisioning profile. Degrade to the private
-                // catalog and say so where the user will see it, instead of alerting every launch.
+            switch Self.response(to: error, protectedDataAvailable: protectedDataAvailable(),
+                                 hasSharedContainer: hasSharedContainer) {
+            case .readAgainWhenUnlocked:
+                // The device is locked — a headset taken off — and its library with it. Not a build
+                // without the App Group, and nothing to tell anyone: what is shown stays, a library
+                // never read stays unread rather than empty, and it is read again as the device
+                // unlocks (2026-10-21, the owner's headset: "The file hosts.json couldn't be opened
+                // because you don't have permission to view it", after which this session had moved
+                // to the app's own copy of the library, as if the group were missing).
+                readsAgainWhenUnlocked = true
+                return
+            case .useAppLibrary:
+                isLoaded = true
+                notifyCapabilitiesCatalogLoaded()
+                // The container resolves but the sandbox refuses it with the device unlocked: the
+                // App Group entitlement is not granted by this build's provisioning profile. Degrade
+                // to the private catalog and say so where the user will see it, instead of alerting
+                // every launch.
                 switchToLocalCatalog(reason: "This build is not allowed to use the shared host library "
                     + "(the App Group entitlement is not granted by its provisioning profile), so hosts are "
                     + "kept in this app only until it is signed with the group.")
                 await load()
-                return
+            case .report:
+                isLoaded = true
+                notifyCapabilitiesCatalogLoaded()
+                errorMessage = "The host library could not be read: \(GlassShellError.message(for: error))"
             }
-            errorMessage = "The host library could not be read: \(GlassShellError.message(for: error))"
         }
+    }
+
+    /// What a library that couldn't be read means.
+    enum LoadFailure: Equatable {
+        /// Refused while the device is locked: read again as it unlocks.
+        case readAgainWhenUnlocked
+        /// Refused with the device unlocked: this build has no App Group, so the app's own library.
+        case useAppLibrary
+        /// Anything else, said as it is.
+        case report
+    }
+
+    static func response(to error: Error, protectedDataAvailable: Bool, hasSharedContainer: Bool) -> LoadFailure {
+        guard isPermissionDenied(error) else { return .report }
+        guard protectedDataAvailable else { return .readAgainWhenUnlocked }
+        return hasSharedContainer ? .useAppLibrary : .report
+    }
+
+    /// The device has unlocked: a library read refused while it was locked is read now. Called by
+    /// the composition root on UIKit's protected-data notification.
+    public func protectedDataBecameAvailable() async {
+        guard readsAgainWhenUnlocked else { return }
+        readsAgainWhenUnlocked = false
+        await load()
     }
 
     /// The library's list: the catalog's machines, with the device's own at the head.
@@ -629,6 +674,10 @@ public final class GlassShellModel: GlassServiceStore {
                 rebuildProjection()
                 // A machine that arrived may be this device (D86).
                 recognizeThisMac()
+                // The capabilities' own lists hold what they read at the last load, so Settings
+                // and edit sheets showed, and saved from, copies older than these (2026-10-22).
+                // During `load()` they are told when it finishes.
+                if isLoaded { for capability in registry.registered { capability.catalogDidLoad() } }
             }
             if !departed.isEmpty {
                 // Deliberately not rethrown: a capability failing to delete its credential must not

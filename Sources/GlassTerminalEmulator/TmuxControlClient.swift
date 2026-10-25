@@ -30,6 +30,11 @@ public enum TmuxControlAction: Equatable, Sendable {
     /// tmux ended the client (`%exit`): detached, or the session ended. What follows on the PTY is
     /// the shell's again, if anything.
     case exited(reason: String?)
+    /// The grid for the terminal to show the pane at: tmux's window's while another client has it —
+    /// the same session open on another device — so the program's lines break where it broke them,
+    /// with the space beyond marked (`own` false); its own again once the window is (2026-10-22).
+    /// The terminal's frame stays its own, and its own size still goes to tmux.
+    case showGrid(columns: Int, rows: Int, own: Bool)
 }
 
 /// The control-mode client: bytes from tmux, keystrokes and sizes in; what to draw and what to send out.
@@ -69,6 +74,20 @@ public struct TmuxControlClient: Sendable {
     private var heldInput: [UInt8] = []
     private var announcedLive = false
     private var askedAtStart = false
+    /// The session attached (`$1`), as tmux last named it.
+    private var session: String?
+    /// The window's size, as its last layout gave it; nil before one has. tmux gives a window the
+    /// size of the client that switched to its session last (`window-size latest`; measured, tmux
+    /// 3.8: another client's typing or sizes don't take it back), so with a session open on the Mac
+    /// and the headset this is the other's size whenever the other was switched to last.
+    private var windowSize: (columns: Int, rows: Int)?
+    /// A claim sent and not yet answered by a layout: one is enough.
+    private var claimPending = false
+    /// The grid last told (`showGrid`); nil until another client has first had the window.
+    private var shownGrid: (columns: Int, rows: Int)?
+    /// A size sent and tmux's window not yet read back: what was known of the window is from before
+    /// it, and a terminal alone on its session would look like another's for that moment.
+    private var windowSizePending = false
 
     /// - Parameter overPipe: tmux runs as `-C` on pipes rather than `-CC` on a terminal: no start
     ///   marker, its protocol from the first byte.
@@ -103,6 +122,11 @@ public struct TmuxControlClient: Sendable {
                 window = nil
                 announcedLive = false
                 askedAtStart = false
+                session = nil
+                windowSize = nil
+                claimPending = false
+                shownGrid = nil
+                windowSizePending = false
             case .line(let line):
                 actions += handle(line)
             }
@@ -137,10 +161,23 @@ public struct TmuxControlClient: Sendable {
             guard pane == self.pane else { return [] }
             // Output older than the client could take was dropped: carry on, and read the pane again.
             return send("refresh-client -A '\(pane):continue'", as: .ignored) + readPane()
-        case .sessionChanged:
-            // The first is the attach; a later one, the session gone and another in its place.
-            if phase == .starting { return startIfDue() }
+        case .sessionChanged(let id):
+            // The first is the attach; a later one, the session gone and another in its place — or
+            // this client's own switch to the session it is on (`claim`), which changes nothing to
+            // read again.
+            if phase == .starting {
+                session = id
+                return startIfDue()
+            }
+            if let id, id == session { return [] }
+            session = id
             return phase == .live || phase == .restoring ? askForPane() : []
+        case .layoutChange(let window, let layout):
+            guard window == self.window, let size = TmuxLayout.windowSize(layout) else { return [] }
+            windowSize = size
+            windowSizePending = false
+            claimPending = false
+            return noteGrid(force: false)
         case .sessionWindowChanged:
             return phase == .live || phase == .restoring ? askForPane() : []
         case .windowPaneChanged(let window, let pane):
@@ -161,6 +198,8 @@ public struct TmuxControlClient: Sendable {
 
     private enum Purpose: Sendable {
         case ignored
+        /// `WxH`: the window's size, read back after a size was sent.
+        case windowSize
         case paneAndWindow
         case restore(TmuxPaneRestore.Part)
     }
@@ -202,6 +241,13 @@ public struct TmuxControlClient: Sendable {
         switch purpose {
         case .ignored:
             return []
+        case .windowSize:
+            windowSizePending = false
+            if let reply = lines?.first.map({ String(decoding: $0, as: UTF8.self) }) {
+                let parts = reply.split(separator: "x")
+                if parts.count == 2, let columns = Int(parts[0]), let rows = Int(parts[1]) { windowSize = (columns, rows) }
+            }
+            return noteGrid(force: isForeign)
         case .paneAndWindow:
             guard let lines, let reply = lines.first.map({ String(decoding: $0, as: UTF8.self) }) else { return [] }
             let parts = reply.split(separator: " ")
@@ -288,6 +334,18 @@ public struct TmuxControlClient: Sendable {
         return Self.coalesced(actions)
     }
 
+    /// **The terminal in front takes its session's window** (the owner, 2026-10-22: "do the focus
+    /// claim"): focused, or its window made the key one, while tmux has the window at another
+    /// client's size — the same session open on the Mac and the headset — it switches to its own
+    /// session, which is what makes tmux size the window to it, and the program redraws for it.
+    /// Nothing while the window is this terminal's size already, or a claim is unanswered.
+    public mutating func claim() -> [TmuxControlAction] {
+        guard phase == .live, let pane, let windowSize, !claimPending,
+              windowSize.columns != columns || windowSize.rows != rows else { return [] }
+        claimPending = true
+        return send("switch-client -t \(pane)", as: .ignored)
+    }
+
     /// tmux never started (the attach failed at the shell): what was held, to be typed there after
     /// all. The client has nothing more to do.
     public mutating func abandon() -> Data {
@@ -297,17 +355,49 @@ public struct TmuxControlClient: Sendable {
         return Data(held)
     }
 
-    /// The terminal's new size, for tmux to size the window to.
+    /// The terminal's new size — its own, fitted to its frame — for tmux to size the window to.
     public mutating func resize(columns: Int, rows: Int) -> [TmuxControlAction] {
         let columns = max(1, columns), rows = max(1, rows)
-        guard columns != self.columns || rows != self.rows else { return [] }
+        let changed = columns != self.columns || rows != self.rows
         self.columns = columns
         self.rows = rows
         // Once the start has sent a size, every change goes too: one made while the pane was being
         // asked for was kept here and never reached tmux, and the pane stayed the placeholder's
         // size under a taller terminal (2026-10-20).
         guard phase == .live || phase == .restoring || (phase == .starting && askedAtStart) else { return [] }
-        return send("refresh-client -C \(columns),\(rows)", as: .ignored)
+        if changed {
+            var commands: [(String, Purpose)] = [("refresh-client -C \(columns),\(rows)", .ignored)]
+            // What tmux made of it, read back rather than assumed: the window this size, or still
+            // another client's. Until then nothing is decided.
+            if windowSize != nil {
+                windowSizePending = true
+                commands.append(("display-message -p '#{window_width}x#{window_height}'", .windowSize))
+            }
+            return sendLine(commands)
+        }
+        // The terminal fitted itself to its frame again at the same size: while another client has
+        // the window, it goes back to that size.
+        return noteGrid(force: isForeign)
+    }
+
+    /// Whether tmux has the window at another client's size.
+    private var isForeign: Bool {
+        guard let windowSize else { return false }
+        return windowSize.columns != columns || windowSize.rows != rows
+    }
+
+    /// The grid to show, told when it changes (or `force`): tmux's window's while it is another
+    /// client's size, the terminal's own otherwise. Nothing until another client has first had it.
+    private mutating func noteGrid(force: Bool) -> [TmuxControlAction] {
+        guard !windowSizePending else { return [] }
+        let grid: (columns: Int, rows: Int) = isForeign ? windowSize! : (columns, rows)
+        if let shownGrid {
+            guard force || shownGrid != grid else { return [] }
+        } else if !isForeign {
+            return []
+        }
+        shownGrid = grid
+        return [.showGrid(columns: grid.columns, rows: grid.rows, own: !isForeign)]
     }
 
     /// Neighbouring sends and draws joined, so a burst is one write and one feed.
@@ -435,9 +525,12 @@ enum TmuxControlLine: Equatable {
     case begin(time: Substring, number: Substring, flags: Substring)
     case output(pane: String, data: [UInt8])
     case pause(pane: String)
-    case sessionChanged
+    /// `%session-changed $1 name`: the session attached, by its id.
+    case sessionChanged(id: String?)
     case sessionWindowChanged
     case windowPaneChanged(window: String, pane: String)
+    /// `%layout-change @window layout visible-layout flags`: the window's size and its panes'.
+    case layoutChange(window: String, layout: String)
     case exit(reason: String?)
     case other
 
@@ -455,11 +548,13 @@ enum TmuxControlLine: Equatable {
         case "%pause" where words.count >= 2:
             self = .pause(pane: String(words[1]))
         case "%session-changed":
-            self = .sessionChanged
+            self = .sessionChanged(id: words.count > 1 ? String(words[1]) : nil)
         case "%session-window-changed":
             self = .sessionWindowChanged
         case "%window-pane-changed" where words.count >= 3:
             self = .windowPaneChanged(window: String(words[1]), pane: String(words[2]))
+        case "%layout-change" where words.count >= 3:
+            self = .layoutChange(window: String(words[1]), layout: String(words[2]))
         case "%exit":
             let reason = words.dropFirst().joined(separator: " ")
             self = .exit(reason: reason.isEmpty ? nil : reason)
@@ -564,5 +659,19 @@ enum TmuxSendKeys {
     /// Printable ASCII but the quote itself, which single quotes cannot hold.
     private static func isLiteral(_ byte: UInt8) -> Bool {
         (0x20...0x7E).contains(byte) && byte != 0x27
+    }
+}
+
+// MARK: - Layouts
+
+/// tmux's layout strings: a checksum, then the window's cell, `WxH,X,Y` and its pane or panes.
+enum TmuxLayout {
+    /// The window's size: the first cell's `WxH`, after the checksum.
+    static func windowSize(_ layout: String) -> (columns: Int, rows: Int)? {
+        guard let comma = layout.firstIndex(of: ",") else { return nil }
+        let cell = layout[layout.index(after: comma)...].prefix { $0 != "," }
+        let parts = cell.split(separator: "x")
+        guard parts.count == 2, let columns = Int(parts[0]), let rows = Int(parts[1]) else { return nil }
+        return (columns, rows)
     }
 }

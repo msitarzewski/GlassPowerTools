@@ -36,7 +36,6 @@ final class GlassTerminalToolsIPhoneUITests: XCTestCase {
     }
 
     func testToolsRowsSayWhatTheyDoAndReachSettings() throws {
-        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "the iPhone's Tools menu")
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
@@ -67,7 +66,6 @@ final class GlassTerminalToolsIPhoneUITests: XCTestCase {
     /// A Mermaid diagram a program printed as text has a mark beside it, which shows it drawn
     /// (2026-10-21: "an inline diagram icon would be amazing").
     func testADiagramHasAMarkThatShowsIt() throws {
-        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "the iPhone's terminal")
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
@@ -90,7 +88,6 @@ final class GlassTerminalToolsIPhoneUITests: XCTestCase {
     /// returns to the terminal (the owner, 2026-10-21: "Open Folder in Editor doesn't [work]"). The
     /// terminal had taken the library's place, and the editor's presenter with it.
     func testOpenFolderInEditorShowsTheEditor() throws {
-        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "the iPhone's Tools menu")
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
@@ -114,6 +111,9 @@ final class GlassTerminalToolsIPhoneUITests: XCTestCase {
         let editorSettings = app.buttons["editor-settings"].firstMatch
         XCTAssertTrue(editorSettings.waitForExistence(timeout: 10), "the editor never appeared")
         attachScreen("editor")
+        // An iPad opens the editor in a window of its own; a phone shows it over the terminal,
+        // with the way back.
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
         let back = app.buttons["Terminal"].firstMatch
         XCTAssertTrue(back.exists, "the editor's back button doesn't say it returns to the terminal")
         back.tap()

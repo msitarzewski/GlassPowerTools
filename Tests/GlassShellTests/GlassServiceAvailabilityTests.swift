@@ -30,12 +30,25 @@ struct GlassServiceAvailabilityTests {
         return (listener, port)
     }
 
+    /// Closes the listener and waits until it says it has. A fixed 200 ms stood for that, which a
+    /// busy run can outlast (2026-10-24).
+    private func close(_ listener: NWListener) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resumed = OSAllocatedUnfairLock(initialState: false)
+            listener.stateUpdateHandler = { state in
+                if case .cancelled = state, resumed.withLock({ done in defer { done = true }; return !done }) {
+                    continuation.resume()
+                }
+            }
+            listener.cancel()
+        }
+    }
+
     @Test("a port that accepts is reachable; a closed one is not")
     func probe() async throws {
         let (open, port) = try await listener()
         #expect(await GlassAvailabilityMonitor.probe(host: "127.0.0.1", port: port) == .reachable)
-        open.cancel()
-        try await Task.sleep(for: .milliseconds(200))
+        await close(open)
         #expect(await GlassAvailabilityMonitor.probe(host: "127.0.0.1", port: port) == .unreachable)
         #expect(await GlassAvailabilityMonitor.probe(host: "127.0.0.1", port: 0) == .unreachable)
     }
@@ -59,8 +72,7 @@ struct GlassServiceAvailabilityTests {
         }
         await monitor.refresh(targets(), now: start)
         #expect(monitor.states[ssh] == .reachable && monitor.states[vnc] == .reachable)
-        open.cancel()
-        try await Task.sleep(for: .milliseconds(200))
+        await close(open)
         await monitor.refresh(targets(), now: start.addingTimeInterval(30))
         #expect(monitor.states[ssh] == .reachable, "30 seconds later nothing is probed")
         await monitor.refresh(targets(), now: start.addingTimeInterval(61))

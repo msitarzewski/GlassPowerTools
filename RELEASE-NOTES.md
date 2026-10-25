@@ -108,10 +108,30 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   can't draw one, gets a button after its first line that shows it drawn over the terminal, on the
   Mac, iPad, iPhone and Vision Pro.
 - **A sidebar for Vision Pro's terminal windows.** From the second terminal on, a window lists its
-  terminals in a sidebar, as a Mac window does, and widens for it: each row with its name and where
-  it is. Pinch and hold a row for its menu, or drag it onto another window, onto another row, or into
-  empty space for a window of its own; a terminal's name at the top drags the same way. Apple's tab
-  bar, which held the tabs before, showed only identical symbols until looked at.
+  terminals in a sidebar, as a Mac window does, in its own glass on the window's plane, a few points
+  from its left edge: each row with its name and where it is. Showing or hiding it leaves the window's
+  size alone, so the terminal doesn't move or change its rows and columns. Pinch and hold a row for its
+  menu, or drag it onto another window, onto another row, or into empty space for a window of its own;
+  a terminal's name at the top drags the same way. Apple's tab bar, which held the tabs before, showed
+  only identical symbols until looked at.
+- **A tmux session open on the Mac and the headset follows the one in front.** tmux gives a session one
+  size, the size of the device that attached last, and the other device drew the program's lines at its
+  own width, broken and run together. Now a terminal takes the session's size when you select its tab,
+  come back to its window or type in it, and the program redraws for that device; the other device
+  shows the session at that size, with dots in the space past it, as tmux marks it.
+- **Quick Look on Vision Pro.** Pinch and hold a path a terminal printed and choose Quick Look: the file,
+  copied from the server, shows over the terminal as on the Mac, with Open in Editor and Show in Files.
+  With a trackpad or mouse, resting the pointer on a path shows it too (Show previews in Settings ▸
+  Terminal and in a window's settings), or Space does under Mouseover + Space.
+- **No "host library could not be read" after taking the headset off.** The library is locked with the
+  device; a read while it was locked was taken for a build without its shared storage. Now the app reads
+  it again as the device unlocks, and says nothing.
+- **Show All Windows around you on Vision Pro.** Pinch and hold ⚡ for All Windows; choose Around You,
+  or set Settings ▸ Appearance ▸ Show All Windows ▸ Opens to Around You, and the same cards stand in an
+  arc around you while other apps step out of the room. In a Window, or a pinch out with both hands,
+  steps back. A two-handed pinch on a window is visionOS's resize, so it isn't used to open it.
+- **⚡ in Vision Pro's terminal bar.** It takes the place of Connections: a pinch opens Connections on
+  Active, and a pinch held shows every window, as ⚡ does in other windows.
 - **Vision Pro's terminal bar, tidied.** **Sidebar** shows and hides a window's sidebar; a pinch on
   **Terminal View** shrinks the window to its orb (held, it lists the layouts); Font Size and the AI
   Assistant are in the tools menu. The orb's ring has larger dots, each showing its terminal's agent.
@@ -128,6 +148,77 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - **Keys on Vision Pro.** A terminal's bar has a Keys menu: Escape, Tab, Control for the next key,
   the arrows and F1–F12, for when no keyboard is paired. The headset shows apps no keyboard
   accessory, which is where iPhone and iPad keep these.
+- **A database that won't connect says why.** When the machine a database is tunnelled through finds
+  nothing listening, the message says so at once, and where to enter another address if the
+  database runs elsewhere. Any connect that hasn't finished after 30 seconds now stops and says so.
+  Before, a MySQL connect through such a tunnel waited for ever and showed nothing.
+- **Saved connections changed on another device stay changed.** Saving a terminal, database or
+  remote desktop on one device wrote back its copy of every other one of that kind. A copy older
+  than an edit made elsewhere went back over it: a database lost the address it is reached at. A
+  connection added on another device could be deleted by the next "last connected" stamp, and a
+  field from a newer build was dropped. Now a save writes only what was changed on that device,
+  and the lists are read again whenever iCloud brings changes while the app is open.
+- **A database's Connection Details show where the tunnel goes.** The Endpoint was the machine's
+  own address even when the tunnel goes on to a Database address beyond it, so a lost address
+  could not be seen there. It now shows the Database address, or "on this machine" when there is
+  none, and the Tunnel row names the machine a tunnel goes through instead of always saying
+  "this machine".
+- **⌘F finds in the editor.** Edit ▸ Find ▸ Find…, Find Next (⌘G) and Find Previous (⇧⌘G) were
+  greyed out in an editor window, whose find bar was on ⌥⌘F in the Editor menu. They search the
+  document now, and Find puts the cursor in the find field. A match found, and a line gone to,
+  is now selected and scrolled to: until now the find bar and Go to Line moved a selection the
+  text never showed, on every device.
+- **Git in the editor.** A project in a git repository shows its branch at the foot of the file list,
+  with how many files differ from the last commit, and the tree marks each changed file (M, A, D, R,
+  U for new) and every folder holding one. The branch opens **Changes**: every changed file's lines
+  since the last commit in one scroll, numbered old and new, as `git diff HEAD` has them, new files
+  whole. A line opens its file there. Changes keeps itself current while it is open, and every
+  project's git is asked again when its window comes forward and after a save. On the Mac it is
+  Text ▸ Show Changes (⌃⇧G). It runs the git where the folder is: the Mac's own, or the server's over
+  the project's SSH connection, so a project on a server shows its changes on an iPhone, iPad or
+  Vision Pro too. Folders on an iPhone, iPad or Vision Pro have no git to run.
+- **Change marks and committing.** An open file in a git project marks its lines beside the
+  numbers: green where lines were added since the last commit, amber where they changed, a red
+  wedge where lines were removed. The marks follow what you type, before you save, and clear when
+  the change is committed. In **Changes**, each file has a box that stages it for the next commit
+  or takes it back out (a dash means part of it is staged), and **Stage All** does every file. Write
+  a message above them and choose **Commit** (⌘↩); with nothing staged the button is **Commit
+  All** and stages everything listed first. Folders that are repositories of their own are never
+  staged. A project below its repository's root asks before committing files staged outside its
+  folder, which Changes doesn't list. When git refuses — no name and email set, a hook that
+  stopped the commit, another git command holding the repository — Changes says why and what to do.
+- **A dropped terminal is listed once in Active.** When a terminal in tmux lost its connection, as an
+  iPhone's do while it's put away, Active listed it twice: the terminal, Disconnected, and its
+  session again below it, Open elsewhere, where choosing it opened a second terminal on the same
+  session. Now the terminal's row stands for the session and says what the machine said of it —
+  where it is, whether it's open elsewhere, when it was used — or that it has ended. Choosing it
+  reconnects to the session. Swipe it to **Detach** and the session is listed under the machine
+  straight away.
+- **A remote desktop that ends the session says why.** A server ending a session sends its reason and
+  hangs up; when the reason arrived while the app was still drawing the picture before it, it was
+  dropped, and the session read as closed normally. The reason is kept now, so "logged on elsewhere"
+  or "disconnected by an administrator" is what you're told.
+- **tmux on the Mac can be stopped.** A tmux server the app started on the Mac inherited blocked
+  signals from the thread that started it, and ignored `kill-server` and the signal the Mac sends
+  to end a process. What the app starts on the Mac now gets every signal, as from a Terminal window.
+- **Cancel and the time limit stop any SQLite query.** SQLite's interrupt reaches only a statement
+  that is running, so a Cancel, or the query time limit, that came while a query was being prepared
+  or between its statements was lost, and the query ran on. Both now stop it wherever it is.
+- **Reviewing a paste works on an iPhone.** The sheet that asks before a multi-line paste is sent was
+  laid out for a Mac's minimum width, wider than the phone: its sides were cut off, with Cancel,
+  Paste and Join Wrapped Lines past the edges. It fits the screen now.
+- **VoiceOver reads the lines a terminal shows after it changes size.** After a larger text size or
+  a rotation, VoiceOver kept the old size's lines until the terminal printed something.
+- **A text default with a backslash survives on MySQL.** MySQL reads `\` in a quoted value as an
+  escape, so a column default holding a Windows path or a pattern lost or changed its backslashes
+  when set from the table's structure. They are doubled for MySQL now; PostgreSQL is unchanged.
+- **Holding a sheet over ⚡ is holding the sheet.** On an iPhone, a press held on a sheet such as Add
+  Host, at the spot where the library's ⚡ lay underneath, opened All Windows over the sheet. On the
+  iPhone Duo's outer display the sheet's title bar lies right there. Only a ⚡ on the screen in front
+  answers a hold now.
+- **VoiceOver finds a tag field's text box.** On iPhone and iPad VoiceOver outlined a host's tags as
+  the text box, and a double tap could land on a tag's remove button instead. The text box is its
+  own element again.
 
 ### 0.4.492 – 0.4.494 (20 October 2026)
 - **0.4.494 is the Mac's second release**, through Sparkle, and TestFlight build 494.

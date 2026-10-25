@@ -235,6 +235,12 @@ enum GlassDemoMode {
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8),
                                        windowSettings: GlassTerminalRuntime.demoWindowSettings,
                                        opensSettings: surface == "terminal-settings")
+        case "terminal-path":
+            // 2026-10-22: a path everywhere on the screen, for Quick Look on a held path: the
+            // simulator's runner holds the terminal's middle, whatever point is asked for. The demo
+            // is connected to nothing, so its preview says it can't read the file.
+            let row = Array(repeating: "/home/ann/shop/README.md", count: 8).joined(separator: " ")
+            terminal.requestDemoReplay(name: "alpha", output: Data((Array(repeating: row, count: 44).joined(separator: "\r\n")).utf8))
         case "terminal-move":
             // Two windows of one terminal each (W26): the tools menu's Move Tab To lists the other,
             // and either title drags into the other window.

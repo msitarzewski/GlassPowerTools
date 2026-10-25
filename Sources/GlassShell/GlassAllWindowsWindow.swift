@@ -33,6 +33,8 @@ public extension GlassShowAllWindows {
 public struct GlassAllWindowsWindow: View {
     private let model: GlassShellModel
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
 
     public init(model: GlassShellModel) {
         self.model = model
@@ -47,8 +49,23 @@ public struct GlassAllWindowsWindow: View {
                 try? await Task.sleep(for: .milliseconds(300))
                 leave()
             }
-        })
+        }, around: goAround)
         .frame(minWidth: 640, minHeight: 440)
+        #if DEBUG
+        // Screenshots only: `--demo-all-windows-around` in a `--ui-testing` run goes around at once.
+        .task {
+            let arguments = ProcessInfo.processInfo.arguments
+            guard arguments.contains("--ui-testing"), arguments.contains("--demo-all-windows-around") else { return }
+            try? await Task.sleep(for: .seconds(2))
+            goAround()
+        }
+        #endif
+    }
+
+    /// The same cards around the person; this window gives way to them.
+    private func goAround() {
+        leave()
+        Task { await GlassAllWindowsAround.goAround(open: openImmersiveSpace, dismiss: dismissImmersiveSpace) }
     }
 
     private func leave() {

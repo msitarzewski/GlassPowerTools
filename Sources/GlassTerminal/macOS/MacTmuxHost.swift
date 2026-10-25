@@ -19,6 +19,7 @@
 #if os(macOS)
 import Darwin
 import Foundation
+import GlassTerminalEmulator
 
 public nonisolated enum MacTmuxHost {
     /// The argument that starts the app as the host, followed by tmux's path and, for a test's
@@ -56,7 +57,8 @@ public nonisolated enum MacTmuxHost {
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+        // The server's signals as a new process's, though the host serves from its main thread.
+        GlassSpawn.prepare(&attributes)
         var pid: pid_t = 0
         guard posix_spawn(&pid, tmux, &actions, &attributes, argv, environ) == 0 else { return 1 }
 

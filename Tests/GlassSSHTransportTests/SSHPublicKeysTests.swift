@@ -94,12 +94,9 @@ AchkG92DPg9/h94Hlidb8Dl6fz0aV2/rQzwgI=
     }
 
     @Test func fingerprintMatchesSSHKeygenFormat() throws {
-        // ssh-keygen -lf prints SHA256:<unpadded base64 of the key blob>.
+        // What `ssh-keygen -lf` printed for ed25519PublicLine (OpenSSH, 2026-10-24).
         let fingerprint = try SSHPublicKeys.sha256Fingerprint(for: material(Self.ed25519PrivateKey))
-        let blob = try #require(Data(base64Encoded: String(Self.ed25519PublicLine.split(separator: " ")[1])))
-        let expected = "SHA256:" + Data(SHA256.hash(data: blob)).base64EncodedString().trimmingCharacters(in: CharacterSet(charactersIn: "="))
-        #expect(fingerprint == expected)
-        #expect(!fingerprint.hasSuffix("="))
+        #expect(fingerprint == "SHA256:5wcP4nxiSIfXqzrj2/js/ghXXZ9jvoQ1kRRSXlpNEUU")
     }
 
     @Test func declaredTypeReadsOnlyTheHeader() throws {

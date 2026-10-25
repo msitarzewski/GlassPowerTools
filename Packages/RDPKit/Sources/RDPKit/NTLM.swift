@@ -366,7 +366,8 @@ final class RDPCredSSPNTLMContext {
         return output
     }
 
-    private static func ntlmV2Hash(credentials: RDPCredentials) -> Data {
+    /// NTOWFv2 (MS-NLMP 3.3.2). Internal, not private, for the specification's known answers.
+    static func ntlmV2Hash(credentials: RDPCredentials) -> Data {
         let ntHash = md4(utf16LittleEndian(credentials.password))
         let identity = utf16LittleEndian(credentials.username.uppercased() + (credentials.domain ?? ""))
         return hmacMD5(key: ntHash, data: identity)
@@ -381,7 +382,8 @@ final class RDPCredSSPNTLMContext {
         return proof + clientChallenge
     }
 
-    private static func ntlmV2Response(
+    /// NTProofStr and the blob after it, and the session base key (MS-NLMP 3.3.2).
+    static func ntlmV2Response(
         serverChallenge: Data,
         clientChallenge: Data,
         targetInfo: Data,
@@ -703,7 +705,7 @@ final class RDPCredSSPNTLMContext {
         | negotiateSign
 }
 
-private final class RDPNTLMRC4 {
+final class RDPNTLMRC4 {
     private var i = 0
     private var j = 0
     private var state = [UInt8](0 ... 255)

@@ -46,24 +46,4 @@ struct ConfigurationTests {
                 == "ssh:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         )
     }
-
-    @Test("Access group passes through")
-    func accessGroupPassthrough() {
-        let config = SecretStoreConfiguration(accessGroup: "TEAM.sh.glas.shared")
-        #expect(config.accessGroup == "TEAM.sh.glas.shared")
-    }
-
-    @Test("Data-protection Keychain opt-in passes through")
-    func dataProtectionKeychainOptIn() {
-        let config = SecretStoreConfiguration(useDataProtectionKeychain: true)
-        #expect(config.useDataProtectionKeychain)
-    }
-
-    @Test("Legacy prefixes stored correctly")
-    func legacyPrefixes() {
-        let config = SecretStoreConfiguration(
-            legacyServiceNamePrefixes: ["app.glassdb", "com.old"]
-        )
-        #expect(config.legacyServiceNamePrefixes == ["app.glassdb", "com.old"])
-    }
 }

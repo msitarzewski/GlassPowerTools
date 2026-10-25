@@ -295,19 +295,19 @@ struct MockKRDPServerTests {
     )
     defer { server.stop() }
 
-    let report = RDPPreflightClient().run(
-        configuration: RDPConnectionConfiguration(
-            host: "127.0.0.1",
-            port: server.port,
-            credentials: RDPCredentials(username: "rdp-user", password: "secret"),
-            timeoutSeconds: 5,
-            hideCertificateWarnings: true,
-            graphicsFrameCaptureLimit: 1,
-            desktopWidth: 1280,
-            desktopHeight: 720,
-            clipboardEnabled: false
-        ).trustFixtureCertificate()
-    )
+    var configuration = RDPConnectionConfiguration(
+        host: "127.0.0.1",
+        port: server.port,
+        credentials: RDPCredentials(username: "rdp-user", password: "secret"),
+        timeoutSeconds: 5,
+        hideCertificateWarnings: true,
+        graphicsFrameCaptureLimit: 1,
+        desktopWidth: 1280,
+        desktopHeight: 720,
+        clipboardEnabled: false
+    ).trustFixtureCertificate()
+    configuration.allowsAuxiliaryInputChannels = true
+    let report = RDPPreflightClient().run(configuration: configuration)
 
     let dynamicRequestTypes = report.rdpDynamicChannelRequestTypes ?? []
     let audioInputClientNames = server.transcript.snapshot.audioInputClientMessages

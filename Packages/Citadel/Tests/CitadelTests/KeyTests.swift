@@ -120,7 +120,7 @@ final class KeyTests: XCTestCase {
         let privateKey = try Curve25519.Signing.PrivateKey(sshEd25519: key)
         XCTAssertNotNil(privateKey)
         
-        let key2 = privateKey.makeSSHRepresentation(comment: "jaap@Jaaps-MacBook-Pro.local")
+        let key2 = privateKey.makeSSHRepresentation(comment: "user@example.local")
         let privateKey2 = try Curve25519.Signing.PrivateKey(sshEd25519: key2)
         XCTAssertEqual(privateKey.rawRepresentation, privateKey2.rawRepresentation)
     }

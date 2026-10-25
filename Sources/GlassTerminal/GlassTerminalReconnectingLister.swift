@@ -87,6 +87,8 @@ nonisolated final class GlassTerminalReconnectingLister: GlassHostDirectoryListe
             }
         }
         if let sftp = error as? SFTPSessionError, sftp == .closed { return true }
+        // A command on a connection that has gone (`SSHTransport.run`).
+        if let transport = error as? SSHTransportError, transport == .notConnected { return true }
         if let io = error as? IOError, [ECONNRESET, EPIPE, ECONNABORTED, ENOTCONN].contains(io.errnoCode) { return true }
         // Citadel's and swift-nio-ssh's own "closed" errors, which this module does not name.
         let described = String(describing: error)
@@ -145,6 +147,10 @@ nonisolated final class GlassTerminalReconnectingLister: GlassHostDirectoryListe
 
     func realPath(_ path: String) async throws -> String {
         try await run { try await $0.realPath(path) }
+    }
+
+    func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+        try await run { try await $0.runCommand(command) }
     }
 
     func close() async {

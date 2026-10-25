@@ -145,10 +145,12 @@ struct TerminalWindowSettingsTests {
         var preset = LayoutPreset(name: "Builds", serverIDs: [UUID()])
         preset.windowSettings = everything
         mac.upsertLayoutPreset(preset)
-        for _ in 0..<200 where !headset.layoutPresets.contains(where: { $0.id == preset.id }) {
+        // Up to 30 s, gone as soon as it arrives: two stood for it, which a busy run outlasts.
+        for _ in 0..<3_000 where !headset.layoutPresets.contains(where: { $0.id == preset.id }) {
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(headset.layoutPresets.first { $0.id == preset.id }?.windowSettings == everything)
+        #expect(headset.layoutPresets.first { $0.id == preset.id }?.windowSettings == everything,
+                "the look and every other window setting (TerminalWindowLookTests had the look alone)")
     }
 
     @Test("the reopen list keeps every window setting; a list W20 wrote reads its look")

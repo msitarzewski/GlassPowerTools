@@ -26,16 +26,19 @@ struct SecurityTests {
         #expect(out.hex == "69c4e0d86a7b0430d8cdb78070b4c55a")
     }
 
-    /// The VNC key is the password bit-reversed per byte; a plain "password" therefore encrypts
-    /// each 8-byte challenge block with DES key derived from bit-reversed "password".
+    /// The VNC key is the password's first eight bytes, zero-padded, each byte bit-reversed; each
+    /// 8-byte block of the challenge is DES-encrypted under it. The answers were computed outside
+    /// this code, with OpenSSL's DES-ECB over a key reversed in Python (2026-10-24), so the recipe
+    /// is checked rather than repeated: a short password's padding, a long one's truncation, none.
     @Test func vncAuthenticationUsesReversedPasswordKey() throws {
-        let challenge = hexBytes("0123456789abcdef0123456789abcdef")
-        let response = try RFBSecurity.vncAuthenticationResponse(challenge: challenge, password: "pässword-too-long")
-        let key = Array("pässword-too-long".utf8).prefix(8).map(RFBSecurity.reverseBits)
-        let expected = try RFBSecurity.encryptECB(algorithm: CCAlgorithm(kCCAlgorithmDES), key: Array(key), plaintext: challenge)
-        #expect(response == expected)
-        #expect(response.count == 16)
-        #expect(response[0..<8] == response[8..<16])
+        let challenge = hexBytes("0123456789abcdeffedcba9876543210")
+        #expect(try RFBSecurity.vncAuthenticationResponse(challenge: challenge, password: "secret").hex
+                == "2d2a0dd383426c2ebf1186809bba0f9c")
+        #expect(try RFBSecurity.vncAuthenticationResponse(challenge: challenge, password: "pässword-too-long").hex
+                == "8d4f214c9aeedec6c3ef35795936c7bd")
+        #expect(try RFBSecurity.vncAuthenticationResponse(challenge: challenge, password: "").hex
+                == "617b3a0ce8f071009231f236ff9aa95c")
+        #expect(RFBSecurity.reverseBits(0x73) == 0xCE, "s, 0111 0011, reversed")
         #expect(throws: RFBError.self) { try RFBSecurity.vncAuthenticationResponse(challenge: [1, 2, 3], password: "x") }
     }
 

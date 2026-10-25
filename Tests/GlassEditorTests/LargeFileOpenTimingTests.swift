@@ -9,8 +9,10 @@ import GlassEditorUI
 @Suite("Opening a very large one-line file")
 @MainActor
 struct LargeFileOpenTimingTests {
-    @Test func stages() async throws {
-        guard let path = ProcessInfo.processInfo.environment["GPT_LARGE_FILE"] else { return }
+    /// A measurement, printed, not a check: run with GPT_LARGE_FILE naming the file.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["GPT_LARGE_FILE"] != nil, "a timing probe: set GPT_LARGE_FILE"))
+    func stages() async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["GPT_LARGE_FILE"])
         let clock = ContinuousClock()
         var t = clock.now
         func lap(_ name: String) { let now = clock.now; print("STAGE \(name): \(now - t)"); t = now }

@@ -29,9 +29,10 @@ struct RDPImportWiringTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: nil, resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
-        let runtime = GlassDesktopRuntime(layers: GlassLayerStore(),
-                                          app: DesktopAppModel(storageDirectory: root.appendingPathComponent("desktop")))
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
+        let runtime = GlassDesktopRuntime(layers: GlassLayerStore.forTest(),
+                                          app: DesktopAppModel(storageDirectory: root.appendingPathComponent("desktop"),
+                                                                credentialAccess: .inMemory()))
         model.registry.register(GlassDesktopCapability(runtime: runtime))
         return (model, runtime, root)
     }

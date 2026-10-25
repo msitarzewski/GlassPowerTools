@@ -13,7 +13,7 @@ struct GlassShellTagVocabularyTests {
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
                                     resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                    layers: GlassLayerStore())
+                                    layers: GlassLayerStore.forTest())
         return (model, root)
     }
 
@@ -25,13 +25,10 @@ struct GlassShellTagVocabularyTests {
         _ = try await model.addHost(displayName: "alpha", aliases: [], tags: ["Clients", "lab", "prod"])
         _ = try await model.addHost(displayName: "bravo", aliases: ["foxtrot"], tags: ["Prod", "Home", " clients "])
         let vocabulary = model.tagVocabulary
-        #expect(vocabulary.map { $0.lowercased() } == ["clients", "home", "lab", "prod"],
-                "one entry per tag regardless of case or whitespace, sorted case-insensitively; got \(vocabulary)")
-        #expect(Set(vocabulary.map { $0.lowercased() }).count == vocabulary.count)
+        // Spelled as each was first written — alpha's "Clients" and "prod", not bravo's " clients " or
+        // "Prod" — one entry per tag, sorted case-insensitively. (Compared lowercased until 2026-10-24,
+        // which no spelling could fail.)
+        #expect(vocabulary == ["Clients", "Home", "lab", "prod"], "got \(vocabulary)")
     }
 
-    @Test("Pure vocabulary keeps the first spelling and ignores blanks")
-    func pureVocabulary() {
-        #expect(GlassShellTagVocabulary.tags(in: []).isEmpty)
-    }
 }

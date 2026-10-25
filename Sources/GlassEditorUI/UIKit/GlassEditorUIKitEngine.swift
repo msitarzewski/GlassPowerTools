@@ -47,7 +47,50 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         observeModelAppearance()
         observeModelConfiguration()
         observeKeyboardRequests()
+        observeRevealRequests()
+        observeLineChanges()
         installKeyboardAccessory()
+    }
+
+    /// `GlassEditorModel.reveal`: the selection set from outside the view, shown. The AppKit
+    /// engine's, for the same reason.
+    private func observeRevealRequests() {
+        withObservationTracking { [weak self] in
+            _ = self?.model.revealRequest
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let range = self.model.selectedRange
+                self.selectedRange = range
+                self.scrollToVisible(self.textView.selectedRange)
+                self.observeRevealRequests()
+            }
+        }
+    }
+
+    /// `GlassEditorModel.lineChanges`: the gutter's change marks, redrawn when they change.
+    private func observeLineChanges() {
+        withObservationTracking { [weak self] in
+            _ = self?.model.lineChanges
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.gutter?.refresh()
+                self.observeLineChanges()
+            }
+        }
+    }
+
+    /// Scrolls to the range's own rectangle. `scrollRangeToVisible` did nothing for text TextKit 2
+    /// had not laid out yet, a match far down the file, however long after (measured on the iOS
+    /// simulator, 2026-10-22); asking for the rectangle lays it out.
+    private func scrollToVisible(_ range: NSRange) {
+        guard let start = textView.position(from: textView.beginningOfDocument, offset: range.location),
+              let end = textView.position(from: start, offset: range.length),
+              let textRange = textView.textRange(from: start, to: end) else { return }
+        let rect = range.length == 0 ? textView.caretRect(for: start) : textView.firstRect(for: textRange)
+        guard !rect.isNull, !rect.isInfinite else { return }
+        textView.scrollRectToVisible(rect, animated: false)
     }
 
     // MARK: - Model observation

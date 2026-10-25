@@ -33,15 +33,24 @@ final class GlassTerminalScaleIPadUITests: XCTestCase {
 
     private var tools: XCUIElement { app.buttons["Tools"].firstMatch }
 
-    private func launch() throws {
-        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "Scale is offered on iPad, not iPhone")
+    /// Opens a terminal, and says whether this device offers Scale. A phone does not, and that is
+    /// checked here rather than skipped: its Tools menu has no Scale Text.
+    private func launch() throws -> Bool {
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
-                                "--demo-open", "terminal-tabs"]
+                                "--demo-open", "terminal-tabs", "-blinkingCursor", "NO"]
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
         XCTAssertTrue(tools.waitForExistence(timeout: 40), "the terminal's Tools menu did not appear")
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            tools.tap()
+            XCTAssertTrue(app.buttons["Font Size"].firstMatch.waitForExistence(timeout: 5), "the Tools menu opened")
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "terminal-scale-text").firstMatch.exists,
+                           "a phone offers no Scale Text")
+            return false
+        }
+        return true
     }
 
     private func attachScreen(_ name: String) {
@@ -98,7 +107,7 @@ final class GlassTerminalScaleIPadUITests: XCTestCase {
     /// Increase under Scale grows the window by a tenth, the text with it, and leaves the person
     /// free to make it smaller again.
     func testIncreaseGrowsTheScaledWindow() throws {
-        try launch()
+        guard try launch() else { return }
         try XCTSkipUnless(sizeWindow(CGSize(width: 560, height: 800)),
                           "the window could not be resized: the simulator needs Windowed Apps")
         toggleScale()
@@ -119,7 +128,7 @@ final class GlassTerminalScaleIPadUITests: XCTestCase {
     /// Scale draws with Core Graphics for the pixels shown — fewer than the screen's as the window
     /// is made smaller — and Resize goes back to Metal.
     func testScaledTextIsDrawnForThePixelsShown() throws {
-        try launch()
+        guard try launch() else { return }
         let windowed = sizeWindow(CGSize(width: 560, height: 800))
         let drawing = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "terminal-drawing-")).firstMatch

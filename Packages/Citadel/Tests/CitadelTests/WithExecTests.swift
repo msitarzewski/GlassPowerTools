@@ -4,6 +4,33 @@ import NIO
 import XCTest
 import Foundation
 
+/// Ends a fake command once Citadel's exec server has read everything the command wrote. The server
+/// closes its pipes the moment a command succeeds and discards what it has not yet read (server code
+/// the app never runs); a fixed 0.3-second sleep stood for this, and a busy machine outlasted it.
+/// Standard output is read when the pipe holds nothing; standard error, which the server reads to its
+/// end, only when the command closed it (`closedStderr`), once the server's reader has finished.
+private func succeedOnceRead(
+    _ handler: ExecOutputHandler,
+    exitCode: Int = 0,
+    closedStderr: Bool = false,
+    and condition: () -> Bool = { true }
+) {
+    func unread(_ handle: FileHandle) -> Int32 {
+        // FIONREAD, _IOR('f', 127, int): a function-like macro, so Swift does not import it.
+        let fionread: UInt = 0x4004_667F
+        var count: Int32 = 0
+        return ioctl(handle.fileDescriptor, fionread, &count) == 0 ? count : -1
+    }
+    let deadline = Date().addingTimeInterval(30)
+    while Date() < deadline {
+        let stdoutRead = unread(handler.stdoutPipe.fileHandleForReading) == 0
+        let stderrRead = !closedStderr || handler.stderrPipe.fileHandleForReading.readabilityHandler == nil
+        if stdoutRead, stderrRead, condition() { break }
+        Thread.sleep(forTimeInterval: 0.005)
+    }
+    handler.succeed(exitCode: exitCode)
+}
+
 @available(macOS 15.0, *)
 final class WithExecTests: XCTestCase {
 
@@ -84,9 +111,7 @@ final class WithExecTests: XCTestCase {
                     let handle = outputHandler.stdoutPipe.fileHandleForWriting
                     handle.write(Data("hello stdout".utf8))
                     try? handle.close()
-                    // Let NIO drain the pipe before succeed triggers pipeChannel.close
-                    Thread.sleep(forTimeInterval: 0.3)
-                    outputHandler.succeed(exitCode: 0)
+                    succeedOnceRead(outputHandler)
                 }
                 return Ctx()
             }
@@ -111,9 +136,9 @@ final class WithExecTests: XCTestCase {
         }
     }
 
-    /// Client writes data via outbound and server writes back a response on stdout.
-    /// Verifies both directions of the exec channel work in a single session.
-    func testWithExecBidirectionalIO() async throws {
+    /// The command reaches the server, and its output comes back while the client writes on stdin.
+    /// (That the stdin arrives is `testExecStdinReachesServer`'s; here the server never reads it.)
+    func testWithExecForwardsTheCommandAndReadsItsOutputWhileWriting() async throws {
         final class Exec: ExecDelegate, @unchecked Sendable {
             struct Ctx: ExecCommandContext {
                 func terminate() async throws {}
@@ -127,9 +152,7 @@ final class WithExecTests: XCTestCase {
                     let output = outputHandler.stdoutPipe.fileHandleForWriting
                     output.write(Data("response from server".utf8))
                     try? output.close()
-                    // Let NIO drain the pipe before succeed triggers pipeChannel.close
-                    Thread.sleep(forTimeInterval: 0.3)
-                    outputHandler.succeed(exitCode: 0)
+                    succeedOnceRead(outputHandler)
                 }
                 return Ctx()
             }
@@ -175,9 +198,7 @@ final class WithExecTests: XCTestCase {
                     let output = outputHandler.stdoutPipe.fileHandleForWriting
                     output.write(payload)
                     try? output.close()
-                    // Let NIO drain the pipe before succeed triggers pipeChannel.close
-                    Thread.sleep(forTimeInterval: 0.3)
-                    outputHandler.succeed(exitCode: 0)
+                    succeedOnceRead(outputHandler)
                 }
                 return Ctx()
             }
@@ -213,9 +234,7 @@ final class WithExecTests: XCTestCase {
                     handle.write(Data("error output".utf8))
                     try? handle.close()
                     try? outputHandler.stdoutPipe.fileHandleForWriting.close()
-                    // Let the readabilityHandler fire and flush before closing
-                    Thread.sleep(forTimeInterval: 0.3)
-                    outputHandler.succeed(exitCode: 0)
+                    succeedOnceRead(outputHandler, closedStderr: true)
                 }
                 return Ctx()
             }
@@ -294,8 +313,7 @@ final class WithExecTests: XCTestCase {
                     try? handle.close()
                     // No stdout at all — close it immediately
                     try? outputHandler.stdoutPipe.fileHandleForWriting.close()
-                    Thread.sleep(forTimeInterval: 0.3)
-                    outputHandler.succeed(exitCode: 0)
+                    succeedOnceRead(outputHandler, closedStderr: true)
                 }
                 return Ctx()
             }
@@ -324,8 +342,7 @@ final class WithExecTests: XCTestCase {
                     try? outputHandler.stderrPipe.fileHandleForWriting.close()
                     outputHandler.stdoutPipe.fileHandleForWriting.write(Data("out".utf8))
                     try? outputHandler.stdoutPipe.fileHandleForWriting.close()
-                    Thread.sleep(forTimeInterval: 0.3)
-                    outputHandler.succeed(exitCode: 0)
+                    succeedOnceRead(outputHandler, closedStderr: true)
                 }
                 return Ctx()
             }
@@ -378,8 +395,7 @@ final class WithExecTests: XCTestCase {
                     let output = outputHandler.stdoutPipe.fileHandleForWriting
                     output.write(Data("ack".utf8))
                     try? output.close()
-                    Thread.sleep(forTimeInterval: 0.3)
-                    outputHandler.succeed(exitCode: 0)
+                    succeedOnceRead(outputHandler)
                 }
                 return Ctx()
             }
@@ -394,6 +410,13 @@ final class WithExecTests: XCTestCase {
                 for try await _ in inbound {}
             }
 
+            // Citadel's server hands stdin to the command's pipe only as it closes the pipes, when
+            // the command ends (2026-10-24: none arrived in a second of waiting for it), and the
+            // command reads it on a queue of its own: so it is waited for, not read at once.
+            let deadline = Date().addingTimeInterval(30)
+            while execDelegate.stdinReceived == nil, Date() < deadline {
+                try await Task.sleep(for: .milliseconds(5))
+            }
             XCTAssertEqual(
                 execDelegate.stdinReceived.flatMap { String(data: $0, encoding: .utf8) },
                 "hello from stdin"
@@ -438,6 +461,67 @@ final class WithExecTests: XCTestCase {
 
             XCTAssertEqual(execDelegate.receivedEnv["FOO"], "bar")
             XCTAssertEqual(execDelegate.receivedEnv["BAZ"], "qux")
+        }
+    }
+}
+
+// MARK: - Glass Power Tools F12
+
+@available(macOS 15.0, *)
+extension WithExecTests {
+    /// Writes to both streams, then exits with `exitCode`.
+    private final class BothStreams: ExecDelegate, @unchecked Sendable {
+        struct Ctx: ExecCommandContext {
+            func terminate() async throws {}
+        }
+        let exitCode: Int
+        init(exitCode: Int) { self.exitCode = exitCode }
+        func setEnvironmentValue(_ value: String, forKey key: String) async throws {}
+        func start(command: String, outputHandler: ExecOutputHandler) async throws -> ExecCommandContext {
+            let exitCode = exitCode
+            DispatchQueue.global().async {
+                outputHandler.stdoutPipe.fileHandleForWriting.write(Data("on stdout".utf8))
+                try? outputHandler.stdoutPipe.fileHandleForWriting.close()
+                outputHandler.stderrPipe.fileHandleForWriting.write(Data("on stderr".utf8))
+                try? outputHandler.stderrPipe.fileHandleForWriting.close()
+                succeedOnceRead(outputHandler, exitCode: exitCode, closedStderr: true)
+            }
+            return Ctx()
+        }
+    }
+
+    /// A command that warns on standard error and succeeds is an answer, not an error, and its
+    /// streams stay apart.
+    func testCollectingKeepsBothStreamsOfACommandThatSucceeds() async throws {
+        try await runTest { server, client in
+            server.enableExec(withDelegate: BothStreams(exitCode: 0))
+            let result = try await client.executeCommandCollecting("test")
+            XCTAssertEqual(result.exitStatus, 0)
+            XCTAssertEqual(String(buffer: result.standardOutput), "on stdout")
+            XCTAssertEqual(String(buffer: result.standardError), "on stderr")
+        }
+    }
+
+    /// A non-zero status is reported with what the command said, rather than thrown.
+    func testCollectingReportsANonZeroStatus() async throws {
+        try await runTest { server, client in
+            server.enableExec(withDelegate: BothStreams(exitCode: 3))
+            let result = try await client.executeCommandCollecting("test")
+            XCTAssertEqual(result.exitStatus, 3)
+            XCTAssertEqual(String(buffer: result.standardError), "on stderr")
+        }
+    }
+
+    /// Both streams count toward the limit.
+    func testCollectingStopsPastItsLimit() async throws {
+        try await runTest { server, client in
+            server.enableExec(withDelegate: BothStreams(exitCode: 0))
+            do {
+                _ = try await client.executeCommandCollecting("test", maxResponseSize: 12)
+                XCTFail("expected commandOutputTooLarge")
+            } catch let error as CitadelError {
+                XCTAssertEqual(error, .commandOutputTooLarge)
+            }
         }
     }
 }

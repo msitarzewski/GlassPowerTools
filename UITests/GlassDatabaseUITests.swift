@@ -89,16 +89,21 @@ final class GlassDatabaseUITests: XCTestCase {
     /// The fixture the pending cleanup belongs to, so tearDown knows how to reach the editor.
     private var cleanupFixture: DatabaseFixture?
 
+    /// SQL is pasted into the editor on the Mac, through the owner's own clipboard; put back after.
+    private var clipboard: UITestClipboard?
+
     override func setUp() async throws {
         continueAfterFailure = false
         runID = UUID()
         pendingCleanupSQL = []
         cleanupFixture = nil
+        try await MainActor.run { clipboard = try UITestClipboard() }
     }
 
     override func tearDown() async throws {
         await MainActor.run {
             dropPendingFixtures()
+            clipboard?.restore()
             app?.terminate()
             #if os(macOS)
             let container = FileManager.default.homeDirectoryForCurrentUser
@@ -201,10 +206,19 @@ final class GlassDatabaseUITests: XCTestCase {
     /// the scopes above.
     private func element(_ identifier: String) -> XCUIElement {
         for scope in touchBarFreeScopes {
-            let match = scope.descendants(matching: .any).matching(identifier: identifier).firstMatch
-            if match.exists { return match }
+            let matches = scope.descendants(matching: .any).matching(identifier: identifier)
+            if matches.firstMatch.exists { return onScreen(matches) }
         }
-        return app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+        return onScreen(app.descendants(matching: .any).matching(identifier: identifier))
+    }
+
+    /// The match a person can reach. Every open tab keeps its views, hidden from VoiceOver but
+    /// not from XCUITest: on the iPhone the first match for `db-query-run` was a hidden tab's Run
+    /// (hit point {-1, -1}), the tap went nowhere, and the fixture statements never ran
+    /// (2026-10-25); the editor was the same, two in one frame.
+    private func onScreen(_ matches: XCUIElementQuery) -> XCUIElement {
+        if matches.count > 1, let shown = matches.allElementsBoundByIndex.first(where: \.isHittable) { return shown }
+        return matches.firstMatch
     }
 
     /// A control by its visible title, in the same Touch-Bar-free scopes: buttons first, then
@@ -294,6 +308,58 @@ final class GlassDatabaseUITests: XCTestCase {
 
     /// Attaches an inventory of the tree so a failure can be diagnosed from the result bundle.
     /// Never prints a field's value on a form that has held the password.
+    #if !os(macOS)
+    /// Run, from the bar or, where the bar is narrow (the Duo's outer display), from its More:
+    /// there iOS's column holds Back, More and Close, and Run is inside More (2026-10-24).
+    private func pressRun() {
+        let run = element("db-query-run")
+        if run.waitForExistence(timeout: 3) {
+            // On the iPhone Run is in the bottom bar, behind the keyboard while the editor has it:
+            // the tap had no hit point and nothing ran, and XCUITest went on as if it had landed
+            // (2026-10-25). `isHittable` is no guide (it said yes under the keyboard), the frames
+            // are. A person puts the keyboard away first, with the key the editor puts above it.
+            let keyboard = app.keyboards.firstMatch
+            let covered = { keyboard.exists && keyboard.frame.intersects(run.frame) }
+            if covered() { putKeyboardAway() }
+            XCTAssertFalse(covered(), "Run is behind the keyboard")
+            press(run)
+            return
+        }
+        let more = app.buttons.matching(NSPredicate(format: "identifier IN %@",
+                                                    ["BottomOverflowBarButtonItem", "OverflowBarButtonItem"])).firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 5), "neither Run nor the bar's More")
+        press(more)
+        // In More the control keeps neither its identifier nor its accessibility label ("Run
+        // Statement"): the entry is its visible title, an en space and "Statement" (2026-10-25,
+        // Duo; the label is with the owner). Matched by that title as a person reads it.
+        let item = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier == 'db-query-run' OR label BEGINSWITH 'Run' OR label ENDSWITH 'Statement'")).firstMatch
+        if !item.waitForExistence(timeout: 5) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "more-menu"; tree.lifetime = .keepAlways; add(tree)
+        }
+        XCTAssertTrue(item.exists, "Run in the bar's More")
+        press(item)
+        // A menu with a primary action can arrive as a submenu of its entries. The editor holds one
+        // statement here, so Run All Statements runs exactly that.
+        let all = app.buttons["Run All Statements"].firstMatch
+        if all.waitForExistence(timeout: 2) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "run-submenu"; tree.lifetime = .keepAlways; add(tree)
+            press(all)
+        }
+    }
+
+    /// The key the editor puts above the keyboard, as a person puts it away.
+    private func putKeyboardAway() {
+        let keyboard = app.keyboards.firstMatch
+        guard keyboard.exists else { return }
+        let hide = element("editor-hide-keyboard")
+        if hide.waitForExistence(timeout: 2) { press(hide) }
+        _ = waitUntil("the keyboard to go", timeout: 5) { !keyboard.exists }
+    }
+    #endif
+
     private func dumpTree(_ name: String) {
         guard let app else { return }
         var lines: [String] = []
@@ -323,8 +389,10 @@ final class GlassDatabaseUITests: XCTestCase {
             NSPredicate(format: "label == %@ AND (elementType == %d OR elementType == %d)", "All",
                         XCUIElement.ElementType.button.rawValue, XCUIElement.ElementType.tab.rawValue)).firstMatch
         #else
-        let scope = element("glass-library-scope-all-connections")
+        let scope = app.libraryScope("all-connections")
         #endif
+        // Only where the scopes are showing: after a save an iPhone is already on the results.
+        // Callers check where they arrived (the row they look for next).
         if scope.waitForExistence(timeout: 5) { press(scope) }
     }
 
@@ -332,6 +400,12 @@ final class GlassDatabaseUITests: XCTestCase {
         let field = element(identifier)
         XCTAssertTrue(field.waitForExistence(timeout: 10), "missing \(identifier)")
         if (field.value as? String) == value { return }
+        #if os(iOS)
+        field.replaceText(with: value, in: app)
+        if field.elementType != .secureTextField {
+            XCTAssertEqual(field.value as? String, value, "\(identifier) reads what was typed")
+        }
+        #else
         press(field)
         #if os(macOS)
         app.typeKey("a", modifierFlags: .command)
@@ -341,7 +415,9 @@ final class GlassDatabaseUITests: XCTestCase {
         }
         #endif
         field.typeText(value)
+        #endif
     }
+
 
     /// Expands one of the setup sheet's disclosure rows (`GlassFormDisclosureStyle`).
     private func expandDisclosure(_ row: XCUIElement) {
@@ -405,7 +481,11 @@ final class GlassDatabaseUITests: XCTestCase {
             setField("add-database-port", to: fixture.port)
         }
 
+        #if os(iOS)
+        app.tapUntilSheetCloses("host-editor-save")
+        #else
         press("host-editor-save")
+        #endif
         dismissSystemPasswordPrompt()
         XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 20), "the sheet closes after Save")
     }
@@ -413,13 +493,16 @@ final class GlassDatabaseUITests: XCTestCase {
     private func chooseEngine(_ engine: Engine) {
         let picker = element("add-database-engine")
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "engine picker")
-        if "\(picker.value ?? "")".localizedCaseInsensitiveContains(engine.pickerTitle) { return }
+        // The choice is the picker's value on some iOS versions and in its label ("Engine, MySQL")
+        // on others, the Duo's 27.1 among them: read both.
+        func shown() -> String { "\(picker.label) \(picker.value ?? "")" }
+        if shown().localizedCaseInsensitiveContains(engine.pickerTitle) { return }
         press(picker)
         let item = titled(engine.pickerTitle, timeout: 6)
             ?? firstExisting(touchBarFreeScopes.map { $0.staticTexts[engine.pickerTitle] }, timeout: 2)
         if let item { press(item) } else { dumpTree("engine-menu") }
         XCTAssertTrue(waitUntil("the engine picker to read \(engine.pickerTitle)", timeout: 5) {
-            "\(picker.value ?? "")".localizedCaseInsensitiveContains(engine.pickerTitle)
+            shown().localizedCaseInsensitiveContains(engine.pickerTitle)
         }, "the Engine picker did not take \(engine.pickerTitle)")
     }
 
@@ -524,7 +607,9 @@ final class GlassDatabaseUITests: XCTestCase {
     /// enclosing `NSScrollView` is a separate element and carries no value. Asking for the text
     /// view by name is therefore the query that can return SQL; a generic descendant search can
     /// land on the wrapper.
-    private var queryEditor: XCUIElement { app.textViews["db-query-editor"] }
+    /// On the iPhone a second SQL editor sat over the first in the same frame, the first still
+    /// holding its INSERT, and a query for the one editor matched two (2026-10-25): `onScreen`.
+    private var queryEditor: XCUIElement { onScreen(app.textViews.matching(identifier: "db-query-editor")) }
 
     /// Replaces the editor's text. Pasted on the Mac rather than typed: a syntax-aware editor
     /// that completes brackets or quotes would corrupt typed SQL, and the fixture scripts are
@@ -539,10 +624,13 @@ final class GlassDatabaseUITests: XCTestCase {
         NSPasteboard.general.setString(sql, forType: .string)
         app.typeKey("v", modifierFlags: .command)
         #else
-        if let current = editor.value as? String, !current.isEmpty {
-            editor.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
-        }
+        // Select All, then type over it. Deleting backwards from the tap left whatever followed the
+        // cursor, because a tap puts it where it lands: the server got a CREATE with the end of
+        // the DROP before it, "near 'IF EXISTS `gpt_scratch`.`gpt_ui_rows`'" (2026-10-25, iPhone).
+        editor.typeKey("a", modifierFlags: .command)
         editor.typeText(sql)
+        XCTAssertTrue(waitUntil("the editor to hold the statement", timeout: 5) { editorText() == sql },
+                      "the editor holds ‘\(editorText().prefix(160))’, not the statement typed")
         #endif
     }
 
@@ -591,7 +679,7 @@ final class GlassDatabaseUITests: XCTestCase {
             press("db-query-run")
         }
         #else
-        press("db-query-run")
+        pressRun()
         #endif
 
         // DDL and DML are classified, so the editor asks before it runs them.
@@ -813,6 +901,9 @@ final class GlassDatabaseUITests: XCTestCase {
                            file: StaticString = #filePath, line: UInt = #line) {
         let row = element("db-schema-table-\(table)")
         if !row.waitForExistence(timeout: 5) {
+            // On the iPhone a table's data is pushed over the schema list, and a foreign-key
+            // follow leaves the test there (2026-10-25).
+            showSchemaList(database)
             // The tables are not in the tree at all while the database is collapsed, so a
             // missing row here is a question about the disclosure and not about the table.
             guard expandDatabase(database, expecting: table) else {
@@ -830,7 +921,10 @@ final class GlassDatabaseUITests: XCTestCase {
         XCTAssertTrue(row.exists,
                       "‘\(database)’ is expanded but ‘\(table)’ is not among its rows",
                       file: file, line: line)
-        contextPress(row)
+        // On the iPhone a table's actions are its row's "…" menu; a press on the row opened the
+        // table's preview instead (2026-10-25). The iPad's sidebar row has the context menu.
+        let actions = row.buttons["Table Actions"].firstMatch
+        if actions.exists { press(actions) } else { contextPress(row) }
         if let browse = titled("Browse Data") {
             press(browse)
         } else {
@@ -860,14 +954,33 @@ final class GlassDatabaseUITests: XCTestCase {
 
     /// Re-reads the table list for a database after the editor has created something in it.
     private func refreshDatabase(_ name: String) {
+        showSchemaList(name)
         let row = element("db-schema-database-\(name)")
-        guard row.waitForExistence(timeout: 10) else { return }
+        // Not a quiet return: without the refresh the new table is not listed, and the failure
+        // surfaced later as "the sidebar lists …" with the cause gone (2026-10-25, iPhone).
+        guard row.waitForExistence(timeout: 10) else {
+            XCTFail("the schema list does not show \(name) to refresh it")
+            return
+        }
         contextPress(row)
         if let refresh = titled("Refresh") ?? titled("Refresh Tables", timeout: 2) {
             press(refresh)
         } else {
             dismissAnyOpenMenu()
         }
+    }
+
+    /// On the iPhone the schema list is a level of its own, behind the SQL editor; on the Mac and
+    /// the iPad it is the sidebar beside it. Back, as a person goes, until it shows.
+    private func showSchemaList(_ name: String) {
+        #if os(iOS)
+        let row = element("db-schema-database-\(name)")
+        for _ in 0..<3 where !row.waitForExistence(timeout: 2) {
+            let back = app.backButton
+            guard back.exists else { break }
+            press(back)
+        }
+        #endif
     }
 
     /// A context menu left open covers everything under it, so a path that could not find its
@@ -981,8 +1094,17 @@ final class GlassDatabaseUITests: XCTestCase {
         // `isHittable` true while having no hit point at all. Clicking it produced
         // "Unable to find hit point for ScrollView": a lookup that succeeded and a press that could
         // not. Restricting the type is what stops a phantom being pressed instead of a menu item.
-        let byTitle = app.menuItems[summary].firstMatch
-        let byIdentifier = app.menuItems.matching(identifier: "db-row-menu-follow-\(constraintName)").firstMatch
+        //
+        // On iOS the type is a button: a context menu's entries are buttons in a collection view,
+        // and the submenu opens on the first tap. Looking for menu items there found nothing, and
+        // both tests skipped on the iPhone for a submenu that was open (2026-10-25, the test audit).
+        #if os(macOS)
+        let entries = app.menuItems
+        #else
+        let entries = app.buttons
+        #endif
+        let byTitle = entries[summary].firstMatch
+        let byIdentifier = entries.matching(identifier: "db-row-menu-follow-\(constraintName)").firstMatch
         func target() -> XCUIElement? {
             if byTitle.exists { return byTitle }
             if byIdentifier.exists { return byIdentifier }
@@ -1007,6 +1129,10 @@ final class GlassDatabaseUITests: XCTestCase {
 
         guard let item = target() else {
             dumpTree("follow-submenu-\(constraintName)")
+            #if !os(macOS)
+            XCTFail("the Follow Reference submenu shows no ‘\(summary)’", file: file, line: line)
+            return
+            #else
             // Not a failure of the feature, and deliberately not a silent pass.
             //
             // "Follow Reference" is a SwiftUI `Menu` nested inside a `contextMenu`. Across thirteen
@@ -1028,6 +1154,7 @@ final class GlassDatabaseUITests: XCTestCase {
                           + "relationship logic is covered by ForeignKeyNavigationTests and the "
                           + "adapter was verified against the live server; the menu interaction "
                           + "is unverified and needs a person.")
+            #endif
         }
         press(item)
     }
@@ -1081,6 +1208,12 @@ final class GlassDatabaseUITests: XCTestCase {
                             file: StaticString = #filePath, line: UInt = #line) -> [String] {
         XCTAssertTrue(openSQLEditor(), "a SQL editor to read the server with", file: file, line: line)
         guard runStatements([sql], fixture: fixture, file: file, line: line) else { return [] }
+        #if !os(macOS)
+        // Rows the keyboard covers are not laid out, so the walk below ends at the last one above
+        // it. On the Duo's outer display Run is in the bar's More, which leaves the keyboard up,
+        // and the walk read one row of three while the grid said "3 rows" (2026-10-25).
+        putKeyboardAway()
+        #endif
         // The grid populates after the run control returns; an empty result never populates, so
         // this wait expiring is the "no rows" answer rather than a timeout to retry.
         _ = waitUntil("the result grid for \(column)", timeout: 20) {
@@ -1107,9 +1240,17 @@ final class GlassDatabaseUITests: XCTestCase {
                                   file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let actual = serverRows(sql, column: column, fixture: fixture, file: file, line: line)
         guard actual == expected else {
-            XCTFail("\(what): the server holds \(actual) where \(expected) was written. "
-                    + "The statements that did not land ran without an error banner.",
-                    file: file, line: line)
+            // The grid counts what the server sent. When it counts more than the walk read, the
+            // walk missed rows on the screen and the server is not at fault.
+            let counted = app.staticTexts.matching(NSPredicate(format: "label == %@", "\(expected.count) rows")).firstMatch
+            if actual.count < expected.count, counted.exists {
+                XCTFail("\(what): the grid says \(expected.count) rows but only \(actual) could be read from it",
+                        file: file, line: line)
+            } else {
+                XCTFail("\(what): the server holds \(actual) where \(expected) was written. "
+                        + "The statements that did not land ran without an error banner.",
+                        file: file, line: line)
+            }
             return false
         }
         return true

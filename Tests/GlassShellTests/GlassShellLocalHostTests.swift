@@ -17,7 +17,7 @@ throws -> (GlassShellModel, URL) {
     let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                 sharedContainerURL: root.appendingPathComponent("group"),
                                 resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                layers: GlassLayerStore(), registry: registry)
+                                layers: GlassLayerStore.forTest(), registry: registry)
     return (model, root)
 }
 
@@ -130,7 +130,7 @@ struct GlassShellLocalHostTests {
         let relaunched = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                          sharedContainerURL: root.appendingPathComponent("group"),
                                          resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
-                                         layers: GlassLayerStore())
+                                         layers: GlassLayerStore.forTest())
         await relaunched.load()
         let local = try #require(relaunched.localHost)
         #expect(local.displayName == "My Mac")

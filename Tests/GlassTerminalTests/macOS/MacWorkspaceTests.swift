@@ -202,7 +202,7 @@ struct MacWorkspaceTests {
         host.prepareOffscreen(columns: 100, rows: 30)
         defer { model.releaseRenderer() }
         model.ingest(data: Data("PREVIEW ONE\r\n".utf8), nonce: 1)
-        #expect(await waitForCondition(seconds: 2) { model.getVisibleText(lastNLines: 30).joined().contains("PREVIEW ONE") })
+        #expect(await waitForCondition(seconds: 15) { model.getVisibleText(lastNLines: 30).joined().contains("PREVIEW ONE") })
         let resizeCount = resizes
         let inputCount = inputs
         let first = try #require(model.previewImage(maxPixelWidth: 320))
@@ -214,7 +214,7 @@ struct MacWorkspaceTests {
         // Preparing again must reuse the engine and preserve its original grid.
         host.prepareOffscreen(columns: 40, rows: 10)
         model.ingest(data: Data("\u{1b}[31mPREVIEW TWO\u{1b}[0m\r\n".utf8), nonce: 2)
-        #expect(await waitForCondition(seconds: 2) { model.getVisibleText(lastNLines: 30).joined().contains("PREVIEW TWO") })
+        #expect(await waitForCondition(seconds: 15) { model.getVisibleText(lastNLines: 30).joined().contains("PREVIEW TWO") })
         let second = try #require(model.previewImage(maxPixelWidth: 320))
         #expect(first.tiffRepresentation != second.tiffRepresentation)
         #expect(first.size == second.size)
@@ -331,12 +331,12 @@ struct MacWorkspaceTests {
         let request = try MacWorkgroupLauncher.launch(preset: preset, broker: broker, openWindow: { _ in })[0]
         let window = MacWorkspaceWindowController(request: request, startupCommandBroker: broker, defaults: fixture.defaults)
         let manager = SessionManager(loadImmediately: false)
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
         defer { window.closeAllSessions(sessionManager: manager) }
         for tab in window.tabs {
             tab.startLocalPanes(sessionManager: manager, settingsManager: settings, onEmpty: {})
         }
-        #expect(await waitForCondition(seconds: 3) {
+        #expect(await waitForCondition(seconds: 15) {
             (0..<2).allSatisfy { FileManager.default.fileExists(atPath: directory.appending(path: "tab-\($0)").path) }
                 && window.tabs.allSatisfy { $0.closeWarning == nil }
         })
@@ -380,7 +380,7 @@ struct MacWorkspaceTests {
         let controller = MacWorkspaceController(request: request, startupCommandBroker: broker, defaults: fixture.defaults)
         let pane = try #require(controller.focusedPane)
         let manager = FailedLaunchManager(loadImmediately: false)
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
         await controller.prepareSSHPaneIfNeeded(pane, sessionManager: manager, settingsManager: settings)
         #expect(controller.session(for: pane.id) == nil)
         controller.retryPane(pane.id)
@@ -408,8 +408,9 @@ struct MacWorkspaceTests {
         let live = MacWorkspaceWindowController(request: request, startupCommandBroker: broker, defaults: defaults)
         let paneID = try #require(live.selectedTab.focusedPaneID)
         #expect(live.selectedTab.claimStartupCommand(for: paneID)?.command == "echo RESTORED_CONFIG")
+        // (It also expected `restored` to have no command to claim, which held only because `live`
+        // had just used the one-time ticket; `restoredWorkspaceNeverReplaysStartupTicket` tests that.)
         let restored = MacWorkspaceWindowController(request: request, startupCommandBroker: broker, defaults: defaults)
-        #expect(restored.selectedTab.claimStartupCommand(for: paneID) == nil)
         let captured = try restored.capturePreset(name: "Tomorrow", servers: [], sourcePresets: [preset])
         #expect(captured.sessionIntents[0].startupCommand == "echo RESTORED_CONFIG")
         #expect(captured.sessionIntents[0].localShell == nil)
@@ -1913,7 +1914,7 @@ struct MacWorkspaceTests {
         controller.addPane(intent: .ssh(serverID: UUID()), axis: .horizontal)
         let pane = try #require(controller.focusedPane)
         let manager = SlowManager(loadImmediately: false)
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
 
         // The pane's view asks, then is removed: its task is cancelled.
         let view = Task { @MainActor in
@@ -1957,7 +1958,7 @@ struct MacWorkspaceTests {
         controller.addPane(intent: .ssh(serverID: UUID()), axis: .horizontal)
         let pane = try #require(controller.focusedPane)
         let manager = HangingManager(loadImmediately: false)
-        controller.startSSHPaneIfNeeded(pane, sessionManager: manager, settingsManager: SettingsManager(loadImmediately: false))
+        controller.startSSHPaneIfNeeded(pane, sessionManager: manager, settingsManager: SettingsManager.forTest())
         let connection = try #require(controller.sshConnection(for: pane.id))
         try await Task.sleep(for: .milliseconds(50))
 
@@ -1975,7 +1976,7 @@ struct MacWorkspaceTests {
             defaults: fixture.defaults
         )
         let sessionManager = SessionManager(loadImmediately: false)
-        let settingsManager = SettingsManager(loadImmediately: false)
+        let settingsManager = SettingsManager.forTest()
         let serverID = UUID()
         controller.addPane(intent: .ssh(serverID: serverID), axis: .horizontal)
         let pane = try #require(controller.focusedPane)
@@ -2141,7 +2142,7 @@ struct MacWorkspaceTests {
         func nativeTables(in view: NSView) -> [NSTableView] {
             (view as? NSTableView).map { [$0] } ?? view.subviews.flatMap { nativeTables(in: $0) }
         }
-        #expect(await waitForCondition(seconds: 3) {
+        #expect(await waitForCondition(seconds: 15) {
             host.view.layoutSubtreeIfNeeded()
             return nativeTables(in: host.view).contains { $0.numberOfRows == 5 }
         })
@@ -2273,8 +2274,11 @@ struct MacWorkspaceTests {
         )
         window.isReleasedWhenClosed = false
         window.contentView = hostingView
+        // Laid out now, as `exitedLocalPTYRestartsInTheExistingTerminal` explains: a window never shown is laid out
+        // whenever AppKit gets to it, and the shell starts only then.
+        hostingView?.layoutSubtreeIfNeeded()
 
-        let pidWasWritten = await waitForCondition(seconds: 2) {
+        let pidWasWritten = await waitForCondition(seconds: 15) {
             FileManager.default.fileExists(atPath: pidFile.path)
         }
         #expect(pidWasWritten)
@@ -2293,7 +2297,7 @@ struct MacWorkspaceTests {
         hostingView = nil
         window.close()
 
-        let processWasReaped = await waitForCondition(seconds: 4) {
+        let processWasReaped = await waitForCondition(seconds: 15) {
             errno = 0
             let signalResult = kill(processID, 0)
             return signalResult == -1 && errno == ESRCH
@@ -2347,7 +2351,8 @@ struct MacWorkspaceTests {
         let window = NSWindow()
         window.isReleasedWhenClosed = false
         window.contentView = hostingView
-        #expect(await waitForCondition(seconds: 2) {
+        hostingView?.layoutSubtreeIfNeeded()
+        #expect(await waitForCondition(seconds: 15) {
             FileManager.default.fileExists(atPath: pidFile.path)
         })
         let pidText = try String(contentsOf: pidFile, encoding: .utf8)
@@ -2381,7 +2386,7 @@ struct MacWorkspaceTests {
             )
         )
         window.contentView = hostingView
-        #expect(await waitForCondition(seconds: 1) {
+        #expect(await waitForCondition(seconds: 15) {
             runtime.processState.isRunning && kill(processID, 0) == 0
         })
 
@@ -2389,7 +2394,7 @@ struct MacWorkspaceTests {
         window.contentView = nil
         hostingView = nil
         window.close()
-        #expect(await waitForCondition(seconds: 4) {
+        #expect(await waitForCondition(seconds: 15) {
             errno = 0
             return kill(processID, 0) == -1 && errno == ESRCH
         })
@@ -2434,7 +2439,7 @@ struct MacWorkspaceTests {
         }
         // No hosting view or window exists: both startup commands must already
         // have executed, with their output retained by the owned renderers.
-        #expect(await waitForCondition(seconds: 3) {
+        #expect(await waitForCondition(seconds: 15) {
             runtimes.enumerated().allSatisfy { index, runtime in
                 FileManager.default.fileExists(atPath: directory.appending(path: "started-\(index)").path)
                     && runtime.model.getVisibleText().joined().contains("HEADLESS_READY_\(index)")
@@ -2465,11 +2470,12 @@ struct MacWorkspaceTests {
             onResize: { _, _ in presentedResizeCount += 1 },
             onProcessReady: { presentedReadyCount += 1 }
         ))
-        #expect(await waitForCondition(seconds: 2) { presentedResizeCount > 0 })
+        window.contentView?.layoutSubtreeIfNeeded()
+        #expect(await waitForCondition(seconds: 15) { presentedResizeCount > 0 })
         // Wait for view reconstruction by sending fresh input through the same
         // PTY and checking the presentation's updated output callback.
         #expect(runtimes[0].processState.sendCommand("printf 'ATTACHED_OUTPUT\\n'"))
-        #expect(await waitForCondition(seconds: 2) {
+        #expect(await waitForCondition(seconds: 15) {
             String(decoding: presentedOutput, as: UTF8.self).contains("ATTACHED_OUTPUT")
         })
         #expect(kill(processID, 0) == 0)
@@ -2499,15 +2505,15 @@ struct MacWorkspaceTests {
                 terminated = true
             }
         )
-        #expect(await waitForCondition(seconds: 2) {
+        #expect(await waitForCondition(seconds: 15) {
             runtime.hasActiveChildProcesses == false
         })
         #expect(runtime.processState.sendCommand("sleep 30 &"))
-        #expect(await waitForCondition(seconds: 2) {
+        #expect(await waitForCondition(seconds: 15) {
             runtime.hasActiveChildProcesses == true
         })
         #expect(runtime.processState.sendCommand("kill -KILL %1; wait; false; exit"))
-        try #require(await waitForCondition(seconds: 3) { terminated },
+        try #require(await waitForCondition(seconds: 15) { terminated },
                  "Shell output: \(runtime.model.getVisibleText().joined(separator: "\n"))")
         #expect(terminationCode == 1)
         #expect(MacLocalTerminalExitPolicy.shouldClose(exitCode: terminationCode))
@@ -2615,7 +2621,7 @@ struct MacWorkspaceTests {
         model.ingest(data: Data("\u{1B}]52;c;SGVs".utf8), nonce: 1)
         model.ingest(data: Data("bG8=\u{07}".utf8), nonce: 2)
 
-        #expect(await waitForCondition(seconds: 2) {
+        #expect(await waitForCondition(seconds: 15) {
             model.semanticEvents.contains { event in
                 guard case .osc52Denied(let decision) = event.kind else { return false }
                 return decision.disposition == .deniedWrite

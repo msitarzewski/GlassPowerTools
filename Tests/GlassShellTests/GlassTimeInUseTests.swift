@@ -45,7 +45,7 @@ struct GlassTimeInUseTests {
         registry.register(Database())
         return GlassShellModel(storageDirectory: root.appendingPathComponent(name),
                                sharedContainerURL: nil, resolveSharedContainer: false,
-                               accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore(), registry: registry)
+                               accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest(), registry: registry)
     }
 
     /// alpha, with a Terminal and a database.

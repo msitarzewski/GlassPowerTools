@@ -95,10 +95,36 @@ struct TableSchemaDefaultInjectionTests {
                             original: column(type: "varchar(40)"), type: "varchar(40)")
         let joined = sql.joined()
         #expect(joined.contains("''"), "the embedded quote is doubled")
-        #expect(!joined.contains("' , DROP"), "the clause cannot be reopened")
+        #expect(joined.contains(#"DEFAULT 'O''Brien'', DROP COLUMN secret --'"#), "the clause cannot be reopened: \(joined)")
+    }
+
+    /// MySQL reads a backslash in a literal as an escape (unless NO_BACKSLASH_ESCAPES, off by
+    /// default): with quotes doubled alone, `x\'` ended its own literal there (2026-10-24, the test
+    /// audit — this file's check above has a space that never matches, so it couldn't see it).
+    @Test("A backslash in a MySQL text default is doubled, and can't end the literal; PostgreSQL's is kept")
+    func textDefaultsEscapeBackslashes() throws {
+        let typed = "x\\', DROP COLUMN secret #"
+        let mysql = try alter(.mysql, mode: .literal, literal: typed,
+                              original: column(type: "varchar(40)"), type: "varchar(40)").joined()
+        #expect(mysql.contains(#"DEFAULT 'x\\'', DROP COLUMN secret #'"#), "\(mysql)")
+        let postgres = try alter(.postgresql, mode: .literal, literal: typed,
+                                 original: column(type: "varchar(40)"), type: "varchar(40)").joined()
+        #expect(postgres.contains(#"SET DEFAULT 'x\'', DROP COLUMN secret #'"#), "a backslash is itself there: \(postgres)")
     }
 
     // MARK: - The server's metadata, which the operator does not choose
+
+    /// A text default the server reports, carried by Keep Current: a backslash in it went back as an
+    /// escape — `a\b` became `a`, backspace — and a hostile one ended the literal (2026-10-24).
+    @Test("A server's text default with a backslash goes back as the same text")
+    func serverTextDefaultsKeepTheirBackslashes() throws {
+        let kept = try alter(.mysql, mode: .keep, original: column(type: "varchar(40)", default: #"a\b"#),
+                             type: "varchar(40)").joined()
+        #expect(kept.contains(#"DEFAULT 'a\\b'"#), "\(kept)")
+        let hostile = try alter(.mysql, mode: .keep, original: column(type: "varchar(40)", default: #"x\', DROP COLUMN secret #"#),
+                                type: "varchar(40)").joined()
+        #expect(hostile.contains(#"DEFAULT 'x\\'', DROP COLUMN secret #'"#), "\(hostile)")
+    }
 
     /// `Keep Current` carries the server's string into the new DDL. A hostile one must be refused.
     @Test("A hostile server default is refused when it is carried forward")

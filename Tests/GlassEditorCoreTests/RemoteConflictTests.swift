@@ -16,7 +16,7 @@ struct RemoteConflictTests {
 
     static let ref = RemoteDocumentRef(
         connectionID: UUID(uuidString: "6F0C1E2A-9B3D-4A57-8E11-2C4D6F8A0B12")!,
-        host: "charlie.tail1234.ts.net",
+        host: "charlie.example.com",
         path: "/etc/nginx/nginx.conf"
     )
 

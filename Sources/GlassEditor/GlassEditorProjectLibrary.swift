@@ -225,12 +225,15 @@ public final class GlassEditorProjectLibrary {
                 try FileManager.default.copyItem(at: source, to: target)
             }
             if arguments.contains("--ui-testing-seed-large-svg") {
-                var path = "M0 0"
-                path.reserveCapacity(700_000)
-                for step in 0..<60_000 { path += " L\((step * 37) % 1000) \((step * 91) % 300)" }
+                // Many small closed shapes, as a design tool exports artwork. It was one filled
+                // zigzag of 60,000 self-crossing points, which WebKit never paints, on the Mac or
+                // a phone (2026-10-24): the test could not tell a blank preview from a working one.
+                var path = ""
+                path.reserveCapacity(720_000)
+                for step in 0..<40_000 { path += "M\((step * 37) % 990) \((step * 91) % 290)h8v8h-8z" }
                 let image = Self.seedPNG().base64EncodedString()
                 let embedded = String(repeating: image, count: 1 + 1_200_000 / max(image.count, 1))
-                let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 1000 300\"><path d=\"\(path) Z\" fill=\"#b5412b\"/><image width=\"200\" height=\"80\" xlink:href=\"data:image/png;base64,\(embedded)\"/></svg>"
+                let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 1000 300\"><path d=\"\(path)\" fill=\"#b5412b\"/><image width=\"200\" height=\"80\" xlink:href=\"data:image/png;base64,\(embedded)\"/></svg>"
                 try Data(svg.utf8).write(to: root.appendingPathComponent("wide-logo.svg"))
             }
         } catch { return }

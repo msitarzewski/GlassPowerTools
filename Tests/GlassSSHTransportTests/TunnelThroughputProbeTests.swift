@@ -47,11 +47,11 @@ struct TunnelThroughputProbeTests {
         return (bulkSeconds, pingMs)
     }
 
-    @Test func compareTunnelWithDirect() async throws {
-        guard IntegrationEnvironment.isConfigured,
-              let port = ProcessInfo.processInfo.environment["GPT_TUNNEL_PROBE_PORT"].flatMap(Int.init) else {
-            print("NOT RUN: set the test host and GPT_TUNNEL_PROBE_PORT"); return
-        }
+    /// A measurement, printed, not a check: the test host and GPT_TUNNEL_PROBE_PORT set.
+    @Test(.enabled(if: IntegrationEnvironment.isConfigured && ProcessInfo.processInfo.environment["GPT_TUNNEL_PROBE_PORT"] != nil,
+                   "a throughput probe: set the test host and GPT_TUNNEL_PROBE_PORT"))
+    func compareTunnelWithDirect() async throws {
+        let port = try #require(ProcessInfo.processInfo.environment["GPT_TUNNEL_PROBE_PORT"].flatMap(Int.init))
         let host = IntegrationEnvironment.host!
         let direct = try measure(host: host, port: port)
         print(String(format: "DIRECT : 50 MB in %.2f s (%.1f MB/s), round trip %.2f ms", direct.bulkSeconds, 50 / direct.bulkSeconds, direct.pingMs))

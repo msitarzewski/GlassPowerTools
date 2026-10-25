@@ -9,10 +9,9 @@ import os
 /// asked to answer, and shown lost. Against the test host (gated as the other real-host tests),
 /// through a relay that can go silent — it stops passing bytes without closing anything, which is
 /// what a connection looks like after a laptop lid has been shut for a while.
-@Suite("A silent connection is found after a wake (gated)", .serialized)
+@Suite("A silent connection is found after a wake (gated)", .serialized, .enabled(if: IntegrationEnvironment.isConfigured, IntegrationEnvironment.notConfigured))
 struct SSHWakeLivenessTests {
     @Test func aConnectionThatWentSilentIsFoundLost() async throws {
-        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let relay = try await SilenceableRelay.start(to: IntegrationEnvironment.host!, port: IntegrationEnvironment.port)
         defer { relay.stop() }
         let endpoint = SSHEndpoint(host: "127.0.0.1", port: relay.port, username: IntegrationEnvironment.user!)

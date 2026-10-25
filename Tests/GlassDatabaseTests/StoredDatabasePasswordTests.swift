@@ -4,7 +4,7 @@ import GlasSecretStore
 @testable import GlassDatabase
 
 /// Nothing stored means no password, on the first connect as on every reconnect (2026-09-22:
-/// MySQL on bravo through the tunnel, root with no password, refused with a Keychain error).
+/// a MySQL server through its tunnel, an account with no password, refused with a Keychain error).
 @Suite("The password a saved service connects with")
 @MainActor
 struct StoredDatabasePasswordTests {

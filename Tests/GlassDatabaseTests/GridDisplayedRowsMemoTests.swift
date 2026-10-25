@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GlassDBKit
 @testable import GlassDatabase
 
 /// The grid keeps its displayed rows between body evaluations; a stale answer would show the
@@ -9,9 +10,10 @@ import Testing
 struct GridDisplayedRowsMemoTests {
     private func key(result: UUID = Self.result, rowCount: Int = 10,
                      filters: [GridColumnFilter] = [], sorts: [GridSortDescriptor] = [],
+                     dialect: DatabaseDialect = .mysql, isAnalysis: Bool = false,
                      isTable: Bool = true) -> GridDisplayedRowsMemo.Key {
         .init(result: result, rowCount: rowCount, filters: filters, sorts: sorts,
-              dialect: .mysql, isAnalysis: false, isTable: isTable)
+              dialect: dialect, isAnalysis: isAnalysis, isTable: isTable)
     }
     private static let result = UUID()
 
@@ -29,6 +31,10 @@ struct GridDisplayedRowsMemoTests {
             key(rowCount: 11),
             key(sorts: [GridSortDescriptor(columnName: "name", direction: .descending)]),
             key(isTable: false),
+            // The three it left out until 2026-10-24.
+            key(filters: [GridColumnFilter(columnName: "name", columnType: "varchar(20)", operation: .equals, value: "ann")]),
+            key(dialect: .postgresql),
+            key(isAnalysis: true),
         ]
         _ = memo.rows(for: key()) { [0] }
         for (offset, next) in changed.enumerated() {

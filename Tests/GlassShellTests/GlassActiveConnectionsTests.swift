@@ -89,6 +89,36 @@ struct GlassActiveConnectionsTests {
         #expect(model.activeMachines().flatMap(\.running).map(\.id) == ["tmux:glass-2"])
     }
 
+    /// The owner, on the iPhone (2026-10-24): a tab whose connection dropped and the session it
+    /// holds were two rows. The tab's row stands for it; closing the tab brings the session's back.
+    @Test("A session held by something open here isn't listed until that closes")
+    func heldSessionsAreListedOnceReleased() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal]))
+        final class Holder { var holds = true }
+        let holder = Holder()
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        terminal.running = [
+            running("tmux:glass-2", on: alphaTerminal.endpointID),
+            GlassRunningSession(id: "tmux:glass-1", title: "held", symbolName: "terminal", endpointID: alphaTerminal.endpointID,
+                                isAttachedElsewhere: true, open: {}, takeOver: {}, end: {}, isHeldHere: { holder.holds }),
+        ]
+        model.registry.register(terminal)
+        await model.load()
+        await model.refreshRunningSessions()
+
+        #expect(model.activeMachines().flatMap(\.running).map(\.id) == ["tmux:glass-2"])
+        #expect(model.listedRunningSessions.map(\.id) == ["tmux:glass-2"], "the + menu's list too")
+        #expect(model.activeSessionCount() == 1)
+        holder.holds = false
+        #expect(model.activeMachines().flatMap(\.running).map(\.id) == ["tmux:glass-2", "tmux:glass-1"],
+                "listed again once released")
+        #expect(model.activeSessionCount() == 2)
+        #expect(terminal.asked == 1, "without asking the machine again")
+    }
+
     /// A capability that reports machines it could not ask, as the terminal does (W6).
     private final class ReportingCapability: GlassCapability {
         let kind: HostServiceKind = .ssh
@@ -230,7 +260,7 @@ struct GlassActiveConnectionsTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: root.appendingPathComponent("group"),
-                                    resolveSharedContainer: false, layers: GlassLayerStore())
+                                    resolveSharedContainer: false, layers: GlassLayerStore.forTest())
         let store = HostCatalogStore(fileURL: root.appendingPathComponent("group/GlassHostCatalog/hosts.json"))
         return (model, root, store)
     }

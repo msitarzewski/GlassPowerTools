@@ -62,8 +62,8 @@ struct UIKitWrapTests {
         #expect(linesOfFirstParagraph(engine) == 1)
         #expect(engine.textView.contentSize.width > phone.width, "content \(engine.textView.contentSize.width)")
         #expect(engine.textView.contentSize.width < 20_000, "as wide as the line, not the unbounded container")
-        engine.textView.setContentOffset(CGPoint(x: engine.textView.contentSize.width - phone.width, y: 0), animated: false)
-        #expect(engine.textView.contentOffset.x > 0, "and it scrolls there")
+        // (It also set an offset and read it back: a scroll view keeps any offset set in code, so that
+        // checked nothing. The content wider than the phone is what lets it scroll.)
     }
 
     @Test("wrap on: the same line wraps to the phone's width, and nothing scrolls sideways")

@@ -187,16 +187,23 @@ public struct GlassRunningSession: Identifiable {
     /// What to attach to when it opens with others in one new window (W13). Nil for a session its
     /// capability opens only one at a time.
     public let attachment: GlassRunningAttachment?
+    /// Something open here holds it, though not connected to it: a terminal whose connection
+    /// dropped, which goes back to the session when it reconnects. Active lists that and not this,
+    /// and lists this the moment it is closed (2026-10-24, the owner, on the iPhone: each dropped
+    /// tab was listed twice, as itself and as its session "Open elsewhere"). Asked as Active draws.
+    public let isHeldHere: @MainActor () -> Bool
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointID: EndpointID, isAttachedElsewhere: Bool, isOpenHere: Bool = false,
                 open: @escaping @MainActor () -> Void, takeOver: @escaping @MainActor () -> Void,
                 end: @escaping @MainActor () async throws -> Void,
-                attachment: GlassRunningAttachment? = nil) {
+                attachment: GlassRunningAttachment? = nil,
+                isHeldHere: @escaping @MainActor () -> Bool = { false }) {
         self.id = id; self.title = title; self.subtitle = subtitle; self.symbolName = symbolName
         self.endpointID = endpointID; self.isAttachedElsewhere = isAttachedElsewhere; self.isOpenHere = isOpenHere
         self.open = open; self.takeOver = takeOver; self.end = end
         self.attachment = attachment
+        self.isHeldHere = isHeldHere
     }
 }
 

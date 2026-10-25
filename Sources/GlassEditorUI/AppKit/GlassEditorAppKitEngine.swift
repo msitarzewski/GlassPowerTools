@@ -77,9 +77,39 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         observeModelRevision()
         observeModelAppearance()
         observeModelConfiguration()
+        observeRevealRequests()
+        observeLineChanges()
     }
 
     // MARK: - Model observation
+
+    /// `GlassEditorModel.reveal`: the selection set from outside the view, shown.
+    private func observeRevealRequests() {
+        withObservationTracking { [weak self] in
+            _ = self?.model.revealRequest
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let range = self.model.selectedRange
+                self.selectedRange = range
+                self.textView.scrollRangeToVisible(self.textView.selectedRange())
+                self.observeRevealRequests()
+            }
+        }
+    }
+
+    /// `GlassEditorModel.lineChanges`: the gutter's change marks, redrawn when they change.
+    private func observeLineChanges() {
+        withObservationTracking { [weak self] in
+            _ = self?.model.lineChanges
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.gutter?.refresh()
+                self.observeLineChanges()
+            }
+        }
+    }
 
     // The model is the API, not the view (GlassEditorView.swift). A consumer
     // that only holds the model — every SwiftUI consumer — calls

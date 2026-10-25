@@ -1,4 +1,5 @@
 import Testing
+import GlassLayers
 import Foundation
 @testable import GlassEditor
 
@@ -13,6 +14,7 @@ import Foundation
 struct GlassEditorSessionLifetimeTests {
     private func runtime(phone: Bool) -> GlassEditorRuntime {
         let runtime = GlassEditorRuntime(
+            layers: GlassLayerStore.forTest(),
             defaults: UserDefaults.forTest(suiteName: "glass-editor-lifetime-\(UUID().uuidString)")!)
         runtime.closesWorkspaceWithItsWindow = !phone
         return runtime

@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import os
 import GlassTerminalEmulator
 
 extension TerminalSession {
@@ -26,13 +27,25 @@ extension TerminalSession {
         if path.hasPrefix("~"), home == nil {
             home = (try? await runTmuxCommand("printf '%s' \"$HOME\""))?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        guard let absolute = TerminalPathResolution.absolute(path, directory: directory, home: home) else { return nil }
-        let kind = try? await runTmuxCommand(
-            "if [ -d \(TerminalDroppedPaths.escaped(absolute)) ]; then echo d; elif [ -e \(TerminalDroppedPaths.escaped(absolute)) ]; then echo f; fi")
-        switch kind?.trimmingCharacters(in: .whitespacesAndNewlines) {
+        guard let absolute = TerminalPathResolution.absolute(path, directory: directory, home: home) else {
+            let reason = path.hasPrefix("~") ? "no-home" : path.hasPrefix("$") ? "variable" : "no-folder"
+            Logger.pathPreview.notice("event=locate result=\(reason, privacy: .public) tmux=\(self.survivesClose, privacy: .public)")
+            return nil
+        }
+        let kind: String
+        do {
+            kind = try await runTmuxCommand(
+                "if [ -d \(TerminalDroppedPaths.escaped(absolute)) ]; then echo d; elif [ -e \(TerminalDroppedPaths.escaped(absolute)) ]; then echo f; fi")
+        } catch {
+            Logger.pathPreview.error("event=locate result=command-failed error=\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+        switch kind.trimmingCharacters(in: .whitespacesAndNewlines) {
         case "d": return (absolute, true)
         case "f": return (absolute, false)
-        default: return nil
+        default:
+            Logger.pathPreview.notice("event=locate result=not-on-host")
+            return nil
         }
     }
 }
@@ -62,6 +75,18 @@ enum TerminalPathActions {
         }
         model.revealPathTitle = "Show in Files"
         model.onWatchFile = watchFile
+        #if os(visionOS)
+        // Quick Look over the terminal (2026-10-22): a copy from the host, as the Mac's is.
+        model.previewFile = { [weak session] path in
+            guard let session, let found = await session.locate(path) else { return nil }
+            guard !found.isDirectory else {
+                Logger.pathPreview.notice("event=preview result=folder")
+                return nil
+            }
+            return await TerminalRemotePreview.fetch(found.path, from: session)
+        }
+        model.previewContent = GlassTerminalRuntime.current?.filePreview
+        #endif
     }
 }
 #endif

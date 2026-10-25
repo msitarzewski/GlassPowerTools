@@ -30,6 +30,9 @@ struct GlassTerminalReconnectingListerTests {
         }
         func stat(_ path: String) async throws -> GlassHostFileStamp? { try answer(nil) }
         func realPath(_ path: String) async throws -> String { try answer(path) }
+        func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+            try answer(GlassHostCommandOutput(exitStatus: 0, standardOutput: contents))
+        }
         func close() async { lock.withLock { closed = true } }
     }
 
@@ -60,6 +63,19 @@ struct GlassTerminalReconnectingListerTests {
         #expect(opener.opened.count == 1 && dead.closed)
         #expect(try await lister.read("/b") == Data("fresh".utf8))
         #expect(opener.opened.count == 1, "the new connection is kept")
+    }
+
+    /// The editor's `git` rides the same connection (2026-10-23): a command on one that has gone
+    /// is made again on a new one, as a read is.
+    @Test("a command on a connection that has gone is run again on a new one")
+    func commandsReconnect() async throws {
+        #expect(GlassTerminalReconnectingLister.connectionIsGone(SSHTransportError.notConnected))
+        let dead = FakeLister(contents: Data("stale".utf8), failure: SSHTransportError.notConnected)
+        let opener = Opener()
+        let lister = reconnecting(dead, opener)
+        let output = try await lister.runCommand("git status")
+        #expect(output.standardOutput == Data("fresh".utf8) && output.exitStatus == 0)
+        #expect(opener.opened.count == 1 && dead.closed)
     }
 
     @Test("every closed-connection error counts; a refusal does not, and is not retried")

@@ -15,7 +15,7 @@ import GlassSSHTransport
 @testable import GlassTerminal
 @testable import GlassTerminalEmulator
 
-@Suite("tmux against a real host (gated)", .serialized)
+@Suite("tmux against a real host (gated)", .serialized, .enabled(if: LiveRemoteEnvironment.isConfigured, "no test host: set GPT_SSH_TEST_HOST, GPT_SSH_TEST_USER and GPT_SSH_TEST_KEY_PATH or GPT_SSH_TEST_PASSWORD"))
 struct LiveTmuxTests {
     private func transport() async throws -> SSHTransport? {
         guard LiveRemoteEnvironment.isConfigured else {
@@ -102,7 +102,7 @@ struct LiveTmuxTests {
         guard let transport = try await transport() else { return }
         defer { Task { await transport.close() } }
         guard case .sessions = try await sessions(transport) else {
-            print("tmux is not installed on the test host: nothing to compare")
+            Issue.record("the test host has no tmux; these tests need it")
             return
         }
         let id = UUID().uuidString.prefix(8).lowercased()
@@ -142,7 +142,22 @@ struct LiveTmuxTests {
         let fromClaim = variables(seen[claimed]), fromTyped = variables(seen[typed])
         print("claimed: \(fromClaim)\ntyped:   \(fromTyped)")
         #expect(!fromTyped.isEmpty, "the typed session's shell answered")
-        #expect(fromClaim == fromTyped, "PATH and locale inside a claimed session match a typed one")
+        // What matters is what a command finds: the same directories, searched in the same order,
+        // and the same locale. Not the same string: a typed session's login profile runs once more
+        // and repeats its own entries, and the claim appends `searchPath`'s two directories (D47),
+        // which can add a command but never hide one. Compared as the string until 2026-10-24,
+        // which failed on the Linux test server over exactly those.
+        func directories(_ path: String?) -> [String] {
+            var seen = Set<String>()
+            return (path ?? "").split(separator: ":").map(String.init).filter { seen.insert($0).inserted }
+        }
+        let claimedPath = directories(fromClaim["PATH"]), typedPath = directories(fromTyped["PATH"])
+        #expect(Array(claimedPath.prefix(typedPath.count)) == typedPath,
+                "a claimed session searches the typed one's directories, in its order")
+        #expect(Set(claimedPath.dropFirst(typedPath.count)).isSubset(of: ["/opt/homebrew/bin", "/usr/local/bin"]),
+                "and adds only the claim's own search path")
+        #expect(fromClaim.filter { $0.key != "PATH" } == fromTyped.filter { $0.key != "PATH" },
+                "the locale inside a claimed session matches a typed one")
     }
 
     /// What a shell sends, as it arrives.
@@ -184,6 +199,7 @@ struct LiveTmuxTests {
                 case .transport(let data): try await shell.write(data)
                 case .live: live = true
                 case .exited: exited = true
+                case .showGrid(let columns, let rows, _): terminal.resize(cols: columns, rows: rows)
                 }
             }
         }
@@ -239,7 +255,7 @@ struct LiveTmuxTests {
         guard let transport = try await transport() else { return }
         defer { Task { await transport.close() } }
         guard case .sessions = try await sessions(transport) else {
-            print("tmux is not installed on the test host: nothing to keep")
+            Issue.record("the test host has no tmux; these tests need it")
             return
         }
         let version = try await transport.execute(TerminalTmux.versionCommand)

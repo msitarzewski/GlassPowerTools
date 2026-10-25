@@ -176,7 +176,7 @@ struct TerminalOverridesSettingsView: View {
                 }
             }
 
-            #if os(macOS)
+            #if os(macOS) || os(visionOS)
             Section {
                 // A printed path's file over the terminal (2026-10-16), this window's way.
                 GlassWindowSettingRow(TerminalWindowSettings.pathPreviews, overrides: $settings,

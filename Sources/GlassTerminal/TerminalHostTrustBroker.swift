@@ -35,6 +35,9 @@ final class TerminalHostTrustBroker {
     /// The request the prompt should be showing, if any. Observed by `TerminalConnectFlow`.
     private(set) var pending: Request?
     private var queue: [Waiting] = []
+    /// How many callers are waiting, the one shown among them. For tests: an `ask` reaches the queue
+    /// only once its task has run, which a single yield doesn't promise.
+    var waitingCount: Int { queue.count }
 
     /// Whether the user's host-key setting permits an interactive prompt at all. Strict mode
     /// means never ask — so a session-less caller is refused rather than left waiting on a

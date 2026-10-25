@@ -129,8 +129,11 @@ public enum AtomicSaver: Sendable {
     }
 
     /// `afterChoosingDirectory` runs once the folder is chosen and before anything is written into
-    /// it: the window a swapped folder would use (pen finding M-2). For tests.
-    static func writeAtomically(_ data: Data, to url: URL, afterChoosingDirectory: () throws -> Void) throws {
+    /// it: the window a swapped folder would use (pen finding M-2). `write` is `write(2)`, or a test's
+    /// that fails partway — as a full disk does — without a file-size limit on the whole test process,
+    /// which failed other tests' writes while it held (2026-10-24). For tests.
+    static func writeAtomically(_ data: Data, to url: URL, afterChoosingDirectory: () throws -> Void,
+                                write: (Int32, UnsafeRawPointer, Int) -> Int = { Darwin.write($0, $1, $2) }) throws {
         // Resolve first: the temp file has to be a sibling of the *real* file.
         // `resolveDestination` follows a leaf symlink to its target explicitly,
         // including a *dangling* one whose target does not exist yet —
@@ -179,7 +182,7 @@ public enum AtomicSaver: Sendable {
         }
 
         do {
-            try writeAll(data, to: descriptor)
+            try writeAll(data, to: descriptor, write: write)
         } catch let error as EditorError {
             throw failing(error)
         }
@@ -236,7 +239,7 @@ public enum AtomicSaver: Sendable {
     /// `write(2)` in a loop. A single call is permitted to write fewer bytes
     /// than asked, and treating a short write as success is how a file ends up
     /// truncated by a code path that believed it was atomic.
-    private static func writeAll(_ data: Data, to descriptor: Int32) throws {
+    private static func writeAll(_ data: Data, to descriptor: Int32, write: (Int32, UnsafeRawPointer, Int) -> Int) throws {
         guard !data.isEmpty else { return }
         try data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
             guard let base = buffer.baseAddress else { return }

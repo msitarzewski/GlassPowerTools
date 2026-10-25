@@ -441,8 +441,8 @@ struct OneDisplayClientTests {
         await source.append(MacLayout.update(MacLayout.mixedPayload))
         await source.append([0, 0, 0, 1] + MacLayout.rectangleHeader(0, 0, 1, 1, .raw) + [1, 2, 3, 0])
         try await waitUntil { client.awaitingDisplay }
-        try await Task.sleep(for: .milliseconds(50))
-        #expect(seen.frames.isEmpty, "the whole desktop is not what this connection is for")
+        // The planner notes the ask before the client writes it; the scale goes after the display.
+        try await waitUntil { clientMessages(Array(await sink.written.dropFirst(13 + 1))).contains { $0.type == 8 } }
         let written = clientMessages(Array(await sink.written.dropFirst(13 + 1)))
         let display = try #require(written.firstIndex { $0.type == 13 })
         #expect(written[display].bytes == [13, 0, 0, 0, 0, 0, 0, 4])
@@ -455,7 +455,8 @@ struct OneDisplayClientTests {
                                                                displays: selected)))
         await source.append([0, 0, 0, 1] + MacLayout.rectangleHeader(1599, 899, 1, 1, .raw) + [1, 2, 3, 0])
         try await waitUntil { !seen.frames.isEmpty }
-        #expect(seen.frames.allSatisfy { $0 == "1600x900" }, "only the display's own pixels are handed on")
+        // The whole-desktop pixel was read before this layout, so a frame of it would be here first.
+        #expect(seen.frames.allSatisfy { $0 == "1600x900" }, "only the display's own pixels are handed on, never the whole desktop")
         #expect(client.currentDisplay == 4 && client.serverScale == 0.5)
         // Its pointer: the display's own pixels, divided by the factor, as on every Mac connection.
         _ = await sink.drain()

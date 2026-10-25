@@ -66,9 +66,9 @@ A number past the end of the file goes to the last line.
 
 ## Find and replace
 
-**On Mac:** choose Text ▸ **Find in Document…** (⌥⌘F). **On iPhone, iPad and Vision Pro:** choose **Find** (the magnifying glass) in the toolbar, or press ⌘F with a keyboard; the same button closes it again. A find bar opens above the text.
+**On Mac:** choose Edit ▸ Find ▸ **Find…** (⌘F). **On iPhone, iPad and Vision Pro:** choose **Find** (the magnifying glass) in the toolbar, or press ⌘F with a keyboard. A find bar opens above the text, ready to type in.
 
-1. Type in **Find** and press Return, or choose the next and previous arrows. The search wraps around the end of the document. The bar shows how many matches there are, for example **3 matches**, or **No matches**.
+1. Type in **Find** and press Return, or choose the next and previous arrows. The Editor selects the match and scrolls to it, and the search wraps around the end of the document. The bar shows how many matches there are, for example **3 matches**, or **No matches**. **On Mac**, Edit ▸ Find ▸ **Find Next** (⌘G) and **Find Previous** (⇧⌘G) move between matches too, with the bar closed or open.
 2. Turn on **Aa** to match case, or **.\*** to search with a regular expression. An invalid expression shows **Invalid pattern**. A regular expression that takes longer than a second is stopped, and the Editor says why; nested repeats such as `(a+)+` are the usual cause.
 3. To replace, type in **Replace** and choose **All**. The Editor reports how many matches it replaced, for example **Replaced 3 matches.** With a regular expression, `$0` in **Replace** stands for the whole match and `$1` for the first group.
 4. Choose **Done** to close the bar.

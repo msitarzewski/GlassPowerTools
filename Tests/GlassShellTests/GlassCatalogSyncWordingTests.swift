@@ -26,7 +26,7 @@ struct GlassCatalogSyncWordingTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                                     sharedContainerURL: nil, resolveSharedContainer: false,
-                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore())
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
         await model.load()
         model.enableCatalogSync(Refusing(error))
         await model.synchronizeCatalog()

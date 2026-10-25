@@ -6,7 +6,7 @@ This page covers terminal windows and tabs, the Mac window's sidebar, moving tab
 
 **On Vision Pro:** each connection opens a terminal window. To add a terminal to the same window, press ⌘T or choose **New Terminal Tab** (the plus button), then pick a saved host. Pinch and hold the plus button instead for a menu of your saved servers: each has **New Terminal**, then, under **Running**, the terminals running there in tmux that aren't open here, with where each one is. The one you choose opens as a tab of this window.
 
-With two or more terminals, the window gets a sidebar, as a Mac window does, and widens to make room for it: the window's name at the top, then a row for each terminal with its name and, under it, where it is (its repository and branch, its machine, and **in tmux** when it's kept there). Each row's symbol is the coding agent running in that terminal, in the agent's colour, or a terminal; it pulses while the terminal prints. Pinch a row to show its terminal. When the window is back to one terminal, the sidebar goes and the window narrows again. **Sidebar**, first in the window's bar, hides the sidebar and narrows the window, and shows it again. The **Terminal View** button beside it shrinks the window into its orb when you pinch it. Pinch and hold it to choose a layout instead: **Tabs**, **Grid**, **Carousel** or **Orb** (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)). In Grid or Carousel, use **Previous** and **Next**, then **Open Terminal** to return to that terminal's tab. With **Auto-focus on activity** on for the window, Grid and Carousel bring forward the terminal that is printing (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)).
+With two or more terminals, the window gets a sidebar, as a Mac window does, in its own glass, on the same plane as the window, a few points from its left edge: the window's name at the top, then a row for each terminal with its name and, under it, where it is (its repository and branch, its machine, and **in tmux** when it's kept there). Each row's symbol is the coding agent running in that terminal, in the agent's colour, or a terminal; it pulses while the terminal prints. Pinch a row to show its terminal. When the window is back to one terminal, the sidebar goes. **Sidebar**, first in the window's bar, hides the sidebar and shows it again. The sidebar is outside the window, so showing or hiding it doesn't change the window's size, and the terminal doesn't move or change its rows and columns. The **Terminal View** button beside it shrinks the window into its orb when you pinch it. Pinch and hold it to choose a layout instead: **Tabs**, **Grid**, **Carousel** or **Orb** (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)). In Grid or Carousel, use **Previous** and **Next**, then **Open Terminal** to return to that terminal's tab. With **Auto-focus on activity** on for the window, Grid and Carousel bring forward the terminal that is printing (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)).
 
 To move a terminal to another window, pinch and hold its row in the sidebar, or its card in **Grid** or **Carousel**, and choose **Move Tab to New Window** (when the window has other tabs), or **Move Tab To** and then the window. **Move Tab To** lists the terminal windows that are open, named as **Active** names them. The terminal's tools menu (the gear button in its bottom bar) has **Move Tab To** too, with **New Window** at the top of its list when the window has other tabs. You can also drag a row from the sidebar, or the terminal's name at the top of its window, onto another terminal window: dropped on a row in that window's sidebar it takes that row's place, and anywhere else it goes after the last tab. Dragged onto another row in the same sidebar, it moves there. Let go in empty space instead, and it opens in a window of its own where you let go, still running. Both work with only one terminal in the window, so to put two windows together, drag one window's name onto the other, or choose **Move Tab To** in its tools menu. Letting go over its own window leaves it where it was. In **Grid** you can also drag a card onto another terminal window: dropped on a card in that window's grid, it takes that card's place; dropped anywhere else on the window, it goes after the last tab. Dragging a card onto another card in the same grid moves it there. A moved terminal keeps running, with its connection, its tmux session and its name, and a window whose last tab leaves closes.
 
@@ -52,7 +52,7 @@ To work with several tabs at once, ⌘-click them in the sidebar, or ⇧-click t
 
 ## Show All Windows
 
-See every terminal window and its tabs, with every other window you have open, at once, as live pictures, and go straight to one. **On Mac** press ⇧⌘\, or pinch in on a terminal or remote desktop window; **on iPad and iPhone** pull down from the bar at the top of the screen, or touch and hold ⚡; **on Vision Pro** pinch and hold ⚡. On the Mac you can also drag a terminal's picture onto another window's group to move that tab there. See [See everything open with Show All Windows](library-connect.md#see-everything-open-with-show-all-windows).
+See every terminal window and its tabs, with every other window you have open, at once, as live pictures, and go straight to one. **On Mac** press ⇧⌘\, or pinch in on a terminal or remote desktop window; **on iPad and iPhone** pull down from the bar at the top of the screen, or touch and hold ⚡; **on Vision Pro** pinch and hold ⚡, and choose **Around You** to stand the pictures around you. On the Mac you can also drag a terminal's picture onto another window's group to move that tab there. See [See everything open with Show All Windows](library-connect.md#see-everything-open-with-show-all-windows).
 
 ## The session's tools menu
 
@@ -134,7 +134,7 @@ The statement opens in a new SQL document on that database, **never run**: run i
 
 - On a web address: **Open Link**, which asks before opening it in your browser, and **Copy Link**. **Open Link** is offered only for an `http` or `https` address with no user name or password in it.
 - On a web address of a 3D model, one ending in `.usdz`, `.usd`, `.usda`, `.usdc` or `.reality`, the question's button is **Open in 3D**. The model is downloaded, up to 512 MB, and shown here in 3D: **on Mac** in the Editor, **on iPhone and iPad** in AR Quick Look, and **on Vision Pro** in Quick Look, where you can walk around it. (Quick Look opens USDZ and Reality files; any other USD file is shown in the Editor instead.) **Downloading 3D model…** shows while it comes. A file that turns out not to be a model is not kept, and **Couldn't Open the Model** says why.
-- On a path: **Quick Look** on Mac (see [Preview a file over the terminal](#preview-a-file-over-the-terminal)); **Open in Editor**, which opens a file as a tab or a folder as a project, on the machine the path is on; **Show in Finder** for a path on this Mac, or **Show in Files** for a path on a server, which opens the file browser at its folder; **Watch Log File**; and **Copy Path**.
+- On a path: **Quick Look** on Mac and Vision Pro (see [Preview a file over the terminal](#preview-a-file-over-the-terminal)); **Open in Editor**, which opens a file as a tab or a folder as a project, on the machine the path is on; **Show in Finder** for a path on this Mac, or **Show in Files** for a path on a server, which opens the file browser at its folder; **Watch Log File**; and **Copy Path**.
 
 A path is read on the machine that printed it: from the shell's current folder when it is relative, and `~` as that machine's home folder. A `:line:column` after it is left off. A path that isn't there beeps.
 
@@ -142,22 +142,24 @@ A path is read on the machine that printed it: from the shell's current folder w
 
 ## Preview a file over the terminal
 
-**On Mac**, the file a path names can show in a popover over the terminal. What it is comes from its contents, not its name, so a log saved as `.output` shows as text:
+**On Mac and Vision Pro**, the file a path names can show in a popover over the terminal. What it is comes from its contents, not its name, so a log saved as `.output` shows as text:
 
 - Code and other text: in the editor's own view, highlighted as the editor highlights its language, with line numbers, and read-only.
 - Markdown (with its diagrams), HTML, SVG and CSV: as the editor previews them.
 - Pictures, PDFs, video, audio and documents: as Quick Look shows them.
 - 3D models (USDZ, USD and Reality files): in 3D, turned with the pointer.
 
-A bar across the top names the file and has **Open in Editor**, to change it, and **Show in Finder**, or **Show in Files** for a file on a server. A file on a server is copied to this Mac for the preview, up to 32 MB, and the copy is removed when the preview closes. A folder has no preview.
+A bar across the top names the file and has **Open in Editor**, to change it, and **Show in Finder**, or **Show in Files** for a file on a server. A file on a server is copied to this device for the preview, up to 32 MB, and the copy is removed when the preview closes. A folder has no preview.
 
-- Choose **Quick Look** from a path's right-click menu.
+- Choose **Quick Look** from a path's right-click menu, or **on Vision Pro** pinch and hold the path and choose **Quick Look**.
 - Or set **Show previews** in **Settings** ▸ **Terminal**:
   - **Mouseover**, the starting setting: rest the pointer on a path, and the preview opens after a moment. Move into it to scroll or click; it closes once the pointer has left both the path and the preview.
   - **Mouseover + Space**: put the pointer on a path and press Space; Space again or Escape closes it. On a web address, Space asks whether to open it, as a ⌘-click does. Anywhere else, Space types a space.
   - **Never**: only **Quick Look** shows a preview.
 
 A window can have its own **Show previews** in its settings, under **This Window**. A click, scrolling or typing in the terminal closes the preview.
+
+**On Vision Pro**, **Mouseover** and **Mouseover + Space** work with a trackpad's or a mouse's pointer; resting your eyes on a path doesn't open it, because visionOS doesn't tell apps where you look. Pinch anywhere outside the preview to close it.
 
 ## See a Mermaid diagram a program printed
 

@@ -18,7 +18,7 @@ private func makeRoot() throws -> URL {
 private func makeModel(at root: URL) -> GlassShellModel {
     GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
                     sharedContainerURL: root.appendingPathComponent("group"),
-                    resolveSharedContainer: false, accessGroup: nil, layers: GlassLayerStore())
+                    resolveSharedContainer: false, accessGroup: nil, layers: GlassLayerStore.forTest())
 }
 
 @Suite("GlassShell security fixes", .serialized)

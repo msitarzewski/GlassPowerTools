@@ -22,6 +22,9 @@ struct PenFixTests {
         try "original".write(to: file, atomically: true, encoding: .utf8)
         // setgid + rwxr-xr-x
         try FileManager.default.setAttributes([.posixPermissions: 0o2755], ofItemAtPath: file.path)
+        // Set, or there is nothing to clear: chmod drops setgid quietly for a group the user isn't in.
+        let before = try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as! NSNumber
+        try #require(before.uint16Value & 0o2000 != 0, "setgid didn't take, so the save can't show it goes")
 
         try AtomicSaver.save("edited", encoding: .utf8(hadBOM: false), to: file)
 

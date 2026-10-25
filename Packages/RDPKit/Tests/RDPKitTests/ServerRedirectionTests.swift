@@ -5,7 +5,7 @@ import Testing
 @Test func parsesServerRedirectionWithLoadBalanceCookie() throws {
     let cookie = Data("Cookie: mststs=1183689379\r\n".utf8)
     let username = utf16LE("rdp-user")
-    let netbios = utf16LE("ANEES-MSI-LAPTOP")
+    let netbios = utf16LE("ALPHA-PC")
     var userData = Data()
     let redirectionLength = UInt16(12 + 4 + cookie.count + 4 + username.count + 4 + netbios.count)
     let totalLength = UInt16(8 + Int(redirectionLength))
@@ -40,8 +40,8 @@ import Testing
     #expect(pdu.flags.contains(.loadBalanceInfo))
     #expect(pdu.routingToken == cookie)
     #expect(pdu.username == "rdp-user")
-    #expect(pdu.targetNetBIOSName == "ANEES-MSI-LAPTOP")
-    #expect(pdu.targetHost == "ANEES-MSI-LAPTOP")
+    #expect(pdu.targetNetBIOSName == "ALPHA-PC")
+    #expect(pdu.targetHost == "ALPHA-PC")
 }
 
 @Test func parsesServerRedirectionTargetAndCredentialFields() throws {

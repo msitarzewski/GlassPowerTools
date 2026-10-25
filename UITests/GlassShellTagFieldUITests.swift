@@ -174,10 +174,24 @@ final class GlassShellTagFieldUITests: XCTestCase {
         XCTAssertTrue(element("host-editor-tags.tag.1").waitForExistence(timeout: 5), "second chip")
         XCTAssertEqual(element("host-editor-tags.tag.0").label, "Clients, tag")
         snap("tag-field-two-chips")
+        #if os(iOS)
+        // The input's accessibility frame is its own box, not the row. VoiceOver outlines the
+        // field by it and activates it at its centre; when it was the whole row, the outline took
+        // in the chips and the centre fell on Lab's remove button (2026-10-25, real VoiceOver on
+        // the iOS 27.1 simulator). Measured on iOS only.
+        let inputFrame = element("host-editor-tags.input").frame
+        for chip in ["host-editor-tags.tag.0", "host-editor-tags.tag.1"] {
+            XCTAssertFalse(inputFrame.intersects(element(chip).frame),
+                           "the input's frame \(inputFrame) covers \(chip) \(element(chip).frame)")
+        }
+        #endif
 
         // Comma commits too, and duplicates (any case) are dropped.
         addTag("clients,", to: "host-editor-tags")
         XCTAssertFalse(element("host-editor-tags.tag.2").waitForExistence(timeout: 2), "a case-insensitive duplicate is not a third chip")
+        // And Lab is still there: a tap at the input's centre once landed on Lab's remove button
+        // and deleted it, and the third-chip check above passed regardless (2026-10-25, Duo).
+        XCTAssertEqual(element("host-editor-tags.tag.1").label, "Lab, tag", "the chips are still Clients and Lab")
 
         #if os(macOS)
         // Backspace on the empty input removes the last chip; the alias field is independent.
@@ -188,7 +202,11 @@ final class GlassShellTagFieldUITests: XCTestCase {
         #endif
         addTag("Foxtrot", to: "host-editor-aliases")
         XCTAssertTrue(element("host-editor-aliases.tag.0").waitForExistence(timeout: 5), "alias chip")
+        #if os(iOS)
+        app.tapUntilSheetCloses("host-editor-save")
+        #else
         tap("host-editor-save")
+        #endif
         dismissSystemPasswordPrompt()
         if !(element("host-add-service").waitForExistence(timeout: 15) || element("host-row-alpha").waitForExistence(timeout: 15)) {
             snap("save-did-not-settle")
@@ -222,7 +240,11 @@ final class GlassShellTagFieldUITests: XCTestCase {
         // A chosen tag is no longer offered; "Lab" remains.
         XCTAssertTrue(element("host-editor-tags.suggestion.0").waitForExistence(timeout: 5))
         XCTAssertEqual(element("host-editor-tags.suggestion.0").label, "Add Lab")
+        #if os(iOS)
+        app.tapUntilSheetCloses("host-editor-save")
+        #else
         tap("host-editor-save")
+        #endif
         dismissSystemPasswordPrompt()
 
         #if !os(visionOS)
@@ -230,24 +252,24 @@ final class GlassShellTagFieldUITests: XCTestCase {
         // detail; pop back to the scopes list first.
         #if os(iOS)
         if element("host-add-service").waitForExistence(timeout: 10) {
-            press(app.navigationBars.buttons.element(boundBy: 0))   // detail → results
-            press(app.navigationBars.buttons.element(boundBy: 0))   // results → scopes
+            press(app.backButton)   // detail → results
+            press(app.backButton)   // results → scopes
         }
         #endif
-        // Matched by identifier, not by label. A sidebar scope row publishes its text as the
+        // Matched by identifier, not by label. A Mac sidebar scope row publishes its text as the
         // element's **value** and leaves `label` empty, so the previous
         // `label CONTAINS[c] 'Clients'` predicate could never match however right the app was —
         // the tree at the failure showed `glass-library-scope-collection-clients` sitting there
-        // with `value: Clients` and a count of 1. The identifier carries the collection's slug,
-        // which is the tag lowercased, so it says the same thing without depending on where the
-        // text surfaces.
-        let collection = element("glass-library-scope-collection-clients")
+        // with `value: Clients` and a count of 1. On iOS the row's title text carries it as its
+        // label (`libraryScope`). The identifier carries the collection's slug, which is the tag
+        // lowercased, so it says the same thing without depending on where the text surfaces.
+        let collection = app.libraryScope("collection-clients")
         if !collection.waitForExistence(timeout: 10) {
             snap("no-collection-scope")
             dumpTree("no-collection-scope")
             XCTFail("the Clients collection does not appear in the sidebar")
         }
-        XCTAssertEqual("\(collection.value ?? "")", "Clients",
+        XCTAssertEqual(collection.shownText, "Clients",
                        "the scope row names the collection the first host introduced")
         #endif
     }

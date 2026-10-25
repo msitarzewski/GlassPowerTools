@@ -171,7 +171,9 @@ struct GlassEditorOutsideChangeTests {
         // The write has landed on the machine and not yet answered when the window comes forward.
         machine.holdsWrites = true
         let saving = Task { await workspace.save(document.id) }
-        while machine.heldWrite == nil { try await Task.sleep(for: .milliseconds(5)) }
+        // Up to 30 s: unbounded, a save that never wrote hung the run instead of failing (2026-10-24).
+        for _ in 0..<6_000 where machine.heldWrite == nil { try await Task.sleep(for: .milliseconds(5)) }
+        try #require(machine.heldWrite != nil, "the save never reached the machine")
         await workspace.checkForOutsideChange(document.id)
         machine.heldWrite?.resume()
         await saving.value

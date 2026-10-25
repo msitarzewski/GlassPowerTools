@@ -61,7 +61,14 @@ struct MacTerminalWindowPolicyTests {
     }
     @Test @MainActor func workspaceUsesNativeTitle() async throws {
         let manager = SessionManager(loadImmediately: false)
-        let settings = SettingsManager(loadImmediately: false)
+        // Settings of the test's own: the window's start reads them, and with the defaults it read the
+        // runner's standard domain and started sync on the real key-value store (2026-10-24).
+        let suite = "sh.glas.test.native-title.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults, sshKeyDefaults: defaults,
+                                       iCloudSettingsSyncService: ICloudSettingsSyncService(store: FakeICloudSettingsStore(), writerID: UUID()),
+                                       workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: FakeICloudSettingsStore()),
+                                       layers: GlassLayerStore.forTest())
         let view = MacWorkspaceView(request: MacWorkspaceLaunchRequest(startsEmpty: true))
             .environment(manager).environment(settings)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
@@ -69,10 +76,12 @@ struct MacTerminalWindowPolicyTests {
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(rootView: view)
         defer { window.contentViewController = nil }
-        for _ in 0..<8 {
+        // Laid out until the window has its title and toolbar, up to 30 s: 200 ms stood for it.
+        let deadline = ContinuousClock.now + .seconds(30)
+        repeat {
             window.contentView?.layoutSubtreeIfNeeded()
             try await Task.sleep(for: .milliseconds(25))
-        }
+        } while (window.title != "New Terminal" || window.toolbar == nil) && ContinuousClock.now < deadline
         #expect(window.title == "New Terminal")
         #expect(window.isMovable)
         let toolbar = try #require(window.toolbar)
@@ -1311,7 +1320,7 @@ struct glas_shTests {
         }
         service.stop()
         store.resumeNextSynchronization(returning: true)
-        try await Task.sleep(for: .milliseconds(10))
+        await mainActorTurns()
 
         #expect(service.status == .disabled)
         #expect(service.acceptedEnvelope == nil)
@@ -1336,15 +1345,11 @@ struct glas_shTests {
         }
 
         store.resumeNextSynchronization(returning: false)
-        try await Task.sleep(for: .milliseconds(10))
+        await mainActorTurns()
         #expect(service.status == .syncing)
 
         store.resumeNextSynchronization(returning: true)
-        for _ in 0..<40 {
-            if service.status == .synced { break }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        #expect(service.status == .synced)
+        #expect(try await until { service.status == .synced })
         #expect(service.lastErrorDescription == nil)
     }
 
@@ -1395,12 +1400,8 @@ struct glas_shTests {
             iCloudSettingsSyncService: service
         )
 
-        for _ in 0..<100 {
-            if store.setCount == 1, settings.iCloudSyncStatusText == "Up to date" { break }
-            try await Task.sleep(for: .milliseconds(25))
-        }
+        #expect(try await until { store.setCount == 1 && settings.iCloudSyncStatusText == "Up to date" })
         #expect(store.setCount == 1)
-        #expect(settings.iCloudSyncStatusText == "Up to date")
 
         store.suspendsSynchronization = true
         settings.windowOpacity = 0.42
@@ -1412,7 +1413,7 @@ struct glas_shTests {
         let writeCountAtCancellation = store.setCount
         settings.setICloudSyncEnabled(false)
         store.resumeNextSynchronization(returning: true)
-        try await Task.sleep(for: .milliseconds(100))
+        await mainActorTurns()
 
         #expect(settings.iCloudSyncStatusText == "Off")
         #expect(service.status == .disabled)
@@ -1433,18 +1434,11 @@ struct glas_shTests {
             iCloudSettingsSyncService: service
         )
 
-        try await Task.sleep(for: .milliseconds(650))
-        #expect(settings.iCloudSyncStatusText.contains("unavailable"))
+        #expect(try await until { settings.iCloudSyncStatusText.contains("unavailable") })
         let failedAttemptCount = store.setCount
         store.synchronizeResult = true
 
-        for _ in 0..<100 {
-            if store.setCount > failedAttemptCount,
-               settings.iCloudSyncStatusText == "Up to date" {
-                break
-            }
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        _ = try await until { store.setCount > failedAttemptCount && settings.iCloudSyncStatusText == "Up to date" }
         #expect(store.setCount > failedAttemptCount)
         #expect(settings.iCloudSyncStatusText == "Up to date")
     }
@@ -1462,10 +1456,9 @@ struct glas_shTests {
             iCloudSettingsSyncService: service
         )
 
-        try await Task.sleep(for: .milliseconds(650))
+        #expect(try await until { settings.iCloudSyncStatusText.contains("iCloud account") })
         #expect(store.observerCount == 1)
         #expect(store.setCount == 0)
-        #expect(settings.iCloudSyncStatusText.contains("iCloud account"))
 
         // Account absence is persistent state, not a transport failure. Waiting
         // beyond the former first retry proves no polling push is scheduled.
@@ -1474,12 +1467,7 @@ struct glas_shTests {
 
         store.isAccountAvailable = true
         store.emit(ICloudSettingsStoreChange(reason: .account, changedKeys: []))
-        for _ in 0..<40 {
-            if store.setCount == 1 && settings.iCloudSyncStatusText == "Up to date" {
-                break
-            }
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        _ = try await until { store.setCount == 1 && settings.iCloudSyncStatusText == "Up to date" }
 
         #expect(store.setCount == 1)
         #expect(settings.iCloudSyncStatusText == "Up to date")
@@ -1643,19 +1631,12 @@ struct glas_shTests {
 
     // MARK: - Constants Tests
 
-    @Test func userDefaultsKeysAreConsistent() {
-        // Verify keys don't have typos by checking they round-trip through UserDefaults
-        let testSuite = UserDefaults.forTest(suiteName: "sh.glas.test.constants")!
-        defer { testSuite.removePersistentDomain(forName: "sh.glas.test.constants") }
-
-        testSuite.set(true, forKey: UserDefaultsKeys.autoReconnect)
-        #expect(testSuite.bool(forKey: UserDefaultsKeys.autoReconnect) == true)
-
-        testSuite.set(42, forKey: UserDefaultsKeys.maxScrollbackLines)
-        #expect(testSuite.integer(forKey: UserDefaultsKeys.maxScrollbackLines) == 42)
-
-        testSuite.set("Block", forKey: UserDefaultsKeys.cursorStyle)
-        #expect(testSuite.string(forKey: UserDefaultsKeys.cursorStyle) == "Block")
+    /// The names saved settings are read back by: renamed, everyone's setting is lost. (It wrote and
+    /// read back through the constant itself until 2026-10-24, which any spelling passes.)
+    @Test func userDefaultsKeysKeepTheirNames() {
+        #expect(UserDefaultsKeys.autoReconnect == "autoReconnect")
+        #expect(UserDefaultsKeys.maxScrollbackLines == "maxScrollbackLines")
+        #expect(UserDefaultsKeys.cursorStyle == "cursorStyle")
     }
 
     @Test func keychainConfigServiceNamesAreWellFormed() {
@@ -4041,29 +4022,6 @@ struct glas_shTests {
         #expect(try migrationReport(from: fixture.defaults) == firstReport)
     }
 
-    @Test @MainActor func serverManagerStartsEmpty() {
-        let manager = ServerManager(loadImmediately: false)
-        #expect(manager.servers.isEmpty)
-    }
-
-    @Test @MainActor func serverManagerAddAndRemove() {
-        let manager = ServerManager(loadImmediately: false)
-        let server = ServerConfiguration(
-            name: "Test Server",
-            host: "test.example.com",
-            port: 22,
-            username: "testuser"
-        )
-
-        manager.servers.append(server)
-        #expect(manager.servers.count == 1)
-        #expect(manager.server(for: server.id)?.name == "Test Server")
-
-        manager.servers.removeAll { $0.id == server.id }
-        #expect(manager.servers.isEmpty)
-        #expect(manager.server(for: server.id) == nil)
-    }
-
     @Test @MainActor func serverManagerToggleFavorite() async {
         let suiteName = "sh.glas.test.server-manager.toggle-favorite.\(UUID().uuidString)"
         let defaults = UserDefaults.forTest(suiteName: suiteName)!
@@ -4409,7 +4367,7 @@ struct glas_shTests {
     // MARK: - SettingsManager Tests
 
     @Test @MainActor func settingsManagerDefaults() {
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
 
         #expect(settings.autoReconnect == true)
         #expect(settings.confirmBeforeClosing == true)
@@ -4427,7 +4385,7 @@ struct glas_shTests {
     }
 
     @Test @MainActor func settingsManagerSnippetCRUD() {
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
 
         let snippet = CommandSnippet(
             name: "List files",
@@ -4719,7 +4677,9 @@ struct glas_shTests {
         #expect(!SSHConnection.isChannelClosedError(SSHError.connectionFailed))
     }
 
-    @Test func generatedCommandPolicyAllowsOnlyClassifiedReadOnlyCommands() {
+    /// Every command the assistant writes asks before it runs, read-only or not. (Named "allows only
+    /// classified read-only commands" until 2026-10-24, though nothing here is allowed.)
+    @Test func generatedCommandsAlwaysAskBeforeRunning() {
         #expect(GeneratedCommandPolicy.assess("ls -la").requiresConfirmation)
         #expect(GeneratedCommandPolicy.assess("git status").requiresConfirmation)
         #expect(GeneratedCommandPolicy.assess("rm -rf build").requiresConfirmation)
@@ -5950,7 +5910,7 @@ struct glas_shTests {
     #if os(iOS)
     @Test @MainActor func iOSTerminalWorkgroupPresentationRemainsResponsive() async throws {
         let manager = SessionManager(loadImmediately: false)
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
         let router = IOSAppRouter()
         let group = manager.createWorkgroup(name: "Presentation regression", colorTag: .blue)
         let session = TerminalSession(server: ServerConfiguration(
@@ -6031,7 +5991,7 @@ struct glas_shTests {
 
     private func verifyVisionWorkgroupTransitions(sessionCount: Int) async throws {
         let manager = SessionManager(loadImmediately: false)
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
         let group = manager.createWorkgroup(name: "Spatial transition test", colorTag: .blue)
         var sentBytes = 0
         let sessions = (1...sessionCount).map { index in
@@ -6769,7 +6729,7 @@ struct glas_shTests {
 
         // Exercise the real session-to-model path before any renderer exists.
         session.feedTerminalData(dataA)
-        for _ in 0..<100 where model.pendingRendererByteCount != dataA.count {
+        for _ in 0..<3_000 where model.pendingRendererByteCount != dataA.count {
             try? await Task.sleep(for: .milliseconds(10))
         }
         #expect(model.pendingRendererByteCount == dataA.count)
@@ -6810,12 +6770,12 @@ struct glas_shTests {
         await Task.yield()
 
         #expect(model.hasRetainedRenderer)
-        for _ in 0..<100 where model.pendingRendererByteCount != 0 {
+        for _ in 0..<3_000 where model.pendingRendererByteCount != 0 {
             try? await Task.sleep(for: .milliseconds(10))
         }
         #expect(model.pendingRendererByteCount == 0)
         session.feedTerminalData(titleDataA)
-        for _ in 0..<100 where !firstTitles.contains(titleA) {
+        for _ in 0..<3_000 where !firstTitles.contains(titleA) {
             try? await Task.sleep(for: .milliseconds(10))
         }
         #expect(firstTitles.contains(titleA))
@@ -6829,7 +6789,7 @@ struct glas_shTests {
         // The retained emulator keeps consuming transport bytes while no
         // representable is mounted.
         session.feedTerminalData(dataB)
-        for _ in 0..<100 where model.performanceDiagnostics.receivedChunkCount < 3 {
+        for _ in 0..<3_000 where model.performanceDiagnostics.receivedChunkCount < 3 {
             try? await Task.sleep(for: .milliseconds(10))
         }
 
@@ -6849,11 +6809,11 @@ struct glas_shTests {
         hostingView?.layoutSubtreeIfNeeded()
         await Task.yield()
         session.feedTerminalData(titleDataB)
-        for _ in 0..<100 where !secondTitles.contains(titleB) {
+        for _ in 0..<3_000 where !secondTitles.contains(titleB) {
             try? await Task.sleep(for: .milliseconds(10))
         }
         session.feedTerminalData(bellData)
-        for _ in 0..<100 where model.performanceDiagnostics.receivedChunkCount < 5 {
+        for _ in 0..<3_000 where model.performanceDiagnostics.receivedChunkCount < 5 {
             try? await Task.sleep(for: .milliseconds(10))
         }
 
@@ -7156,7 +7116,10 @@ struct glas_shTests {
             socks5Username: "proxy-user",
             socks5Password: "session-secret"
         ))
-        let encodedForward = String(decoding: try JSONEncoder().encode(forward), as: UTF8.self)
+        // What the manager holds, as it would be saved — not the value this test made, which never
+        // had the credentials to leak (2026-10-24).
+        let held = try #require(manager.forwards(for: sessionID).first)
+        let encodedForward = String(decoding: try JSONEncoder().encode(held), as: UTF8.self)
         #expect(!encodedForward.contains("proxy-user"))
         #expect(!encodedForward.contains("session-secret"))
     }
@@ -7181,7 +7144,7 @@ struct glas_shTests {
             serverManager: serverManager,
             loadImmediately: false
         )
-        let settings = SettingsManager(loadImmediately: false)
+        let settings = SettingsManager.forTest()
         let session = TerminalSession(server: original)
         manager.registerSession(session)
 
@@ -7528,7 +7491,7 @@ struct glas_shTests {
         do {
             _ = try await manager.createAuthorizedSession(
                 for: target,
-                settingsManager: SettingsManager(loadImmediately: false)
+                settingsManager: SettingsManager.forTest()
             )
             Issue.record("Initial launch must prepare the full jump chain before connecting")
         } catch let error as SessionOpenError {
@@ -7609,7 +7572,7 @@ struct glas_shTests {
         do {
             try await manager.reconnect(
                 session,
-                settingsManager: SettingsManager(loadImmediately: false)
+                settingsManager: SettingsManager.forTest()
             )
             Issue.record("Credential query failure must block reconnect")
         } catch let error as SessionOpenError {
@@ -7841,18 +7804,6 @@ struct glas_shTests {
         #expect(session.pendingHostKeyChallenge == nil)
         #expect(session.connectionProgress == nil)
         #expect(session.server.host == "example.com")
-    }
-
-    @Test @MainActor func terminalSessionRetainsOneRendererHostIdentity() {
-        let session = TerminalSession(server: ServerConfiguration(
-            name: "Test",
-            host: "example.com",
-            port: 22,
-            username: "user"
-        ))
-
-        let initialHost = session.terminalHostModel
-        #expect(initialHost === session.terminalHostModel)
     }
 
     @Test @MainActor func terminalSessionDisconnect() {
@@ -8388,7 +8339,7 @@ struct glas_shTests {
     }
     #endif
 
-    @Test @MainActor func terminalSessionCoalescesRapidRemotePTYResizes() async {
+    @Test @MainActor func terminalSessionCoalescesRapidRemotePTYResizes() async throws {
         let probe = TerminalResizeProbe()
         let session = TerminalSession(
             server: ServerConfiguration(
@@ -8404,9 +8355,12 @@ struct glas_shTests {
         session.state = .connected
 
         session.updateTerminalGeometry(rows: 24, columns: 80)
-        while probe.resizes.isEmpty {
+        // Up to 30 s: unbounded, a resize that never went hung the run instead of failing (2026-10-24).
+        let deadline = ContinuousClock.now + .seconds(30)
+        while probe.resizes.isEmpty, ContinuousClock.now < deadline {
             await Task.yield()
         }
+        try #require(!probe.resizes.isEmpty, "the first resize never reached the host")
         session.updateTerminalGeometry(rows: 30, columns: 100)
         session.updateTerminalGeometry(rows: 40, columns: 120)
         await session.waitUntilTerminalResizesComplete()
@@ -8730,11 +8684,26 @@ struct glas_shTests {
     }
 
     @MainActor
+    /// Until the main actor has run everything queued on it before this call: what a resumed
+    /// synchronization's completion queued is done once a task queued after it has run. A 10 ms sleep
+    /// stood for this, and on a busy run the checks after it read a state the stale completion had
+    /// not yet had its turn to change — passing without having tested it (2026-10-24).
+    private func mainActorTurns(_ turns: Int = 3) async {
+        for _ in 0..<turns { await Task { @MainActor in }.value }
+    }
+
+    /// Until something holds, for up to 30 s.
+    private func until(_ condition: () -> Bool) async throws -> Bool {
+        let deadline = ContinuousClock.now + .seconds(30)
+        while !condition(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        return condition()
+    }
+
     private func waitForPendingSynchronizations(
         _ expectedCount: Int,
         in store: FakeICloudSettingsStore
     ) async throws -> Bool {
-        let deadline = ContinuousClock.now + .seconds(2)
+        let deadline = ContinuousClock.now + .seconds(30)
         while store.pendingSynchronizationCount < expectedCount,
               ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))

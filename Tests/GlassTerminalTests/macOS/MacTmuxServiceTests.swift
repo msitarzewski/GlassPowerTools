@@ -6,7 +6,7 @@ import Testing
 /// This Mac's tmux server under launchd (2026-10-12): a Force Quit of an app started inside a
 /// session ended every local terminal, since a server an app starts is that app's to end.
 @Suite("Local tmux under launchd", .serialized)
-struct MacTmuxServiceTests {
+nonisolated struct MacTmuxServiceTests {
     static let host = "/Applications/Glass Power Tools.app/Contents/MacOS/Glass Power Tools"
 
     @Test("the job runs the app as the host of tmux, at a terminal's priority, with the pane's environment less launchd's own")

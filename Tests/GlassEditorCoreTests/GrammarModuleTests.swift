@@ -598,14 +598,6 @@ struct GrammarModuleTests {
         #expect(!grammar.isParsable)
     }
 
-    @Test("Every parsable language loads a compiled query from the bundle", arguments: CaptureMappingTests.parsableLanguages)
-    func everyLanguageLoads(_ language: LanguageID) throws {
-        let grammar = try GrammarRegistry().grammar(for: language)
-        #expect(grammar.isParsable)
-        let query = try #require(grammar.highlightQuery)
-        #expect(query.patternCount > 0)
-    }
-
     // MARK: - Error paths
 
     /// A missing query resource is a `grammarUnavailable`, not a crash and not a

@@ -105,8 +105,16 @@ public struct GlassTagField: View {
                     .frame(minWidth: 96, minHeight: 28)
                     .accessibilityIdentifier("\(identifier).input")
             }
-            .contentShape(.rect)
-            .onTapGesture { focused = true }
+            // A tap anywhere in the row focuses the input. The gesture sits behind the row, not on
+            // it: on the row, iOS gave the input the whole row as its accessibility frame, chips
+            // included, so VoiceOver outlined the chips as the text field and its activation point,
+            // the row's centre, could fall on a chip's remove button (2026-10-25, iOS 27.1).
+            .background {
+                Color.clear
+                    .contentShape(.rect)
+                    .onTapGesture { focused = true }
+                    .accessibilityHidden(true)
+            }
 
             if focused, !matches.isEmpty {
                 GlassTagFlowLayout(spacing: 6) {

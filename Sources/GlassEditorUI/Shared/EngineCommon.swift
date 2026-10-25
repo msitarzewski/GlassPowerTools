@@ -41,6 +41,10 @@ public enum EditorMetrics {
     public static let gutteredLeadingInset: CGFloat = gutterWidth + containerInset
     /// Trailing gap between a line number's right edge and the text.
     public static let gutterNumberTrailingGap: CGFloat = 10
+    /// A change mark's bar: how wide, and how far its right edge is from the gutter's. It sits in
+    /// the gap after the numbers, where VS Code and Zed put theirs.
+    public static let changeMarkWidth: CGFloat = 3
+    public static let changeMarkTrailingInset: CGFloat = 3
 }
 
 // MARK: - Color bridging
@@ -326,6 +330,24 @@ public enum AttributedAssembly {
 
     /// Relative emphasis of gutter numbers against body text.
     static let gutterEmphasis: Double = 0.55
+
+    /// A change mark's colour, from the theme's own green, amber and red: a string's for lines
+    /// added, a number's for lines modified, an error's for lines removed.
+    public static func changeMarkColor(
+        _ kind: LineChange.Kind,
+        theme: EditorTheme,
+        surface: SurfaceCondition,
+        configuration: GlassEditorConfiguration
+    ) -> PlatformColor {
+        let role: TokenRole = switch kind {
+        case .added: .string
+        case .modified: .number
+        case .deleted: .error
+        }
+        let result = theme.color(for: role, on: surface,
+                                 floor: contrastFloor(configuration: configuration, surface: surface))
+        return PlatformColor(resolved: result.color)
+    }
 
     /// The gutter's own font: monospaced *digits* at a size below the body text,
     /// matching the shipped metric (`HighlightedTextEditor.swift:372`).

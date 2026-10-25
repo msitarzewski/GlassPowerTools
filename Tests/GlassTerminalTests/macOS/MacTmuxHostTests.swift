@@ -8,7 +8,7 @@ import Testing
 /// session, and the host with it. Live tests use a private server: a socket of their own and no
 /// configuration (rule 63).
 @Suite("Local tmux host", .serialized)
-struct MacTmuxHostTests {
+nonisolated struct MacTmuxHostTests {
     @Test("only the app started as host runs as one: the flag, then tmux's full path, then a test's server arguments")
     func request() {
         #expect(MacTmuxHost.request(["app"]) == nil)
@@ -18,6 +18,20 @@ struct MacTmuxHostTests {
         let plain = MacTmuxHost.request(["app", "--tmux-host", "/opt/homebrew/bin/tmux"])
         #expect(plain?.tmux == "/opt/homebrew/bin/tmux" && plain?.serverArguments == [])
         #expect(MacTmuxHost.request(["app", "--tmux-host", "/t", "-S", "/tmp/s"])?.serverArguments == ["-S", "/tmp/s"])
+    }
+
+    /// 2026-10-24: a program the app starts from a thread other than the main one began with that
+    /// thread's blocked signals — SIGINT, SIGHUP, SIGTERM and SIGCHLD among them — and a tmux server
+    /// started so ignored `kill-server`. A shell that interrupts itself shows it: blocked, it lives
+    /// to say so; as a new process should, it is ended.
+    @Test("a program the app starts off the main thread gets its signals, as a new process does")
+    func signalsReachWhatTheAppStarts() async {
+        let interrupted = await Task.detached {
+            MacLocalTmux.run("/bin/sh", ["-c", "kill -INT $$; echo survived"])
+        }.value
+        #expect(interrupted == nil, "the shell lived through its own SIGINT: \(interrupted ?? "")")
+        #expect(await Task.detached { MacLocalTmux.run("/bin/sh", ["-c", "echo ran"]) }.value == "ran\n",
+                "and a program that isn't interrupted runs as before")
     }
 
     @Test("its exit status is tmux's, or 128 and the signal that ended it")

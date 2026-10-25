@@ -63,18 +63,12 @@ struct TerminalLinkTargetTests {
     }
 
     @Test("what Watch Log File types is what the shell reads back")
-    func watchCommandThroughAShell() throws {
+    func watchCommandThroughAShell() async throws {
         let path = "/tmp/a dir/it's $(x) & `y`.log"
         let command = try #require(TerminalWatchFile.command(for: path, in: nil))
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        // The words the shell would hand tail, printed one per line instead.
-        process.arguments = ["-f", "-c", "printf '%s\\n' " + command.dropFirst("tail -F ".count)]
-        let output = Pipe()
-        process.standardOutput = output
-        try process.run()
-        process.waitUntilExit()
-        let words = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        // The words the shell would hand tail, printed one per line instead; off the main actor.
+        let words = await LiveProcess.runDetached("/bin/zsh", ["-f", "-c", "printf '%s\\n' " + command.dropFirst("tail -F ".count)],
+                                                  environment: ["PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8"]).output
         #expect(words == path + "\n")
     }
 

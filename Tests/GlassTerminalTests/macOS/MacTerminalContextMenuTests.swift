@@ -116,7 +116,7 @@ struct MacTerminalContextMenuTests {
                                                      characters: "a", charactersIgnoringModifiers: "a", isARepeat: false, keyCode: 0))
         #expect(view.performKeyEquivalent(with: commandA))
         #expect(view.selection.active, "the screen is highlighted")
-        for _ in 0..<50 where MacTerminalContextMenu.selectedText(of: view) != "line 1\nline 2\nthe screen" {
+        for _ in 0..<3_000 where MacTerminalContextMenu.selectedText(of: view) != "line 1\nline 2\nthe screen" {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(MacTerminalContextMenu.selectedText(of: view) == "line 1\nline 2\nthe screen")
@@ -144,7 +144,9 @@ struct MacTerminalContextMenuTests {
         await host.feed("hello world\r\n")
         let view = try terminalView(host)
         MacTerminalContextMenu.selectAll(in: view)
-        try await Task.sleep(for: .milliseconds(50))
+        // Decided as Select All runs: no read of the history is started. (A 50 ms sleep, then "not asked",
+        // stood for this, which a read not yet run on a busy run also passed — 2026-10-24.)
+        #expect((view as? MacTerminalHistoryHolding)?.historyRead == nil, "a read of the history was started")
         #expect(!asked)
         #expect(MacTerminalContextMenu.selectedText(of: view)?.contains("hello world") == true)
     }

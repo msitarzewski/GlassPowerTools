@@ -387,7 +387,7 @@ public final class GlassDatabaseCapability: GlassCapability {
         guard hostAccess.canForwardPorts else { return nil }
         // Through this machine: to the database's address as the machine sees it, when one is
         // given, else to the loopback asked for.
-        let target = config.tunnelTargetHost
+        let target = config.reachedHost
         return { remoteHost, port in try await hostAccess.forwardPort(toHost: target ?? remoteHost, port: port) }
     }
 

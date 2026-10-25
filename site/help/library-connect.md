@@ -76,7 +76,7 @@ To open it:
 
 - **On Mac:** press ⇧⌘\, or choose **Window** ▸ **Show All Windows**, from any window, Connections included. **Show All Windows** is also in each window's toolbar: beside ⚡ in a session's window, and after **Local Terminal** in Connections. On a terminal or remote desktop window, you can pinch in with two fingers; pinch out to close it again.
 - **On iPad and iPhone:** pull down from an empty part of the bar at the top of the screen (not on a button or a search field), or touch and hold ⚡. It slides down as a pane of glass over what you were doing.
-- **On Vision Pro:** pinch and hold ⚡. It opens as a window of its own, which you can make as large as the work needs; the pictures grow with it.
+- **On Vision Pro:** pinch and hold ⚡, in Connections or in a terminal's, database's, desktop's or editor's bar. It opens as a window of its own, which you can make as large as the work needs; the pictures grow with it, or around you if you've chosen that (see [Around you on Vision Pro](#around-you-on-vision-pro)). A pinch with both hands on a window resizes it: that gesture is visionOS's own.
 - **With Siri or Shortcuts**, on any device: say "Show all windows in Glass Power Tools", or use the **Show All Windows** action.
 
 ### On Mac
@@ -106,6 +106,17 @@ What is connected appears as cards, with editor windows while they are open, gro
 - Choose **Done** to close it. **On iPhone and iPad** you can also tap below the pane, or push the bar at its bottom edge up.
 
 When nothing is connected, it says **Nothing Is Open**. Sessions running on your machines with no window here are in **Active** instead.
+
+### Around you on Vision Pro
+
+Show All Windows can also stand around you. Other apps step out of the room, which dims a little, and the same cards stand in an arc at arm's length where you were looking, a group for each machine.
+
+- From the window, choose **Around You**.
+- Look at a card and pinch to go to that window: the room comes back, and the window comes to you.
+- **In a Window**, below the cards, or a pinch out with both hands, goes back to the window. **Done** goes back to where you were.
+- To have ⚡ open it around you straight away, set **Settings** ▸ **Appearance** ▸ **Show All Windows** ▸ **Opens** to **Around You**.
+
+Your own Glass Power Tools windows stay where they are behind the cards; visionOS doesn't let an app move or hide its windows, so the cards are their live pictures. If Focus Mode's environment is up, it steps aside while the cards are around you and comes back after. Around You needs no permission.
 
 ### AI agents and private pictures
 

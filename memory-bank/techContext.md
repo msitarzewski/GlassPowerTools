@@ -422,7 +422,8 @@ Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages>
   the extension when each declares an `AppIntentsPackage` that includes the package's.
 - `swift test` cannot reach a VM on a local or virtual network ("No route to host"): macOS's Local Network permission
   blocks the runner. Tunnel through loopback for live SSH tests (`ssh -N -L 2223:localhost:22`, then
-  `GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2223`; not 2222, which Citadel's own tests bind).
+  `GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2223`; Citadel's own tests bound 2222 until 2026-10-24,
+  and take a free loopback port now).
 - A dead SFTP/SSH connection under Citadel surfaces as NIO `ChannelError.ioOnClosedChannel` or `.outputClosed`.
 
 

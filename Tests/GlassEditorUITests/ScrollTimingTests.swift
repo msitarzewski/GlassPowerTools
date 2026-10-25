@@ -46,8 +46,9 @@ struct ScrollTimingTests {
         window.close()
     }
 
-    @Test func frames() throws {
-        guard ProcessInfo.processInfo.environment["GPT_SCROLL_TIMING"] != nil else { return }
+    /// A measurement, printed, not a check: run with GPT_SCROLL_TIMING set.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["GPT_SCROLL_TIMING"] != nil, "a timing probe: set GPT_SCROLL_TIMING"))
+    func frames() throws {
         var source = ""
         for i in 0..<5_000 { source += "func f\(i)(x: Int) -> Int { let y = x * \(i) // step \(i)\n  return y + \(i) }\n" }
         let only = ProcessInfo.processInfo.environment["GPT_SCROLL_CASE"]

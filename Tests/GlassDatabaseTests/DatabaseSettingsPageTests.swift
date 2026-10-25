@@ -9,7 +9,7 @@ import GlassShell
 struct DatabaseSettingsPageTests {
     @Test("the capability offers its settings to the shell's Settings")
     func registersAPage() {
-        let capability = GlassDatabaseCapability(runtime: GlassDatabaseRuntime(layers: GlassLayerStore()))
+        let capability = GlassDatabaseCapability(runtime: GlassDatabaseRuntime(layers: GlassLayerStore.forTest()))
         #expect(capability.settingsPages.map(\.title) == ["Databases"])
     }
 }

@@ -126,7 +126,7 @@ struct TerminalSessionNamesTests {
     /// default server, which holds the owner's sessions, is never reached (rule 63).
     @Test("live: the read, run by sh against a private tmux server, in a repository git made",
           .enabled(if: TerminalTmuxTests.tmux != nil && TerminalRepositoryTests.hasGit))
-    func readLive() throws {
+    func readLive() async throws {
         let tmux = try #require(TerminalTmuxTests.tmux)
         let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8).lowercased())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -137,18 +137,21 @@ struct TerminalSessionNamesTests {
             return String(cString: resolved)
         })
         let environment = ["PATH": "/usr/bin:/bin", "HOME": home, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"]
-        @discardableResult func run(_ arguments: [String]) -> Int32 {
-            LiveProcess.run(tmux, ["-S", socket] + arguments, environment: environment).status
+        // Each run off the main actor (`LiveProcess.runDetached`).
+        @discardableResult func run(_ arguments: [String]) async -> Int32 {
+            await LiveProcess.runDetached(tmux, ["-S", socket] + arguments, environment: environment).status
         }
-        defer { run(["kill-server"]) }
+        defer { _ = LiveProcess.run(tmux, ["-S", socket, "kill-server"], environment: environment) }
         let app = home + "/src/app"
         try FileManager.default.createDirectory(atPath: app + "/Sources", withIntermediateDirectories: true)
-        try #require(LiveProcess.run("/usr/bin/git", ["-C", app, "init", "-q", "-b", "feature/x"], environment: environment).status == 0)
+        try #require(await LiveProcess.runDetached("/usr/bin/git", ["-C", app, "init", "-q", "-b", "feature/x"],
+                                                   environment: environment).status == 0)
 
-        #expect(run(["-u", "-f", "/dev/null", "new-session", "-d", "-s", "glass-5", "-c", app + "/Sources", "-x", "80", "-y", "10",
-                     "/bin/sleep", "600"]) == 0)
-        #expect(run(["-u", "select-pane", "-t", "=glass-5:", "-T", "✳ Claude Code"]) == 0)
-        #expect(run(try #require(TerminalTmux.givenNameArguments(session: "glass-5", name: "deploys"))) == 0)
+        #expect(await run(["-u", "-f", "/dev/null", "new-session", "-d", "-s", "glass-5", "-c", app + "/Sources", "-x", "80", "-y", "10",
+                           "/bin/sleep", "600"]) == 0)
+        #expect(await run(["-u", "select-pane", "-t", "=glass-5:", "-T", "✳ Claude Code"]) == 0)
+        let naming = try #require(TerminalTmux.givenNameArguments(session: "glass-5", name: "deploys"))
+        #expect(await run(naming) == 0)
 
         let bin = folder.appendingPathComponent("bin")
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
@@ -157,16 +160,16 @@ struct TerminalSessionNamesTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shim.path)
         var throughShim = environment
         throughShim["PATH"] = "\(bin.path):/usr/bin:/bin"
-        func read(_ session: String) -> TerminalTmux.PaneState? {
+        func read(_ session: String) async -> TerminalTmux.PaneState? {
             let command = TerminalTmux.paneStateCommand(session: session)!
-            return TerminalTmux.parsePaneState(LiveProcess.run("/bin/sh", ["-c", command], environment: throughShim).output)
+            return TerminalTmux.parsePaneState(await LiveProcess.runDetached("/bin/sh", ["-c", command], environment: throughShim).output)
         }
-        let state = try #require(read("glass-5"))
+        let state = try #require(await read("glass-5"))
         #expect(state.givenName == "deploys" && state.title == "✳ Claude Code")
         #expect(state.program == "sleep" && (state.shellProcessID ?? 0) > 0, "the foreground program and its shell")
         #expect(state.directory == app + "/Sources" && state.home == home)
         #expect(state.repository.map { [$0.name, $0.branch] } == ["app", "feature/x"])
-        #expect(read("glass-6") == nil, "a session that is not running says nothing")
+        #expect(await read("glass-6") == nil, "a session that is not running says nothing")
     }
 
     // MARK: The terminal

@@ -31,11 +31,20 @@ struct MacLocalPaneScaleTests {
         var window = GlassWindowOverrides()
         window[TerminalWindowSettings.whenResized] = TerminalResizeBehavior.scale.rawValue
 
+        // A shell of the test's own: no login files, no home of the owner's. `/bin/sh -l` read his
+        // profile inside the test's deadlines (2026-10-24).
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-scale-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let shell = folder.appendingPathComponent("sh")
+        try Data("#!/bin/sh\nexec /usr/bin/env -i HOME='\(folder.path)' PATH=/usr/bin:/bin TERM=\"$TERM\" /bin/sh\n".utf8).write(to: shell)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shell.path)
+
         let runtime = SwiftTermLocalProcessRuntime()
         defer { runtime.terminate() }
         let pane = MacLocalTerminalPaneView(
             runtime: runtime, recorder: SessionRecorder(), workspaceID: UUID(),
-            shellOverride: "/bin/sh", directoryOverride: NSTemporaryDirectory(),
+            shellOverride: shell.path, directoryOverride: folder.path,
             isFocused: true, showsPaneChrome: false, findRequest: .none,
             claimStartupCommand: { nil }, onFocus: {}, onDisconnect: {}, onProcessStatusChange: { _ in },
             hostModel: runtime.model, processState: runtime.processState)
@@ -50,8 +59,9 @@ struct MacLocalPaneScaleTests {
         defer { host.contentView = nil }
         hosting.layoutSubtreeIfNeeded()
 
-        #expect(await waitFor(seconds: 10) { runtime.processState.isRunning }, "the shell never started")
-        let scaling = await waitFor(seconds: 5) { runtime.model.scaledGrid != nil }
+        // Generous, since each returns as soon as it holds: the run's other tests share the main actor.
+        #expect(await waitFor(seconds: 30) { runtime.processState.isRunning }, "the shell never started")
+        let scaling = await waitFor(seconds: 30) { runtime.model.scaledGrid != nil }
         #expect(scaling, "the window scales, but the local terminal never started keeping its grid")
         let kept = try #require(runtime.model.scaledGrid)
 
@@ -59,7 +69,7 @@ struct MacLocalPaneScaleTests {
             let marker = "SIZE\(Int.random(in: 1000...9999))"
             _ = runtime.processState.sendCommand("echo \(marker) $(stty size)")
             var found: String?
-            _ = await waitFor(seconds: 5) {
+            _ = await waitFor(seconds: 30) {
                 found = runtime.model.getVisibleText(lastNLines: 8).last { $0.hasPrefix(marker) }
                 return found != nil
             }

@@ -63,7 +63,7 @@ struct AppleMediaReceiverTests {
     @Test("pictures sent as SRTP over UDP arrive decoded, and the receiver's reports are authentic")
     func endToEnd() async throws {
         let session = RFBAppleMediaSession()
-        let base = UInt16.random(in: 40_000...50_000)
+        let base = try freeUDPBase()
         let ports = RFBAppleMediaSession.Ports(audio: base, videos: [base + 1])
         let macPorts = RFBAppleMediaSession.Ports(audio: base + 100, videos: [base + 101])
         let collected = Collected()
@@ -99,7 +99,7 @@ struct AppleMediaReceiverTests {
         var reports = try RFBAppleSRTP.ReportReceiver(master: session.videos[0].keys.toMac)
         var authentic = 0
         var buffer = [UInt8](repeating: 0, count: 2048)
-        let deadline = ContinuousClock.now + .seconds(5)
+        let deadline = ContinuousClock.now + .seconds(30)
         while ContinuousClock.now < deadline {
             let count = recv(macVideo, &buffer, buffer.count, MSG_DONTWAIT)
             if count > 0, (try? reports.authenticate(Array(buffer[0..<count]))) != nil { authentic += 1 }
@@ -120,7 +120,7 @@ struct AppleMediaReceiverTests {
     @Test("a packet under another key is dropped, and nothing is decoded from it")
     func forgedIsDropped() async throws {
         let session = RFBAppleMediaSession()
-        let base = UInt16.random(in: 50_001...60_000)
+        let base = try freeUDPBase()
         let ports = RFBAppleMediaSession.Ports(audio: base, videos: [base + 1])
         let macPorts = RFBAppleMediaSession.Ports(audio: base + 100, videos: [base + 101])
         let collected = Collected()
@@ -140,7 +140,49 @@ struct AppleMediaReceiverTests {
                 _ = packet.withUnsafeBytes { send(macVideo, $0.baseAddress, $0.count, 0) }
             }
         }
-        try await Task.sleep(for: .milliseconds(500))
-        collected.lock.withLock { #expect(collected.pictures.isEmpty && collected.failure == nil) }
+        // Then the same pictures under the right keys, after the forged ones: once these three are in,
+        // the forged packets have been read too, and any picture made from one would be a fourth. (A
+        // half-second sleep stood for that, and on a busy run nothing had been read yet — 2026-10-24.)
+        let videoKeys = try RFBAppleSRTP.SessionKeys(master: session.videos[0].keys.fromMac, base: 0)
+        var sequence: UInt16 = 100
+        for (number, unit) in try fixtureUnits().enumerated() {
+            let parts = payloads(unit)
+            for (index, payload) in parts.enumerated() {
+                let packet = try protect(payload, keys: videoKeys, sequence: sequence, timestamp: UInt32(number * 400),
+                                         ssrc: 0x39b8_5839, marker: index == parts.count - 1, payloadType: 100)
+                _ = packet.withUnsafeBytes { send(macVideo, $0.baseAddress, $0.count, 0) }
+                sequence &+= 1
+            }
+        }
+        for _ in 0..<3_000 where collected.lock.withLock({ collected.pictures.count < 3 }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        collected.lock.withLock {
+            #expect(collected.pictures.count == 3, "the three genuine pictures and none from the forged packets")
+            #expect(collected.failure == nil)
+        }
     }
+}
+
+/// A base port whose four ports the receiver binds — base, base + 1, base + 100, base + 101 — are
+/// free on the loopback now, below macOS's ephemeral range (49152 on), where the system hands out
+/// ports of its own. A random base from 40000 to 60000 could land on one in use (2026-10-24).
+func freeUDPBase() throws -> UInt16 {
+    func free(_ port: UInt16) -> Bool {
+        let socket = Darwin.socket(AF_INET, SOCK_DGRAM, 0)
+        guard socket >= 0 else { return false }
+        defer { close(socket) }
+        var address = sockaddr_in()
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = port.bigEndian
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        return withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(socket, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0 }
+        }
+    }
+    for _ in 0..<50 {
+        let base = UInt16.random(in: 30_000...39_000)
+        if [base, base + 1, base + 100, base + 101].allSatisfy(free) { return base }
+    }
+    throw CocoaError(.featureUnsupported)
 }

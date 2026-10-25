@@ -55,10 +55,14 @@ public protocol GlassEditorFileAccess {
     func stat(_ path: String) async throws -> RemoteStat?
     /// Drops whatever this is holding open. A disk holds nothing; an SFTP session is a connection.
     func close() async
+    /// How to run `git` on the machine the files are on (2026-10-23), or nil where there is none:
+    /// a folder on an iPhone, an iPad or a Vision Pro.
+    var gitRunner: (any GlassEditorGitRunner)? { get }
 }
 
 public extension GlassEditorFileAccess {
     func close() async {}
+    var gitRunner: (any GlassEditorGitRunner)? { nil }
 
     /// SHA-256 of a file's bytes — tier 2 of the conflict check, and the tier that kills the
     /// false positives a coarse modification time produces.
@@ -74,6 +78,15 @@ public struct GlassEditorLocalFileAccess: GlassEditorFileAccess {
     public static var skipped: Set<String> { GlassEditorProject.skippedNames }
 
     public init() {}
+
+    /// This Mac's own `git`. Nowhere else has one an app can run.
+    public var gitRunner: (any GlassEditorGitRunner)? {
+        #if os(macOS)
+        GlassEditorLocalGit.shared
+        #else
+        nil
+        #endif
+    }
 
     public func contents(ofDirectory path: String) async throws -> [GlassEditorProjectNode] {
         let url = URL(filePath: GlassEditorProject.normalized(path), directoryHint: .isDirectory)
@@ -218,17 +231,26 @@ public struct GlassEditorRemoteFileAccess: GlassEditorFileAccess {
     private let writer: Write
     private let stater: Stat
     private let onClose: @MainActor () async -> Void
+    /// A command on the machine, over the same connection: what `git` runs through. Nil where the
+    /// connection cannot run one.
+    private let command: GlassEditorRemoteGit.Command?
 
     public init(listing: @escaping Listing,
                 read: @escaping Read,
                 write: @escaping Write,
                 stat: @escaping Stat,
+                command: GlassEditorRemoteGit.Command? = nil,
                 onClose: @escaping @MainActor () async -> Void = {}) {
         self.listing = listing
         self.reader = read
         self.writer = write
         self.stater = stat
+        self.command = command
         self.onClose = onClose
+    }
+
+    public var gitRunner: (any GlassEditorGitRunner)? {
+        command.map { GlassEditorRemoteGit(command: $0) }
     }
 
     public func contents(ofDirectory path: String) async throws -> [GlassEditorProjectNode] {

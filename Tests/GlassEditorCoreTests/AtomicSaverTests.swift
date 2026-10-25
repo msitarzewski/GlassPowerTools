@@ -148,9 +148,9 @@ struct AtomicSaverTests {
 
     // MARK: - Failure paths
 
-    @Test("A save that cannot start leaves no temp file and no damaged destination")
+    @Test("A save that cannot start leaves no temp file and no damaged destination",
+          .enabled(if: geteuid() != 0, "root bypasses directory permissions entirely"))
     func failedSaveIsInvisible() throws {
-        guard geteuid() != 0 else { return }  // root bypasses directory permissions entirely
 
         let directory = try temporaryDirectory()
         defer {
@@ -194,7 +194,7 @@ struct AtomicSaverTests {
     @Test("Remote and ephemeral origins are refused, never half-saved locally")
     func refusesOriginsThePackageDoesNotOwn() {
         let remote = DocumentOrigin.remote(
-            RemoteDocumentRef(connectionID: UUID(), host: "charlie.tail1234.ts.net", path: "/etc/hosts")
+            RemoteDocumentRef(connectionID: UUID(), host: "charlie.example.com", path: "/etc/hosts")
         )
         #expect(throws: EditorError.self) {
             try AtomicSaver.save("x", encoding: .utf8(hadBOM: false), to: remote)

@@ -355,16 +355,25 @@ struct MacWorkspaceRestorationTests {
             let previous = MacLocalTmux.server
             MacLocalTmux.server = fake.server
             defer { MacLocalTmux.server = previous }
+            // A session of its own name: the list of sessions closed this run is the process's, and
+            // earlier tests close panes holding the low glass-N names a new pane would be given.
+            var intent = MacWorkspacePaneIntent.local
+            intent.localTmuxSession = "restoration-\(UUID().uuidString.prefix(8))"
             let window = MacWorkspaceWindowController(
-                request: MacWorkspaceLaunchRequest(initialPaneIntent: .local), defaults: defaults)
+                request: MacWorkspaceLaunchRequest(initialPaneIntent: intent), defaults: defaults)
             let pane = try #require(window.selectedTab.focusedPaneID)
             let name = try #require(window.selectedTab.localTmuxSession(for: pane))
+            #expect(name == intent.localTmuxSession)
             let registry = MacWorkspacePreviewRegistry()
             let shownWindow = NSWindow()
             shownWindow.isReleasedWhenClosed = false
             registry.register(window, window: shownWindow)
             #expect(MacLocalTmuxLaunchOffer.shownSessions(registry: registry).contains(name))
 
+            // Not there before: the list is the process's, and earlier tests close panes holding the
+            // same low names, so "contains" after the close proved nothing on its own (2026-10-24).
+            try #require(!MacLocalTmuxLaunchOffer.shared.closedThisRun.contains(name),
+                         "\(name) was already listed as closed this run")
             window.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
             #expect(MacLocalTmuxLaunchOffer.shared.closedThisRun.contains(name))
         }

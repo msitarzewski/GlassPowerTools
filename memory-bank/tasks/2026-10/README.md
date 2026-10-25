@@ -209,3 +209,6 @@
     panel, a toggle, additive), agent marks on every tab and on the orb's ring, a pinch on Terminal View for
     the orb, Mermaid diagram marks in terminals, and Join Wrapped Lines keeping code and diagrams.
   - Committed 2026-10-21 at his word ("commit everything"); not pushed.
+- 2026-10-23 — [Git in the editor: Changes, marks, stage and commit](2026-10-23_editor-git.md) (0.4.519–0.4.520; committed with 0.4.522)
+- 2026-10-24 — [A dropped terminal is listed once in Active](2026-10-24_active-dropped-tabs.md) (0.4.521; committed with 0.4.522)
+- 2026-10-24 — [Test audit: every test useful, every suite reliable](2026-10-24_test-audit.md) (eight product fixes; 3,113 package tests pass twice; every UI test on the iPhone and the folded Duo; committed with 0.4.522 on 2026-10-25, not pushed)

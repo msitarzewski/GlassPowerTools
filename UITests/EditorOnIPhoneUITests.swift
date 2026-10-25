@@ -86,14 +86,14 @@ final class EditorOnIPhoneUITests: XCTestCase {
                       "tapping a folder did not open it")
         shoot(app, "05-folder-pushed")
 
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.backButton.tap()
         XCTAssertTrue(readme.waitForExistence(timeout: 10), "the back button did not return to the project")
 
         // And a file is a push onto the editor, with the file in it.
         readme.tap()
         Thread.sleep(forTimeInterval: 3)
         shoot(app, "06-file-open")
-        XCTAssertTrue(app.buttons["editor-save"].waitForExistence(timeout: 10),
+        XCTAssertTrue(app.buttons["editor-position"].waitForExistence(timeout: 10),
                       "choosing a file did not open the editor")
     }
 }
@@ -133,7 +133,7 @@ extension EditorOnIPhoneUITests {
         XCTAssertTrue(alert.waitForNonExistence(timeout: 10), "the alert stays on screen")
 
         // Back to the list, and open the one that works.
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.backButton.tap()
         let demo = app.staticTexts["DemoProject"].firstMatch
         XCTAssertTrue(demo.waitForExistence(timeout: 10), "the working project is not listed")
         demo.tap()
@@ -170,7 +170,7 @@ extension EditorOnIPhoneUITests {
             let projects = app.descendants(matching: .any)
                 .matching(identifier: "glass-library-panel-editor-projects").firstMatch
             for _ in 0..<4 where !projects.exists {
-                let back = app.navigationBars.buttons.element(boundBy: 0)
+                let back = app.backButton
                 guard back.exists else { break }
                 back.tap()
                 Thread.sleep(forTimeInterval: 1.5)
@@ -193,15 +193,18 @@ extension EditorOnIPhoneUITests {
                       "the bolt belongs in every session's toolbar, whether or not anything else is open")
         shoot(app, "10-first-editor")
 
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.backButton.tap()
         Thread.sleep(forTimeInterval: 2)
 
         openProject("OtherProject")
         XCTAssertTrue(app.staticTexts["NOTES.md"].firstMatch.waitForExistence(timeout: 15),
                       "the second project did not open on its files")
 
-        let bolt = app.buttons["active-connections-bolt"].firstMatch
-        XCTAssertTrue(bolt.waitForExistence(timeout: 10), "no bolt in the editor's toolbar")
+        let bolts = app.buttons.matching(identifier: "active-connections-bolt")
+        XCTAssertTrue(bolts.firstMatch.waitForExistence(timeout: 10), "no bolt in the editor's toolbar")
+        // The one a person can reach: the library's own stays in the tree under the editor, and on
+        // the Duo's outer display it comes first while the editor's is in iOS's column.
+        let bolt = bolts.allElementsBoundByIndex.first { $0.isHittable } ?? bolts.firstMatch
         shoot(app, "11-bolt")
         bolt.tap()
 
@@ -258,7 +261,7 @@ extension EditorOnIPhoneUITests {
 
         // A phone pushed the picture over the list; the headset keeps the list beside it.
         #if !os(visionOS)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.backButton.tap()
         #endif
         let markdown = app.staticTexts["PREVIEW.md"].firstMatch
         XCTAssertTrue(markdown.waitForExistence(timeout: 10))
@@ -294,7 +297,7 @@ extension EditorOnIPhoneUITests {
         XCTAssertTrue(preview.waitForNonExistence(timeout: 10), "a third press did not return to the text")
         #else
         toggle.tap()
-        XCTAssertTrue(app.buttons["editor-save"].waitForExistence(timeout: 10), "a second press did not return to the text")
+        XCTAssertTrue(app.buttons["editor-position"].waitForExistence(timeout: 10), "a second press did not return to the text")
         #endif
     }
 }
@@ -330,7 +333,7 @@ extension EditorOnIPhoneUITests {
         newDocument.tap()
 
         // An editor on one untitled document.
-        XCTAssertTrue(app.buttons["editor-save"].firstMatch.waitForExistence(timeout: 15),
+        XCTAssertTrue(app.buttons["editor-position"].firstMatch.waitForExistence(timeout: 15),
                       "New Document did not open an editor")
         XCTAssertTrue(app.staticTexts["Untitled"].firstMatch.waitForExistence(timeout: 10),
                       "the new editor is not on an Untitled document")
@@ -339,10 +342,34 @@ extension EditorOnIPhoneUITests {
 }
 
 extension EditorOnIPhoneUITests {
-    /// A one-line, ~2 MB SVG opens on a phone and the app stays alive and responsive — as text and
-    /// with Preview (2026-09-23: the same shape froze the Mac until lines over 20,000 characters
-    /// stopped being coloured).
+    #if os(iOS)
+    /// How many pixels are near the seeded SVG's red, #b5412b.
+    static func reddish(in image: UIImage) -> Int {
+        guard let cgImage = image.cgImage else { return 0 }
+        let width = cgImage.width, height = cgImage.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8,
+                                      bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0 }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var count = 0
+        for index in stride(from: 0, to: pixels.count, by: 4)
+        where abs(Int(pixels[index]) - 181) < 40 && abs(Int(pixels[index + 1]) - 65) < 40 && abs(Int(pixels[index + 2]) - 43) < 40 {
+            count += 1
+        }
+        return count
+    }
+    #endif
+
+    /// A one-line, ~2 MB SVG opens on a phone and the app stays alive and responsive (2026-09-23: the
+    /// same shape froze the Mac until lines over 20,000 characters stopped being coloured).
+    ///
+    /// A phone's text view cannot draw a line that long, so such a file opens as its picture with the
+    /// text one press away (`GlassEditorWorkspace`, the owner on 2026-09-23: "previews only on iOS,
+    /// that's fine"). This waited for the text first and missed that; it now checks the picture is
+    /// drawn — the path's red — not merely that a preview view exists.
     func testAOneLineMegabyteSVGOpensWithoutHanging() throws {
+        #if os(iOS)
         continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString, "--ui-testing-seed-project",
@@ -362,63 +389,39 @@ extension EditorOnIPhoneUITests {
         XCTAssertTrue(svg.waitForExistence(timeout: 15), "the large SVG was not seeded")
         let started = Date()
         svg.tap()
-        XCTAssertTrue(app.buttons["editor-save"].waitForExistence(timeout: 20), "the SVG did not open as text")
-        Thread.sleep(forTimeInterval: 6)
-        shoot(app, "30-large-svg-text")
+        let preview = app.descendants(matching: .any).matching(identifier: "editor-preview").firstMatch
         let toggle = app.buttons["editor-preview-toggle"].firstMatch
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
-        toggle.tap()
-        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "editor-preview").firstMatch
-            .waitForExistence(timeout: 20), "Preview did not appear")
-        Thread.sleep(forTimeInterval: 10)
-        shoot(app, "31-large-svg-preview")
-        toggle.tap()
+        if UIDevice.current.userInterfaceIdiom != .phone {
+            // Elsewhere it opens as text, as any file does; Preview draws the picture.
+            XCTAssertTrue(app.buttons["editor-position"].waitForExistence(timeout: 20), "the SVG did not open")
+            XCTAssertFalse(preview.exists, "an iPad opens it as text")
+            XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            toggle.tap()
+        }
+        XCTAssertTrue(preview.waitForExistence(timeout: 20), "the SVG did not open as its picture")
+        XCTAssertTrue(app.buttons["editor-position"].exists, "the file is open in the editor")
+        // The app's whole screen: the identifier is on the pane's group, so the first element
+        // carrying it can be a piece of the web view with no frame, which has no picture to take.
+        let drawn = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            Self.reddish(in: app.screenshot().image) > 200
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [drawn], timeout: 30), .completed, "the picture was not drawn")
+        shoot(app, "30-large-svg-preview")
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            toggle.tap()
+            XCTAssertTrue(preview.waitForNonExistence(timeout: 20), "the text is not one press away")
+            shoot(app, "31-large-svg-text")
+            toggle.tap()
+            XCTAssertTrue(preview.waitForExistence(timeout: 20), "a second press did not bring the picture back")
+        }
         // Alive and answering: the app is still in front and the editor answers a query.
         XCTAssertEqual(app.state, .runningForeground, "the app is no longer running")
-        XCTAssertTrue(app.buttons["editor-save"].waitForExistence(timeout: 10), "the editor stopped answering")
+        XCTAssertTrue(app.buttons["editor-position"].waitForExistence(timeout: 10), "the editor stopped answering")
         print("LARGE-SVG seconds: \(Int(Date().timeIntervalSince(started)))")
+        #else
+        throw XCTSkip("the picture is counted from a UIImage; the Mac's editor opens such a file as text")
+        #endif
     }
 }
 
-extension EditorOnIPhoneUITests {
-    /// The user's own logo — 14.6 MB on one line, almost all an embedded PNG — opened on a phone.
-    /// Runs only when `GPT_SEED_FILE` names a file on the Mac (2026-09-23).
-    func testTheUsersOneLineLogoOpens() throws {
-        guard let path = ProcessInfo.processInfo.environment["GPT_SEED_FILE"], !path.isEmpty else {
-            throw XCTSkip("Set TEST_RUNNER_GPT_SEED_FILE to a file on this Mac.")
-        }
-        continueAfterFailure = true
-        let app = XCUIApplication()
-        app.launchArguments += ["--ui-testing", UUID().uuidString, "--ui-testing-seed-project",
-                                "--ui-testing-seed-file", path]
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
-        let projects = app.descendants(matching: .any)
-            .matching(identifier: "glass-library-panel-editor-projects").firstMatch
-        XCTAssertTrue(projects.waitForExistence(timeout: 15))
-        projects.tap()
-        app.staticTexts["DemoProject"].firstMatch.tap()
-        let open = app.buttons["project-open"].firstMatch
-        XCTAssertTrue(open.waitForExistence(timeout: 15))
-        open.tap()
-        let name = (path as NSString).lastPathComponent
-        let row = app.staticTexts[name].firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 15), "the file was not copied into the project")
-        let started = Date()
-        row.tap()
-        let opened = app.buttons["editor-save"].waitForExistence(timeout: 60)
-        print("USER-FILE open seconds: \(Int(Date().timeIntervalSince(started))) opened: \(opened)")
-        Thread.sleep(forTimeInterval: 6)
-        shoot(app, "40-user-file-text")
-        XCTAssertEqual(app.state, .runningForeground, "the app is no longer running after opening the file")
-        let toggle = app.buttons["editor-preview-toggle"].firstMatch
-        if toggle.waitForExistence(timeout: 10) {
-            toggle.tap()
-            Thread.sleep(forTimeInterval: 12)
-            shoot(app, "41-user-file-preview")
-        }
-        XCTAssertEqual(app.state, .runningForeground, "the app is no longer running after Preview")
-        let responsive = app.buttons["editor-save"].waitForExistence(timeout: 20)
-        print("USER-FILE responsive after preview: \(responsive)")
-    }
-}

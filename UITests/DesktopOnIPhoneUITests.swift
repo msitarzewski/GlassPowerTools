@@ -28,7 +28,6 @@ final class DesktopOnIPhoneUITests: XCTestCase {
     }
 
     func testTheStatusBarStepsAsideWhileTheKeyboardsBarIsUp() throws {
-        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("an iPhone's layout") }
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "desktop"]
         app.launch()

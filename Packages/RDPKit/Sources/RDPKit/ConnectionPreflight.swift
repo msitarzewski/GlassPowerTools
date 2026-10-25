@@ -2308,7 +2308,7 @@ private final class TLSHandshakeCompletionHandler: ChannelInboundHandler, Remova
 
 extension TLSHandshakeCompletionHandler: @unchecked Sendable {}
 
-private final class TLSTPKTStreamHandler: ChannelInboundHandler, RemovableChannelHandler {
+final class TLSTPKTStreamHandler: ChannelInboundHandler, RemovableChannelHandler {
     typealias InboundIn = ByteBuffer
 
     private let onWireReceive: RDPWireReceiveHandler?
@@ -2338,10 +2338,10 @@ private final class TLSTPKTStreamHandler: ChannelInboundHandler, RemovableChanne
     func nextPacket(on channel: Channel) -> EventLoopFuture<Data> {
         let promise = channel.eventLoop.makePromise(of: Data.self)
         channel.eventLoop.execute {
-            if let failure = self.failure {
-                promise.fail(failure)
-            } else if !self.packets.isEmpty {
+            if !self.packets.isEmpty {
                 promise.succeed(self.packets.removeFirst())
+            } else if let failure = self.failure {
+                promise.fail(failure)
             } else {
                 self.pending.append(promise)
             }
@@ -2368,8 +2368,11 @@ private final class TLSTPKTStreamHandler: ChannelInboundHandler, RemovableChanne
         completeIfPossible(context: context)
     }
 
+    /// A server's last packets before it hangs up, an ErrorInfo and a Deactivate All, are its reason
+    /// for ending: those that arrived whole are still read, and only then the disconnect. They were
+    /// discarded when the client had not yet asked for them, and the session read as a clean end.
     func channelInactive(context: ChannelHandlerContext) {
-        fail(RDPApplicationReceiveError.remoteDisconnected)
+        end(RDPApplicationReceiveError.remoteDisconnected)
         context.fireChannelInactive()
     }
 
@@ -2379,15 +2382,20 @@ private final class TLSTPKTStreamHandler: ChannelInboundHandler, RemovableChanne
     }
 
     func fail(_ error: Error) {
+        packets.removeAll()
+        end(error)
+    }
+
+    private func end(_ error: Error) {
         guard failure == nil else { return }
         failure = error
         received = Data()
         receivedReadOffset = 0
+        // Waiting means nothing was queued.
         for promise in pending {
             promise.fail(error)
         }
         pending.removeAll()
-        packets.removeAll()
     }
 
     private func completeIfPossible(context: ChannelHandlerContext) {

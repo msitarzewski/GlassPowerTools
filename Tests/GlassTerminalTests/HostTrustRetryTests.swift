@@ -8,6 +8,11 @@
 //  still in the prompt state, that cleanup closed and unregistered it before the retry task
 //  reached `reconnect`. The fix takes the session out of the prompt state synchronously.
 //
+//  What these drive: `takePendingTrustSession`, the helper the Confirm action calls before its task,
+//  and the dismissal's cleanup, as the flow's binding setter runs it. That the Confirm action calls
+//  the helper *before* starting its task is the flow's own order (`TerminalConnectFlow`, where a
+//  comment says why), which a SwiftUI view modifier keeps out of reach of a unit test.
+//
 
 import Testing
 import Foundation

@@ -14,11 +14,12 @@ struct GlassAppIntentsTests {
     private var library: GlassWidgetSnapshot {
         GlassWidgetSnapshot(
             machines: [
-                .init(id: alpha, name: "alpha", isFavorite: true, services: [
+                .init(id: alpha, name: "alpha", services: [
                     .init(id: alphaTerminal, kind: .terminal, name: "Terminal"),
                     .init(id: alphaOrders, kind: .database, name: "Orders"),
                 ]),
-                .init(id: bravo, name: "bravo web", services: [.init(id: bravoDesktop, kind: .desktop, name: "Desktop")]),
+                // The favourite sorts after alpha by name, so "favourites first" is something to see.
+                .init(id: bravo, name: "bravo web", isFavorite: true, services: [.init(id: bravoDesktop, kind: .desktop, name: "Desktop")]),
             ],
             workgroups: [.init(id: deploy, name: "Deploy", terminals: 3)],
             savedQueries: [.init(id: signups, name: "Signups this week", database: "Orders"),
@@ -48,7 +49,7 @@ struct GlassAppIntentsTests {
             #expect(byID.map(\.name) == ["bravo web"])
             #expect(byWords.map(\.id) == [bravo])
             #expect(none.isEmpty)
-            #expect(suggested.map(\.name) == ["alpha", "bravo web"])
+            #expect(suggested.map(\.name) == ["bravo web", "alpha"], "the favourite first, though alpha sorts before it")
         }
     }
 

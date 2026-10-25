@@ -58,6 +58,7 @@ diff -ru --exclude=.git /tmp/citadel Packages/Citadel
 | F9 | `SFTPFile.read(_: [ReadRequest])`: up to 8 ranges (2 MiB) in flight at once, returned in request order. | `SFTPFile.swift`, `SFTPClient.swift` |
 | F10 | `executeCommand(_:maxResponseSize:executionTimeout:)`: a time limit, and task cancellation closes the channel. | `ExecClient.swift` |
 | F11 | `SSHClient.checkAlive(timeout:)`: a keepalive that waits for the server's answer, failing with `SSHClient.NotAnswering` (uses swift-nio-ssh N7). Used after the Mac wakes and when the app returns to the foreground. | `Client.swift` |
+| F12 | `executeCommandCollecting(_:maxResponseSize:executionTimeout:)`: the exit status, standard output and standard error kept apart (`ExecCommandResult`), so a command that writes to standard error or exits non-zero is an answer rather than a thrown error. `executeCommand` fails on the first byte of standard error, and `git` warns there while succeeding. The same limits as F10. | `ExecClient.swift` |
 
 New error cases for these: `SFTPError.invalidPacketLength`, `SFTPError.unsupportedExtension`,
 `CitadelError.commandExecutionTimedOut` (`Errors.swift`). `SFTPClient`'s initializer and response
@@ -73,8 +74,34 @@ the notice in all copies.
 
 23 tests for the changes above are added in an `extension Citadel2Tests` at the end of
 `Tests/CitadelTests/Citadel2Tests.swift`, which now imports Citadel with `@testable` to reach the
-SFTP parser and serializer. No upstream test was changed. The package's own suite runs 58 tests
-(35 upstream, 23 added), all passing.
+SFTP parser and serializer. One upstream test was changed: `testRebex` connects to test.rebex.net over
+the internet, accepting any host key, and now runs only with `CITADEL_INTERNET_TESTS=1`, skipping with
+that reason otherwise (2026-10-24); and `KeyTests` re-encodes a key with a neutral comment in place of a
+person's own machine name. F12's three tests are in an `extension WithExecTests` at the end of
+`Tests/CitadelTests/WithExecTests.swift`, beside the in-process exec server they use.
+
+The test audit of 2026-10-24 changed these, all in tests:
+
+- The in-process servers listen on a free loopback port. `EndToEndTests` and two `Citadel2Tests` bound
+  2222 or 2345 on every interface and dialled 127.0.0.1, accepting any host key: a tunnel to a real
+  server already on that port would have answered, and been signed in to.
+- `WithExecTests`' fake commands slept 0.3 seconds before ending, because the exec server closes its
+  pipes the moment a command succeeds and discards what it has not read. They now end once the server
+  has read everything (`succeedOnceRead`). The same server hands a command its stdin only as it closes
+  those pipes, so `testExecStdinReachesServer` waits for the input rather than reading it at once.
+  Both are behaviours of the exec *server*, which the app does not run, and are left as they are.
+- `withDisconnectTest` waits for the disconnect instead of sleeping a second, and closes its server.
+- `RemotePortForwardTests` checked the forward only inside its callback, which passes if the callback
+  never runs; it counts the forwards that opened and checks them after. Its memberwise-initialiser
+  test is gone.
+- The hard-link test drives `hardLink(at:to:)` and gets the server's refusal back, instead of
+  completing a promise by hand; the open-flags and ATTRS tests compare against the SFTP draft's
+  bytes, not the library's own constants and parser.
+- Two names said what the tests do not: `testClientRejectsWrongHostKey` (it accepts a trusted key) and
+  `testWithExecBidirectionalIO` (the server never reads the stdin it is sent).
+
+The package's own suite runs 62 tests, all passing; 6 skip without a live server or the internet
+(`SSH_HOST`, `SSH_PORT`, `SSH_USERNAME`, `SSH_PASSWORD`; `CITADEL_INTERNET_TESTS=1`).
 
 ## Deliberately not changed
 

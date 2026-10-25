@@ -304,6 +304,24 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         return tlsVerification.shortDescription
     }
 
+    /// Where the database is, as the far end of its route reaches it: the address
+    /// `GlassDatabaseCapability.forwardProvider` aims a tunnel at, or the host itself without one.
+    /// Nil only for a tunnel through this machine to the machine itself, its loopback. Not `host`
+    /// alone: through this machine to a Database address, `host` is the machine's own address, and
+    /// the overview showed it as the database's (2026-10-22).
+    var reachedHost: String? {
+        guard usesHostTunnel, tunnelServiceID == nil else { return host }
+        return tunnelTargetHost
+    }
+
+    /// The overview's Endpoint: where the connection ends. "This machine" is the Database address
+    /// field's own word for a blank one.
+    var endpointDescription: String {
+        if engine == .sqlite { return host }
+        guard let reachedHost else { return "Port \(port) on this machine" }
+        return "\(reachedHost):\(port)"
+    }
+
     var displaySubtitle: String {
         if engine == .sqlite {
             let filename = URL(fileURLWithPath: host).lastPathComponent

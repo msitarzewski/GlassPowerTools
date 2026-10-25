@@ -36,40 +36,6 @@ struct GlassGalleryLayoutTests {
 }
 
 /// The card contract the gallery and the solver share.
-@Suite("A card says what it can, and admits what it cannot")
-@MainActor
-struct GlassSessionCardContractTests {
-    private func session(snapshot: (@MainActor () -> Image?)? = nil) -> GlassOpenSession {
-        GlassOpenSession(id: "terminal:1", title: "alpha", subtitle: "Connected",
-                         symbolName: "terminal", activate: {}, close: {}, snapshot: snapshot)
-    }
-
-    @Test func aSessionWithNoPictureOfItselfIsStillASession() {
-        // The editor and the database have nothing to photograph. The switcher must not wait for
-        // one, and a nil snapshot is a supported answer rather than a missing feature.
-        #expect(session().snapshot == nil)
-    }
-
-    @Test func aSnapshotIsAskedForRatherThanStored() {
-        // A picture of a terminal is stale the moment it is taken, so the card asks at draw time.
-        // Proven by counting the asks, which is the only externally visible difference.
-        final class Asked { var count = 0 }
-        let asked = Asked()
-        let row = session(snapshot: { asked.count += 1; return nil })
-        _ = row.snapshot?()
-        _ = row.snapshot?()
-        #expect(asked.count == 2)
-    }
-
-    @Test func theLayoutAndTheCardAgreeAboutProportions() {
-        // The solver reserves `captionHeight` under an image of `aspectRatio`, and the card draws
-        // exactly that. Two constants in two files is how a grid starts clipping its own titles.
-        #expect(GlassGalleryLayout.aspectRatio == 1.6)
-        #expect(GlassGalleryLayout.captionHeight == 72)
-        #expect(GlassGalleryLayout.spacing == 18)
-    }
-}
-
 /// The degenerate sizes a real screen actually hands a `GeometryReader`.
 @Suite("A layout for a size that is not there yet")
 struct GlassGalleryLayoutDegenerateTests {

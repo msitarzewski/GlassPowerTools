@@ -14,6 +14,7 @@ struct TmuxControlClientTests {
         var sent = ""
         var live = 0
         var exited: String??
+        var grids: [String] = []
 
         mutating func receive(_ text: String) { apply(client.receive(Data(text.utf8))) }
         mutating func type(_ text: String) { apply(client.input(Data(text.utf8))) }
@@ -25,6 +26,7 @@ struct TmuxControlClientTests {
                 case .transport(let data): sent += String(decoding: data, as: UTF8.self)
                 case .live: live += 1
                 case .exited(let reason): exited = .some(reason)
+                case .showGrid(let columns, let rows, let own): grids.append("\(columns)x\(rows)\(own ? " own" : "")")
                 }
             }
         }
@@ -203,6 +205,68 @@ struct TmuxControlClientTests {
         exchange.receive("%window-pane-changed @1 %9\r\n")
         #expect(exchange.client.pane == "%9")
         #expect(exchange.takeSent().first?.contains("-t %9") == true)
+    }
+
+    @Test("in front while another client has the window's size: a switch to its own session, once a layout")
+    func claim() {
+        var exchange = attached()
+        _ = exchange.takeSent()
+        exchange.apply(exchange.client.claim())
+        #expect(exchange.takeSent().isEmpty, "no layout yet: the attach made the window this client's")
+        exchange.receive("%layout-change @1 bc7d,127x53,0,0,3 bc7d,127x53,0,0,3 *\r\n")
+        exchange.receive("%layout-change @2 bcfd,80x24,0,0,7 bcfd,80x24,0,0,7 *\r\n")
+        exchange.apply(exchange.client.claim())
+        #expect(exchange.takeSent() == ["switch-client -t %3"], "another window's layout said nothing of this one's")
+        exchange.apply(exchange.client.claim())
+        #expect(exchange.takeSent().isEmpty, "one claim until tmux answers with a layout")
+        exchange.receive("%layout-change @1 bcfd,80x24,0,0,3 bcfd,80x24,0,0,3 *\r\n")
+        exchange.apply(exchange.client.claim())
+        #expect(exchange.takeSent().isEmpty, "the window is this terminal's size")
+    }
+
+    @Test("one device: however its terminal resizes, it is never held at another size (0.4.511 was)")
+    func oneDeviceNeverHeld() {
+        var exchange = attached()
+        exchange.apply(exchange.client.resize(columns: 120, rows: 40))
+        exchange.receive("%layout-change @1 bc7d,120x40,0,0,3 bc7d,120x40,0,0,3 *\r\n")
+        exchange.apply(exchange.client.resize(columns: 150, rows: 45))
+        exchange.receive("%layout-change @1 bc7d,150x45,0,0,3 bc7d,150x45,0,0,3 *\r\n")
+        exchange.apply(exchange.client.resize(columns: 150, rows: 45))
+        #expect(exchange.grids.isEmpty, "a terminal alone on its session is never told a grid: \(exchange.grids)")
+        #expect(exchange.takeSent().contains { $0.hasPrefix("refresh-client -C 150,45") }, "its own size went to tmux")
+    }
+
+    @Test("another client has the window: shown at its size, its own size still sent, then its own again")
+    func otherClientsSize() {
+        var exchange = attached()
+        _ = exchange.takeSent()
+        exchange.receive("%layout-change @1 bc7d,127x53,0,0,3 bc7d,127x53,0,0,3 *\r\n")
+        #expect(exchange.grids == ["127x53"], "shown at the other client's size")
+        // The frame changed: SwiftTerm fitted the grid to it and said so; tmux hears the new size,
+        // and the grid goes back to the other client's.
+        exchange.apply(exchange.client.resize(columns: 100, rows: 30))
+        #expect(exchange.takeSent() == ["refresh-client -C 100,30 ; display-message -p '#{window_width}x#{window_height}'"])
+        exchange.receive(reply(10) + reply(11, ["127x53"]))
+        #expect(exchange.grids.last == "127x53", "read back: still the other client's")
+        // Fitted again to the same frame: told again, as SwiftTerm's grid is its own once more.
+        let told = exchange.grids.count
+        exchange.apply(exchange.client.resize(columns: 100, rows: 30))
+        #expect(exchange.grids.count == told + 1 && exchange.grids.last == "127x53")
+        #expect(exchange.takeSent().isEmpty, "the same size isn't sent twice")
+        // The window is this terminal's again (its claim, or the other gone).
+        exchange.receive("%layout-change @1 bcfd,100x30,0,0,3 bcfd,100x30,0,0,3 *\r\n")
+        #expect(exchange.grids.last == "100x30 own")
+    }
+
+    @Test("a switch to the session the client is on reads nothing again; another session is read")
+    func ownSwitch() {
+        var exchange = attached()
+        _ = exchange.takeSent()
+        _ = exchange.takeDrawn()
+        exchange.receive("%session-changed $1 alpha\r\n")
+        #expect(exchange.takeSent().isEmpty, "its own claim's switch: the pane isn't read again")
+        exchange.receive("%session-changed $2 bravo\r\n")
+        #expect(exchange.takeSent().first?.hasPrefix("display-message") == true, "another session: asked for its pane")
     }
 
     @Test("%exit: the client ends, the ST is passed over, and what follows is the shell's")
