@@ -840,7 +840,30 @@ public final class SwiftTermHostModel: ObservableObject {
     /// narrower fence was around the *feature* that happened to want it first (the spatial
     /// overview), so a terminal could not draw itself on a phone and the session gallery had
     /// nothing to show there. Rule 52: fence the API, not the capability.
+    ///
+    /// Asked from a SwiftUI body — an orb's, the dock's, All Windows' cards — drawing the terminal
+    /// lays out the window it is in when that window has a layout pending: a SwiftUI update inside
+    /// SwiftUI's own, and AttributeGraph aborted the app (seven times on the headset, 0.4.508 to
+    /// 0.4.536). So it gives the picture drawn last, and draws the next just after, outside the
+    /// update; the asker, drawn again each second, shows it then.
     public func previewImage(maxPixelWidth: Int = 640) -> UIImage? {
+        if !previewAsked {
+            previewAsked = true
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                previewAsked = false
+                drawPreview(maxPixelWidth: maxPixelWidth)
+            }
+        }
+        return rememberedPreview
+    }
+
+    /// One picture asked for and not yet drawn.
+    private var previewAsked = false
+
+    /// Draws the picture now; never from inside a SwiftUI update.
+    @discardableResult
+    private func drawPreview(maxPixelWidth: Int) -> UIImage? {
         // Off the screen — a terminal the person has left, on an iPhone — the view may draw
         // nothing current, so it gives the picture it last drew there (2026-10-14: All Windows'
         // cards; Blur previews softens it like every other).
@@ -873,7 +896,7 @@ public final class SwiftTermHostModel: ObservableObject {
 
     /// Takes the picture as the view leaves the screen, while it can still draw itself.
     fileprivate func rememberPreview() {
-        _ = previewImage(maxPixelWidth: 800)
+        drawPreview(maxPixelWidth: 800)
     }
     #endif
 

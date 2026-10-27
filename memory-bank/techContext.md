@@ -636,6 +636,11 @@ workgroups"; then "run btop or something for the terminal examples"):
   (visionOS 2+). Five real files carried `metersPerUnit`, `upAxis`, `defaultPrim`, `customLayerData` and `doc`, and no
   camera. ARKit's `WorldTrackingProvider` asks for no authorization and runs in the simulator; full immersion fades
   about 1.5 m from where the person started. Details in `tasks/2026-10/2026-10-26_focus-environments.md`.
+- **Drawing a SwiftUI-hosted view from a SwiftUI body (2026-10-27):** `layer.render(in:)` (and `layoutIfNeeded`) on a
+  view inside a SwiftUI window lays out that window's `_UIHostingView` when a layout is pending; from inside a
+  `TimelineView`'s content that is an update inside SwiftUI's own, and AttributeGraph aborts (`AG::Graph::value_set`
+  precondition). Seven crashes on the headset; the simulator never showed it, even with every view's layout pending.
+  Draw such pictures outside the update (a main-actor task) and show the last one.
 - **ARKit on visionOS (2026-10-27):** "ARKit data is available only when your app presents a Full Space and other apps
   are hidden" (Apple, Setting up access to ARKit data), so a window in the shared space gets no head direction.
   `ARKitSession.run(_:)` "either throws an ARKitSession.Error or asserts" when passed a stopped provider (Apple's
