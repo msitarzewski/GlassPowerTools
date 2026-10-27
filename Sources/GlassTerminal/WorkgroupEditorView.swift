@@ -17,7 +17,7 @@ struct WorkgroupEditorContext: Identifiable {
     let sessionIntents: [LayoutPreset.SessionIntent]
     var workspaceLayout: LayoutPreset.WorkspaceLayout? = nil
     var openingView: LayoutPreset.OpeningView = .tabs
-    var autoFocusOnActivity = false
+    var autoFocusOnActivity = LayoutPreset.followsActivityByDefault
     var gridCardWidth: Double? = nil
     /// The settings the workgroup's window opens with (W20's look, W22): a captured window's, or
     /// the one being edited's. The editor changes their Look and Text (D84) and keeps the rest.

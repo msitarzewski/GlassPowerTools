@@ -37,7 +37,7 @@ public struct GlassDesktopScenes: Scene {
         #if os(visionOS)
         .windowStyle(.plain)
         // Asked for from the orb dock, it comes back above the dock (D88).
-        .glassReturnsAboveOrbDock()
+        .glassComesBackByOrbDock()
         #endif
         #if os(macOS)
         // File ▸ Import RDP File… (⇧⌘I), glassDT's menu item. Aimed by the library toolbar's

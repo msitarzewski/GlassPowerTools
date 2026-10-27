@@ -282,6 +282,8 @@ private struct GlassSessionOrbModifier: ViewModifier {
         if inDock, let id = face.dockID, GlassShowAllWindows.openSessions?().contains(where: { $0.id == id }) == true {
             guard !departing else { return }
             let size = sizer.windowSize
+            // Its picture, while it still draws itself: its orb's after a relaunch.
+            GlassOrbDockModel.shared.keepPicture(sizer.uiPicture(), for: id)
             departing = true
             // The drop lands in the dock as the window finishes gathering into it, then the window
             // goes.
@@ -354,6 +356,11 @@ struct GlassSessionOrbView: View {
     /// be read from the dot ("foveated rendering … reading the top tab's name under the orb is
     /// impossible"). Only the icon is looked at; the name opens toward the trailing side.
     var expandsDots = false
+    /// The room either side of the orb in the dock: a dot near the dock's trailing edge opens its
+    /// name toward the leading side instead (the owner, 2026-10-26: "When a docked window's tab is
+    /// too close to the right to reliably show, it should show to the left instead and not get
+    /// cropped"). Nil outside the dock, or before the dock has laid it out.
+    var nameRoom: GlassOrbNameRoom? = nil
     let grow: () -> Void
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.layoutDirection) private var layoutDirection
@@ -383,7 +390,7 @@ struct GlassSessionOrbView: View {
             orb(tabs)
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                 if expandsDots {
-                    openingDot(tab)
+                    openingDot(tab, opensLeading: opensLeading(index, of: tabs.count))
                         .offset(z: GlassOrbRingLayout.lift(of: index, count: tabs.count))
                 } else {
                     dot(tab)
@@ -498,9 +505,21 @@ struct GlassSessionOrbView: View {
     /// In front of the orb, so an open name crossing it stays over it ("they need to remain on
     /// top!"): drawn after the orb, it was still under the sphere's glass, and an effect the system
     /// draws cannot bring anything forward.
-    private func openingDot(_ tab: GlassSessionOrbTab) -> some View {
+    /// Whether the dot at `index` opens its name toward the leading side: too little room past it
+    /// toward the dock's trailing edge, and more the other way.
+    private func opensLeading(_ index: Int, of count: Int) -> Bool {
+        guard let nameRoom else { return false }
+        let offset = GlassOrbRingLayout.ringRadius * cos(-Double.pi / 2 + 2 * Double.pi * Double(index) / Double(max(count, 1)))
+        let along = layoutDirection == .rightToLeft ? -offset : offset
+        return GlassOrbNameSide.opensLeading(
+            trailingRoom: nameRoom.trailing - along, leadingRoom: nameRoom.leading + along,
+            needs: GlassOrbNameSide.reach(dotDiameter: GlassOrbRingLayout.dotDiameter, nameWidth: GlassOrbRingLayout.nameWidth))
+    }
+
+    private func openingDot(_ tab: GlassSessionOrbTab, opensLeading: Bool = false) -> some View {
         let side = GlassOrbRingLayout.dotDiameter
-        let rightToLeft = layoutDirection == .rightToLeft
+        // Opening toward the leading side is drawn as a right-to-left dot is.
+        let rightToLeft = (layoutDirection == .rightToLeft) != opensLeading
         let name = Text(tab.title)
             .font(.footnote.weight(.medium))
             .lineLimit(1)
@@ -532,6 +551,7 @@ struct GlassSessionOrbView: View {
         .buttonStyle(GlassSessionOrbPressStyle())
         .hoverEffectGroup(look(tab))
         .frame(width: side, height: side, alignment: .leading)
+        .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight)
         .accessibilityLabel("Open \(tab.title)")
         .accessibilityIdentifier("session-orb-tab-\(tab.id)")
     }

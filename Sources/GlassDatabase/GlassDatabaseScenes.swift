@@ -64,7 +64,7 @@ public struct GlassDatabaseScenes: Scene {
         #if os(visionOS)
         .windowStyle(.plain)
         // Asked for from the orb dock, it comes back above the dock (D88).
-        .glassReturnsAboveOrbDock()
+        .glassComesBackByOrbDock()
         #endif
         #if !os(iOS)
         .defaultSize(width: 1400, height: 900)

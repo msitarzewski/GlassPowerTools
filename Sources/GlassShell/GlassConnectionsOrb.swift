@@ -27,13 +27,26 @@ public struct GlassConnectionsOrb: View {
     static var windowSide: CGFloat { GlassConnectionsWindowSize.orbSide }
 
     private let model: GlassShellModel
+    /// Larger in the dock, where it leads the others (the owner, 2026-10-26: "bring the connections
+    /// orb to more prominence").
+    private let scale: CGFloat
     private let restore: () -> Void
+    /// What a pinch and hold offers, in the dock.
+    private var menu: AnyView?
     @Environment(\.scenePhase) private var scenePhase
 
     /// - Parameter restore: grows the window back into the library.
-    init(model: GlassShellModel, restore: @escaping () -> Void) {
+    init(model: GlassShellModel, scale: CGFloat = 1, restore: @escaping () -> Void) {
         self.model = model
+        self.scale = scale
         self.restore = restore
+    }
+
+    /// - Parameter menu: offered on a pinch and hold; a pinch still restores.
+    init<Items: View>(model: GlassShellModel, scale: CGFloat = 1, restore: @escaping () -> Void,
+                      @ViewBuilder menu: () -> Items) {
+        self.init(model: model, scale: scale, restore: restore)
+        self.menu = AnyView(menu())
     }
 
     /// The library's own number — the Active row's — so the orb never disagrees with the window
@@ -42,53 +55,70 @@ public struct GlassConnectionsOrb: View {
 
     public var body: some View {
         let count = activeCount
-        Button(action: restore) {
-            // Room under the icon for the count's badge before the name.
-            VStack(spacing: 10 + GlassConnectionsOrbBadge.drop) {
-                GlassConnectionsOrbFace()
-                    .frame(width: Self.diameter, height: Self.diameter)
-                    .glassBackgroundEffect(in: .circle)
-                    .contentShape(.hoverEffect, .circle)
-                    // Looked at, it lights as every control does, and grows a little.
-                    .hoverEffect(.highlight)
-                    .hoverEffect(GlassOrbGrowEffect().hoverEffectPhaseOverride(Self.lookedAtOverride))
-                    // Over the icon, after its hover effects, so the highlight's circle never clips it.
-                    .overlay(alignment: .bottom) {
-                        if count > 0 {
-                            GlassConnectionsOrbBadge(count: count)
-                                .alignmentGuide(.bottom) { $0[.bottom] - GlassConnectionsOrbBadge.drop }
-                                .transition(.opacity)
-                        }
-                    }
-                Text("Connections")
-                    .font(.callout.weight(.medium))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .glassBackgroundEffect(in: .capsule)
-                    // Shown only while the orb is looked at: the name, where the eyes already are.
-                    .hoverEffect(GlassOrbRevealEffect().hoverEffectPhaseOverride(Self.lookedAtOverride))
+        orb(count)
+            // Activated in its middle, on the icon. Left to SwiftUI, the point moved down to the name
+            // when the badge came out of the icon (42071ef); the name is invisible until the orb is
+            // looked at, and the UI test's tap there reached the terminal behind the orb instead (W34).
+            .accessibilityActivationPoint(.center)
+            .frame(width: Self.windowSide * scale, height: Self.windowSide * scale)
+            .animation(.smooth, value: count)
+            .help("Open Connections")
+            .accessibilityLabel(count > 0 ? "Open Connections, \(count) active" : "Open Connections")
+            // What runs on the machines, asked the way the library asks as it appears: at most once
+            // in `runningSessionsMaxAge`, and not before the library has loaded. Nothing more polls.
+            .task { await model.refreshRunningSessionsIfDue() }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await model.refreshRunningSessionsIfDue() }
             }
-            // Looking at either part lights both.
-            .hoverEffectGroup()
+    }
+
+    /// A pinch restores the library. With a menu, a pinch and hold opens it (the owner, 2026-10-27:
+    /// "No menu on the connections icon with pinch and hold"): a `.contextMenu` on the button never
+    /// opened in the dock, on the headset or in the simulator, scrolling or not; a menu whose pinch is
+    /// its primary action does, as a toolbar button's does.
+    @ViewBuilder
+    private func orb(_ count: Int) -> some View {
+        if let menu {
+            Menu { menu } label: { face(count) } primaryAction: { restore() }
+                .menuIndicator(.hidden)
+                .buttonStyle(GlassOrbButtonStyle())
+        } else {
+            // Its own style: a plain button would light its whole frame on a look, a square over
+            // the circle.
+            Button(action: restore) { face(count) }
+                .buttonStyle(GlassOrbButtonStyle())
         }
-        // Its own style: a plain button would light its whole frame on a look, a square over
-        // the circle.
-        .buttonStyle(GlassOrbButtonStyle())
-        // Activated in its middle, on the icon. Left to SwiftUI, the point moved down to the name
-        // when the badge came out of the icon (42071ef); the name is invisible until the orb is
-        // looked at, and the UI test's tap there reached the terminal behind the orb instead (W34).
-        .accessibilityActivationPoint(.center)
-        .frame(width: Self.windowSide, height: Self.windowSide)
-        .animation(.smooth, value: count)
-        .help("Open Connections")
-        .accessibilityLabel(count > 0 ? "Open Connections, \(count) active" : "Open Connections")
-        // What runs on the machines, asked the way the library asks as it appears: at most once
-        // in `runningSessionsMaxAge`, and not before the library has loaded. Nothing more polls.
-        .task { await model.refreshRunningSessionsIfDue() }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await model.refreshRunningSessionsIfDue() }
+    }
+
+    private func face(_ count: Int) -> some View {
+        // Room under the icon for the count's badge before the name.
+        VStack(spacing: 10 + GlassConnectionsOrbBadge.drop) {
+            GlassConnectionsOrbFace()
+                .frame(width: Self.diameter * scale, height: Self.diameter * scale)
+                .glassBackgroundEffect(in: .circle)
+                .contentShape(.hoverEffect, .circle)
+                // Looked at, it lights as every control does, and grows a little.
+                .hoverEffect(.highlight)
+                .hoverEffect(GlassOrbGrowEffect().hoverEffectPhaseOverride(Self.lookedAtOverride))
+                // Over the icon, after its hover effects, so the highlight's circle never clips it.
+                .overlay(alignment: .bottom) {
+                    if count > 0 {
+                        GlassConnectionsOrbBadge(count: count)
+                            .alignmentGuide(.bottom) { $0[.bottom] - GlassConnectionsOrbBadge.drop }
+                            .transition(.opacity)
+                    }
+                }
+            Text("Connections")
+                .font(.callout.weight(.medium))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .glassBackgroundEffect(in: .capsule)
+                // Shown only while the orb is looked at: the name, where the eyes already are.
+                .hoverEffect(GlassOrbRevealEffect().hoverEffectPhaseOverride(Self.lookedAtOverride))
         }
+        // Looking at either part lights both.
+        .hoverEffectGroup()
     }
 
     #if DEBUG

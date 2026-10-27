@@ -22,6 +22,11 @@ final class GlassWindowSizer {
         return scene.effectiveGeometry.coordinateSpace.bounds.size
     }
 
+    /// The person's hand is on the window's corner, resizing it.
+    var isInteractivelyResizing: Bool {
+        window?.windowScene?.effectiveGeometry.isInteractivelyResizing ?? false
+    }
+
     /// Bumped by every resize asked for, so an older one still waiting gives way to the newest.
     private var generation = 0
 
@@ -78,6 +83,11 @@ extension GlassWindowSizer {
     /// The window as it looks now, drawn as it is composited — the system's glass is drawn outside
     /// the window, so what is in it, on clear — at most `maxPixelWidth` wide; nil outside a window.
     func picture(maxPixelWidth: CGFloat = 640) -> Image? {
+        uiPicture(maxPixelWidth: maxPixelWidth).map(Image.init(uiImage:))
+    }
+
+    /// The same, as UIKit's image: to be kept on the device (`GlassOrbDockModel.keepPicture`).
+    func uiPicture(maxPixelWidth: CGFloat = 640) -> UIImage? {
         guard let window, window.bounds.width > 0, window.bounds.height > 0 else { return nil }
         let scale = min(1, maxPixelWidth / window.bounds.width)
         let format = UIGraphicsImageRendererFormat()
@@ -88,7 +98,7 @@ extension GlassWindowSizer {
         let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
             drawn = window.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: false)
         }
-        return drawn ? Image(uiImage: image) : nil
+        return drawn ? image : nil
     }
 }
 

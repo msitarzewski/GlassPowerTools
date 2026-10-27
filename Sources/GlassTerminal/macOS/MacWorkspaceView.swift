@@ -50,7 +50,7 @@ struct MacWorkspaceView: View {
     @State private var tabDropTargeted = false
     @State private var showingOverview = false
     @State private var overviewCarousel = false
-    @State private var followsActivity = false
+    @State private var followsActivity = LayoutPreset.followsActivityByDefault
     @State private var appliedOpeningPreferences = false
     @State private var overviewControlsVisible = true
     @State private var gridCardWidth: Double?

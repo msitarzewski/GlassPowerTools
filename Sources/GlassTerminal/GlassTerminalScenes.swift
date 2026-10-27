@@ -140,7 +140,7 @@ public struct GlassTerminalScenes: Scene {
         .defaultSize(width: 1200, height: 800)
         .restorationBehavior(.disabled)
         // Asked for from the orb dock, it comes back above the dock (D88).
-        .glassReturnsAboveOrbDock()
+        .glassComesBackByOrbDock()
         .commands { PlatformTerminalCommands() }
         // No orb scene here: Connections becomes its own orb, in its own window (the shell's
         // `glassConnectionsIdleShrink`, W29 and W39), showing the library's Active count, which

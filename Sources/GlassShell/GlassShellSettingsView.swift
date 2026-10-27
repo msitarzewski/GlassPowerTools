@@ -50,7 +50,7 @@ public struct GlassShellSettingsView: View {
     @State private var page = GlassShellSettingsSelection.shell(.general)
     #if os(macOS) || os(visionOS)
     /// HIG: a settings window reopens on the pane last viewed.
-    @AppStorage("com.glasspowertools.settings.pane", store: GlassUITestRun.settingsDefaults) private var storedPane = "general"
+    @AppStorage(Self.paneKey, store: GlassUITestRun.settingsDefaults) private var storedPane = "general"
     #endif
     @Environment(\.dismiss) private var dismiss
     #if os(iOS)
@@ -58,6 +58,10 @@ public struct GlassShellSettingsView: View {
     #endif
 
     public init(model: GlassShellModel) { self.model = model }
+
+    /// The pane Settings opens on: the one last viewed, or one another place sets before opening it
+    /// (the orb dock's Connections menu, on Appearance).
+    public static let paneKey = "com.glasspowertools.settings.pane"
 
     private var capabilityPages: [GlassCapabilitySettingsPage] { model.registry.settingsPages }
 
@@ -249,10 +253,13 @@ public struct GlassShellSettingsView: View {
     private var dockLookData = Data()
     @AppStorage(GlassOrbDock.sizeKey, store: GlassUITestRun.settingsDefaults)
     private var dockSize = ""
+    @AppStorage(GlassOrbDock.tallSideKey, store: GlassUITestRun.settingsDefaults)
+    private var tallDockSide = GlassOrbDockSide.trailing.rawValue
 
     /// Where a window shrunk to its orb goes (D88): where it is, or into one dock with the rest. The
-    /// dock's own glass and Opacity, following Appearance until set here (the owner, 2026-10-26: "its
-    /// own, but start with Appearance"), and its size back to fitting its orbs.
+    /// side a window comes back on from a tall dock outside Focus Mode (the owner, 2026-10-27: "Head
+    /// in Focus Mode, else setting"); the dock's own glass and Opacity, following Appearance until set
+    /// here (2026-10-26: "its own, but start with Appearance"), and its size back to fitting its orbs.
     @ViewBuilder
     private var orbsSection: some View {
         Section("Orbs") {
@@ -261,9 +268,19 @@ public struct GlassShellSettingsView: View {
                 Text("Into the Dock").tag(true)
             }
             .accessibilityIdentifier("settings-orbs-dock")
-            Text("Into the Dock gathers your orbs, and Connections, in a row you move by its bar; resize it taller than it is wide and they stand in a column. Pinch an orb to bring its window back above the dock.")
+            Text("Into the Dock gathers your orbs, and Connections, in a row you move by its bar. Resize it and they wrap to its shape, and it snaps around them. Pinch an orb to bring its window back above the dock, or beside it when the dock is taller than it is wide.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if orbsInDock {
+                Picker("Windows From a Tall Dock", selection: $tallDockSide) {
+                    Text("On Its Left").tag(GlassOrbDockSide.leading.rawValue)
+                    Text("On Its Right").tag(GlassOrbDockSide.trailing.rawValue)
+                }
+                .accessibilityIdentifier("settings-orbs-tall-side")
+                Text("In Focus Mode they come back on the side away from where you turned to look at the dock. Elsewhere visionOS doesn't say where you are looking.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if !dockSize.isEmpty {
                 Button("Fit Dock to Its Orbs", systemImage: "arrow.left.and.right") { dockSize = "" }
                     .accessibilityIdentifier("settings-orbs-dock-fit")

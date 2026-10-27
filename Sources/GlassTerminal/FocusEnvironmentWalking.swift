@@ -19,8 +19,8 @@ import OSLog
 
 #if os(visionOS)
 import RealityKit
-import ARKit
 import QuartzCore
+import GlassShell
 
 /// Everything that walks: the world that moves, the floor and sky that catch pinches, the ring and
 /// target that show where they lead, and the head they are measured from.
@@ -45,7 +45,7 @@ final class FocusWalking {
     private var arrow = Entity()
     private var targetMaterial = UnlitMaterial()
 
-    private let head = FocusHeadTracker()
+    private let head = GlassHeadTracker(purpose: "Focus Mode")
     private(set) var pose = FocusWorldPose.identity
     private var room: FocusEnvironmentScenes.LoadedRoom?
     private var roomPose: FocusRoomPose?
@@ -508,41 +508,4 @@ enum FocusDemoRoom {
 }
 #endif
 
-/// The head, from ARKit's world tracking while the space is open. Nothing in the simulator, where
-/// the person counts as standing where Focus Mode began, facing ahead.
-@MainActor
-final class FocusHeadTracker {
-    private let session = ARKitSession()
-    private let tracking = WorldTrackingProvider()
-    private var running = false
-    nonisolated private static let log = Logger(subsystem: "com.glasspowertools", category: "FocusEnvironments")
-
-    func run() async {
-        guard !running else { return }
-        Self.log.info("World tracking: supported \(WorldTrackingProvider.isSupported, privacy: .public), needs \(String(describing: WorldTrackingProvider.requiredAuthorizations), privacy: .public)")
-        // Only without a question to the person: one that asked would need its reason in Info.plist.
-        guard WorldTrackingProvider.isSupported, WorldTrackingProvider.requiredAuthorizations.isEmpty else { return }
-        do {
-            try await session.run([tracking])
-            running = true
-        } catch {
-            Self.log.error("World tracking couldn't start: \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    func stop() {
-        session.stop()
-        running = false
-    }
-
-    /// The head around the person: where it is, and the way it looks.
-    func pose() -> (position: SIMD3<Float>, forward: SIMD3<Float>)? {
-        guard running, tracking.state == .running,
-              let anchor = tracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime()) else { return nil }
-        let matrix = anchor.originFromAnchorTransform
-        let position = SIMD3<Float>(matrix.columns.3.x, matrix.columns.3.y, matrix.columns.3.z)
-        let forward = -SIMD3<Float>(matrix.columns.2.x, matrix.columns.2.y, matrix.columns.2.z)
-        return (position, simd_normalize(forward))
-    }
-}
 #endif

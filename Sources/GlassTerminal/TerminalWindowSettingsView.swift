@@ -74,7 +74,7 @@ struct TerminalOverridesSettingsView: View {
 
     /// What the window follows until it sets Auto-focus on activity: its saved Workgroup's.
     private var workgroupFollowsActivity: Bool {
-        settingsManager.layoutPresets.first { $0.id == workgroupID }?.autoFocusOnActivity ?? false
+        settingsManager.layoutPresets.first { $0.id == workgroupID }?.autoFocusOnActivity ?? LayoutPreset.followsActivityByDefault
     }
 
     var body: some View {

@@ -162,7 +162,7 @@ final class GlassOrbRelaunchUITests: XCTestCase {
         let terminalIntoTheDock = Self.dockOn + ["--demo-open", "terminal", "--demo-session-orb"]
         launch(terminalIntoTheDock + ["--demo-dock-resize", "420x1100"])
         XCTAssertTrue(orbInDock.waitForExistence(timeout: 60), "the terminal did not go into the dock")
-        let column = expectation(for: NSPredicate(format: "value == %@", "column"), evaluatedWith: dock)
+        let column = expectation(for: NSPredicate(format: "value == %@", "tall"), evaluatedWith: dock)
         XCTAssertEqual(XCTWaiter().wait(for: [column], timeout: 20), .completed,
                        "resized taller than wide, the dock is a \(dock.value ?? "nothing")")
         assertStacked()
@@ -172,7 +172,7 @@ final class GlassOrbRelaunchUITests: XCTestCase {
         launch(terminalIntoTheDock)
         XCTAssertTrue(orbInDock.waitForExistence(timeout: 60), "the terminal did not go into the dock")
         sleep(3)
-        XCTAssertEqual(dock.value as? String, "column", "the dock did not open at the size it was given")
+        XCTAssertEqual(dock.value as? String, "tall", "the dock did not open at the size it was given")
         assertStacked()
     }
 

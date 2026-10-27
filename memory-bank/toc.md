@@ -110,7 +110,7 @@ source applications are obsolete and no longer compile.
 | [Git and diffs in the editor](tasks/2026-10/2026-10-23_editor-git.md) | Changes, diffs and commits in the editor's projects |
 | [A dropped terminal is listed once in Active](tasks/2026-10/2026-10-24_active-dropped-tabs.md) | One row per tmux session; a dropped tab's row says what the machine said |
 | [Test audit](tasks/2026-10/2026-10-24_test-audit.md) | Every failing test found and settled, checks that could not fail fixed or deleted, each kept test seen biting |
-| [Orbs gather in a dock (D88)](tasks/2026-10/2026-10-25_orb-dock.md) | Eight rounds: the dock, machine orbs, names over everything, a kept order, windows back as left, a resizable dock with its own look |
+| [Orbs gather in a dock (D88)](tasks/2026-10/2026-10-25_orb-dock.md) | Ten rounds: the dock, machine orbs, names over everything, a kept order, windows back as left, a resizable dock with its own look, orbs that wrap and a dock that snaps, Connections' hold menu, a tall dock's side, the resize crash |
 | [A picture pasted in a terminal](tasks/2026-10/2026-10-25_terminal-paste-picture.md) | A pasted image goes to the machine on Vision Pro |
 | [The tools menu while agents work](tasks/2026-10/2026-10-25_terminal-tools-menu-busy.md) | The gear menu on a busy terminal on the headset: still open, with diagnostics in place |
 | [Focus Mode environments (D89)](tasks/2026-10/2026-10-26_focus-environments.md) | Built-in and your own environments, Open Immersed, Try Out with fits, and Mirador's teleport inside |

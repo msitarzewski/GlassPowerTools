@@ -126,8 +126,9 @@ struct MacWorkspaceTests {
 
     @Test func workgroupPresentationPreferencesRoundTripAndLegacyDefaults() throws {
         var preset = LayoutPreset(name: "Monitor", sessionIntents: [.init(kind: .local)])
+        #expect(preset.autoFocusOnActivity, "on unless set (2026-10-26)")
         preset.openingView = .carousel
-        preset.autoFocusOnActivity = true
+        preset.autoFocusOnActivity = false
         preset.gridCardWidth = 460
         let data = try JSONEncoder().encode(preset)
         #expect(try JSONDecoder().decode(LayoutPreset.self, from: data) == preset)
@@ -137,11 +138,11 @@ struct MacWorkspaceTests {
         legacy.removeValue(forKey: "gridCardWidth")
         let restored = try JSONDecoder().decode(LayoutPreset.self, from: JSONSerialization.data(withJSONObject: legacy))
         #expect(restored.openingView == .tabs)
-        #expect(!restored.autoFocusOnActivity)
+        #expect(restored.autoFocusOnActivity, "saved before the setting: on, as unset is now")
         #expect(restored.gridCardWidth == nil)
         let copy = WorkgroupEditorContext.duplicate(preset)
         #expect(copy.openingView == .carousel)
-        #expect(copy.autoFocusOnActivity)
+        #expect(!copy.autoFocusOnActivity, "saved off, it stays off")
         #expect(copy.gridCardWidth == 460)
     }
 

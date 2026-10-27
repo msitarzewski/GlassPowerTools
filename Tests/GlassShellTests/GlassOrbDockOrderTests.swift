@@ -59,22 +59,6 @@ struct GlassOrbDockOrderTests {
         #expect(order.ids.first == "old-0", "the first places kept")
     }
 
-    @Test("A carried orb lands on the one under its middle, or before or after them all")
-    func landing() {
-        let widths: [CGFloat] = [280, 200, 280]
-        // Not carried, or not far: where it was.
-        #expect(GlassOrbDockOrder.landing(of: 1, carried: 0, widths: widths) == .on(1))
-        #expect(GlassOrbDockOrder.landing(of: 1, carried: -90, widths: widths) == .on(1))
-        // Its middle over the next or the one before.
-        #expect(GlassOrbDockOrder.landing(of: 1, carried: 150, widths: widths) == .on(2))
-        #expect(GlassOrbDockOrder.landing(of: 1, carried: -110, widths: widths) == .on(0))
-        #expect(GlassOrbDockOrder.landing(of: 0, carried: 300, widths: widths) == .on(1))
-        // Past the first's leading edge, over Connections; past the last's trailing edge.
-        #expect(GlassOrbDockOrder.landing(of: 1, carried: -400, widths: widths) == .first)
-        #expect(GlassOrbDockOrder.landing(of: 1, carried: 500, widths: widths) == .last)
-        #expect(GlassOrbDockOrder.landing(of: 5, carried: 0, widths: widths) == .last, "an orb not in the row")
-    }
-
     @Test("The order is this device's, kept between launches")
     func keptInDefaults() throws {
         let defaults = try #require(UserDefaults(suiteName: "GlassOrbDockOrderTests-\(UUID().uuidString)"))

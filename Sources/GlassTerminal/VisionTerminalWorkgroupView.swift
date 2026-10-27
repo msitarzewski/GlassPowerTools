@@ -427,11 +427,11 @@ struct VisionTerminalWorkgroupView: View {
 
     #if os(visionOS)
     /// Auto-focus on activity (the owner, 2026-10-15): the window's own, in This Window, else the
-    /// saved Workgroup's it was opened from, else off.
+    /// saved Workgroup's it was opened from, else on (2026-10-26).
     private var followsActivity: Bool {
         sessionManager.workgroup(for: workgroupID)?.windowSettings[TerminalWindowSettings.autoFocusOnActivity]
             ?? settingsManager.layoutPresets.first { $0.id == workgroupID }?.autoFocusOnActivity
-            ?? false
+            ?? LayoutPreset.followsActivityByDefault
     }
 
     /// This window as its orb: the terminal in front, live; pulsing while a terminal here prints, when

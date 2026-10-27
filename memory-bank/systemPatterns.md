@@ -294,7 +294,7 @@ test fails without the push.
 - **A card drawn as its window paints (2026-10-17).** `GlassOpenSession.backdrop` carries what a session's window paints
   behind it where the window has an opaque page (iPhone, iPad); All Windows draws it and takes its light or dark.
 
-## tmux in control mode, looks, SQL, This Mac, time in use, the orb dock, environments (D83–D89, 2026-10-19 to 26)
+## tmux in control mode, looks, SQL, This Mac, time in use, the orb dock, environments (D83–D89, 2026-10-19 to 27)
 
 - **A terminal kept in tmux is a control-mode client (D83).** `TmuxControlClient`
   (`Sources/GlassTerminalEmulator/TmuxControlClient.swift`) reads tmux's `%output` and feeds the emulator, which keeps
@@ -316,11 +316,20 @@ test fails without the push.
   `GlassUsagePayload`, D81's one-entry-per-device shape.
 - **The orb dock (D88).** `GlassOrbDockModel` (`Sources/GlassShell/GlassOrbDock.swift`, one per app) holds the docked
   windows: visionOS carries no window, so a window docks by closing, its sessions kept, and comes back through the
-  scene's `defaultWindowPlacement` (`glassReturnsAboveOrbDock`), placed by the dock's `returning` queue. Its order is
-  `GlassOrbDockOrder` (kept by id, tested apart from the view). The dock is a resizable plain window whose shape decides
-  a row or a column; the size the person gives it is kept and opened at (`glassOrbDockOpensAtItsSize`), and until then
-  it fits its orbs through `GlassWindowSizer`. Its look is a `GlassWindowOverrides` over Appearance, drawn as every
-  window's, and edited with the same rows as This Window (`GlassWindowLayerControls`).
+  scene's `defaultWindowPlacement` (`glassComesBackByOrbDock`), placed by the dock's `returning` queue: above a wide
+  dock, `.leading`/`.trailing` of a tall one. Its order is `GlassOrbDockOrder` (kept by id). Its geometry is pure and
+  tested apart from the view (`GlassOrbDockGeometry.swift`): `GlassOrbFlow` lays the orbs in wrapping rows and
+  `snapped` gives the dock's size around them within the size the person gave it; `landing(at:)` places a carried orb;
+  `GlassOrbNameSide` turns a name toward the room; `GlassOrbDockSide` picks the side; `GlassOrbDockMenu` fills
+  Connections' hold menu. The size given is kept (`sizeKey`) and opened at (`glassOrbDockOpensAtItsSize`); the dock
+  asks for its snapped size through `GlassWindowSizer` once `isInteractivelyResizing` is false. The carry is UIKit's
+  long press on the dock's window (`GlassOrbCarryProbe`; visionOS has no `UIGestureRecognizerRepresentable`), begun
+  only on an orb, so the scroll view keeps every quick drag. Connections there is a `Menu` whose primary action is the
+  pinch (a `.contextMenu` on its button never opened). Head direction comes only from Focus Mode's
+  `GlassHeadTracker` (`GlassHeadTracker.current`; a new ARKit session and provider each run); otherwise the side is the
+  setting (`tallSideKey`). Docked windows' pictures are kept in Caches ("Orb Pictures", complete protection) until they
+  leave the dock. Its look is a `GlassWindowOverrides` over Appearance, drawn as every window's, and edited with the
+  same rows as This Window (`GlassWindowLayerControls`).
 - **Windows come back as they were left (D88, 2026-10-26).** The terminal's reopen record (W15) carries `asOrb`, read
   from the dock's model when the list is written: a docked window is put in the dock and its window not opened; a
   standing orb opens as its orb (`opensAsOrb`, taken by the window's `standAsOrb`). Connections keeps
@@ -332,6 +341,8 @@ test fails without the push.
   tested (`FocusRoomFit`, `FocusRoomPose`, `FocusWorldPose`, `FocusLocomotion` in `FocusRoomFit.swift`); moving about
   moves the world, never the person (`FocusWalking`), with the numbers of the owner's Mirador gallery.
 - **Test switches stand in for what the simulator's runner cannot do**, DEBUG and `--ui-testing` only: `--demo-reopen`
-  (a last run's window), `--demo-dock-resize` (a hand on the dock's corner), `--ui-testing-seed-hosts alpha:ssh=<uuid>`
+  (a last run's window), `--demo-dock-resize` (a hand on the dock's corner), `--demo-dock-carry` (a hold carrying the
+  last orb onto the first), the `orb-dock-last-side` marker (the side a window was sent to, since the runner reads each
+  window's frame in its own space), `--ui-testing-seed-hosts alpha:ssh=<uuid>`
   (a seeded service with a known id), `--demo-try-out`, `--demo-teleport`. A UI test that must cross a relaunch launches
   again under the same `--ui-testing <uuid>`, whose store is kept.

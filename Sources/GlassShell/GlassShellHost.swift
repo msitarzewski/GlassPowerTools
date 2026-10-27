@@ -192,3 +192,21 @@ extension GlassShellHost {
         return "This removes \(host.displayName) and \(services) from your library on every device, with each service's settings and saved password. Your SSH keys stay in SSH Keys."
     }
 }
+
+public extension GlassShellModel {
+    /// A service's name with its machine's: "Terminal on alpha" for one named only by its kind or
+    /// its machine, its own name where that already says the machine ("MySQL on alpha"), and
+    /// "reports on alpha" where it does not.
+    nonisolated static func paletteName(of service: HostServiceLink, on host: GlassShellHost) -> String {
+        let kind = GlassServicePresentation.displayName(for: service.kind)
+        let name = service.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty || name.caseInsensitiveCompare(kind) == .orderedSame
+            || name.caseInsensitiveCompare(host.displayName) == .orderedSame {
+            return "\(kind) on \(host.displayName)"
+        }
+        if name.range(of: " on \(host.displayName)", options: [.caseInsensitive, .anchored, .backwards]) != nil {
+            return name
+        }
+        return "\(name) on \(host.displayName)"
+    }
+}

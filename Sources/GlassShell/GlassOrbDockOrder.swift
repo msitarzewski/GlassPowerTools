@@ -30,29 +30,12 @@ public struct GlassOrbDockOrder: Equatable, Sendable {
         defaults.set(ids, forKey: Self.settingKey)
     }
 
-    /// Where a carried orb is let go: on another, or before or after them all.
+    /// Where a carried orb is let go: on another, or before or after them all
+    /// (`landing(at:frames:before:)`).
     public enum Landing: Equatable, Sendable {
         case on(Int)
         case first
         case last
-    }
-
-    /// Where the orb at `index`, carried `by` points along the row, lands among orbs `widths` wide
-    /// side by side: on the one under its middle; before them all once its middle is past the first
-    /// one's leading edge (over Connections), after them all past the last one's trailing edge.
-    public static func landing(of index: Int, carried by: CGFloat, widths: [CGFloat]) -> Landing {
-        guard widths.indices.contains(index) else { return .last }
-        var starts: [CGFloat] = []
-        var start: CGFloat = 0
-        for width in widths {
-            starts.append(start)
-            start += width
-        }
-        let middle = starts[index] + widths[index] / 2 + by
-        if middle < 0 { return .first }
-        guard let under = starts.indices.last(where: { starts[$0] <= middle }),
-              middle < starts[under] + widths[under] else { return .last }
-        return .on(under)
     }
 
     /// `items` in the dock's order.

@@ -603,7 +603,7 @@ workgroups"; then "run btop or something for the terminal examples"):
 - **The crash behind that report** was the app's, in the database window's policy (0.4.476, 5c567dd): a re-apply
   set window properties to their own values, which still notifies SwiftUI's hosting view.
 
-## Platform facts measured 2026-10-19 to 2026-10-26 (D83–D89)
+## Platform facts measured 2026-10-19 to 2026-10-27 (D83–D89)
 
 - **tmux outside control mode loses lines.** Measured for D83: 32 of 60 lines printed at once never reached the
   terminal over SSH, and at least 85 of 1,000 locally. SwiftTerm's PTY reader left tmux's last bytes waiting under
@@ -618,7 +618,17 @@ workgroups"; then "run btop or something for the terminal examples"):
     main thread busy (the runner: "process main thread busy"); plain `frame(maxWidth:/maxHeight:)` did not.
   - While an app launches, visionOS shows a glass panel with its icon; it is not the app's window.
   - The UI test runner cannot drag a window's corner; `-key value` launch arguments reach a `UserDefaults` suite too
-    (the argument domain), so a test sets a device setting that way.
+    (the argument domain), so a test sets a device setting that way. Its `press(forDuration:)` does open a
+    `.contextMenu` (a toolbar button, a library row); its touch reaches a long press on the window.
+  - A `.contextMenu` on the dock's Connections button (a custom `ButtonStyle`, in a `ScrollView` in a custom `Layout`)
+    never opened, in the simulator or on the headset, with the window's long press taken out and with scrolling off;
+    UIKit's context-menu click feedback started and stopped at once and the button's action ran.
+    `Menu { } label: { } primaryAction: { }` opened on the same hold (2026-10-27).
+  - SwiftUI's `LongPressGesture.sequenced(before: DragGesture)` on items in a `ScrollView` kept a quick drag from
+    scrolling; a `UILongPressGestureRecognizer` on the window let it scroll. `UIGestureRecognizerRepresentable` is
+    unavailable on visionOS.
+  - `UIWindowSceneGeometry.isInteractivelyResizing` is in the visionOS 26 SDK; whether it is true while a person drags
+    the corner is not yet measured on the headset.
 - **SSH connect timeout:** Citadel's default is 30 seconds (`Packages/Citadel/Sources/Citadel/ClientSession.swift`);
   Connections waits 40 for the reopened terminals before going back into the dock.
 - **RealityKit and USD (D89, measured on the Mac):** a file's `metersPerUnit` becomes the loaded root's scale; a Z-up
@@ -626,3 +636,8 @@ workgroups"; then "run btop or something for the terminal examples"):
   (visionOS 2+). Five real files carried `metersPerUnit`, `upAxis`, `defaultPrim`, `customLayerData` and `doc`, and no
   camera. ARKit's `WorldTrackingProvider` asks for no authorization and runs in the simulator; full immersion fades
   about 1.5 m from where the person started. Details in `tasks/2026-10/2026-10-26_focus-environments.md`.
+- **ARKit on visionOS (2026-10-27):** "ARKit data is available only when your app presents a Full Space and other apps
+  are hidden" (Apple, Setting up access to ARKit data), so a window in the shared space gets no head direction.
+  `ARKitSession.run(_:)` "either throws an ARKitSession.Error or asserts" when passed a stopped provider (Apple's
+  `run(_:)` page); the headset's report of 0.4.535 shows it: SIGABRT from an `NSException` in
+  `ar_session_run_with_result`. Make a new session and provider for every run.

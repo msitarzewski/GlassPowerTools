@@ -679,7 +679,7 @@ struct GlassPowerToolsApp: App {
         // at; the window can still be resized, and comes back from its orb at whatever size it had.
         .defaultSize(width: GlassConnectionsWindowSize.width, height: GlassConnectionsWindowSize.height)
         // Asked for from the orb dock, it comes back above the dock (D88).
-        .glassReturnsAboveOrbDock()
+        .glassComesBackByOrbDock()
         #else
         let group = WindowGroup("Connections", id: "main") { mainContent }
         #if os(macOS)

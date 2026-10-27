@@ -1829,8 +1829,33 @@ until resized (Settings: Fit Dock to Its Orbs), and has a Dock section in Settin
 Glass following Appearance until set. This ends the dock as a window with no panel: it now paints what Appearance
 paints, and 0% of both makes it clear again.
 
+**Revised again 2026-10-26, with the commit (bd85f676).** "Respond like a responsive flex with cards in it where the
+docked windows move to fit the shape of the dock"; a name near the dock's right edge opening left; "a pinch and drag
+scrolls the dock 100% of the time ... pinch hold drag on a window should move it like it does today"; Connections
+"more prominence ... pinch and hold actions"; and from a tall dock, windows "to the left or right depending on dock
+position". Asked, he chose orbs that wrap (not cards), Connections a third larger and set apart, its hold menu with
+favorites, recents and Settings, and the side from where the head points (visionOS tells an app nothing of where its
+windows stand). The hold that carries an orb is UIKit's on the dock's window: measured, SwiftUI's hold-then-drag on the
+orbs kept a quick drag from scrolling. Then, from the headset: docked orbs show the picture their window had as it
+docked, kept across a relaunch; and "enable focus on motion by default": Auto-focus on Activity is on unless set.
+
+**Revised 2026-10-27, from the headset on 0.4.535.** "No menu on the connections icon with pinch and hold. When we
+resize the dock, let's make sure it snaps to the shape of the visible icons. Also, the first time I tried to resize
+vertically the app crashed." Found: ARKit gives head tracking only in a Full Space ("ARKit data is available only when
+your app presents a Full Space and other apps are hidden", Apple, Setting up access to ARKit data), so the head-based
+side never worked in the shared space; and `ARKitSession.run(_:)` "throws an error or asserts" when handed a provider
+it stopped, which the dock did as it went tall, wide and tall again. Asked, he chose **the head in Focus Mode, a
+setting elsewhere** (Settings ▸ Appearance ▸ Orbs: Windows From a Tall Dock, On Its Left / On Its Right, right by
+default) and **the nearest whole rows** for the snap. So the dock runs no head tracking of its own and asks Focus
+Mode's; a resized dock, once the hand lets go, snaps to the widest row its orbs make at that width and to every row or
+the whole rows nearest its height, and snaps within the size given again as orbs come and go. Connections' hold menu
+is a menu whose pinch is its primary action: a `.contextMenu` on that button never opened, in the simulator either.
+
 **Status:** Approved 2026-10-25; built through the eighth round (0.4.534) and committed 2026-10-26 at his word. The
-headset has seen rounds one to five; the sixth to eighth are his to confirm. Task note `tasks/2026-10/2026-10-25_orb-dock.md`.
+headset has seen rounds one to five and nine; the sixth to eighth are his to confirm. The ninth (the flex, names,
+scroll, Connections' menu, sides, kept pictures, auto-focus on) is 0.4.535 and the tenth (the crash, the snap, the
+menu, the side setting) 0.4.536, both committed 2026-10-27 at his word. Task note
+`tasks/2026-10/2026-10-25_orb-dock.md`.
 
 ## D89 — Focus Mode environments on Vision Pro — Approved 2026-10-26
 **Owner, 2026-10-22:** "crazy crazy idea for the focus mode.... in the window settings, overriding the application

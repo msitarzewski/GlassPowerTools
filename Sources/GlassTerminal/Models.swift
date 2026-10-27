@@ -2410,6 +2410,10 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     }
     static let currentSchemaVersion = 4
     nonisolated static let maximumNameLength = 80
+    /// Auto-focus on activity where nothing says otherwise — a window not opened from a saved
+    /// workgroup, a new workgroup, one saved before the setting: on (the owner, 2026-10-26: "We
+    /// should enable focus on motion by default"). A workgroup saved with it off stays off.
+    nonisolated static let followsActivityByDefault = true
     static let maximumSessionCount = 32
 
     struct SessionIntent: Codable, Hashable {
@@ -2705,7 +2709,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     var sessionIntents: [SessionIntent]
     var workspaceLayout: WorkspaceLayout? = nil
     var openingView: OpeningView = .tabs
-    var autoFocusOnActivity = false
+    var autoFocusOnActivity = LayoutPreset.followsActivityByDefault
     /// Nil lets the grid choose its layout; otherwise a preferred width in points.
     var gridCardWidth: Double? = nil
     let createdAt: Date
@@ -2835,7 +2839,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         windowSettings = TerminalWindowSettingsCoding.decode(from: container, look: .look, settings: .windowSettings)
         workspaceLayout = try container.decodeIfPresent(WorkspaceLayout.self, forKey: .workspaceLayout)
         openingView = try container.decodeIfPresent(OpeningView.self, forKey: .openingView) ?? .tabs
-        autoFocusOnActivity = try container.decodeIfPresent(Bool.self, forKey: .autoFocusOnActivity) ?? false
+        autoFocusOnActivity = try container.decodeIfPresent(Bool.self, forKey: .autoFocusOnActivity) ?? Self.followsActivityByDefault
         gridCardWidth = try container.decodeIfPresent(Double.self, forKey: .gridCardWidth).map { min(720, max(220, $0)) }
 
         if let decodedIntents = try container.decodeIfPresent([SessionIntent].self, forKey: .sessionIntents) {
