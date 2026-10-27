@@ -197,7 +197,7 @@ enum TerminalTabMoves {
     }
 
     /// Where **Move to** can send a terminal from `workgroupID`.
-    struct Destination: Identifiable, Equatable {
+    nonisolated struct Destination: Identifiable, Equatable {
         let id: UUID
         let title: String
     }
@@ -214,13 +214,15 @@ enum TerminalTabMoves {
             let live = manager.sessions(inWorkgroup: workgroup.id)
             return live.isEmpty ? nil : (workgroup, live)
         }
-        let titles = candidates.map { GlassTerminalCapability.title(of: $0.0, live: $0.1) }
+        // Steady: a title with an agent's spinner changed with every turn of it, and the menu
+        // listing it was rebuilt under the pinch that chose from it.
+        let titles = candidates.map { TerminalSessionNaming.steady(GlassTerminalCapability.title(of: $0.0, live: $0.1)) }
         return candidates.enumerated().map { index, candidate in
             let (workgroup, live) = candidate
             var title = titles[index]
             if titles.filter({ $0 == title }).count > 1 {
                 let shown = workgroup.selectedSessionID.flatMap(manager.session(for:)) ?? live[0]
-                let label = TerminalWorkgroupOpening.label(shown, on: .tabOrnament)
+                let label = TerminalSessionNaming.steady(TerminalWorkgroupOpening.label(shown, on: .tabOrnament))
                 if label != title { title += " · \(label)" }
             }
             return Destination(id: workgroup.id, title: title)

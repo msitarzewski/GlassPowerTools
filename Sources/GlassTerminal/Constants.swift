@@ -33,6 +33,8 @@ nonisolated enum UserDefaultsKeys {
     static let blinkingCursor = "blinkingCursor"
     static let pathPreviews = "pathPreviews"
     static let whenResized = "whenResized"
+    static let focusEnvironment = "focusEnvironment"
+    static let focusOpensImmersed = "focusOpensImmersed"
     static let errorSuggestions = "errorSuggestions"
     static let fontFollowsSystemTextSize = "fontFollowsSystemTextSize"
     static let joinsWrappedPastes = "joinsWrappedPastes"

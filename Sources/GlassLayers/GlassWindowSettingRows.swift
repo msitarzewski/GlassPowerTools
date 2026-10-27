@@ -153,10 +153,15 @@ public struct GlassWindowLayerControls: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Binding private var overrides: GlassWindowOverrides
     private let inheritsFrom: String
+    private let title: String
 
-    public init(overrides: Binding<GlassWindowOverrides>, inheritsFrom: String = "Appearance") {
+    /// - Parameter title: the section's: Appearance on a This Window page; the window's name where
+    ///   its own look is set in Settings (the orb dock's).
+    public init(overrides: Binding<GlassWindowOverrides>, inheritsFrom: String = "Appearance",
+                title: String = "Appearance") {
         _overrides = overrides
         self.inheritsFrom = inheritsFrom
+        self.title = title
     }
 
     public var body: some View {
@@ -188,7 +193,7 @@ public struct GlassWindowLayerControls: View {
             }
             #endif
         } header: {
-            Text("Appearance")
+            Text(title)
         } footer: {
             if reduceTransparency {
                 Text(GlassWindowGlassFooter.reduceTransparency)

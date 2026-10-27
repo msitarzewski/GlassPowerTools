@@ -44,6 +44,19 @@ enum TerminalSessionNaming {
         return (directory as NSString).lastPathComponent
     }
 
+    /// A name without the spinner a coding agent turns at the start of its title: Claude Code's
+    /// `· ✢ ✳ ✶ ✻ ✽`, or a braille frame, and the space after it. For a menu, which is rebuilt
+    /// whenever what it says changes, and a menu rebuilt under a pinch takes nothing (the owner,
+    /// 2026-10-25: the gear menu "shows, but using doesn't work" while the terminal is busy).
+    nonisolated static func steady(_ name: String) -> String {
+        // By the first character's first scalar: "✳️", the glyph drawn as an emoji, is one character.
+        guard let scalar = name.unicodeScalars.first,
+              "·✢✳✶✻✽".unicodeScalars.contains(scalar) || (0x2800...0x28FF).contains(scalar.value),
+              name.dropFirst().first?.isWhitespace == true else { return name }
+        let rest = name.dropFirst().drop(while: \.isWhitespace)
+        return rest.isEmpty ? name : String(rest)
+    }
+
     /// Where a terminal is, for the line under its name. In a repository its name and branch,
     /// then the folder inside it unless that is the top: `app · main · Sources/App` (W11). The
     /// owner's tabs showed a folder path, which did not say which repository, or which branch.

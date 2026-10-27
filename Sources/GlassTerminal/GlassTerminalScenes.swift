@@ -139,6 +139,8 @@ public struct GlassTerminalScenes: Scene {
         .windowStyle(.plain)
         .defaultSize(width: 1200, height: 800)
         .restorationBehavior(.disabled)
+        // Asked for from the orb dock, it comes back above the dock (D88).
+        .glassReturnsAboveOrbDock()
         .commands { PlatformTerminalCommands() }
         // No orb scene here: Connections becomes its own orb, in its own window (the shell's
         // `glassConnectionsIdleShrink`, W29 and W39), showing the library's Active count, which
@@ -206,8 +208,26 @@ public struct GlassTerminalScenes: Scene {
                 // Steps aside for Show All Windows around the person, and comes back after it.
                 .glassImmersiveSpacePresence("focus-environment")
         }
-        .immersionStyle(selection: .constant(.progressive), in: .progressive)
+        // Partway, the Digital Crown dialling it in, as Focus Mode always opened; or all the way
+        // round with Open Immersed (Settings ▸ Terminal ▸ Focus Mode), the Crown still bringing the
+        // room back.
+        .immersionStyle(selection: .constant(focusImmersion), in: focusImmersion)
+        .restorationBehavior(.disabled)
+        // Try Out: one of the person's 3D environments, fitted from a window beside it.
+        WindowGroup(id: FocusEnvironmentFitView.windowID, for: String.self) { $environmentID in
+            if let environmentID {
+                FocusEnvironmentFitView(environmentID: environmentID)
+            }
+        }
+        .defaultSize(width: 460, height: 680)
         .restorationBehavior(.disabled)
         #endif
     }
+
+    #if os(visionOS)
+    private var focusImmersion: any ImmersionStyle {
+        FocusEnvironmentStage.immersion(opensImmersed: settingsManager.focusOpensImmersed
+                                        || FocusEnvironmentStage.shared.tryingOut != nil)
+    }
+    #endif
 }

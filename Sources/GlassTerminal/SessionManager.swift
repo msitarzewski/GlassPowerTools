@@ -590,6 +590,16 @@ class SessionManager {
         return id
     }
 
+    /// Names a workgroup's window, or gives it back its own name when `name` is nil or blank. Kept
+    /// for the next launch by the reopen list, as its settings are.
+    func renameWorkgroup(_ workgroupID: UUID, to name: String?) {
+        guard let index = workgroups.firstIndex(where: { $0.id == workgroupID }) else { return }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let given = trimmed?.isEmpty == false ? trimmed : nil
+        guard workgroups[index].givenName != given else { return }
+        workgroups[index].givenName = given
+    }
+
     /// Gives a workgroup's window its own settings, or none (W20, W22): every terminal in it, and
     /// every one moved in later, draws and behaves with them. Kept for the next launch by the
     /// reopen list, which follows the workgroups; a saved Workgroup is never changed by it.

@@ -9,6 +9,7 @@
 
 import SwiftUI
 import GlassShell
+import GlassConnectionKit
 import GlassLayers
 import GlasSecretStore
 
@@ -36,9 +37,22 @@ public struct GlassDatabaseScenes: Scene {
                     // Shrinks into an orb (2026-10-15); a database has no picture, so its symbol.
                     .glassSessionOrb(GlassSessionOrbFace(
                         title: sessionManager.session(for: request.sessionID)?.connectionConfig.name ?? "Database",
-                        symbolName: "cylinder.split.1x2") { nil })
+                        symbolName: "cylinder.split.1x2",
+                        // Waits in the dock with its machine (D88).
+                        dockID: GlassDatabaseCapability.sessionID(sessionID: request.sessionID),
+                        endpointIDs: sessionManager.session(for: request.sessionID).map { [EndpointID(rawValue: $0.connectionConfig.id)] } ?? [],
+                        kind: .database) { nil })
                     #endif
-                    .onDisappear { sessionManager.releaseWorkspace(workspaceID) }
+                    .onDisappear {
+                        #if os(visionOS)
+                        // Into the dock (D88): the window goes and the session stays, for its orb.
+                        if GlassOrbDockModel.shared.isDocked(GlassDatabaseCapability.sessionID(sessionID: request.sessionID)) {
+                            sessionManager.forgetWorkspace(workspaceID)
+                            return
+                        }
+                        #endif
+                        sessionManager.releaseWorkspace(workspaceID)
+                    }
             } else {
                 ContentUnavailableView(
                     "Database Workspace Not Found",
@@ -49,6 +63,8 @@ public struct GlassDatabaseScenes: Scene {
         }
         #if os(visionOS)
         .windowStyle(.plain)
+        // Asked for from the orb dock, it comes back above the dock (D88).
+        .glassReturnsAboveOrbDock()
         #endif
         #if !os(iOS)
         .defaultSize(width: 1400, height: 900)

@@ -149,9 +149,22 @@ enum GlassDemoMode {
             // The Coding Agent look (D84, 2026-10-21): a coding agent at work on the made-up shop,
             // which names itself in its title as Claude Code does, and waits for an answer.
             terminal.requestDemoReplay(name: "alpha", output: Data(agentTranscript.utf8), windowSettings: demoLook)
+        case "agent-busy":
+            // Coding agents at work in two windows on one machine, as Claude Code is: each writing
+            // ten times a second, its title's spinner turning (the owner, 2026-10-25: the gear menu
+            // "shows, but using doesn't work" while the terminal is busy). The second stands in front.
+            let spinner = ["✶", "✻", "✽", "✻", "✶", "✳"]
+            let ticks = spinner.indices.map { step in
+                Data("\r\n\u{1B}[2m  ⎿  reading line \(step + 1)\u{1B}[0m".utf8)
+            }
+            for task in ["Fixing the jobs worker", "Reading the logs"] {
+                terminal.requestDemoReplay(name: "alpha", output: Data(agentTranscript.utf8), windowSettings: demoLook,
+                                           ticks: ticks, titles: spinner.map { "\($0) \(task)" }, every: .milliseconds(100))
+            }
         case "terminal-diagram":
             // A Mermaid diagram a coding agent printed as text, with its mark (2026-10-21).
             terminal.requestDemoReplay(name: "alpha", output: Data(diagramTranscript.utf8), windowSettings: demoLook)
+
         case "btop":
             // The website's terminal (the owner, 2026-10-18: "run btop or something for the
             // terminal examples"): a btop-style monitor of the made-up shop (GlassDemoBtop.swift).
@@ -229,7 +242,7 @@ enum GlassDemoMode {
             let screen = "\u{1B}[?1049h\u{1B}[?1000h\u{1B}[?1002h\u{1B}[?1006h\u{1B}[H\u{1B}[2J"
                 + Array(repeating: words, count: 60).joined(separator: "\r\n")
             let status = "\u{1B}7\u{1B}[999;1H\u{1B}[7m[0] 0:zsh*  \u{1B}[0m\u{1B}8"
-            terminal.requestDemoReplay(name: "alpha", output: Data(screen.utf8), tick: Data(status.utf8))
+            terminal.requestDemoReplay(name: "alpha", output: Data(screen.utf8), ticks: [Data(status.utf8)])
         case "terminal-window", "terminal-settings":
             // A window with settings of its own (W22), and This Window open over it.
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8),

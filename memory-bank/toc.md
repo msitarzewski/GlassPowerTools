@@ -10,8 +10,8 @@ source applications are obsolete and no longer compile.
 |---|---|
 | [Project brief](projectbrief.md) | Scope, the decision to merge, and what the product is |
 | [Product context](productContext.md) | The host-centric model and the interface it implies |
-| [System patterns](systemPatterns.md) | Module boundaries as intended and as built, the reuse inventory, who owns each key, and the patterns through D78 |
-| [Technical context](techContext.md) | Measured sizes, dependencies, targets and identities, the toolchain, and platform facts through D78 |
+| [System patterns](systemPatterns.md) | Module boundaries as intended and as built, the reuse inventory, who owns each key, and the patterns through D89 |
+| [Technical context](techContext.md) | Measured sizes, dependencies, targets and identities, the toolchain, and platform facts through D89 |
 | [Active context](activeContext.md) | Current state, authorization, the release checklist and open questions |
 | [Progress](progress.md) | What is built, how each part is verified, what is not verified, and what is open |
 | [Project rules](projectRules.md) | Rules specific to this merge |
@@ -103,6 +103,17 @@ source applications are obsolete and no longer compile.
 | [Terminal looks (D84)](tasks/2026-10/2026-10-20_terminal-looks.md) | Backgrounds behind the text, glowing palettes, motion that follows activity, the ground rules |
 | [SQL from a terminal (D85)](tasks/2026-10/2026-10-20_sql-detector.md) | Right-click on SQL, the machine's databases, the table found on the server |
 | [This Mac knows its library record (D86)](tasks/2026-10/2026-10-20_this-mac-link.md) | Recognising the device's own machine in the synced library, and what the link changes |
+| [Ship it: the first Mac release](tasks/2026-10/2026-10-20_first-mac-release.md) | 0.4.491 to TestFlight, the repository public, the site and help brought current |
+| [After the first release](tasks/2026-10/2026-10-20_after-the-release.md) | Scale Text on the Mac's own terminals, the folder button's Open in Editor, iCloud's signed-out words |
+| [Your Library counts time in use (D87)](tasks/2026-10/2026-10-20_time-in-use.md) | Minutes with input or output, per device and merged, instead of one per Connect |
+| [More looks, the Duo half open, Keys on Vision Pro](tasks/2026-10/2026-10-21_looks-duo-keys.md) | Agent, Aurora, Starfield and Blueprint looks; the Duo's half-open poses; the key manager on the headset |
+| [Git and diffs in the editor](tasks/2026-10/2026-10-23_editor-git.md) | Changes, diffs and commits in the editor's projects |
+| [A dropped terminal is listed once in Active](tasks/2026-10/2026-10-24_active-dropped-tabs.md) | One row per tmux session; a dropped tab's row says what the machine said |
+| [Test audit](tasks/2026-10/2026-10-24_test-audit.md) | Every failing test found and settled, checks that could not fail fixed or deleted, each kept test seen biting |
+| [Orbs gather in a dock (D88)](tasks/2026-10/2026-10-25_orb-dock.md) | Eight rounds: the dock, machine orbs, names over everything, a kept order, windows back as left, a resizable dock with its own look |
+| [A picture pasted in a terminal](tasks/2026-10/2026-10-25_terminal-paste-picture.md) | A pasted image goes to the machine on Vision Pro |
+| [The tools menu while agents work](tasks/2026-10/2026-10-25_terminal-tools-menu-busy.md) | The gear menu on a busy terminal on the headset: still open, with diagnostics in place |
+| [Focus Mode environments (D89)](tasks/2026-10/2026-10-26_focus-environments.md) | Built-in and your own environments, Open Immersed, Try Out with fits, and Mirador's teleport inside |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

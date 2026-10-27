@@ -16,6 +16,10 @@
 //  terminal in tmux does not come back, as a Mac window of plain shells does not. A workgroup
 //  closed by hand, or whose last terminal ended, is not in the list.
 //
+//  On Vision Pro a window comes back as it was left (the owner, 2026-10-26: "let's have windows
+//  respawn in their last used state. In the dock vs. open?"): open, in the orb dock (D88), or
+//  standing as its orb where visionOS puts it (D74), growing back to the size it had.
+//
 
 import Foundation
 import Observation
@@ -24,6 +28,7 @@ import OSLog
 #if os(visionOS)
 import SwiftUI
 import UIKit
+import GlassShell
 #endif
 
 /// One workgroup as the next launch reopens it: its terminals in order, which one was selected,
@@ -54,9 +59,38 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
     /// Its window's own settings (W20's look, W22's rest), which it comes back with. Absent from
     /// lists written before them; an earlier build reading the list ignores what it doesn't know.
     var windowSettings = GlassWindowOverrides()
+    /// The name someone gave its window; absent from lists written before it, and nil while the
+    /// window goes by `name`.
+    var givenName: String?
+    /// Vision Pro: its window was an orb when the app last ran, in the orb dock (D88) or standing
+    /// where it was (D74), and comes back the same (the owner, 2026-10-26: "let's have windows
+    /// respawn in their last used state. In the dock vs. open?"). Nil for a window that was open,
+    /// and absent from lists written before it.
+    var asOrb: Orb?
+
+    /// A window as its orb: where, and the size it grows back to.
+    nonisolated struct Orb: Codable, Equatable, Sendable {
+        var inDock: Bool
+        var width: Double?
+        var height: Double?
+
+        init(inDock: Bool, size: CGSize?) {
+            self.inDock = inDock
+            width = size.map { Double($0.width) }
+            height = size.map { Double($0.height) }
+        }
+
+        /// The size kept, when it is one a window could have.
+        var size: CGSize? {
+            guard let width, let height, width.isFinite, height.isFinite,
+                  (1...10_000).contains(width), (1...10_000).contains(height) else { return nil }
+            return CGSize(width: width, height: height)
+        }
+    }
 
     init(id: UUID, name: String, colorTag: ServerColorTag, terminals: [Terminal], selectedIndex: Int,
-         isShown: Bool, windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
+         isShown: Bool, windowSettings: GlassWindowOverrides = GlassWindowOverrides(), givenName: String? = nil,
+         asOrb: Orb? = nil) {
         self.id = id
         self.name = name
         self.colorTag = colorTag
@@ -64,10 +98,12 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
         self.selectedIndex = selectedIndex
         self.isShown = isShown
         self.windowSettings = windowSettings
+        self.givenName = givenName
+        self.asOrb = asOrb
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, colorTag, terminals, selectedIndex, isShown, look, windowSettings
+        case id, name, colorTag, terminals, selectedIndex, isShown, look, windowSettings, givenName, asOrb
     }
 
     init(from decoder: any Decoder) throws {
@@ -80,6 +116,9 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
         isShown = try container.decode(Bool.self, forKey: .isShown)
         // Settings that can't be read cost the workgroup those settings, never its terminals.
         windowSettings = TerminalWindowSettingsCoding.decode(from: container, look: .look, settings: .windowSettings)
+        givenName = try? container.decodeIfPresent(String.self, forKey: .givenName)
+        // An orb that can't be read costs the window its orb: it comes back open.
+        asOrb = try? container.decodeIfPresent(Orb.self, forKey: .asOrb)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -91,6 +130,8 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
         try container.encode(selectedIndex, forKey: .selectedIndex)
         try container.encode(isShown, forKey: .isShown)
         try TerminalWindowSettingsCoding.encode(windowSettings, into: &container, look: .look, settings: .windowSettings)
+        try container.encodeIfPresent(givenName, forKey: .givenName)
+        try container.encodeIfPresent(asOrb, forKey: .asOrb)
     }
 }
 
@@ -105,6 +146,9 @@ final class TerminalWorkgroupsToReopen {
     private nonisolated static let logger = Logger(subsystem: "sh.glas", category: "reopen")
 
     @ObservationIgnored private let defaults: UserDefaults
+    /// A workgroup's window as its orb now; nil while it is open. Vision Pro's orbs are kept by the
+    /// orb dock's model, which is observed, so a window docking or growing back rewrites the list.
+    @ObservationIgnored private let windowAsOrb: @MainActor (UUID) -> TerminalWorkgroupReopenRecord.Orb?
     /// This run has taken the last run's list: from then on, this run's workgroups are the list.
     @ObservationIgnored private(set) var hasTaken = false
     @ObservationIgnored private weak var sessionManager: SessionManager?
@@ -117,8 +161,22 @@ final class TerminalWorkgroupsToReopen {
     /// iPhone and iPad: the workgroup on screen, if one is.
     private(set) var shownWorkgroupID: UUID?
 
-    init(defaults: UserDefaults = SharedDefaults.defaults) {
+    init(defaults: UserDefaults = SharedDefaults.defaults,
+         windowAsOrb: @escaping @MainActor (UUID) -> TerminalWorkgroupReopenRecord.Orb? = TerminalWorkgroupsToReopen.orbsNow) {
         self.defaults = defaults
+        self.windowAsOrb = windowAsOrb
+    }
+
+    /// Vision Pro: the workgroup's window in the orb dock, or standing as its orb; nil elsewhere.
+    static func orbsNow(_ workgroupID: UUID) -> TerminalWorkgroupReopenRecord.Orb? {
+        #if os(visionOS)
+        let orbs = GlassOrbDockModel.shared
+        let id = GlassTerminalCapability.sessionID(workgroupID: workgroupID)
+        if orbs.isDocked(id) { return .init(inDock: true, size: orbs.size(of: id)) }
+        return orbs.standingSize(of: id).map { .init(inDock: false, size: $0) }
+        #else
+        return nil
+        #endif
     }
 
     // MARK: Taking the last run's list, once
@@ -190,7 +248,7 @@ final class TerminalWorkgroupsToReopen {
     func current(in manager: SessionManager) -> [TerminalWorkgroupReopenRecord] {
         Self.records(of: manager.workgroups, session: manager.session(for:),
                      isSaved: { manager.serverManager.server(for: $0) != nil },
-                     leaving: closedByHand, shown: shownWorkgroupID)
+                     leaving: closedByHand, shown: shownWorkgroupID, asOrb: windowAsOrb)
     }
 
     private func write(_ records: [TerminalWorkgroupReopenRecord]) {
@@ -212,8 +270,8 @@ final class TerminalWorkgroupsToReopen {
     /// server; none closed by hand. A terminal on a server that isn't saved (Quick Connect, a
     /// Tailscale device) has nothing to connect with at the next launch, and is left out.
     static func records(of workgroups: [TerminalWorkgroup], session: (UUID) -> TerminalSession?,
-                        isSaved: (UUID) -> Bool, leaving closedByHand: Set<UUID>,
-                        shown: UUID?) -> [TerminalWorkgroupReopenRecord] {
+                        isSaved: (UUID) -> Bool, leaving closedByHand: Set<UUID>, shown: UUID?,
+                        asOrb: (UUID) -> TerminalWorkgroupReopenRecord.Orb? = { _ in nil }) -> [TerminalWorkgroupReopenRecord] {
         let listed = workgroups.compactMap { workgroup -> TerminalWorkgroupReopenRecord? in
             guard !closedByHand.contains(workgroup.id) else { return nil }
             let kept = workgroup.sessionIDs.compactMap(session).filter { $0.purpose == .terminal && isSaved($0.server.id) }
@@ -229,7 +287,8 @@ final class TerminalWorkgroupsToReopen {
             return TerminalWorkgroupReopenRecord(
                 id: workgroup.id, name: workgroup.name, colorTag: workgroup.colorTag, terminals: terminals,
                 selectedIndex: kept.firstIndex { $0.id == workgroup.selectedSessionID } ?? 0,
-                isShown: workgroup.id == shown, windowSettings: workgroup.windowSettings)
+                isShown: workgroup.id == shown, windowSettings: workgroup.windowSettings,
+                givenName: workgroup.givenName, asOrb: asOrb(workgroup.id))
         }
         return Array(listed.prefix(maximumWorkgroups))
     }
@@ -260,6 +319,46 @@ final class TerminalWorkgroupsToReopen {
             shownWorkgroupID = nil
         }
     }
+
+    #if DEBUG
+    /// UI tests (`GlassOrbRelaunchUITests`): `--demo-reopen open|dock|orb` stands for a last run that
+    /// left one window open, in the orb dock, or standing as its orb, its one terminal in tmux on the
+    /// demo's machine. Only in a `--ui-testing` run whose last run left nothing. `--demo-reopen kept`
+    /// stands for nothing: the list is the one the run's last launch wrote.
+    static func demoLastRun(servers: [ServerConfiguration]) -> [TerminalWorkgroupReopenRecord] {
+        guard let wanted = demoReopen, let server = servers.first(where: { $0.id == demoServerID }) else { return [] }
+        let size = CGSize(width: 900, height: 600)
+        let asOrb: TerminalWorkgroupReopenRecord.Orb?
+        switch wanted {
+        case "open": asOrb = nil
+        case "dock": asOrb = .init(inDock: true, size: size)
+        case "orb": asOrb = .init(inDock: false, size: size)
+        default: return []
+        }
+        return [TerminalWorkgroupReopenRecord(
+            id: UUID(), name: server.name, colorTag: .blue,
+            terminals: [.init(serverID: server.id, tmuxSession: "glass-1", label: nil, name: nil)],
+            selectedIndex: 0, isShown: false, asOrb: asOrb)]
+    }
+
+    /// `--demo-reopen`'s word, in a `--ui-testing` run.
+    static var demoReopen: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"), let flag = arguments.firstIndex(of: "--demo-reopen"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        return arguments[flag + 1]
+    }
+
+    /// The demo's machine, the same at every launch of a run, at an address where nothing answers. A
+    /// seeded host has no terminal settings behind its service, so the terminal knows none of them:
+    /// the test seeds the service with this id (`alpha:ssh=<id>`), and these settings go on it.
+    static let demoServerID = UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000A1")!
+    static func demoServer() -> ServerConfiguration {
+        ServerConfiguration(id: demoServerID, name: "alpha", host: "192.0.2.10", username: "ann")
+    }
+    /// Saved once per launch at most, before the list is taken.
+    static var savingDemoServer = false
+    #endif
 }
 
 // MARK: Reopening one
@@ -287,6 +386,7 @@ extension TerminalWorkgroupOpening {
         let servers = sessionManager.serverManager.servers
         let workgroupID = sessionManager.createWorkgroup(id: record.id, name: record.name, colorTag: record.colorTag,
                                                          windowSettings: record.windowSettings)
+        sessionManager.renameWorkgroup(workgroupID, to: record.givenName)
         var selected: UUID?
         for (index, terminal) in record.terminals.enumerated() {
             let called = displayName(of: terminal)
@@ -384,7 +484,9 @@ struct TerminalWorkgroupWindowPresence: ViewModifier {
             .onDisappear {
                 // Closed by hand while the app is in front. A window the system takes away from an
                 // app in the background was not the person's choice, and comes back.
-                let byHand = UIApplication.shared.applicationState != .background
+                // Nor was a window gone into the dock (D88): it is still open, as its orb.
+                let docked = GlassOrbDockModel.shared.isDocked(GlassTerminalCapability.sessionID(workgroupID: workgroupID))
+                let byHand = UIApplication.shared.applicationState != .background && !docked
                 TerminalWorkgroupsToReopen.shared.windowDisappeared(workgroupID, closedByHand: byHand)
             }
     }

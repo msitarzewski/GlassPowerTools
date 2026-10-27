@@ -1974,7 +1974,8 @@ public final class GlassShellModel: GlassServiceStore {
     /// `--ui-testing-seed-hosts "bravo:ssh|bravo:rdp|alpha:ssh+database"` creates one record
     /// per `|` entry, named before the colon, with one service per `+`-separated kind; a name may
     /// carry the host's address after `@` (`bravo@192.0.2.6:ssh`) and its collections after `#`,
-    /// comma-separated (`alpha#Production,Home:ssh`). Only honoured alongside
+    /// comma-separated (`alpha#Production,Home:ssh`); a kind may carry its service's id after `=`
+    /// (`alpha:ssh=<uuid>`), for a test that saves that service's settings itself. Only honoured alongside
     /// `--ui-testing`, only into a catalog that is not under a real Group Container, and only when
     /// that catalog is empty.
     private func seedForUITestingIfRequested() async throws {
@@ -2010,9 +2011,14 @@ public final class GlassShellModel: GlassServiceStore {
             let name = nameParts[0]
             let address = nameParts.count > 1 ? nameParts[1] : nil
             guard !name.isEmpty else { continue }
-            let kinds = parts.count > 1 ? parts[1].split(separator: "+").compactMap { HostServiceKind(rawValue: String($0)) } : []
-            let services = kinds.map {
-                HostServiceLink(endpointID: EndpointID(), kind: $0, displayName: "\(GlassServicePresentation.displayName(for: $0)) on \(name)")
+            let kinds = parts.count > 1 ? parts[1].split(separator: "+").compactMap { item -> (HostServiceKind, EndpointID)? in
+                let pieces = item.split(separator: "=", maxSplits: 1)
+                guard let kind = HostServiceKind(rawValue: String(pieces[0])) else { return nil }
+                let given = pieces.count > 1 ? UUID(uuidString: String(pieces[1])).map(EndpointID.init(rawValue:)) : nil
+                return (kind, given ?? EndpointID())
+            } : []
+            let services = kinds.map { kind, endpointID in
+                HostServiceLink(endpointID: endpointID, kind: kind, displayName: "\(GlassServicePresentation.displayName(for: kind)) on \(name)")
             }
             let created = Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
             var host = try HostProfile(displayName: name, address: address, aliases: [], services: services,

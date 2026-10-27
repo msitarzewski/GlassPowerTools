@@ -116,6 +116,12 @@ class DatabaseSessionManager {
     /// it alone — glassdb's "Open New Workspace Window", kept. A phone registers a workspace and
     /// never releases it, because leaving a screen there is not closing it (D31); its ⋯ menu ends
     /// the session on purpose.
+    /// The window goes and its session stays: a workspace gone into the orb dock (D88), whose orb
+    /// opens the session's window again.
+    func forgetWorkspace(_ windowID: UUID) {
+        workspaceRequests[windowID] = nil
+    }
+
     @discardableResult
     func releaseWorkspace(_ windowID: UUID) -> Task<Void, Never>? {
         guard let released = workspaceRequests.removeValue(forKey: windowID) else { return nil }

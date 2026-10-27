@@ -24,6 +24,12 @@ struct TerminalOverridesSettingsView: View {
     @Environment(SettingsManager.self) private var settingsManager
     /// The window's workgroup, whose saved Workgroup's Auto-focus on activity it follows (visionOS).
     @Environment(\.terminalWorkgroupID) private var workgroupID
+    #if !os(macOS)
+    @Environment(SessionManager.self) private var sessionManager
+    /// The window's name as typed, kept on Return or on leaving the field.
+    @State private var nameDraft = ""
+    @FocusState private var nameFocused: Bool
+    #endif
 
     /// Where each kind of setting lives for every window, as This Window names it.
     enum Source {
@@ -36,6 +42,35 @@ struct TerminalOverridesSettingsView: View {
     init(settings: Binding<GlassWindowOverrides>) {
         _settings = settings
     }
+
+    #if !os(macOS)
+    /// The window's own name (the owner, 2026-10-25: "need a way to name windows (They all say
+    /// 'Terminal on [his Mac]')"): on its orb, in Move Tab To, Active and All Windows. Empty, it goes
+    /// by its machine's, or its saved Workgroup's. A Mac window has Rename Window instead.
+    @ViewBuilder
+    private var nameSection: some View {
+        if let workgroupID, let workgroup = sessionManager.workgroup(for: workgroupID) {
+            // The name it goes by without one given, as the field's prompt.
+            let own = { var unnamed = workgroup; unnamed.givenName = nil; return unnamed }()
+            Section {
+                TextField("Name", text: $nameDraft,
+                          prompt: Text(GlassTerminalCapability.title(of: own, live: sessionManager.sessions(inWorkgroup: workgroupID))))
+                    .focused($nameFocused)
+                    .submitLabel(.done)
+                    .onSubmit { sessionManager.renameWorkgroup(workgroupID, to: nameDraft) }
+                    .onChange(of: nameFocused) { _, focused in
+                        if !focused { sessionManager.renameWorkgroup(workgroupID, to: nameDraft) }
+                    }
+                    .onAppear { nameDraft = workgroup.givenName ?? "" }
+                    .accessibilityIdentifier("terminal-window-name")
+            } header: {
+                Text("Name")
+            } footer: {
+                Text("What this window is called on its orb, in Move Tab To, Active and All Windows. Leave it empty for its own.")
+            }
+        }
+    }
+    #endif
 
     /// What the window follows until it sets Auto-focus on activity: its saved Workgroup's.
     private var workgroupFollowsActivity: Bool {
@@ -51,6 +86,9 @@ struct TerminalOverridesSettingsView: View {
             over: global.currentTheme, library: global.themeLibrary)
 
         Form {
+            #if !os(macOS)
+            nameSection
+            #endif
             Section {
                 GlassWindowSettingRow(GlassLayerSettings.opacity, overrides: $settings,
                                       global: global.windowOpacity, inheritsFrom: Source.appearance) { value in
@@ -246,6 +284,24 @@ struct TerminalOverridesSettingsView: View {
             } footer: {
                 Text("While a terminal in this window prints, the grid and carousel bring it forward, and the window's orb pulses.")
             }
+
+            Section {
+                GlassWindowSettingRow(TerminalWindowSettings.focusEnvironment, overrides: $settings,
+                                      global: global.focusEnvironment, inheritsFrom: Source.allTerminals) { value in
+                    GlassSettingLabeled("Environment") {
+                        Picker("Environment", selection: value) {
+                            ForEach(focusEnvironments(including: value.wrappedValue), id: \.id) { choice in
+                                Text(choice.name).tag(choice.id)
+                            }
+                        }
+                        .accessibilityIdentifier("terminal-window-focus-environment")
+                    }
+                }
+            } header: {
+                Text("Focus Mode")
+            } footer: {
+                Text("What surrounds you when this window enters Focus Mode. To add your own, go to All Terminals ▸ Focus Mode.")
+            }
             #endif
 
             Section {
@@ -272,6 +328,16 @@ struct TerminalOverridesSettingsView: View {
             set: { value.wrappedValue = $0 }
         )
     }
+
+    #if os(visionOS)
+    /// The library's environments, and the window's own if it isn't on this device (yet).
+    private func focusEnvironments(including current: String) -> [(id: String, name: String)] {
+        let library = FocusEnvironmentLibrary.shared
+        let offered = library.environments.map { (id: $0.id, name: $0.name) }
+        guard !offered.contains(where: { $0.id == current }) else { return offered }
+        return offered + [(id: current, name: "\(library.name(ofID: current)) (not on this Vision Pro)")]
+    }
+    #endif
 
     /// All Terminals' four fonts, and the window's own if a theme or another device gave it another.
     private func fontFamilies(including current: String) -> [String] {

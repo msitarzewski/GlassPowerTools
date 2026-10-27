@@ -64,6 +64,8 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     /// The library's size while the window is its orb, kept with the window's scene, so a launch
     /// that restores the window at the orb's size grows it back to its own. Empty otherwise.
     @SceneStorage("connections.librarySize") private var keptLibrarySize = ""
+    /// Idle, the window closes into the orb dock rather than becoming an orb where it is (D88).
+    @AppStorage(GlassOrbDock.settingKey, store: GlassUITestRun.settingsDefaults) private var inDock = false
 
     init(model: GlassShellModel, recovery: GlassWindowRecoveryManager) {
         self.model = model
@@ -123,6 +125,8 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
             becomeLibrary(why: "asked")
         }
         .onAppear {
+            // On screen again, however it was asked for: the dock no longer stands for it.
+            GlassOrbDockModel.shared.holdsConnections = false
             let parked = recovery.takeConnectionsPark()
             if parked || orbOver != nil {
                 Logger.idle.info("Connections opened as its orb: it was closed as the last window")
@@ -130,7 +134,22 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
             }
         }
         .onDisappear { recovery.connectionsWindowClosed(token) }
-        .task { await growIfRestoredAtTheOrbsSize() }
+        .task { await comeBackAsLeft() }
+    }
+
+    /// Into the dock (D88), whose Connections orb brings it back above the dock. The window goes once
+    /// the dock is on screen: two seconds into a launch, asked to go as the dock was asked for, it
+    /// stayed, dimmed, behind the dock (visionOS 27.2 simulator).
+    private func intoDock() async {
+        let orbs = GlassOrbDockModel.shared
+        orbs.holdsConnections = true
+        orbs.open(with: openWindow)
+        var waited = 0
+        while !orbs.isShown, waited < 30, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        dismissWindow()
     }
 
     /// The window becomes its orb: the library kept, out of sight, at `library` — the window's
@@ -163,10 +182,16 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
         probe.resize(to: library, event: "library-\(why)")
     }
 
-    /// A launch can bring this window back at the orb's size: quit while it was the orb, visionOS
-    /// keeps the window's size but not what it showed. It shows the library, so it grows back to
-    /// the library's size kept with the scene, or to its first size.
-    private func growIfRestoredAtTheOrbsSize() async {
+    /// Connections as the last run left it (the owner, 2026-10-26: "let's have windows respawn in
+    /// their last used state"). Quit while it was its orb, visionOS brings the window back at the
+    /// orb's size but showing the library: it becomes the orb again, growing back to the library's
+    /// size kept with the scene. Left in the dock, it waits for the windows the last run left to
+    /// come back and connect (`TerminalWorkgroupsToReopen`), as long as a connection takes to give
+    /// up, then goes back into the dock — unless it is showing something then (a password asked
+    /// for, a host key to confirm, what failed), is in use, or was asked for: then it stays open.
+    private func comeBackAsLeft() async {
+        let wasDocked = GlassOrbDockModel.shared.takeConnectionsWereDocked()
+        let askedAtLaunch = GlassConnectionsRequests.shared.untrackedCount
         var waited = 0
         while probe.windowSize == nil, waited < 30, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(100))
@@ -174,11 +199,36 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
         }
         guard orbOver == nil, let size = probe.windowSize else { return }
         if GlassConnectionsWindowSize.isOrbSized(size) {
-            Logger.idle.info("Connections came back at the orb's size: growing it to the library's")
-            let library = GlassConnectionsWindowSize.returning(to: GlassConnectionsWindowSize.stored(keptLibrarySize))
-            probe.resize(to: library, event: "library-relaunch")
+            Logger.idle.info("Connections came back at the orb's size: its orb again")
+            becomeOrb(library: GlassConnectionsWindowSize.stored(keptLibrarySize) ?? GlassConnectionsWindowSize.standard,
+                      why: "relaunch")
+            return
         }
         keptLibrarySize = ""
+        if wasDocked {
+            let orbs = GlassOrbDockModel.shared
+            waited = 0
+            // SSH gives up on a connection after 30 seconds.
+            while !(model.isLoaded && orbs.lastRunIsBack), waited < 400, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+                waited += 1
+            }
+            // A moment for what they said to be shown.
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            let state = probe.state(connectingSince: nil)
+            if !orbs.lastRunIsBack {
+                Logger.idle.info("Connections was in the orb dock, and stays open: the last run's windows are not back")
+            } else if state.isPresenting || state.isEditingText || state.isTouching || state.isDragging {
+                Logger.idle.info("Connections was in the orb dock, and stays open: it is showing something or in use")
+            } else if GlassConnectionsRequests.shared.untrackedCount != askedAtLaunch {
+                Logger.idle.info("Connections was in the orb dock, and stays open: it was asked for")
+            } else {
+                Logger.idle.info("Connections was in the orb dock: back into it")
+                await intoDock()
+                return
+            }
+        }
         #if DEBUG
         // UI tests: a size of the test's own, so growing back to "the size it had" is told apart
         // from growing back to the first size.
@@ -213,6 +263,11 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
                 if recovery.anotherConnectionsWindowIsOrb(than: token) {
                     Logger.idle.info("A second Connections window idle beside the orb: closing it")
                     dismissWindow()
+                    return
+                }
+                if inDock {
+                    Logger.idle.info("Connections idle for \(String(describing: interval), privacy: .public): into the orb dock")
+                    await intoDock()
                     return
                 }
                 Logger.idle.info("Connections idle for \(String(describing: interval), privacy: .public): becoming its orb")

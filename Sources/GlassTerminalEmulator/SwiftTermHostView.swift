@@ -466,6 +466,10 @@ public final class SwiftTermHostModel: ObservableObject {
     /// it needs no review, and is typed (the owner, 2026-10-19: "skip the review when it joins to one
     /// line"). Anything else is reviewed as it came, and the review offers the joining.
     public var pasteRewrite: ((String) -> String?)?
+    /// A paste of pictures or files, taken before any text is: true when the clipboard held some,
+    /// which then go where the shell can read them (the window that knows the machine sends them up
+    /// as a drop's, `TerminalRemoteDrops`). Nil, or false, and the paste is text.
+    public var pasteFiles: (@MainActor () -> Bool)?
     /// A control-mode client of tmux (`TmuxControlClient`, D83): tmux hands the terminal every byte its
     /// pane's program writes, so the history is the terminal's own; and tmux has already answered
     /// every query the program sends, so the terminal's own answers are dropped. Set by the session,
@@ -2247,9 +2251,22 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     /// shows is sized to it (`SwiftTermHostModel.onTerminalFocused`, 2026-10-22).
     override func becomeFirstResponder() -> Bool {
         let became = super.becomeFirstResponder()
+        #if os(visionOS)
+        note("keyboard taken=\(became)")
+        #endif
         if became { hostModel()?.onTerminalFocused?() }
         return became
     }
+
+    #if os(visionOS)
+    /// Where the keyboard goes, beside a hand's pinches: a menu that would not take a pinch while
+    /// the terminal worked (the owner, 2026-10-26) is read from the headset's file.
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        note("keyboard given up=\(resigned)")
+        return resigned
+    }
+    #endif
 
     private weak var observedWindow: UIWindow?
 
@@ -2264,6 +2281,9 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     }
 
     @objc private func windowBecameKey() {
+        #if os(visionOS)
+        note("window became key holding=\(isFirstResponder)")
+        #endif
         guard isFirstResponder else { return }
         hostModel()?.onTerminalFocused?()
     }
@@ -2774,7 +2794,14 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     }
     #endif
 
+    /// A picture or file copied goes up to the machine, as one dropped does, and its path is typed
+    /// (the owner, 2026-10-25, on Vision Pro: "I tried to paste an image but it didn't paste"). This
+    /// read text alone, so an image pasted did nothing at all.
     @objc override func paste(_ sender: Any?) {
+        let pasteFiles = hostModel()?.pasteFiles
+        os.Logger(subsystem: "sh.glas", category: "terminal-paste").notice(
+            "event=paste files-taken-here=\(pasteFiles != nil, privacy: .public)")
+        if pasteFiles?() == true { return }
         guard let text = UIPasteboard.general.string, !text.isEmpty else { return }
         onPasteRequest?(text, getTerminal().bracketedPasteMode)
     }

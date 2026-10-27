@@ -212,3 +212,7 @@
 - 2026-10-23 — [Git in the editor: Changes, marks, stage and commit](2026-10-23_editor-git.md) (0.4.519–0.4.520; committed with 0.4.522)
 - 2026-10-24 — [A dropped terminal is listed once in Active](2026-10-24_active-dropped-tabs.md) (0.4.521; committed with 0.4.522)
 - 2026-10-24 — [Test audit: every test useful, every suite reliable](2026-10-24_test-audit.md) (eight product fixes; 3,113 package tests pass twice; every UI test on the iPhone and the folded Duo; committed with 0.4.522 on 2026-10-25, not pushed)
+- 2026-10-25 — [Orbs gather in a dock on Vision Pro](2026-10-25_orb-dock.md) (D88; eight rounds: the sixth 0.4.532, the dot opens itself again; the seventh and eighth 0.4.534, windows come back as left, and the dock's shape and its own look; not committed)
+- 2026-10-25 — [A picture pasted in a terminal goes to the machine](2026-10-25_terminal-paste-picture.md) (iPhone, iPad, Vision Pro; 0.4.526; not committed; seen working on the headset)
+- 2026-10-25 — [The terminal's tools menu works while its agents work](2026-10-25_terminal-tools-menu-busy.md) (Vision Pro; the menu rebuilt with every title read; 0.4.527; not committed)
+- 2026-10-26 — [Focus Mode environments on Vision Pro](2026-10-26_focus-environments.md) (D89; built-ins drawn in code, your own rooms and 360° photos in iCloud Drive; 0.4.530; Open Immersed 0.4.531; Try Out, fits and Mirador's teleport inside 0.4.533; not committed)

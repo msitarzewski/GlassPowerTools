@@ -28,6 +28,9 @@ public enum GlassEditorSidebarSelection: Hashable, Sendable {
 
 @MainActor @Observable
 public final class GlassEditorWorkspace {
+    /// The open session this workspace was opened from (`GlassOpenSession.id`): a terminal window,
+    /// by its folder button. Its orb shows the editor on its ring (D88). Nil when opened otherwise.
+    public var openedFrom: String?
     /// Open documents, in the order they were opened — the order the tab list shows.
     public private(set) var documents: [GlassEditorDocument] = []
     public var selection: GlassEditorDocument.ID?

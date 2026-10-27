@@ -31,6 +31,54 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
+## 2026-10-26 — RESUME HERE: Focus Mode environments (D89), the tools menu on the headset (unsolved)
+- **Windows come back as they were left, and the dock's shape and look (his asks while testing 0.4.533), 0.4.534:**
+  a terminal window in the dock, standing as its orb, or open; Connections back in the dock unless it is showing a
+  question; the dock resizable (taller than wide, a column; size kept) with its own Opacity and Glass starting with
+  Appearance (his choices). Simulator: 11 orb and relaunch UI tests pass, each new one seen failing with its change
+  out. The headset is his: a relaunch with docked windows, a corner drag, the Dock sliders. The dock now paints
+  Appearance's glass and Opacity by default (0% of both makes it clear). `tasks/2026-10/2026-10-25_orb-dock.md`,
+  seventh and eighth rounds.
+- **Focus Mode environments on Vision Pro (D89), built:** a library of environments — Dimmed Room (default, as
+  before), Night Sky, Dusk, Grid and Studio drawn in code, and his own 3D rooms and 360° photos in iCloud Drive ▸ Glass
+  Power Tools ▸ Environments (Settings ▸ Terminal ▸ Focus Mode; This Window; the moon's pinch-and-hold menu). Vision Pro
+  only (his word); a Mac manages the folder in Finder. Unit and UI tests pass; seen in the simulator; the headset and
+  iCloud not yet. Proposed to him, not built: live data in environments; Sketchfab (now KitBash's) or another
+  catalogue. `tasks/2026-10/2026-10-26_focus-environments.md`.
+- **Open Immersed** (his ask, 2026-10-26 afternoon): a toggle in Settings ▸ Terminal ▸ Focus Mode, off by default; on,
+  Focus Mode opens fully immersed and the Crown still dials it back. Built, tested (unit, UI, simulator captures; each
+  seen failing with its break), 0.4.531.
+- **Try Out, fits, and Mirador's teleport inside** (his "Yes, build all three", 2026-10-26): built and tested in the
+  simulator (unit, UI, captures; breaks caught); the headset not yet. Task note has the details and what isn't seen.
+- **Orb dock, sixth round (0.4.532):** his "We lost hover/view focus on the terminal/service icons … only show a stub":
+  the fifth round's name layer reverted; the dot opens itself again, as in 0.4.527; overlaps ordered by depth.
+  `tasks/2026-10/2026-10-25_orb-dock.md`. The headset is his to confirm.
+- **Tools menu on Vision Pro: still fails on the headset in 0.4.527** ("I still can't select an item"). 0.4.528 writes
+  the menu's openings and choices, the bar's redraws and the terminal's keyboard focus into the diagnostics file; next
+  is one try from him, with the time, then the file copied off the headset. `tasks/2026-10/2026-10-25_terminal-tools-menu-busy.md`.
+- **Orb dock (D88, fifth round):** open names are a layer in front of every dot and orb, so the next orb's dot no longer
+  covers them; circles at rest; his order by hold and carry. `tasks/2026-10/2026-10-25_orb-dock.md`.
+- **Diagram mark on Vision Pro** fixed: it was missing from accessibility (glass instead of a material behind it).
+- **A pasted picture** goes to the host (0.4.526; he pastes his captures that way).
+- **Committed 2026-10-26 at his word ("Commit now, update all of the memory bank files"): 0.4.523–0.4.534**, the
+  orb dock's eight rounds, Focus Mode environments, the paste and tools-menu work and the test fixes. Not pushed;
+  pushing needs his word. Never `git checkout` a file here: restore from saved copies (one line of
+  `MacLocalTerminalPaneView.swift` was lost that way on 2026-10-26 and put back).
+- **Next, his asks with the commit (2026-10-26):** the dock as a responsive flex of cards that move to fit its shape;
+  a dot's name opening to the left near the dock's right edge instead of being cut off; a pinch-drag that always
+  scrolls the dock (hold-and-drag still moves an orb); a more prominent Connections orb with pinch-and-hold actions; and
+  a window coming back from a vertical dock beside it, left or right by where the dock stands, not above it.
+
+## 2026-10-25 — the orb dock (D88)
+Building D88 (`tasks/2026-10/2026-10-25_orb-dock.md`): Vision Pro orbs gathered in a dock, Settings ▸ Appearance ▸
+Orbs. Terminal windows dock as their own orbs; databases, desktops and library editors as one orb per machine; an
+editor opened from a terminal on that terminal's ring; the machine's services, Editor included, on the ring; the
+water drop going in. Simulator: 5 of 5 orb tests and 5 service tests pass; shell and editor packages pass. His first look
+(0.4.523) revised it (D88): only open services, machine orbs, half the spacing, colours; window names and Move
+Tab To's docked windows added. 0.4.524 on the Mac (running, no crash report), iPhone and Vision Pro. Not committed. Also uncommitted: two audit test fixes (the
+delete test's re-read behind the Duo's keyboard; `typeKey` for visionOS), found after the 03a86e9c commit; the
+Duo rerun passed 9 of 11 before them, the iPhone 11 of 11.
+
 ## 2026-10-21 — RESUME HERE
 
 Committed at his word: through 0.4.505 on 2026-10-21 (`dcad5dcb`), and everything after it, through the
@@ -301,11 +349,13 @@ test audit, with 0.4.522 on 2026-10-25. Not pushed. The "not committed" notes be
   a trackpad/mouse pointer resting 0.6 s (`UIHoverGestureRecognizer`), Space under Mouseover + Space; the file via
   `TerminalSession.locate` + `TerminalRemotePreview.fetch` (wired in `TerminalPathActions.install` on visionOS);
   Show previews in Settings and This Window on visionOS. Demo `terminal-path`, UI test `testQuickLookOnAHeldPath`.
-- **Proposed, his idea (2026-10-22): Focus Mode environments** — per window over the app's setting: his own USDZ
+- **Built 2026-10-26 (D89): Focus Mode environments** — per window over the app's setting: his own USDZ
   room or 360° picture, and a Sketchfab browser (rooms/environments filters). Sketchfab's terms (read on their
   developer pages): downloads need each person signed in by OAuth 2.0 in the app; the app is registered by
   contacting Sketchfab (name, grant type, redirect URI — no custom schemes; an https or localhost one); USDZ is one
-  of the formats; every model shows its license, author and link, and Sketchfab is credited. Not started.
+  of the formats; every model shows its license, author and link, and Sketchfab is credited. His answers
+  (2026-10-22): draft the registration request (drafted for him to send; the redirect page on the site doesn't exist
+  yet), keep environments in iCloud, 360° photos too. Not started: the tmux sizing trouble took over that day.
 - **Git and diffs in the editor (his "We really, really need git support and diffs in the editor now... see this
   instead of having to open Zed"), 2026-10-23** (`tasks/2026-10/2026-10-23_editor-git.md`). He withdrew the iOS
   Files report ("files works now, focus on git"). Built, read-only: the real `git` where the folder is (the Mac's

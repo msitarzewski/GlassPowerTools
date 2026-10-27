@@ -200,6 +200,12 @@ struct GlassPowerToolsApp: App {
         // Show All Windows lists every open window beside the terminal's (GlassShowAllWindows):
         // the composition root is the one place that holds every capability's sessions.
         GlassShowAllWindows.openSessions = { [model] in model.registry.openSessions() }
+        #if os(visionOS)
+        // An orb's ring holds its machine's other services (D88): the library knows them.
+        GlassSessionOrbServices.dots = { [weak model] endpoints, own, from in
+            model?.orbServiceDots(for: endpoints, excluding: own, openedFrom: from) ?? []
+        }
+        #endif
         // Stage C: Projects in the library, the same way. Answering "is that machine this one?"
         // needs the catalog, which the editor deliberately does not hold, so the answer is supplied
         // from here: the catalog's own local record (D8), or a saved machine whose Terminal service's
@@ -361,7 +367,7 @@ struct GlassPowerToolsApp: App {
         terminal.showLibraryPanel = { [weak model] panelID in model?.showPanel(panelID) }
         // A machine's folder as a project; on a phone, `returnTitle` is what the editor's back
         // button returns to.
-        let openFolderAsProject: @MainActor (UUID, String, String?) -> Void = { serverID, path, returnTitle in
+        let openFolderAsProject: @MainActor (UUID, String, String?, String?) -> Void = { serverID, path, returnTitle, origin in
             let host = library.host(owningEndpoint: EndpointID(rawValue: serverID))
             let project = GlassEditorProject(hostID: host?.id, path: path)
             // This Mac browsed over SSH opens from the disk too (B-X22).
@@ -369,16 +375,17 @@ struct GlassPowerToolsApp: App {
             // The returned id is a window that has to be *shown*; dropping it left the project
             // opened into a workspace nothing was displaying.
             if let windowID = editorRuntime.openProject(project, reach: reach) {
+                editorRuntime.note([windowID], openedFrom: origin)
                 editorRuntime.present(windowID, returningTo: returnTitle)
             }
         }
-        terminal.openFolderAsProject = { @MainActor serverID, path in openFolderAsProject(serverID, path, nil) }
+        terminal.openFolderAsProject = { @MainActor serverID, path in openFolderAsProject(serverID, path, nil, nil) }
         // A terminal's folder button ▸ Open in Editor (2026-10-20, the owner: "either opens the
         // Project with the same server/path or it opens a new Editor with pwd at the working
         // directory"): the machine's project that is or holds the shell's folder, else that folder
         // in a new editor window. A shell on this Mac (`serverID` nil) is This Mac's, and This Mac
         // has three names here: no host, its own record, and its library machine (D86).
-        terminal.openWorkingFolderInEditor = { @MainActor serverID, path in
+        terminal.openWorkingFolderInEditor = { @MainActor serverID, path, origin in
             let host = serverID.flatMap { library.host(owningEndpoint: EndpointID(rawValue: $0)) }
                 ?? (serverID == nil ? library.host(GlassLocalHost.id) : nil)
             let onThisMac = serverID == nil || host?.isLocal == true || host?.isThisMac == true
@@ -387,12 +394,16 @@ struct GlassPowerToolsApp: App {
             if let project = editorRuntime.projects.project(containing: path, on: machines) {
                 let reach: GlassEditorProjectReach = project.hostID.flatMap { library.host($0) }.map { projectReach($0) }
                     ?? .thisMachine
-                editorRuntime.present(editorRuntime.openProject(project, reach: reach), returningTo: "Terminal")
+                let windowID = editorRuntime.openProject(project, reach: reach)
+                editorRuntime.note([windowID], openedFrom: origin)
+                editorRuntime.present(windowID, returningTo: "Terminal")
             } else if let serverID, !onThisMac {
-                openFolderAsProject(serverID, path, "Terminal")
+                openFolderAsProject(serverID, path, "Terminal", origin)
             } else {
                 let folder = URL(filePath: path, directoryHint: .isDirectory)
-                GlassWindowOpener.shared.perform { editorRuntime.show(editorRuntime.open(urls: [folder]), with: $0) }
+                let windows = editorRuntime.open(urls: [folder])
+                editorRuntime.note(windows, openedFrom: origin)
+                GlassWindowOpener.shared.perform { editorRuntime.show(windows, with: $0) }
             }
         }
         // Favorites beyond machines (2026-10-13): the editor's and the terminal's stars ask the
@@ -667,6 +678,8 @@ struct GlassPowerToolsApp: App {
         // system's 1280 × 720 was "pretty large" (2026-10-10). It is the size a new window opens
         // at; the window can still be resized, and comes back from its orb at whatever size it had.
         .defaultSize(width: GlassConnectionsWindowSize.width, height: GlassConnectionsWindowSize.height)
+        // Asked for from the orb dock, it comes back above the dock (D88).
+        .glassReturnsAboveOrbDock()
         #else
         let group = WindowGroup("Connections", id: "main") { mainContent }
         #if os(macOS)
@@ -805,6 +818,16 @@ struct GlassPowerToolsApp: App {
         }
         .immersionStyle(selection: .constant(.mixed), in: .mixed)
         .restorationBehavior(.disabled)
+        // The orb dock (D88): windows shrunk into their orbs, moved by the window's bar. Opened by
+        // the first window to dock, or a launch that puts docked windows back. Resized, it keeps the
+        // size it is given, and stands its orbs in a column when taller than wide.
+        Window("Orbs", id: GlassOrbDock.windowID) {
+            orbDockContent
+        }
+        .windowStyle(.plain)
+        .windowResizability(.contentMinSize)
+        .glassOrbDockOpensAtItsSize()
+        .restorationBehavior(.disabled)
         #endif
     }
 
@@ -825,6 +848,24 @@ struct GlassPowerToolsApp: App {
         .glassLayers(layers)
         .environment(model.registry)
         .glassRegistersWindowOpener()
+    }
+
+    /// The dock inside every capability's bootstrap, as All Windows is: a pinch on an orb asks for
+    /// a terminal's window or a desktop's, which a bootstrap carries out.
+    private var orbDockContent: some View {
+        GlassTerminalBootstrap(runtime: terminal) {
+            GlassDatabaseBootstrap(runtime: database) {
+                GlassDesktopBootstrap(runtime: desktop) {
+                    GlassEditorBootstrap(runtime: editor) {
+                        GlassOrbDockView(model: model)
+                    }
+                }
+            }
+        }
+        .glassLayers(layers)
+        .environment(model.registry)
+        .glassRegistersWindowOpener()
+        .trackWindowPresence(key: GlassOrbDock.windowID, recovery: windowRecovery)
     }
 
     /// The arc inside every capability's bootstrap, as the window is, for the same reason.

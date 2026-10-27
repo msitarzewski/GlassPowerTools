@@ -60,7 +60,15 @@ private struct TerminalDiagramMark: View {
                 .font(.system(size: max(9, cell.height * 0.62), weight: .semibold))
                 .foregroundStyle(.tint)
                 .frame(width: cell.height * 1.7, height: cell.height)
+                #if os(visionOS)
+                // Vision Pro's own glass. A material, or any fill, behind a plain button's label with
+                // a popover on it took the mark out of Vision Pro's accessibility (2026-10-26, found by
+                // walking its tree in the simulator: glass and a borderless button kept it), so
+                // VoiceOver could not reach Show Diagram there.
+                .glassBackgroundEffect(in: .capsule)
+                #else
                 .background(.regularMaterial, in: .capsule)
+                #endif
                 .contentShape(.capsule)
         }
         .buttonStyle(.plain)

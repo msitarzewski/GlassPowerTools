@@ -28,6 +28,7 @@ struct MacLocalTmuxTests {
         private var _givenNames: [(session: String, name: String?)] = []
         private var _contexts: [String: MacWorkspacePaneContext] = [:]
         private var _contextReads = 0
+        private var _contextReadTimes: [ContinuousClock.Instant] = []
         private var _contextReadDelay: TimeInterval = 0
         private var _repositories: [(session: String, repository: TerminalRepository?)] = []
         private var _readsRepositories = false
@@ -52,6 +53,8 @@ struct MacLocalTmuxTests {
         }
         /// How many times every session's context was read (W19).
         var contextReads: Int { lock.withLock { _contextReads } }
+        /// When each of those reads began.
+        var contextReadTimes: [ContinuousClock.Instant] { lock.withLock { _contextReadTimes } }
         /// How long a read of every session's context takes.
         var contextReadDelay: TimeInterval {
             get { lock.withLock { _contextReadDelay } }
@@ -110,6 +113,7 @@ struct MacLocalTmuxTests {
                 contexts: { _ in
                     let (answer, delay) = self.lock.withLock { () -> ([String: MacWorkspacePaneContext], TimeInterval) in
                         self._contextReads += 1
+                        self._contextReadTimes.append(.now)
                         return (self._contexts, self._contextReadDelay)
                     }
                     if delay > 0 { Thread.sleep(forTimeInterval: delay) }
@@ -1105,11 +1109,13 @@ struct MacLocalTmuxTests {
             #expect(await eventually { titles() == ["job 0", "job 1", "job 2"] })
             #expect(fake.contextReads == 1, "three tabs settling together are one run of tmux")
 
-            let first = ContinuousClock.now
             tabs[0].refreshLocalTmuxContext()
             tabs[1].refreshLocalTmuxContext()
             #expect(await eventually { fake.contextReads == 2 }, "asked within the interval: one more read, at its end")
-            #expect(ContinuousClock.now - first >= interval - .milliseconds(150), "not before the interval is out")
+            // Timed between the reads, as the interval is: timed from here, after the wait for the
+            // first titles, a full run's late wake made a read on time look early (2026-10-26).
+            let reads = fake.contextReadTimes
+            #expect(reads.count == 2 && reads[1] - reads[0] >= interval - .milliseconds(50), "not before the interval is out")
             try await Task.sleep(for: interval * 2)
             #expect(fake.contextReads == 2, "every tab quiet: nothing more is read")
 

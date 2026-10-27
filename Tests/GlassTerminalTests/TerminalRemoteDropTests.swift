@@ -56,7 +56,7 @@ struct TerminalRemoteDropTests {
         #expect(typed?.contains("broken") == false, "a file that didn't arrive types nothing")
         #expect(TerminalRemoteDropPlan.typedText(for: [.failed("broken.png", .connectionLost)]) == nil)
         #expect(TerminalRemoteDropPlan.failureMessage(for: outcomes)
-                == "Couldn't upload broken.png: the upload didn't finish. Try dropping it again.")
+                == "Couldn't upload broken.png: the upload didn't finish. Try again.")
         #expect(TerminalRemoteDropPlan.failureMessage(for: [.failed("photo.heic", .folderRefused)])
                 == "Couldn't upload photo.heic: the host refused the folder. Check that your account can write to ~/.cache.")
         #expect(TerminalRemoteDropPlan.progressText(index: 1, of: 3, name: "b.png") == "Uploading 2 of 3 files…")
@@ -136,7 +136,7 @@ struct TerminalRemoteDropTests {
         #expect(typed == [Self.day + "/good.txt "])
         #expect(await host.data(at: Self.day + "/broken.bin") == nil)
         #expect(drops.statuses[session.id] == TerminalRemoteDropStatus(
-            kind: .problem, text: "Couldn't upload broken.bin: the upload didn't finish. Try dropping it again."))
+            kind: .problem, text: "Couldn't upload broken.bin: the upload didn't finish. Try again."))
 
         // A folder the host refuses: nothing goes, nothing is typed.
         let refusing = DropTestHost(home: Self.home, refusing: ["/home/alpha/.cache"])
@@ -185,9 +185,64 @@ struct TerminalRemoteDropTests {
         await drops.waitForDrop(on: session.id)
 
         #expect(drops.statuses[session.id] == TerminalRemoteDropStatus(
-            kind: .notice, text: "Not connected. Reconnect, then drop again."))
+            kind: .notice, text: "Not connected. Reconnect, then try again."))
         #expect(!opened, "nothing was sent")
         #expect(typed.isEmpty)
+    }
+
+    // MARK: Pasted
+
+    @Test("a paste is a file when it holds a picture, or a file with no text; else it is text")
+    func pastedKinds() {
+        let file = SFTPIncomingDrop.isPastedFile
+        #expect(file(["public.png"]))
+        #expect(file(["public.utf8-plain-text", "public.jpeg"]), "a picture, whatever else it carries")
+        #expect(file(["com.adobe.pdf"]))
+        #expect(file(["public.file-url", "com.adobe.pdf"]), "read for its content")
+        #expect(!file(["public.utf8-plain-text"]))
+        #expect(!file(["public.rtf", "public.utf8-plain-text"]))
+        #expect(!file(["public.url", "public.utf8-plain-text"]), "a link is text")
+        #expect(!file(["public.url"]))
+        #expect(!file(["public.file-url"]), "a name the app may not open, with nothing to read")
+        #expect(!file(["com.example.never-declared"]))
+        #expect(!file([]))
+        #expect(SFTPIncomingDrop.fileType(in: ["public.utf8-plain-text", "public.png"]) == "public.png", "the picture")
+        #expect(SFTPIncomingDrop.fileType(in: ["com.adobe.pdf", "public.utf8-plain-text"]) == "com.adobe.pdf")
+    }
+
+    @Test("a picture pasted goes up as Pasted.png and its path is typed; text pasted is left to be typed")
+    func pastedPictureUploads() async throws {
+        let host = DropTestHost(home: Self.home)
+        let session = Self.connectedSession()
+        let drops = Self.drops(on: host)
+        var typed: [String] = []
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01])
+        // As the clipboard has a picture: some text about it first, then the picture.
+        let picture = NSItemProvider()
+        picture.registerDataRepresentation(forTypeIdentifier: UTType.utf8PlainText.identifier, visibility: .all) { done in
+            done(Data("a caption".utf8), nil); return nil
+        }
+        picture.registerDataRepresentation(forTypeIdentifier: UTType.png.identifier, visibility: .all) { done in
+            done(png, nil); return nil
+        }
+        let caption = NSItemProvider(object: "a caption" as NSString)
+
+        #expect(drops.receive(pasted: [picture, caption], on: session) { typed.append($0) })
+        await drops.waitForDrop(on: session.id)
+
+        #expect(await host.data(at: Self.day + "/Pasted.png") == png, "the picture, not its caption")
+        #expect(typed == [Self.day + "/Pasted.png "])
+
+        #expect(!drops.receive(pasted: [caption], on: session) { typed.append($0) }, "text is typed as text")
+        #expect(!drops.receive(pasted: [], on: session) { typed.append($0) })
+        #expect(typed.count == 1)
+        #expect(drops.statuses[session.id] == nil)
+
+        let offline = TerminalSession(server: ServerConfiguration(name: "alpha", host: "192.0.2.10", username: "ann"))
+        #expect(drops.receive(pasted: [picture], on: offline) { typed.append($0) }, "a picture is never typed as text")
+        #expect(drops.statuses[offline.id] == TerminalRemoteDropStatus(
+            kind: .notice, text: "Not connected. Reconnect, then try again."))
+        #expect(typed.count == 1)
     }
 
     // MARK: Insert Path

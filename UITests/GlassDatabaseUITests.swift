@@ -627,7 +627,12 @@ final class GlassDatabaseUITests: XCTestCase {
         // Select All, then type over it. Deleting backwards from the tap left whatever followed the
         // cursor, because a tap puts it where it lands: the server got a CREATE with the end of
         // the DROP before it, "near 'IF EXISTS `gpt_scratch`.`gpt_ui_rows`'" (2026-10-25, iPhone).
+        #if os(visionOS)
+        // visionOS's XCUITest takes a key, not a string.
+        editor.typeKey(XCUIKeyboardKey(rawValue: "a"), modifierFlags: .command)
+        #else
         editor.typeKey("a", modifierFlags: .command)
+        #endif
         editor.typeText(sql)
         XCTAssertTrue(waitUntil("the editor to hold the statement", timeout: 5) { editorText() == sql },
                       "the editor holds ‘\(editorText().prefix(160))’, not the statement typed")
@@ -1462,6 +1467,11 @@ final class GlassDatabaseUITests: XCTestCase {
         XCTAssertTrue(openSQLEditor(), "a SQL editor to re-read the table with")
         XCTAssertTrue(runStatements(["SELECT id, label FROM \(qualified(Self.rowsTable, fixture)) ORDER BY id"],
                                     fixture: fixture), "the re-read ran")
+        #if !os(macOS)
+        // The rows under the keyboard are not laid out, as `serverRows` says: on the Duo's outer
+        // display row 2 read "" with the keyboard still up (2026-10-25).
+        putKeyboardAway()
+        #endif
         XCTAssertTrue(waitForCell(row: 1, column: "label", toRead: "alpha"),
                       "an independent SELECT still sees the first row")
         XCTAssertEqual(cellText(row: 2, column: "label"), "gamma")

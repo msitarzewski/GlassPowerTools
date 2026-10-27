@@ -1770,5 +1770,99 @@ in a row now and that's not reflected in the data here." Asked what counts and w
 - Connections are still counted only for a library Connect. Counting every path (restores, reconnects, the terminal's
   own) is deferred.
 
-**Status:** Implemented 2026-10-20 (0.4.490); not committed. Task note `2026-10-20_time-in-use.md`.
+**Status:** Implemented 2026-10-20 (0.4.490); committed in 7f824f86. Task note `2026-10-20_time-in-use.md`.
 
+
+## D88 — Orbs gather in a dock on Vision Pro — Approved 2026-10-25
+**Owner:** "an invisible 'canvas' where (when enabled) a user's windows (when the orb mode is clicked) would move
+automatically into a 'dock' that itself can be moved around. I'd resize the connections orb to match, and include it
+too. We also need to add Editor, Database, and Desktop to the orb so it's more of a machine nav than just tabs for a
+Terminal window." From his headset captures: four session orbs and the Connections orb, each a window of its own,
+in a row at desk height.
+
+**Platform:** visionOS opens a new window above, below, leading or trailing another one (`WindowPlacement.Position`,
+visionOS 2+), and moves no window already open; the app has met that before (a resized window stays centred). So no
+window can be carried into a dock: a window docks by closing into its orb, with its sessions kept, and comes back
+when its orb is pinched.
+
+**Asked, he chose:**
+- **A terminal window is one orb**, its tabs on the ring as now, with its machine's Database, Desktop and Editor
+  added. **Databases and desktops are one orb per machine.** **An editor** opened from a terminal (the folder button,
+  Open in Editor) goes with that terminal window's orb; one opened from the machine in the library goes with the
+  machine's orb.
+- **Every service the machine has** is on the ring, dimmed while not open; a pinch opens it.
+- **The Connections orb** is in the dock at the session orbs' size, keeping the app's icon and the Active count.
+- **A window comes back above the dock.** The orbs keep their current size ("I like the current size of the orb").
+
+**Decision:**
+- A Vision Pro setting, off by default: Settings ▸ Appearance ▸ Orbs. Off, a window shrinks into its own orb where
+  it is (D74). On, Shrink to Orb closes the window into the dock, a window of its own with no panel, moved by its bar.
+- Pinching an orb in the dock opens its window again above the dock, at the size it had.
+
+**Revised the same evening, on the headset (0.4.523):** "we should only show connected services. Every orb has ghost
+services for the editor, mysql, and desktop for [one machine] … if I connect mysql on [it], then we should show [that
+machine's] orb with a single mysql tab. The spacing is about 2x what it should be … maybe we need horizontal scroll?
+Looks like we also lost the colors for the icons? and the icons in the middle seem to overlap?" So:
+- A ring holds only what is open: no faint services, no Editor that opens a project.
+- In the dock a machine's connected databases, desktops and library editors are one orb for that machine, docked or
+  not, and terminal orbs no longer repeat them. In place, a terminal orb's ring adds its machine's connected services.
+- Orbs in the dock sit half as far apart; a dot's name shows under its orb while the dot is looked at; past a width
+  the dock scrolls sideways.
+- Tabs in the dock draw their agents' marks in colour, as a window's own orb does.
+
+**Revised again on the headset (0.4.525):** "Let's have the natural state remain the circle, only expand on
+attention. and they need to remain on top!", then "the next thing is pinch/click and hold on a docked window to move its
+order so muscle memory can land." So a dot in the dock is a circle until looked at, an open name lies over the orb,
+and an orb held in the dock is carried along the row and takes the place of the one it is let go on; every orb keeps
+its place on this device, so one that leaves the dock comes back where it stood.
+
+**Revised 2026-10-26, his asks while testing 0.4.533.** "Let's have windows respawn in their last used state. In the
+dock vs. open?" So a terminal window the launch reopens comes back open, in the dock, or standing as its orb, growing
+back to the size it had; Connections comes back in the dock or as its orb. Connections waits for the reopened terminals
+to connect, and stays open if it is showing anything then (a password asked for, a host key, what failed) — found by
+the relaunch test, where docking would have closed the question with it. Databases, desktops and editors are not
+reopened at launch at all, so they have no state to come back in. Then: "could we make it responsive? A user could
+then make it vertical with simply resizing it so … Glass/transparency options for the dock?" Asked, he chose **its
+shape decides** (taller than wide, a column; no direction setting) and **its own glass and Opacity, starting with
+Appearance**. So the dock is resizable, keeps the size given it on this device and opens at it, fits its orbs in a row
+until resized (Settings: Fit Dock to Its Orbs), and has a Dock section in Settings ▸ Appearance ▸ Orbs: Opacity and
+Glass following Appearance until set. This ends the dock as a window with no panel: it now paints what Appearance
+paints, and 0% of both makes it clear again.
+
+**Status:** Approved 2026-10-25; built through the eighth round (0.4.534) and committed 2026-10-26 at his word. The
+headset has seen rounds one to five; the sixth to eighth are his to confirm. Task note `tasks/2026-10/2026-10-25_orb-dock.md`.
+
+## D89 — Focus Mode environments on Vision Pro — Approved 2026-10-26
+**Owner, 2026-10-22:** "crazy crazy idea for the focus mode.... in the window settings, overriding the application
+preferences.... the user should be able to upload their own environment. include a sketchfab free model browser with
+room and environment filters." His answers that day: iCloud for the files, 360° photos too, and a Sketchfab
+registration request drafted for him to send (not known to be sent). **2026-10-26:** "Go ahead and build the upload
+interfaces and the environment library", "can you make a few that will become part of the library of environments by
+default?", then "This environment feature should only be on visionOS … The user may manage their library from mac,
+but the environments are spatial and only work (today) on Vision Pro."
+
+**Decision:**
+- Focus Mode on Vision Pro shows an environment from a library: Dimmed Room (as before, the default), four built-ins
+  drawn in code (Night Sky, Dusk, Grid, Studio; no image assets), and the person's own 3D rooms (USDZ, Reality) and
+  360° photos (pictures twice as wide as tall).
+- The person's own are files in iCloud Drive ▸ Glass Power Tools ▸ Environments (the app's iCloud container, made
+  public in Finder and Files), so a Mac manages the library in Finder; without iCloud Drive they stay on the device.
+  Added on the headset from Files, or dropped on the library. Checked on the way in: a 3D file must be one inside, a
+  picture 2:1; refusals say why.
+- Settings ▸ Terminal ▸ Focus Mode chooses for every window (synced, but sent only by Vision Pro, so another device's
+  unchosen default can't undo it); This Window, and the moon's pinch-and-hold menu, for one window.
+- Only Vision Pro shows any of it. The Mac's Focus Mode stays full screen.
+- **Not built:** Sketchfab (sold by Epic to KitBash in August 2026, its Download API's future unannounced) or any other
+  catalogue; live data in environments (proposed to him).
+- **Open Immersed** (the owner, 2026-10-26, answering whether a chosen environment should open fully around him:
+  "Leave immersion to the user... in that same panel in the main settings. [ ] Open Immersed."): a toggle in Settings ▸
+  Terminal ▸ Focus Mode, off by default. On, Focus Mode opens all the way round; the Digital Crown still dials it back.
+- **Try Out, fits and moving about** (the owner, 2026-10-26: "Yes, build all three"): a 3D environment is fitted in
+  Try Out (what its numbers are in, a size, a floor, where to start; the file's own camera when it has one), the fit
+  kept beside the file in iCloud for every Vision Pro. Inside any environment with a floor the person moves by
+  Mirador's teleport (pinch the floor, the hand chooses the facing, raise it to cancel; swing a pinch on the sky or
+  a wall to turn 45°), onto a room's own floors and landings too. The world moves, never the person; a floor is
+  forced under every walkable environment. Head position from ARKit world tracking, which asks nothing of the person.
+
+**Status:** Approved and built 2026-10-26 (0.4.530–0.4.533); committed 2026-10-26 at his word. Not yet seen on the
+headset. Task note `tasks/2026-10/2026-10-26_focus-environments.md`.

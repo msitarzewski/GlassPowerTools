@@ -162,15 +162,15 @@ nonisolated enum TerminalRemoteDropFailure: Error, Equatable, Sendable {
         case .folderRefused:
             "the host refused the folder. Check that your account can write to ~/.cache."
         case .notAFolder(let path):
-            "\(path) on the host is a file, not a folder. Move it aside, then drop again."
+            "\(path) on the host is a file, not a folder. Move it aside, then try again."
         case .noSafeUpload:
             "the host's SFTP server can't upload without risking an existing file. It needs OpenSSH's hardlink extension."
         case .tooLarge(let limit):
             "it's larger than the \(ByteCountFormatter.string(fromByteCount: Int64(clamping: limit), countStyle: .file)) upload limit."
         case .connectionLost:
-            "the connection ended. Reconnect, then drop it again."
+            "the connection ended. Reconnect, then try again."
         case .didNotFinish:
-            "the upload didn't finish. Try dropping it again."
+            "the upload didn't finish. Try again."
         case .cancelled:
             "the upload was cancelled."
         }
@@ -485,6 +485,25 @@ final class TerminalRemoteDrops {
         return true
     }
 
+    /// A paste on a terminal: the pictures and files in it go up as a drop's do, and their paths
+    /// are typed (2026-10-25). False when it held none, and the paste is text; true when it held
+    /// some, whether they went up or the terminal said why not.
+    func receive(pasted providers: [NSItemProvider], on session: TerminalSession,
+                 insert: @escaping (String) -> Void) -> Bool {
+        // The kinds on the clipboard, never what they hold: which a paste was taken as.
+        let types = providers.map { $0.registeredTypeIdentifiers.joined(separator: ",") }.joined(separator: " | ")
+        guard let paste = SFTPIncomingDrop(pasted: providers) else {
+            Self.logger.notice("event=paste-text types=\(types, privacy: .public)")
+            return false
+        }
+        Self.logger.notice("event=paste-files types=\(types, privacy: .public)")
+        guard accepts(session) else { return true }
+        start(on: session, insert: insert) { staging in
+            try await paste.materialize(into: staging).urls
+        }
+        return true
+    }
+
     /// Files already on this device.
     @discardableResult
     func receive(files: [URL], on session: TerminalSession, insert: @escaping (String) -> Void) -> Bool {
@@ -501,7 +520,7 @@ final class TerminalRemoteDrops {
     private func accepts(_ session: TerminalSession) -> Bool {
         guard session.purpose == .terminal, session.state == .connected,
               session.getSSHConnection() != nil else {
-            show(TerminalRemoteDropStatus(kind: .notice, text: "Not connected. Reconnect, then drop again."), for: session.id)
+            show(TerminalRemoteDropStatus(kind: .notice, text: "Not connected. Reconnect, then try again."), for: session.id)
             return false
         }
         // One drop at a time; the corner already says one is going up.
@@ -540,7 +559,7 @@ final class TerminalRemoteDrops {
             return
         } catch {
             Self.logger.error("A drop on a terminal couldn't be read: \(String(describing: error), privacy: .public)")
-            show(TerminalRemoteDropStatus(kind: .problem, text: "Couldn't read what was dropped. Try dropping it again."), for: sessionID)
+            show(TerminalRemoteDropStatus(kind: .problem, text: "Couldn't read what was dropped or pasted. Try again."), for: sessionID)
             return
         }
         defer { withExtendedLifetime(staging) {} }

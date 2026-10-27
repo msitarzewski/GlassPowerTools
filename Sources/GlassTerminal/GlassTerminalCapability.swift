@@ -121,9 +121,11 @@ public final class GlassTerminalRuntime {
         #if DEBUG
         /// Screenshots (App/GlassDemoMode.swift): a session that connects to nothing, showing a
         /// recorded transcript in the real terminal window. Typing goes nowhere.
-        /// `windowSettings` for its window (W22), and This Window opened over it when asked; `tick`,
-        /// when given, arrives again and again after it, as a program's redraws do.
-        case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool, tick: Data?)
+        /// `windowSettings` for its window (W22), and This Window opened over it when asked; `ticks`,
+        /// when given, arrive one after another and again after it, as a program's redraws do, each
+        /// with the next of `titles` as its tmux session's would be read.
+        case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool, ticks: [Data],
+                        titles: [String], every: Duration)
         /// Screenshots: a terminal running a stand-in for a full-screen program, which draws its
         /// whole screen for the rows and columns the window gives it, and again when they change.
         case demoScreen(name: String, draw: @MainActor (_ rows: Int, _ columns: Int) -> Data, windowSettings: GlassWindowOverrides)
@@ -152,9 +154,10 @@ public final class GlassTerminalRuntime {
     public var openFolderAsProject: GlassOpenFolderAsProject?
     /// A terminal's folder button, right-clicked ▸ Open in Editor (2026-10-20): the project on that
     /// machine whose folder is or holds the shell's, or else the folder itself in a new editor
-    /// window. `serverID` nil is this Mac's own shell. Set by the composition root; nil where no
-    /// editor is wired in, and then not offered.
-    public var openWorkingFolderInEditor: (@MainActor (_ serverID: UUID?, _ path: String) -> Void)?
+    /// window. `serverID` nil is this Mac's own shell. `origin` is the terminal window's open session,
+    /// which the editor goes with on Vision Pro's orbs (D88). Set by the composition root; nil where
+    /// no editor is wired in, and then not offered.
+    public var openWorkingFolderInEditor: (@MainActor (_ serverID: UUID?, _ path: String, _ origin: String?) -> Void)?
     /// Favorites, for Files' star and a workgroup's (2026-10-13). Supplied by the composition root.
     public var favorites: GlassFavoritesAccess?
 
@@ -540,13 +543,15 @@ public final class GlassTerminalRuntime {
     #if DEBUG
     /// Screenshots only: a terminal window on `name` showing `output`, with no connection behind it,
     /// keeping `windowSettings` as its own (W22); with `opensSettings`, Settings ▸ This Window opens
-    /// over it. `tick`, when given, is fed again every 0.4 s after `output`, as tmux redraws its
-    /// status line.
+    /// over it. `ticks`, when given, are fed one `every` after `output`, round and round, as tmux
+    /// redraws its status line or a coding agent writes; with each, the next of `titles` is the
+    /// program's title, as a read of its tmux session would bring a coding agent's turning spinner.
     public func requestDemoReplay(name: String, output: Data,
                                   windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
-                                  opensSettings: Bool = false, tick: Data? = nil) {
+                                  opensSettings: Bool = false, ticks: [Data] = [], titles: [String] = [],
+                                  every: Duration = .milliseconds(400)) {
         enqueue(.demoReplay(name: name, output: output, windowSettings: windowSettings, opensSettings: opensSettings,
-                            tick: tick))
+                            ticks: ticks, titles: titles, every: every))
     }
     /// Screenshots only: a terminal window on `name` running a stand-in for a full-screen program
     /// (`draw`), which is given the window's rows and columns each time they change, as a program is.
@@ -889,7 +894,17 @@ public final class GlassTerminalCapability: GlassCapability {
                 Self.backdrop(window: manager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides(),
                               runtime: runtime)
             },
-            lastActivity: { session.terminalHostModel.lastActivityAt }
+            lastActivity: { session.terminalHostModel.lastActivityAt },
+            // Its agent in its colour, else a terminal in the window's, pulsing while it prints: as the
+            // window's own orb and its sidebar draw it.
+            icon: { [runtime] side in
+                let workgroup = manager.workgroup(for: workgroupID)
+                let look = TerminalLook.resolved(workgroup?.windowSettings ?? GlassWindowOverrides(),
+                                                 settings: runtime.settingsManager)
+                return AnyView(TerminalSessionMark(session: session,
+                                                   color: look.tintColor ?? workgroup?.colorTag.color ?? .secondary,
+                                                   size: side))
+            }
         )
     }
 
@@ -911,6 +926,7 @@ public final class GlassTerminalCapability: GlassCapability {
     /// "Terminal on …" while the window had the name. A workgroup with a name of its own, or with
     /// several terminals, keeps its name.
     static func title(of workgroup: TerminalWorkgroup, live: [TerminalSession]) -> String {
+        if let given = workgroup.givenName { return given }
         guard live.count == 1, let only = live.first, workgroup.name == only.server.name else { return workgroup.name }
         return TerminalWorkgroupOpening.label(only, on: .active)
     }
@@ -976,6 +992,12 @@ public final class GlassTerminalCapability: GlassCapability {
     /// to exclude itself, so the two must agree — hence one function rather than two literals.
     public static func sessionID(workgroupID: UUID) -> String {
         "terminal:\(workgroupID.uuidString)"
+    }
+
+    /// The workgroup a `sessionID(workgroupID:)` names; nil for any other id.
+    public static func workgroupID(ofSessionID id: String) -> UUID? {
+        guard id.hasPrefix("terminal:") else { return nil }
+        return UUID(uuidString: String(id.dropFirst("terminal:".count)))
     }
 
     public func open(service: HostServiceLink, host: HostProfile, report: @escaping GlassCapabilityReport) {

@@ -497,6 +497,10 @@ class TerminalSession: Identifiable, Hashable {
     /// What its tmux session says about itself, last read: the name a tab gave it, its active
     /// pane's title and folder, and the repository and branch there.
     private(set) var tmuxPane: TerminalTmux.PaneState?
+    #if DEBUG
+    /// Screenshots and UI tests: a program's title, as a read of its tmux session brings it.
+    func demoPaneTitle(_ title: String) { tmuxPane = TerminalTmux.PaneState(title: title) }
+    #endif
     /// The name someone gave this terminal, here or on another device through its session.
     private(set) var givenName: String?
     /// Reads `tmuxPane` on devices without the Mac's tabs. On the Mac a tab turns it on for its
@@ -2357,7 +2361,14 @@ struct CodableColor: Codable, Equatable {
 /// Endpoint, account, route and trust-policy changes do, including any hop.
 struct TerminalWorkgroup: Identifiable, Equatable, Sendable {
     let id: UUID
+    /// What it was opened as: its machine's name, or its saved Workgroup's.
     var name: String
+    /// The name someone gave its window (the owner, 2026-10-25: "need a way to name windows (They
+    /// all say 'Terminal on [his Mac]')"); nil while it goes by `name`. A saved Workgroup is never
+    /// renamed by it.
+    var givenName: String? = nil
+    /// What the window is called: the name given it, else what it was opened as.
+    var displayName: String { givenName ?? name }
     var colorTag: ServerColorTag
     var sessionIDs: [UUID]
     var selectedSessionID: UUID?

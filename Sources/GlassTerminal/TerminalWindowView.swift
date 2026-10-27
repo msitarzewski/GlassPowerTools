@@ -212,6 +212,14 @@ struct TerminalWindowView: View {
             }
             .onAppear {
                 terminalHostModel.pasteRewrite = TerminalWrappedPaste.rewrite(settings: settingsManager)
+                #if !os(macOS)
+                // A picture or file pasted goes up to the host, as a dropped one does (W14).
+                terminalHostModel.pasteFiles = { [weak session] in
+                    guard let session else { return false }
+                    return TerminalRemoteDrops.shared.receive(pasted: UIPasteboard.general.itemProviders, on: session,
+                                                              insert: TerminalRemoteDrops.typeIntoTerminal(of: session))
+                }
+                #endif
                 guard let onTerminalContextChange else { return }
                 terminalHostModel.onTerminalTitleChange = { [weak terminalHostModel] title in
                     onTerminalContextChange(title, terminalHostModel?.currentDirectory)
@@ -289,6 +297,26 @@ struct TerminalWindowView: View {
             .onDisappear {
                 handleTerminalDisappear()
             }
+            #if os(visionOS)
+            // This Window or Settings changing the environment while this window's Focus Mode is open.
+            .onChange(of: focusEnvironmentID) { _, id in
+                if isImmersiveFocusActive { FocusEnvironmentStage.shared.environmentID = id }
+            }
+            // What Focus Mode is fetching or making, or why it can't show one, on the window that opened it.
+            .overlay(alignment: .top) {
+                if isImmersiveFocusActive, let note = FocusEnvironmentStage.shared.note {
+                    Text(note)
+                        .font(.callout)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 520)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .glassBackgroundEffect(in: .capsule)
+                        .padding(.top, 16)
+                        .accessibilityIdentifier("focus-environment-note")
+                }
+            }
+            #endif
             .onChange(of: find.isPresented) { oldValue, showing in
                 handleSearchPresentationChange(oldValue, showing)
             }
@@ -302,6 +330,7 @@ struct TerminalWindowView: View {
                 withAnimation(.easeInOut(duration: 0.2)) { find.perform(request.command) }
             }
             .onChange(of: showingTerminalSettings) { _, showing in
+                noteTools("settings sheet \(showing ? "asked for" : "closed")")
                 updateTerminalFocusOwnership(competingControlPresented: showing)
             }
             .onChange(of: showingSnippetPicker) { _, showing in
@@ -488,6 +517,7 @@ struct TerminalWindowView: View {
         terminalSurface
         .sheet(isPresented: $showingTerminalSettings) {
             terminalSettingsModal
+                .onAppear { noteTools("settings sheet on screen") }
         }
         .sheet(isPresented: $showingSnippetPicker) {
             snippetPicker
@@ -586,12 +616,105 @@ struct TerminalWindowView: View {
                 showingTerminalSettings = true
             }
         }
+        #if os(visionOS)
+        // `--demo-focus <environment>`: Focus Mode open around the window, for looking at an
+        // environment in the simulator ("night-sky" for `builtin.nightSky`, or an identifier).
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--demo-focus"),
+           ProcessInfo.processInfo.arguments.indices.contains(index + 1), !isImmersiveFocusActive {
+            let asked = ProcessInfo.processInfo.arguments[index + 1]
+            let id = FocusBuiltInEnvironment.allCases.first {
+                $0.rawValue.lowercased() == asked.replacingOccurrences(of: "-", with: "").lowercased()
+            }?.id ?? asked
+            // `--demo-focus-immersed`: as Open Immersed opens it, set for this run only (not saved).
+            if ProcessInfo.processInfo.arguments.contains("--demo-focus-immersed") {
+                settingsManager.focusOpensImmersed = true
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                FocusEnvironmentLibrary.shared.start()
+                FocusEnvironmentStage.shared.environmentID = id
+                isImmersiveFocusActive = await openImmersiveSpace(id: "focus-environment") == .opened
+            }
+        }
+        // `--demo-try-out <identifier>`: Try Out's window for one of the person's 3D environments.
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "--demo-try-out"), arguments.indices.contains(index + 1) {
+            let id = arguments[index + 1]
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                FocusEnvironmentLibrary.shared.start()
+                openWindow(id: FocusEnvironmentFitView.windowID, value: id)
+            }
+        }
+        // `--demo-teleport x,y,z,heading°` and `--demo-walk-target x,y,z,heading°`, once a room has
+        // loaded and been made somewhere to stand: what a pinch there would do, as nothing can pinch.
+        for (flag, teleports) in [("--demo-teleport", true), ("--demo-walk-target", false)] {
+            guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { continue }
+            let numbers = arguments[index + 1].split(separator: ",").compactMap { Float($0) }
+            guard numbers.count == 4 else { continue }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(14))
+                let point = SIMD3<Float>(numbers[0], numbers[1], numbers[2]), yaw = Double(numbers[3]) * .pi / 180
+                if teleports {
+                    FocusEnvironmentStage.shared.walking?.demoTeleport(toward: point, yaw: yaw)
+                } else {
+                    FocusEnvironmentStage.shared.walking?.demoShowTarget(at: point, yaw: yaw)
+                }
+            }
+        }
+        #endif
+        #endif
+        #if os(visionOS)
+        // The moon's menu lists the person's own environments too.
+        FocusEnvironmentLibrary.shared.start()
         #endif
         rejectPendingHostKeyChallengeInStrictMode()
         updateTerminalFocusOwnership(
             competingControlPresented: session.pendingHostKeyChallenge != nil || showingErrorCard
         )
     }
+
+    #if os(visionOS)
+    /// The environment this window's Focus Mode shows: its own, else Settings ▸ Terminal ▸ Focus Mode's.
+    private var focusEnvironmentID: String {
+        windowSettings[TerminalWindowSettings.focusEnvironment] ?? settingsManager.focusEnvironment
+    }
+
+    private func toggleImmersiveFocus() async {
+        if isImmersiveFocusActive {
+            await dismissImmersiveSpace()
+            isImmersiveFocusActive = false
+        } else {
+            await enterImmersiveFocus()
+        }
+    }
+
+    private func enterImmersiveFocus() async {
+        FocusEnvironmentStage.shared.environmentID = focusEnvironmentID
+        let result = await openImmersiveSpace(id: "focus-environment")
+        isImmersiveFocusActive = (result == .opened)
+    }
+
+    /// The moon's pinch-and-hold menu: the library, this window's environment checked. Choosing one
+    /// keeps it for the window and shows it.
+    @ViewBuilder
+    private var focusEnvironmentMenu: some View {
+        Picker("Focus Environment", selection: Binding(get: { focusEnvironmentID }, set: chooseFocusEnvironment)) {
+            ForEach(FocusEnvironmentLibrary.shared.environments) { environment in
+                Text(environment.name).tag(environment.id)
+            }
+        }
+        .pickerStyle(.inline)
+    }
+
+    private func chooseFocusEnvironment(_ id: String) {
+        // Settings' own choice isn't kept as the window's: the window goes on following it.
+        windowSettingsBinding?.wrappedValue[TerminalWindowSettings.focusEnvironment] =
+            id == settingsManager.focusEnvironment ? nil : id
+        FocusEnvironmentStage.shared.environmentID = id
+        if !isImmersiveFocusActive { Task { await enterImmersiveFocus() } }
+    }
+    #endif
 
     private func handleTerminalDisappear() {
         terminalHostModel.stopFocusMaintenance()
@@ -644,7 +767,13 @@ struct TerminalWindowView: View {
     /// wired in, and then not offered.
     private var openFolderInEditor: (@MainActor (String) -> Void)? {
         let serverID = session.server.id
-        if let open = terminalRuntime?.openWorkingFolderInEditor { return { open(serverID, $0) } }
+        // The window it was opened from, for its orb (D88); a Mac's terminal window has no workgroup.
+        #if os(macOS)
+        let origin: String? = nil
+        #else
+        let origin = workgroupID.map { GlassTerminalCapability.sessionID(workgroupID: $0) }
+        #endif
+        if let open = terminalRuntime?.openWorkingFolderInEditor { return { open(serverID, $0, origin) } }
         guard let open = terminalRuntime?.openFolderAsProject else { return nil }
         return { open(serverID, $0) }
     }
@@ -1698,6 +1827,7 @@ struct TerminalWindowView: View {
     @ViewBuilder
     private func bottomStatusBarContents(compact: Bool, inMenu: Bool = false) -> some View {
         #if os(visionOS)
+        let _ = noteBarDrawn()
         // The sidebar first, where a Mac window's toggle is (the owner, 2026-10-21: "We need a
         // sidebar/tabs toggle in the bottom ornaments"); in the tabs layout, where it is shown.
         if let visionSidebar, visionPresentation?.wrappedValue != .grid, visionPresentation?.wrappedValue != .carousel {
@@ -1782,18 +1912,12 @@ struct TerminalWindowView: View {
 
             #if os(visionOS)
             Button {
-                Task {
-                    if isImmersiveFocusActive {
-                        await dismissImmersiveSpace()
-                        isImmersiveFocusActive = false
-                    } else {
-                        let result = await openImmersiveSpace(id: "focus-environment")
-                        isImmersiveFocusActive = (result == .opened)
-                    }
-                }
+                Task { await toggleImmersiveFocus() }
             } label: {
                 Image(systemName: isImmersiveFocusActive ? "moon.fill" : "moon")
             }
+            // Pinch and hold: this window's environment, chosen and shown (2026-10-26).
+            .contextMenu { focusEnvironmentMenu }
             .accessibilityLabel(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
             .help(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
             #elseif os(macOS)
@@ -1856,7 +1980,9 @@ struct TerminalWindowView: View {
                 #endif
             }
 
-            Menu {
+            // Drawn again only when what it shows changes (`TerminalSteadyMenu`).
+            TerminalSteadyMenu(key: toolsMenuKey(inMenu: inMenu)) {
+                let _ = noteTools("built")
                 if Self.toolsHoldViewControls {
                     if aiAssistant.isAvailable {
                         Button("AI Assistant", systemImage: "sparkles") { openAIAssistant() }
@@ -1874,6 +2000,7 @@ struct TerminalWindowView: View {
                     Divider()
                 }
                 Button {
+                    noteTools("chose search")
                     configureFind()
                     withAnimation(.easeInOut(duration: 0.2)) {
                         if find.isPresented { find.close() } else { find.present() }
@@ -1883,6 +2010,7 @@ struct TerminalWindowView: View {
                 }
 
                 Button {
+                    noteTools("chose clear")
                     session.clearScreen()
                 } label: {
                     Label("Clear", systemImage: "trash")
@@ -2002,6 +2130,7 @@ struct TerminalWindowView: View {
                     Divider()
 
                     Button {
+                        noteTools("chose settings")
                         openTerminalSettings()
                     } label: {
                         Label("Settings", systemImage: "gearshape")
@@ -2010,6 +2139,7 @@ struct TerminalWindowView: View {
             } label: {
                 toolLabel("Session", image: inMenu ? "ellipsis.circle" : "gearshape", inMenu: inMenu)
             }
+            .equatable()
             .menuOrder(.fixed)
 #if os(iOS)
             .menuStyle(.button)
@@ -2046,6 +2176,43 @@ struct TerminalWindowView: View {
             aiAssistantDirectory = await session.workingDirectory(reported: terminalHostModel.currentDirectory)
             showingAIAssistant = true
         }
+    }
+
+    /// The tools menu's openings and choices, and how often its bar is drawn, into the headset's
+    /// diagnostics file (`TerminalSelectionDiagnostics`): it showed and would not take a pinch while
+    /// the terminal worked, on the headset only (the owner, 2026-10-26).
+    private func noteTools(_ event: String) {
+        #if os(visionOS)
+        TerminalSelectionDiagnostics.record?("tools \(event) terminal=\(session.id.uuidString.prefix(4)) active=\(isTerminalActive)")
+        #endif
+    }
+
+    #if os(visionOS)
+    /// The bar's drawings, counted and written at most every two seconds.
+    @MainActor private static var barDrawings = (count: 0, since: ContinuousClock.now)
+
+    private func noteBarDrawn() {
+        Self.barDrawings.count += 1
+        let elapsed = ContinuousClock.now - Self.barDrawings.since
+        guard elapsed >= .seconds(2) else { return }
+        TerminalSelectionDiagnostics.record?("tools bar drawn \(Self.barDrawings.count) times in \(elapsed.components.seconds)s")
+        Self.barDrawings = (0, .now)
+    }
+    #endif
+
+    /// What the tools menu shows that it does not watch for itself as it is drawn.
+    private func toolsMenuKey(inMenu: Bool) -> TerminalToolsMenuKey {
+        #if os(macOS)
+        let (workgroupID, movesTabs): (UUID?, Bool) = (nil, false)
+        #else
+        let movesTabs = tabMoving != nil
+        #endif
+        return TerminalToolsMenuKey(inMenu: inMenu, isTerminalActive: isTerminalActive,
+                                    canOpenWorkingFolder: canOpenWorkingFolder, opensEditor: openFolderInEditor != nil,
+                                    workgroupID: workgroupID, movesTabs: movesTabs,
+                                    hasAssistant: aiAssistant.isAvailable, hasSnippets: !settingsManager.snippets.isEmpty,
+                                    state: session.state, isRecording: session.recorder?.isRecording == true,
+                                    survivesClose: session.survivesClose)
     }
 
     @ViewBuilder
@@ -2111,6 +2278,38 @@ struct TerminalWindowView: View {
     }
 }
 
+/// A menu drawn again only when `key` changes, never because the view it is in was (the owner,
+/// 2026-10-25: the gear menu "shows, but using doesn't work" while the terminal is busy). A terminal
+/// window is drawn again with every read of its program's title, several times a second with a
+/// coding agent at work, and its open tools menu was rebuilt each time, under the pinch choosing
+/// from it. What the menu reads as it is drawn (an observed session) still draws it again.
+struct TerminalSteadyMenu<Key: Equatable, Content: View, MenuLabel: View>: View, Equatable {
+    let key: Key
+    @ViewBuilder let content: () -> Content
+    @ViewBuilder let label: () -> MenuLabel
+
+    var body: some View {
+        Menu(content: content, label: label)
+    }
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.key == rhs.key }
+}
+
+/// What a terminal's tools menu shows (`TerminalSteadyMenu`).
+struct TerminalToolsMenuKey: Equatable {
+    var inMenu: Bool
+    var isTerminalActive: Bool
+    var canOpenWorkingFolder: Bool
+    var opensEditor: Bool
+    var workgroupID: UUID?
+    var movesTabs: Bool
+    var hasAssistant: Bool
+    var hasSnippets: Bool
+    var state: SessionState
+    var isRecording: Bool
+    var survivesClose: Bool
+}
+
 /// **Terminal Settings**, from a terminal's tools menu ▸ Settings: the window's own settings
 /// (**This Window**, W20, W22), the settings every terminal shares (**All Terminals**) and, for an
 /// SSH session, its port forwards. A Mac's local pane opens the same sheet without Port Forwarding
@@ -2135,7 +2334,15 @@ struct TerminalSettingsSheet: View {
     }
 
     static func firstTab(hasWindowSettings: Bool) -> TerminalSettingsModalTab {
-        hasWindowSettings ? .overrides : .terminal
+        #if DEBUG
+        // `--demo-settings-tab terminal`: another tab first, for screenshots and tests.
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "--demo-settings-tab"), arguments.indices.contains(index + 1),
+           let tab = TerminalSettingsModalTab(rawValue: arguments[index + 1]) {
+            return tab
+        }
+        #endif
+        return hasWindowSettings ? .overrides : .terminal
     }
 
     var body: some View {

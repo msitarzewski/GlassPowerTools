@@ -148,6 +148,10 @@ nonisolated struct ICloudPortableTerminalPreferences: Codable, Equatable, Sendab
     var pathPreviews: String? = nil
     /// When resized (D75, 2026-10-16), optional for the same reason.
     var whenResized: String? = nil
+    /// Focus Mode's environment on Vision Pro (2026-10-26), optional for the same reason.
+    var focusEnvironment: String? = nil
+    /// Focus Mode opening immersed on Vision Pro (2026-10-26), optional for the same reason.
+    var focusOpensImmersed: Bool? = nil
 
     func validate() throws {
         guard (0...100_000).contains(maximumScrollbackLines) else {
@@ -172,6 +176,9 @@ nonisolated struct ICloudPortableTerminalPreferences: Codable, Equatable, Sendab
         }
         guard !glassTint.isEmpty, glassTint.count <= 64 else {
             throw ICloudSettingsSyncError.invalidPayload("Glass tint values must contain 1...64 characters.")
+        }
+        if let focusEnvironment, focusEnvironment.count > FocusEnvironmentFiles.longestID {
+            throw ICloudSettingsSyncError.invalidPayload("Focus environments must be named in at most \(FocusEnvironmentFiles.longestID) characters.")
         }
         guard windowOpacity.isFinite, (0...1).contains(windowOpacity),
               blurBackground.isFinite, (0...1).contains(blurBackground) else {

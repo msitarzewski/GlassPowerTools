@@ -190,7 +190,13 @@ public struct DesktopSessionView: View {
                                   minimum: DesktopWindowAspect.spatialMinimum)
         }
         // Shrinks into an orb with the remote screen live on its face (2026-10-15).
-        .glassSessionOrb(GlassSessionOrbFace(title: windowTitle, symbolName: "display") { [session] in
+        .glassSessionOrb(GlassSessionOrbFace(
+            title: windowTitle, symbolName: "display",
+            // The desktop's own window waits in the dock with its machine (D88); a display window
+            // of a second screen shrinks where it is.
+            dockID: viewport.isPrimary ? GlassDesktopCapability.sessionID(connectionID: session.connection.id) : nil,
+            endpointIDs: [session.connection.id], kind: .rdp
+        ) { [session] in
             session.frame.flatMap(GlassDesktopCapability.picture(of:))
         })
         #else
@@ -367,7 +373,17 @@ public struct DesktopSessionView: View {
                 displayOptions
             }
         }
-        .onDisappear { alerts = DesktopSessionAlertPresentation(); session.detach(viewport) }
+        .onDisappear {
+            alerts = DesktopSessionAlertPresentation()
+            #if os(visionOS)
+            // Into the dock (D88): the session keeps its window's viewport, so it does not end with
+            // the window, and the window that comes back takes the same one.
+            if viewport.isPrimary, GlassOrbDockModel.shared.isDocked(GlassDesktopCapability.sessionID(connectionID: session.connection.id)) {
+                return
+            }
+            #endif
+            session.detach(viewport)
+        }
         .onChange(of: session.shouldClosePresentation) { _, shouldClose in
             if shouldClose { if let onClose { onClose() } else { dismiss() } }
         }

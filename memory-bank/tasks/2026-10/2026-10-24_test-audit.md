@@ -432,3 +432,12 @@ phone-only suites now running there (the editor-on-iPhone suite, the All Windows
 Tools/diagram/desktop tests) — device test plans proposed to the owner. Not run: the iPad on the latest build, the
 unfolded Duo, the Mac UI tests (decision 7). Committed with 0.4.522 at the owner's word (2026-10-25). Probe test
 files are removed.
+
+## 2026-10-26 — W19's interval, timed from the wrong moment (test fixed)
+`MacLocalTmuxTests` "W19: one read of this Mac's tmux answers every local tab…" failed once in a full terminal run:
+`ContinuousClock.now - first >= interval - .milliseconds(150)`. The product paces reads from its last read
+(`MacLocalTmuxContextReads.lastReadAt`); the test started its clock after its own wait for the first titles, so a late
+wake from that wait made a read on time look early. The fake now records when each read begins and the test times
+between the reads (50 ms allowance). Shown: with a 300 ms late wake added after the first read, the old timing failed
+and the new passed, the product unchanged; with the product's wait for the interval removed, the new timing failed.
+Sources restored byte for byte; the terminal suite then passed whole (1,021).

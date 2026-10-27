@@ -1,6 +1,7 @@
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 import XCTest
 import UIKit
+import UniformTypeIdentifiers
 
 /// A reply copied from Claude Code or Codex arrives with a newline wherever the window ended, and a
 /// paste sends each as Return. The terminal joins such lines again (2026-10-19, the owner: "We
@@ -62,6 +63,42 @@ final class TerminalPasteUITests: XCTestCase {
         paste.tap()
     }
 
+    /// A picture copied goes to the machine when pasted, as a dropped one does (the owner, 2026-10-25,
+    /// on Vision Pro: "I tried to paste an image but it didn't paste"; the paste read text alone).
+    /// This terminal connects to nothing, so the terminal says why it couldn't upload: the paste
+    /// reached the upload rather than going nowhere for want of text. The upload is unit-tested
+    /// (`TerminalRemoteDropTests`).
+    func testAPictureIsSentToTheMachine() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString,
+                                "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
+                                "--demo-open", "terminal", "-blinkingCursor", "NO"]
+        app.launch()
+        self.app = app
+        XCTAssertTrue(terminal.waitForExistence(timeout: 30), "the terminal")
+        let picture = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).pngData { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+        UIPasteboard.general.setItems([[UTType.png.identifier: picture]],
+                                      options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(120)])
+        // The terminal's own menu, as a hold shows it; ⌘V from the simulator's runner never reached
+        // the terminal on visionOS (its paste logged nothing), though SwiftTerm leaves ⌘ keys to UIKit.
+        terminal.press(forDuration: 1.2)
+        let paste = app.menuItems["Paste"].exists ? app.menuItems["Paste"] : app.buttons["Paste"]
+        XCTAssertTrue(paste.waitForExistence(timeout: 5), "the terminal's menu offers Paste")
+        paste.tap()
+        // The demo's terminal counts as connected and has no SFTP channel: the picture, named, went
+        // to the upload and was refused there.
+        let said = app.staticTexts["Couldn't upload Pasted.png: the connection ended. Reconnect, then try again."]
+        XCTAssertTrue(said.waitForExistence(timeout: 10), "the picture went to the upload")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "picture-pasted"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    #if os(iOS)
     func testAWrappedReplyIsJoinedWhenPasted() throws {
         let app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
@@ -103,5 +140,6 @@ final class TerminalPasteUITests: XCTestCase {
         XCTAssertEqual((text.value as? String)?.split(separator: "\n").count, 3)
         app.buttons["Cancel"].tap()
     }
+    #endif
 }
 #endif

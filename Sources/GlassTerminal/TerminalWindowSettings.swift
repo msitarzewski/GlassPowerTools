@@ -80,6 +80,11 @@ nonisolated enum TerminalWindowSettings {
     /// terminal in the window prints, the grid and carousel bring it forward and the window's orb
     /// pulses. Unset, the window follows the saved Workgroup it was opened from, else is off.
     static let autoFocusOnActivity = GlassWindowSetting<Bool>("terminal.autoFocusOnActivity", title: "Auto-focus on Activity")
+    /// Vision Pro (2026-10-26): what surrounds the person when this window enters Focus Mode, an
+    /// environment's identifier (`FocusEnvironment`). Unset, Settings ▸ Terminal ▸ Focus Mode's.
+    static let focusEnvironment = GlassWindowSetting<String>("terminal.focusEnvironment", title: "Focus Environment") {
+        FocusEnvironmentFiles.isValidID($0) ? $0 : nil
+    }
 
     /// The settings W20's look carried, which records keep under `look` in its format.
     static var lookKeys: Set<String> {

@@ -171,7 +171,16 @@ public final class GlassEditorRuntime {
         // went with it. Active lists it, "1 unsaved", and choosing it brings the window back. A
         // Mac asks before its window closes (`GlassWindowCloseGate`), so only a quit gets here
         // with changes, and the app goes too.
-        if closesWorkspaceWithItsWindow, workspaces[id]?.hasUnsavedChanges != true { workspaces[id] = nil }
+        if closesWorkspaceWithItsWindow, workspaces[id]?.hasUnsavedChanges != true, !Self.isDocked(id) { workspaces[id] = nil }
+    }
+
+    /// Gone into the orb dock (D88): the window is closed and the workspace waits for its orb.
+    private static func isDocked(_ id: UUID) -> Bool {
+        #if os(visionOS)
+        GlassOrbDockModel.shared.isDocked(sessionID(windowID: id))
+        #else
+        false
+        #endif
     }
 
     /// What closing this workspace would lose, as a sentence; nil when nothing is unsaved.
@@ -237,7 +246,8 @@ public final class GlassEditorRuntime {
                     hostID: workspace.projects.first?.hostID ?? GlassLocalHost.id,
                     activate: { [weak self] in self?.present(id) },
                     close: { [weak self] in self?.closeWorkspace(id) },
-                    unsavedChanges: { [weak workspace] in workspace.flatMap(Self.unsavedChanges(in:)) }
+                    unsavedChanges: { [weak workspace] in workspace.flatMap(Self.unsavedChanges(in:)) },
+                    openedFrom: workspace.openedFrom
                 )
             }
     }
@@ -545,6 +555,12 @@ public final class GlassEditorRuntime {
     public private(set) var requestedReturnTitle: String?
 
     /// Asks for a window. Nil is a request for a new, empty one.
+    /// Notes the session these windows were opened from (`GlassEditorWorkspace.openedFrom`).
+    public func note(_ windowIDs: [UUID?], openedFrom origin: String?) {
+        guard let origin else { return }
+        for id in windowIDs.compactMap({ $0 }) { workspaces[id]?.openedFrom = origin }
+    }
+
     public func present(_ id: UUID?, returningTo returnTitle: String? = nil) {
         let id = id ?? newWindowID()
         issuedWindowIDs.insert(id)
@@ -744,6 +760,8 @@ public struct GlassEditorScenes: Scene {
         }
         #if os(visionOS)
         .windowStyle(.plain)
+        // Asked for from the orb dock, it comes back above the dock (D88).
+        .glassReturnsAboveOrbDock()
         #endif
         #if !os(iOS)
         .defaultSize(width: 1100, height: 720)

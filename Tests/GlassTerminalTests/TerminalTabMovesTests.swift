@@ -135,6 +135,42 @@ struct TerminalTabMovesTests {
         #expect(TerminalTabMoves.destinations(from: source, among: [named], in: manager).map(\.id) == [named])
     }
 
+    /// The owner, 2026-10-25: the gear menu "shows, but using doesn't work" while the terminal is
+    /// busy. Another window's coding agent turned its title's spinner, Move Tab To named that window
+    /// by its title, and the menu was rebuilt with every turn, under the pinch choosing from it.
+    @Test("Move Tab To names a window the same while its agent's spinner turns")
+    func destinationsHoldStillWhileAnAgentWorks() {
+        let manager = SessionManager(loadImmediately: false)
+        let source = workgroup("Here", [terminal("alpha", in: manager)], in: manager)
+        let busy = terminal("alpha", in: manager), twin = terminal("alpha", in: manager)
+        let lone = workgroup("alpha", [busy], in: manager)
+        let both = workgroup("Work", [twin, terminal("bravo", in: manager)], in: manager)
+        _ = workgroup("Work", [terminal("charlie", in: manager)], in: manager)
+        manager.selectSession(twin.id, inWorkgroup: both)
+
+        var seen: Set<[String]> = []
+        for spinner in ["·", "✢", "✳", "✶", "✻", "✽", "⠋", "✳\u{FE0F}"] {
+            busy.demoPaneTitle("\(spinner) Fixing the jobs worker")
+            twin.demoPaneTitle("\(spinner) Reading the logs")
+            seen.insert(TerminalTabMoves.destinations(from: source, among: nil, in: manager).map(\.title))
+        }
+        #expect(seen.count == 1, "the menu changed with the spinner: \(seen)")
+        let titles = TerminalTabMoves.destinations(from: source, among: nil, in: manager)
+        #expect(titles.first { $0.id == lone }?.title == "Fixing the jobs worker")
+        #expect(titles.first { $0.id == both }?.title == "Work · Reading the logs")
+    }
+
+    @Test("Only an agent's spinner goes from a name, never a name's own first mark")
+    func steadyNames() {
+        #expect(TerminalSessionNaming.steady("✳ Claude Code") == "Claude Code")
+        #expect(TerminalSessionNaming.steady("· Thinking") == "Thinking")
+        #expect(TerminalSessionNaming.steady("⠙ Working") == "Working")
+        #expect(TerminalSessionNaming.steady("★ prod") == "★ prod")
+        #expect(TerminalSessionNaming.steady("~/src") == "~/src")
+        #expect(TerminalSessionNaming.steady("✳") == "✳", "nothing after it to name the terminal")
+        #expect(TerminalSessionNaming.steady("logs") == "logs")
+    }
+
     // MARK: One terminal to a window (W26)
     //
     // The owner, on the Vision Pro: "we still don't have a way to combine two independent terminal

@@ -293,3 +293,45 @@ test fails without the push.
   should see.
 - **A card drawn as its window paints (2026-10-17).** `GlassOpenSession.backdrop` carries what a session's window paints
   behind it where the window has an opaque page (iPhone, iPad); All Windows draws it and takes its light or dark.
+
+## tmux in control mode, looks, SQL, This Mac, time in use, the orb dock, environments (D83–D89, 2026-10-19 to 26)
+
+- **A terminal kept in tmux is a control-mode client (D83).** `TmuxControlClient`
+  (`Sources/GlassTerminalEmulator/TmuxControlClient.swift`) reads tmux's `%output` and feeds the emulator, which keeps
+  the whole history, the program's alternate screen and its mouse. Remote tabs run `tmux -CC` on the SSH PTY; the Mac's
+  own panes run `-C` on pipes (`Sources/GlassTerminal/macOS/MacLocalTmux.swift`). One session, one window, one pane per
+  tab; the session still outlives the connection.
+- **Looks are drawn behind the text, never over it (D84).** `TerminalLooks` and `TerminalWindowLook`
+  (`Sources/GlassTerminal/`) are SwiftUI behind a transparent terminal: motion follows the terminal's activity and stops
+  under Reduce Motion, Low Power Mode and in hidden windows; a readability guard keeps contrast; the window keeps its
+  glass.
+- **SQL from a terminal (D85).** `TerminalSQLDetector` (`Sources/GlassTerminalEmulator/TerminalSQLDetector.swift`) takes
+  the statement under a Mac right-click (`MacTerminalContextMenu`); the destinations are the machine's databases and
+  those reached through its server; the database capability opens it unrun, with the table it names opened beside it.
+- **This Mac knows its own record (D86).** `GlassThisMac` (`Sources/GlassShell/GlassThisMac.swift`) keeps a device-local
+  link, never synced, made by the pinned host key, offered by address, or set by hand; the library then shows one row and
+  the record's Terminal opens a local shell.
+- **Time in use (D87).** Capabilities report a minute with input or output as `GlassUsageActivity`
+  (`Sources/GlassShell/GlassOpenSession.swift`); the shell keeps 90 days per device and syncs them per day in
+  `GlassUsagePayload`, D81's one-entry-per-device shape.
+- **The orb dock (D88).** `GlassOrbDockModel` (`Sources/GlassShell/GlassOrbDock.swift`, one per app) holds the docked
+  windows: visionOS carries no window, so a window docks by closing, its sessions kept, and comes back through the
+  scene's `defaultWindowPlacement` (`glassReturnsAboveOrbDock`), placed by the dock's `returning` queue. Its order is
+  `GlassOrbDockOrder` (kept by id, tested apart from the view). The dock is a resizable plain window whose shape decides
+  a row or a column; the size the person gives it is kept and opened at (`glassOrbDockOpensAtItsSize`), and until then
+  it fits its orbs through `GlassWindowSizer`. Its look is a `GlassWindowOverrides` over Appearance, drawn as every
+  window's, and edited with the same rows as This Window (`GlassWindowLayerControls`).
+- **Windows come back as they were left (D88, 2026-10-26).** The terminal's reopen record (W15) carries `asOrb`, read
+  from the dock's model when the list is written: a docked window is put in the dock and its window not opened; a
+  standing orb opens as its orb (`opensAsOrb`, taken by the window's `standAsOrb`). Connections keeps
+  `holdsConnections` on the device and, at launch, waits for the reopen to say it is done (`lastRunCameBack`) before
+  going back into the dock — and stays open while it shows anything, since the reopen's questions are asked on it.
+- **Focus Mode environments (D89).** `FocusEnvironmentLibrary` (`Sources/GlassTerminal/FocusEnvironments.swift`) lists
+  the built-ins (drawn in code, `FocusEnvironmentArt`) and the person's files in the app's iCloud Drive folder; each 3D
+  file's fit lives beside it in the container, outside Documents ("Environment Fits"). What a fit means is pure and
+  tested (`FocusRoomFit`, `FocusRoomPose`, `FocusWorldPose`, `FocusLocomotion` in `FocusRoomFit.swift`); moving about
+  moves the world, never the person (`FocusWalking`), with the numbers of the owner's Mirador gallery.
+- **Test switches stand in for what the simulator's runner cannot do**, DEBUG and `--ui-testing` only: `--demo-reopen`
+  (a last run's window), `--demo-dock-resize` (a hand on the dock's corner), `--ui-testing-seed-hosts alpha:ssh=<uuid>`
+  (a seeded service with a known id), `--demo-try-out`, `--demo-teleport`. A UI test that must cross a relaunch launches
+  again under the same `--ui-testing <uuid>`, whose store is kept.

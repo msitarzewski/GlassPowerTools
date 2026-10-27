@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GlassShell
+import GlassConnectionKit
 import GlassLayers
 // Every platform this view is built for: Watch Log File reads a terminal's folder (2026-10-15).
 import GlassTerminalEmulator
@@ -460,7 +461,12 @@ struct VisionTerminalWorkgroupView: View {
                     },
                     select: { _ = sessionManager.selectSession(session.id, inWorkgroup: workgroupID) })
             },
-            showsButton: tabs.count < 2
+            showsButton: tabs.count < 2,
+            // Waits in the dock as the row Active lists it by, and brings its machine's other
+            // services onto the ring (D88).
+            dockID: GlassTerminalCapability.sessionID(workgroupID: workgroupID),
+            endpointIDs: tabs.map { EndpointID(rawValue: $0.server.id) },
+            kind: .ssh
         ) {
             let front = shown.flatMap { sessionManager.session(for: $0) } ?? sessionManager.selectedSession(inWorkgroup: workgroupID)
             return front?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
@@ -846,7 +852,7 @@ struct VisionTerminalWorkgroupView: View {
         .accessibilityIdentifier("vision-terminal-sidebar")
         // The window's name, its Workgroup's or its machine's, in the header every Glass window's
         // sidebar has.
-        .glassSpatialColumn(workgroup.name)
+        .glassSpatialColumn(workgroup.displayName)
     }
 
     /// Every terminal in the window, the one shown in front, and the grid and carousel over them.
@@ -1025,7 +1031,7 @@ struct VisionTerminalWorkgroupView: View {
         sessions: [TerminalSession]
     ) -> some View {
         TabView(selection: $selectedSessionID) {
-            TabSection(workgroup.name) {
+            TabSection(workgroup.displayName) {
                 ForEach(sessions) { session in
                     terminalTab(session: session, workgroup: workgroup)
                 }
@@ -1349,15 +1355,40 @@ struct TerminalTabMoveActions: View {
     /// every one with live terminals (iPhone and iPad show one at a time; Active lists the rest).
     private var destinations: [TerminalTabMoves.Destination] {
         #if os(visionOS)
-        TerminalTabMoves.destinations(from: workgroupID, among: TerminalWorkgroupsToReopen.shared.openWindowIDs,
-                                      in: sessionManager)
+        // A window in the orb dock is closed and still there to move to (the owner, 2026-10-25: Move
+        // Tab To "only shows maximized windows").
+        let docked = GlassOrbDockModel.shared.docked.compactMap(GlassTerminalCapability.workgroupID(ofSessionID:))
+        return TerminalTabMoves.destinations(from: workgroupID,
+                                             among: TerminalWorkgroupsToReopen.shared.openWindowIDs.union(docked),
+                                             in: sessionManager)
         #else
         TerminalTabMoves.destinations(from: workgroupID, among: nil, in: sessionManager)
         #endif
     }
 
     var body: some View {
-        let destinations = self.destinations
+        // Drawn again only when the rows change: the other windows' names are read here, and one
+        // read again with nothing new in it rebuilt the open menu around them all the same.
+        TerminalTabMoveRows(destinations: destinations, canMoveToNewWindow: canMoveToNewWindow, asOneRow: asOneRow,
+                            moveToNewWindow: moveToNewWindow, move: move)
+            .equatable()
+    }
+}
+
+/// `TerminalTabMoveActions`' rows, from the other windows as they were read.
+private struct TerminalTabMoveRows: View, Equatable {
+    let destinations: [TerminalTabMoves.Destination]
+    let canMoveToNewWindow: Bool
+    let asOneRow: Bool
+    let moveToNewWindow: () -> Void
+    let move: (UUID) -> Void
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.destinations == rhs.destinations && lhs.canMoveToNewWindow == rhs.canMoveToNewWindow
+            && lhs.asOneRow == rhs.asOneRow
+    }
+
+    var body: some View {
         if asOneRow {
             if canMoveToNewWindow || !destinations.isEmpty {
                 Menu("Move Tab To", systemImage: "rectangle.portrait.and.arrow.right") {
@@ -1373,12 +1404,12 @@ struct TerminalTabMoveActions: View {
                 }
             }
         } else {
-            separateRows(destinations)
+            separateRows
         }
     }
 
     @ViewBuilder
-    private func separateRows(_ destinations: [TerminalTabMoves.Destination]) -> some View {
+    private var separateRows: some View {
         if canMoveToNewWindow || !destinations.isEmpty {
             Divider()
         }

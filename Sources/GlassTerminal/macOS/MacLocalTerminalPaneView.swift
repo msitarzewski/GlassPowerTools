@@ -651,7 +651,7 @@ struct MacLocalTerminalPaneView: View {
     /// The editor's way in for this shell's folder; nil where no editor is wired in.
     private var openFolderInEditor: (@MainActor (String) -> Void)? {
         guard let open = terminalRuntime?.openWorkingFolderInEditor else { return nil }
-        return { open(nil, $0) }
+        return { open(nil, $0, nil) }
     }
 
     /// The shell's folder in the editor, found as Open Folder Here finds it, its problems said the

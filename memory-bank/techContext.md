@@ -603,3 +603,26 @@ workgroups"; then "run btop or something for the terminal examples"):
 - **The crash behind that report** was the app's, in the database window's policy (0.4.476, 5c567dd): a re-apply
   set window properties to their own values, which still notifies SwiftUI's hosting view.
 
+## Platform facts measured 2026-10-19 to 2026-10-26 (D83–D89)
+
+- **tmux outside control mode loses lines.** Measured for D83: 32 of 60 lines printed at once never reached the
+  terminal over SSH, and at least 85 of 1,000 locally. SwiftTerm's PTY reader left tmux's last bytes waiting under
+  load, hence pipes for the Mac's own panes.
+- **visionOS windows** (visionOS 27.2 simulator unless said):
+  - `.windowResizability(.contentSize)` shows a person's resize and bounces it back; `.contentMinSize` keeps it.
+  - `defaultWindowPlacement`'s `WindowPlacement(size:)` is honoured when the window opens (the dock reopened at
+    420 × 1100).
+  - Two seconds into a launch, `dismissWindow()` called just after `openWindow` for another window left the window on
+    screen, dimmed; waiting until the other window is on screen worked.
+  - `.containerRelativeFrame` on a `ScrollView`'s content, the scroll axis flipping with the window's shape, kept the
+    main thread busy (the runner: "process main thread busy"); plain `frame(maxWidth:/maxHeight:)` did not.
+  - While an app launches, visionOS shows a glass panel with its icon; it is not the app's window.
+  - The UI test runner cannot drag a window's corner; `-key value` launch arguments reach a `UserDefaults` suite too
+    (the argument domain), so a test sets a device setting that way.
+- **SSH connect timeout:** Citadel's default is 30 seconds (`Packages/Citadel/Sources/Citadel/ClientSession.swift`);
+  Connections waits 40 for the reopened terminals before going back into the dock.
+- **RealityKit and USD (D89, measured on the Mac):** a file's `metersPerUnit` becomes the loaded root's scale; a Z-up
+  file is stood upright; a USD camera loads as a `PerspectiveCamera` entity; `Entity.write(to:)` writes a scene
+  (visionOS 2+). Five real files carried `metersPerUnit`, `upAxis`, `defaultPrim`, `customLayerData` and `doc`, and no
+  camera. ARKit's `WorldTrackingProvider` asks for no authorization and runs in the simulator; full immersion fades
+  about 1.5 m from where the person started. Details in `tasks/2026-10/2026-10-26_focus-environments.md`.

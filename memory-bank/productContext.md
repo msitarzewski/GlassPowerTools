@@ -106,6 +106,16 @@ Each is built; where only a simulator or a test has seen it, the owner's devices
   window with several terminals, Orb in the view menu beside Tabs, Grid and Carousel). A glass sphere showing the
   session; its tabs as dots on a ring; look at a dot for its picture and name; a pinch grows the window back, on
   that tab. It pulses with activity when the window's Auto-focus on activity is on.
+- **Vision Pro: orbs in a dock** (D88, 2026-10-25/26): with Settings ▸ Appearance ▸ Orbs on Into the Dock, Shrink to
+  Orb closes the window into one dock with the Connections orb; a machine's databases, desktops and editors are one orb;
+  look at a dot for its name, pinch an orb to bring its window back above the dock, hold and carry an orb to reorder.
+  The dock is resized like any window, standing its orbs in a column when taller than wide and keeping the size; its
+  own Opacity and Glass start from Appearance. After a relaunch, windows come back as they were left — open, in the
+  dock, or as their orb — and Connections goes back into the dock unless something needs an answer.
+- **Vision Pro: Focus Mode environments** (D89, 2026-10-26): Dimmed Room, Night Sky, Dusk, Grid and Studio, and the
+  person's own 3D rooms and 360° photos from iCloud Drive ▸ Glass Power Tools ▸ Environments; Open Immersed; Try Out
+  fits a room (its units, size, floor, where to start) and keeps the fit for every Vision Pro; inside, look down and
+  pinch to move, as in Mirador.
 - **Vision Pro terminal text, as Apple's text works** (2026-10-15/16): double pinch selects a word, pinch and hold
   selects the word held, drag either end to change it, and a trackpad click-drag selects as on a Mac; a pinch-drag
   scrolls even when tmux has the mouse. A held link or path offers its actions.

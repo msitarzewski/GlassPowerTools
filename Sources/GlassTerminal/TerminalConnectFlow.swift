@@ -306,7 +306,7 @@ struct TerminalConnectFlow: ViewModifier {
         case .openWorkgroup(let preset):
             openWorkgroup(preset)
         #if DEBUG
-        case .demoReplay(let name, let output, let windowSettings, let opensSettings, let tick):
+        case .demoReplay(let name, let output, let windowSettings, let opensSettings, let ticks, let titles, let every):
             // No SSHConnection is ever started: the sinks swallow typing and resizes, and the
             // transcript goes straight to the emulator, queued until the window's view attaches.
             let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
@@ -315,7 +315,7 @@ struct TerminalConnectFlow: ViewModifier {
             let answering = DemoWheelAnswer()
             let session = TerminalSession(server: server,
                                           terminalWriteSink: { data in
-                                              guard tick != nil, let reply = DemoWheelAnswer.reply(to: data) else { return }
+                                              guard !ticks.isEmpty, let reply = DemoWheelAnswer.reply(to: data) else { return }
                                               answering.session?.feedTerminalData(reply)
                                           },
                                           terminalResizeSink: { _, _ in })
@@ -325,12 +325,15 @@ struct TerminalConnectFlow: ViewModifier {
             session.demoOpensSettings = opensSettings
             session.feedTerminalData(output)
             presentTerminalWindow(for: session, windowSettings: windowSettings)
-            if let tick {
+            if !ticks.isEmpty {
                 // Held weakly, and never across the wait: the redraws stop when the terminal goes.
                 Task { @MainActor [weak session] in
+                    var next = 0
                     while session != nil {
-                        session?.feedTerminalData(tick)
-                        try? await Task.sleep(for: .milliseconds(400))
+                        session?.feedTerminalData(ticks[next % ticks.count])
+                        if !titles.isEmpty { session?.demoPaneTitle(titles[next % titles.count]) }
+                        next &+= 1
+                        try? await Task.sleep(for: every)
                     }
                 }
             }
@@ -693,12 +696,32 @@ struct TerminalConnectFlow: ViewModifier {
     /// workgroup that was on screen shown again and only its selected terminal connecting — the
     /// others connect when shown (W4b). Each terminal in tmux attaches to its own session. Taken
     /// once per launch and only from a catalog that loaded: one that failed leaves the list for
-    /// the next launch. From then on the list follows this run's workgroups.
+    /// the next launch. From then on the list follows this run's workgroups. On Vision Pro a window
+    /// that was an orb comes back as one: in the orb dock, or standing as its orb (`asOrb`).
     private func reopenWorkgroupsFromLastRun() {
+        #if DEBUG
+        // UI tests: `--demo-reopen` saves its machine first, then asks again.
+        if TerminalWorkgroupsToReopen.demoReopen != nil, !TerminalWorkgroupsToReopen.shared.hasTaken,
+           serverManager.familyCatalogLoaded,
+           serverManager.servers.contains(where: { $0.id == TerminalWorkgroupsToReopen.demoServerID }) == false {
+            guard !TerminalWorkgroupsToReopen.savingDemoServer else { return }
+            TerminalWorkgroupsToReopen.savingDemoServer = true
+            Task { @MainActor in
+                await serverManager.addServer(TerminalWorkgroupsToReopen.demoServer())
+                reopenWorkgroupsFromLastRun()
+            }
+            return
+        }
+        #endif
         // The catalog loads again with every change another device makes; only the first counts.
         guard !TerminalWorkgroupsToReopen.shared.hasTaken,
-              let records = TerminalWorkgroupsToReopen.shared.takeOnce(
+              let taken = TerminalWorkgroupsToReopen.shared.takeOnce(
                 askedBy: "the Connections window", catalogLoaded: serverManager.familyCatalogLoaded) else { return }
+        #if DEBUG
+        let records = taken.isEmpty ? TerminalWorkgroupsToReopen.demoLastRun(servers: serverManager.servers) : taken
+        #else
+        let records = taken
+        #endif
         #if os(visionOS)
         let connectsWhenShown = false
         #else
@@ -712,11 +735,32 @@ struct TerminalConnectFlow: ViewModifier {
             failures += result.failures
             if result.opened { reopened.append(record.id) }
         }
+        #if os(visionOS)
+        // Each window as it was: told to the dock before the list is kept current, so the list
+        // written next says the same.
+        let orbs = GlassOrbDockModel.shared
+        var intoDock = false
+        for record in records where reopened.contains(record.id) {
+            guard let orb = record.asOrb else { continue }
+            let id = GlassTerminalCapability.sessionID(workgroupID: record.id)
+            if orb.inDock {
+                orbs.dock(id, size: orb.size)
+                intoDock = true
+            } else {
+                orbs.opensAsOrb(id, growingBackTo: orb.size)
+            }
+        }
+        #endif
         TerminalWorkgroupsToReopen.shared.keepCurrent(sessionManager)
         #if os(visionOS)
-        for workgroupID in reopened { openWindow(id: "terminal", value: workgroupID) }
+        for workgroupID in reopened where !orbs.isDocked(GlassTerminalCapability.sessionID(workgroupID: workgroupID)) {
+            openWindow(id: "terminal", value: workgroupID)
+        }
+        if intoDock { orbs.open(with: openWindow) }
+        // Connections, left in the dock, goes back once this is said: what failed is said on it.
         guard !reopened.isEmpty else {
             if !failures.isEmpty { connectionFailureMessage = failures.joined(separator: "\n") }
+            orbs.lastRunCameBack()
             return
         }
         let notReopened = failures
@@ -724,6 +768,7 @@ struct TerminalConnectFlow: ViewModifier {
             let all = notReopened + (await TerminalWorkgroupOpening.connectReopened(
                 reopened, sessionManager: sessionManager, settingsManager: settingsManager))
             if !all.isEmpty { connectionFailureMessage = all.joined(separator: "\n") }
+            orbs.lastRunCameBack()
         }
         #else
         if let shown = records.first(where: \.isShown)?.id, reopened.contains(shown) {

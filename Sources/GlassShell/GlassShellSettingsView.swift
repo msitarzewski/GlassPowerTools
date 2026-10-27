@@ -194,6 +194,9 @@ public struct GlassShellSettingsView: View {
             #if os(macOS) || os(visionOS)
             showAllWindowsSection
             #endif
+            #if os(visionOS)
+            orbsSection
+            #endif
         case .privacy: privacy
         case .about: EmptyView()   // `GlassShellAboutView`, outside a form
         }
@@ -238,6 +241,42 @@ public struct GlassShellSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    @AppStorage(GlassOrbDock.settingKey, store: GlassUITestRun.settingsDefaults)
+    private var orbsInDock = false
+    @AppStorage(GlassOrbDock.lookKey, store: GlassUITestRun.settingsDefaults)
+    private var dockLookData = Data()
+    @AppStorage(GlassOrbDock.sizeKey, store: GlassUITestRun.settingsDefaults)
+    private var dockSize = ""
+
+    /// Where a window shrunk to its orb goes (D88): where it is, or into one dock with the rest. The
+    /// dock's own glass and Opacity, following Appearance until set here (the owner, 2026-10-26: "its
+    /// own, but start with Appearance"), and its size back to fitting its orbs.
+    @ViewBuilder
+    private var orbsSection: some View {
+        Section("Orbs") {
+            Picker("Shrink to Orb", selection: $orbsInDock) {
+                Text("Where the Window Is").tag(false)
+                Text("Into the Dock").tag(true)
+            }
+            .accessibilityIdentifier("settings-orbs-dock")
+            Text("Into the Dock gathers your orbs, and Connections, in a row you move by its bar; resize it taller than it is wide and they stand in a column. Pinch an orb to bring its window back above the dock.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !dockSize.isEmpty {
+                Button("Fit Dock to Its Orbs", systemImage: "arrow.left.and.right") { dockSize = "" }
+                    .accessibilityIdentifier("settings-orbs-dock-fit")
+            }
+        }
+        if orbsInDock {
+            GlassWindowLayerControls(overrides: dockLook, title: "Dock")
+        }
+    }
+
+    private var dockLook: Binding<GlassWindowOverrides> {
+        Binding(get: { GlassOrbDock.look(from: dockLookData) },
+                set: { dockLookData = GlassOrbDock.data(of: $0) })
     }
     #endif
 

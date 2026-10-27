@@ -89,6 +89,12 @@ public struct GlassOpenSession: Identifiable {
     /// query or browse, a desktop's last input or moment in front. The library counts a minute in use
     /// for its machine when this falls inside the minute. Nil for a session that doesn't say.
     public let lastActivity: (@MainActor () -> Date?)?
+    /// The open session this one was opened from, by its id: an editor opened from a terminal's
+    /// folder button names that terminal's window, and goes with its orb (D88). Nil otherwise.
+    public let openedFrom: String?
+    /// Its mark as its tab draws it, at a side: a terminal's coding agent in its colour, pulsing while
+    /// it prints. The orb dock's dots (D88); `mark` is the plain picture where this is nil.
+    public let icon: (@MainActor (_ side: CGFloat) -> AnyView)?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -100,7 +106,8 @@ public struct GlassOpenSession: Identifiable {
                 tabs: [GlassOpenSession] = [], waitsToBeShown: Bool = false,
                 unsavedChanges: (@MainActor () -> String?)? = nil,
                 backdrop: (@MainActor () -> GlassSessionBackdrop?)? = nil,
-                lastActivity: (@MainActor () -> Date?)? = nil) {
+                lastActivity: (@MainActor () -> Date?)? = nil, openedFrom: String? = nil,
+                icon: (@MainActor (_ side: CGFloat) -> AnyView)? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -119,6 +126,8 @@ public struct GlassOpenSession: Identifiable {
         self.unsavedChanges = unsavedChanges
         self.backdrop = backdrop
         self.lastActivity = lastActivity
+        self.openedFrom = openedFrom
+        self.icon = icon
     }
 
     /// Ends it, or hands it to `ask` when ending it would lose something (`unsavedChanges`).

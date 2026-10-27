@@ -173,6 +173,13 @@ class SettingsManager {
     /// (as always, the default), or they stay and its text scales. This Window and the window's bar
     /// can say otherwise for one window.
     var whenResized: TerminalResizeBehavior = .changeGrid
+    /// What surrounds the person in Focus Mode on Vision Pro (2026-10-26): an environment's
+    /// identifier (`FocusEnvironment`). This Window can say otherwise for one window.
+    var focusEnvironment: String = FocusEnvironment.defaultID
+    /// Focus Mode opening all the way around the person, instead of partway with the Digital Crown
+    /// to dial it in (the owner, 2026-10-26: "Leave immersion to the user … [ ] Open Immersed").
+    /// The Crown still brings the room back either way. Off by default, as Focus Mode always opened.
+    var focusOpensImmersed: Bool = false
     /// Apple Intelligence explaining an error the output shows, with a fix to review (2026-10-04).
     /// On by default; off here, or from the card itself (the owner, 2026-10-14: "a need to pause on
     /// device AI suggestions … it's monitoring the output of an eval").
@@ -351,6 +358,13 @@ class SettingsManager {
            let saved = TerminalResizeBehavior(rawValue: raw) {
             whenResized = saved
         }
+        if let saved = settingsDefaults.string(forKey: UserDefaultsKeys.focusEnvironment),
+           FocusEnvironmentFiles.isValidID(saved) {
+            focusEnvironment = saved
+        }
+        if settingsDefaults.object(forKey: UserDefaultsKeys.focusOpensImmersed) != nil {
+            focusOpensImmersed = settingsDefaults.bool(forKey: UserDefaultsKeys.focusOpensImmersed)
+        }
         if settingsDefaults.object(forKey: UserDefaultsKeys.joinsWrappedPastes) != nil {
             joinsWrappedPastes = settingsDefaults.bool(forKey: UserDefaultsKeys.joinsWrappedPastes)
         }
@@ -424,6 +438,8 @@ class SettingsManager {
         settingsDefaults.set(blinkingCursor, forKey: UserDefaultsKeys.blinkingCursor)
         settingsDefaults.set(pathPreviews.rawValue, forKey: UserDefaultsKeys.pathPreviews)
         settingsDefaults.set(whenResized.rawValue, forKey: UserDefaultsKeys.whenResized)
+        settingsDefaults.set(focusEnvironment, forKey: UserDefaultsKeys.focusEnvironment)
+        settingsDefaults.set(focusOpensImmersed, forKey: UserDefaultsKeys.focusOpensImmersed)
         settingsDefaults.set(errorSuggestions, forKey: UserDefaultsKeys.errorSuggestions)
         settingsDefaults.set(fontFollowsSystemTextSize, forKey: UserDefaultsKeys.fontFollowsSystemTextSize)
         settingsDefaults.set(joinsWrappedPastes, forKey: UserDefaultsKeys.joinsWrappedPastes)
@@ -1471,6 +1487,12 @@ class SettingsManager {
         if let raw = preferences.whenResized, let synced = TerminalResizeBehavior(rawValue: raw) {
             whenResized = synced
         }
+        if let synced = preferences.focusEnvironment, FocusEnvironmentFiles.isValidID(synced) {
+            focusEnvironment = synced
+        }
+        if let synced = preferences.focusOpensImmersed {
+            focusOpensImmersed = synced
+        }
         // `glassFrost`, `windowOpacity` and `blurBackground` are the shell's layer state
         // (Settings → Appearance), still carried in the payload for glas.sh's readers but not
         // applied here: the store is shared with glas.sh (D3) and applying its payload at launch
@@ -1504,9 +1526,22 @@ class SettingsManager {
                 interactiveGlass: interactiveGlass,
                 glassTint: glassTint,
                 pathPreviews: pathPreviews.rawValue,
-                whenResized: whenResized.rawValue
+                whenResized: whenResized.rawValue,
+                focusEnvironment: Self.sentFromVisionPro(focusEnvironment),
+                focusOpensImmersed: Self.sentFromVisionPro(focusOpensImmersed)
             )
         )
+    }
+
+    /// Only Vision Pro has Focus Mode's environments (the owner, 2026-10-26: "only on visionOS"), so
+    /// only it says which one and how it opens: a Mac's or an iPhone's unchosen default would undo
+    /// the headset's choice.
+    nonisolated static func sentFromVisionPro<Value>(_ chosen: Value) -> Value? {
+        #if os(visionOS)
+        chosen
+        #else
+        nil
+        #endif
     }
 
     private static func cloudThemeRecord(_ record: TerminalThemeRecord) -> ICloudTerminalThemeRecord {

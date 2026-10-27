@@ -101,8 +101,19 @@ final class SFTPIncomingDrop {
         #endif
         case file(URL)
         case provider(NSItemProvider)
+        /// An item pasted: read for its content, never a file URL the clipboard names, which this
+        /// app may not be allowed to open.
+        case pasted(NSItemProvider)
     }
     private let sources: [Source]
+
+    /// Items pasted on a terminal that are pictures or files (`isPastedFile`); nil when none are,
+    /// and the paste is text.
+    init?(pasted providers: [NSItemProvider]) {
+        let files = providers.filter { Self.isPastedFile($0.registeredTypeIdentifiers) }
+        guard !files.isEmpty else { return nil }
+        sources = files.map(Source.pasted)
+    }
 
     #if os(macOS)
     /// Snapshot the drag pasteboard synchronously, before another drag can replace it.
@@ -137,6 +148,25 @@ final class SFTPIncomingDrop {
             && !type.conforms(to: .url)
             && !type.conforms(to: .package)
             && !type.conforms(to: .directory)
+    }
+
+    /// Whether an item pasted is a file to send rather than text to type: a picture, whatever else
+    /// it carries (a photo, a screenshot); else anything held as one file with no text beside it (a
+    /// PDF). Text, a web link, and types the system doesn't know are typed as text, as before.
+    nonisolated static func isPastedFile(_ identifiers: [String]) -> Bool {
+        let types = identifiers.compactMap(UTType.init).filter(\.isDeclared)
+        if types.contains(where: { $0.conforms(to: .image) }) { return true }
+        if types.contains(where: { $0.conforms(to: .text) || $0.conforms(to: .url) && !$0.conforms(to: .fileURL) }) {
+            return false
+        }
+        return types.contains { isReadableAsOneFile($0) }
+    }
+
+    /// The representation a file is read as: a picture first, where an item offers one beside
+    /// other things, else the first that arrives as one file.
+    nonisolated static func fileType(in identifiers: [String]) -> String? {
+        let readable = identifiers.filter { isReadableAsOneFile(UTType($0)) }
+        return readable.first { UTType($0)?.conforms(to: .image) == true } ?? readable.first
     }
 
     /// Files that already exist come back as they are; promised files and bare content are
@@ -188,8 +218,8 @@ final class SFTPIncomingDrop {
                     if received == expected { break }
                 }
             #endif
-            case .provider(let provider):
-                if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            case .provider(let provider), .pasted(let provider):
+                if case .provider = source, provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
                     let stream = AsyncThrowingStream<URL, Error> { continuation in
                         provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, error in
                             do {
@@ -206,10 +236,13 @@ final class SFTPIncomingDrop {
                     for try await url in stream { urls.append(url) }
                     continue
                 }
-                guard let identifier = provider.registeredTypeIdentifiers.first(where: {
-                    Self.isReadableAsOneFile(UTType($0))
-                }) else { throw CocoaError(.fileReadUnsupportedScheme) }
-                let name = provider.suggestedName
+                guard let identifier = Self.fileType(in: provider.registeredTypeIdentifiers) else {
+                    throw CocoaError(.fileReadUnsupportedScheme)
+                }
+                // A picture pasted comes with no name; on the host it is "Pasted", by its type.
+                let pasted = if case .pasted = source { true } else { false }
+                let name = provider.suggestedName ?? (pasted
+                    ? UTType(identifier)?.preferredFilenameExtension.map { "Pasted." + $0 } ?? "Pasted" : nil)
                 let stream = AsyncThrowingStream<URL, Error> { continuation in
                     provider.loadFileRepresentation(forTypeIdentifier: identifier) { url, error in
                         do {
