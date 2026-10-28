@@ -72,10 +72,10 @@ use the disposable test VM only).
   choice:** a nudge pad and slide by hand for fine positioning in Focus Mode (same environments note). Open: his "the
   vision pro didn't connect when the app restarted" after 0.4.543's install; the headset's log shows ten terminals
   coming back at 06:25 and 06:30 UTC and nothing about connecting; he moved on ("GREAT!") before saying what didn't.
-- **Then (2026-10-28) the Mac's third release, 0.4.547** (his "build and deploy the Mac version"): notarized and stapled,
-  the feed entry added, release notes/README/site/help brought current (`tasks/2026-10/2026-10-28_release-0.4.547.md`).
-  Commit, push, the GitHub release and the site deploy follow his word; TestFlight's external testing is drafted
-  (test information, review notes, an external group) and waits on his details and word.
+- **Then (2026-10-28) the Mac's third release, 0.4.548** (his "build and deploy the Mac version"; 0.4.547 built,
+  committed and pushed, then withdrawn unpublished for the Files window's empty-folder gap, his "option 2"):
+  `tasks/2026-10/2026-10-28_release-0.4.548.md`. The GitHub release and the site deploy are his to run (auto mode's
+  classifier refuses a public release); TestFlight's external testing is drafted and waits on his details and word.
 - **Then (2026-10-28) Terminal color schemes, 0.4.546 (Mac read back; headset and iPhone installing as they wake), not committed (D90):**
   a user's 148 Terminal profiles "first class": iCloud Drive ▸ Terminal Themes, Choose Theme (Settings ▸ Terminal ▸
   Theme ▸ Choose…), This Window, Open With. `tasks/2026-10/2026-10-28_terminal-schemes.md`. His "highlight/text

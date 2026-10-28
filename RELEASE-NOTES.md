@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.547 (28 October 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.548 (28 October 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to TestFlight for internal testing; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.547)
+## What it holds (0.4.548)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -92,8 +92,11 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
-### 0.4.495 – 0.4.547 (21 – 28 October 2026)
-- **0.4.547 is the Mac's third release**, through Sparkle.
+### 0.4.495 – 0.4.548 (21 – 28 October 2026)
+- **0.4.548 is the Mac's third release**, through Sparkle.
+- **A Files window opened on an empty folder is painted all over.** On a Mac, a Files window that opened
+  on an empty folder, or on one it couldn't reach, drew only its message in the middle, as tall as its
+  words, with clear glass above and below where the window should be. It fills the window now.
 - **Terminal color schemes.** Bring in macOS Terminal profiles — `.terminal` files, or a folder of
   them, as color-scheme collections come — and choose among them in a terminal's Settings ▸ All
   Terminals ▸ Theme ▸ **Choose…**, where each is drawn small in its own colors: its background, text, a

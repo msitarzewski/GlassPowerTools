@@ -856,6 +856,11 @@ struct SFTPBrowserView: View {
                     Button("Close") { dismiss() }
                 }
             }
+            // Each state fills the window, as the list does: one only as tall as its words, the first
+            // thing a Mac window shows, was centred in it with the rest of the window unpainted —
+            // clear glass above and below (the owner, 2026-10-28, a Files window opened on an empty
+            // folder: "It's like the window has no background at all").
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if isLoading && entries.isEmpty {
             ProgressView("Loading...")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -865,6 +870,7 @@ struct SFTPBrowserView: View {
             } description: {
                 Text("This directory contains no files.")
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             fileList
         }
