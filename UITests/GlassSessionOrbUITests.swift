@@ -202,6 +202,45 @@ final class GlassSessionOrbUITests: XCTestCase {
         sleep(4)
     }
 
+    /// "We need end arrows to show that there's more to scroll to in the dock": a dock showing two of
+    /// its three rows has an arrow at its foot and none at its head; a pinch on it scrolls a row, and
+    /// the arrow at its head comes.
+    func testTheDockShowsArrowsWhereThereIsMore() {
+        let (_, _, connections) = dockTwoTerminals(resizedTo: "420x700")
+        let below = element("orb-dock-more-below"), above = element("orb-dock-more-above")
+        XCTAssertTrue(below.waitForExistence(timeout: 10), "no arrow where there is more below")
+        XCTAssertFalse(above.exists, "an arrow above, with nothing there")
+        let before = connections.frame.minY
+        below.tap()
+        XCTAssertTrue(above.waitForExistence(timeout: 5), "no arrow above after scrolling down")
+        XCTAssertLessThan(connections.frame.minY, before - 100, "the arrow did not scroll the dock a row")
+        XCTAssertFalse(below.exists, "an arrow below, with nothing more there")
+    }
+
+    /// "I just dropped a window in there and it didn't display because the dock window shrunk": a dock
+    /// snapped to one row (resized to 600x352: Connections and an orb, the other below, out of sight)
+    /// grows to show a window docked into a second row.
+    func testAWindowDockedIntoAShortDockIsShown() {
+        let (dock, orbs, _) = dockTwoTerminals(resizedTo: "600x352")
+        let oneRow = expectation(for: NSPredicate { _, _ in dock.frame.height < 400 }, evaluatedWith: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [oneRow], timeout: 15), .completed, "the dock did not snap to one row")
+        // The orb in sight brings its window back, and goes into the dock again: it lands after the
+        // other, in the second row.
+        let shown = orbs.allElementsBoundByIndex.min { $0.frame.minY < $1.frame.minY }!
+        shown.tap()
+        let shrink = element("session-orb-shrink")
+        XCTAssertTrue(shrink.waitForExistence(timeout: 15), "the window did not come back")
+        shrink.tap()
+        let both = expectation(for: NSPredicate { _, _ in dock.frame.height > 600 }, evaluatedWith: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [both], timeout: 20), .completed,
+                       "the dock did not grow to show the window docked into it: \(dock.frame)")
+        for orb in orbs.allElementsBoundByIndex {
+            XCTAssertLessThanOrEqual(orb.frame.maxY, dock.frame.maxY + 1, "an orb is out of sight: \(orb.frame) \(dock.frame)")
+        }
+        // For the capture from outside.
+        sleep(4)
+    }
+
     /// "Give it functionality with pinch and hold actions": held, Connections in the dock offers Dock
     /// Settings (the owner, 2026-10-27: "No menu on the connections icon
     /// with pinch and hold").

@@ -75,6 +75,25 @@ struct GlassOrbDockGeometryTests {
         #expect(alone == CGSize(width: 320, height: 352), "never narrower than visionOS makes a window")
     }
 
+    @Test("an orb docked below what a short dock shows grows it to that row, up to three rows; one shown already changes nothing")
+    func showsAnArrival() {
+        // Snapped to one row: Connections and an orb; the third wraps out of sight.
+        let wide = [connections, ringed, ringed]
+        let oneRow = CGSize(width: 576, height: 352)
+        let grown = GlassOrbFlow.showing(2, of: wide, within: oneRow, inset: 16, gapAfterFirst: 24, rows: 3)
+        #expect(grown == CGSize(width: 576, height: 672), "grown to its row (640)")
+        #expect(GlassOrbFlow.showing(1, of: wide, within: oneRow, inset: 16, gapAfterFirst: 24, rows: 3) == oneRow,
+                "already shown")
+
+        // A column one row tall: the second orb is on the third row, the third on the fourth.
+        let column = [connections, ringed, ringed, ringed]
+        let short = CGSize(width: 312, height: 352)
+        let third = GlassOrbFlow.showing(2, of: column, within: short, inset: 16, gapAfterFirst: 24, rows: 3)
+        #expect(third.height == 1016, "to the third row (984), past the one between")
+        #expect(GlassOrbFlow.showing(3, of: column, within: short, inset: 16, gapAfterFirst: 24, rows: 3) == short,
+                "the fourth row is past three: it scrolls to it instead")
+    }
+
     @Test("a carried orb lands on the one under it in any direction, first over Connections or ahead, last past them")
     func landsIn2D() {
         let frames = [CGRect(x: 0, y: 0, width: 280, height: 320), CGRect(x: 280, y: 0, width: 200, height: 320),
@@ -95,6 +114,21 @@ struct GlassOrbDockGeometryTests {
         #expect(GlassOrbNameSide.opensLeading(trailingRoom: 60, leadingRoom: 500, needs: needs), "near the right edge")
         #expect(!GlassOrbNameSide.opensLeading(trailingRoom: 60, leadingRoom: 40, needs: needs),
                 "no room either side: the right, as names open")
+    }
+
+    @Test("an open name passes under only the dots in front of it that lie on its way, and they make way")
+    func makingWay() {
+        // Five dots around the orb as the dock draws them: 102 from its middle, 48 across; the widest
+        // name's capsule 48 + 4 + 150 + 16 long.
+        func way(_ index: Int, leading: Bool, width: CGFloat) -> [Int] {
+            GlassOrbRing.makingWay(for: index, count: 5, opensLeading: leading, width: width, radius: 102, dotDiameter: 48)
+        }
+        #expect(GlassOrbRing.standing(of: 4, count: 5) > GlassOrbRing.standing(of: 1, count: 5),
+                "the upper left dot stands in front of the upper right one")
+        #expect(way(1, leading: true, width: 218) == [4], "the upper right name, opening left across the orb, under the upper left dot")
+        #expect(way(2, leading: true, width: 218) == [3], "the lower right name, under the lower left dot")
+        #expect(way(1, leading: true, width: 100) == [], "a short name stops before the dot")
+        #expect(way(4, leading: false, width: 218) == [], "opening right, a name lies over the dots, which stand behind it")
     }
 
     @Test("Connections' hold menu: favorites, then the most recent others, newest first, only what can open")

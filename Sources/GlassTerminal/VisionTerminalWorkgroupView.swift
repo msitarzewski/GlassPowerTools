@@ -37,17 +37,43 @@ final class TerminalWindowActivity {
     private(set) var isBusy = false
     /// The terminal that printed last, for Auto-focus on activity in the grid and carousel.
     private(set) var lastSessionID: UUID?
+    /// When each terminal here last printed, for whether the one in front is still at work.
+    @ObservationIgnored private(set) var focus = TerminalActivityFocus()
     @ObservationIgnored private var quiet: Task<Void, Never>?
 
     func note(_ sessionID: UUID) {
+        focus.note(sessionID)
         if !isBusy { isBusy = true }
         if lastSessionID != sessionID { lastSessionID = sessionID }
         quiet?.cancel()
         quiet = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(1_200))
+            try? await Task.sleep(for: TerminalActivityFocus.quiet)
             guard !Task.isCancelled else { return }
             self?.isBusy = false
         }
+    }
+}
+
+/// Brings forward the terminal that printed last, for Auto-focus on activity, apart from its
+/// window's body: only this is drawn again as it changes (`VisionTerminalWorkgroupView`). The one in
+/// front keeps its place while it still prints (`TerminalActivityFocus`); the last to print comes
+/// forward once it is quiet.
+private struct TerminalActivityFollower: View {
+    let activity: TerminalWindowActivity
+    let front: () -> UUID?
+    let bring: (UUID) -> Void
+
+    var body: some View {
+        Color.clear
+            .task(id: activity.lastSessionID) {
+                guard let printing = activity.lastSessionID else { return }
+                while !activity.focus.brings(printing, over: front()) {
+                    guard front() != printing else { return }
+                    do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+                }
+                bring(printing)
+            }
+            .accessibilityHidden(true)
     }
 }
 
@@ -383,9 +409,16 @@ struct VisionTerminalWorkgroupView: View {
         }
         #if os(visionOS)
         // Auto-focus on activity: in the grid and carousel, the terminal printing comes forward.
-        .onChange(of: activity.lastSessionID) { _, printing in
-            guard let printing, followsActivity, presentation != .tabs, selectedSessionID != printing else { return }
-            selectedSessionID = printing
+        // Watched by a view of its own: the terminal that printed last changes with every chunk
+        // from another, and this whole window, its bar and tools menu with it, was drawn again for
+        // each — forty times a second with five agents at work, and the gear took no pinch (the
+        // owner, 2026-10-27: "the hyper refresh is back and the gear no longer works").
+        .background {
+            if followsActivity, presentation != .tabs {
+                TerminalActivityFollower(activity: activity, front: { selectedSessionID }) { printing in
+                    if selectedSessionID != printing { selectedSessionID = printing }
+                }
+            }
         }
         #endif
         .onChange(of: liveSelectedSessionID) { _, newSelection in
@@ -440,9 +473,7 @@ struct VisionTerminalWorkgroupView: View {
         let workgroup = sessionManager.workgroup(for: workgroupID)
         let title = workgroup.map { GlassTerminalCapability.title(of: $0, live: liveSessions(in: $0)) } ?? "Terminal"
         let sessionManager = sessionManager, workgroupID = workgroupID
-        // The terminal in front, or the one printing where the window follows activity (the owner:
-        // "front tab, or whichever is active").
-        let shown = (followsActivity ? activity.lastSessionID : nil) ?? selectedSessionID
+        let activity = activity, follows = followsActivity, selected = selectedSessionID
         let tabs = workgroup.map { liveSessions(in: $0) } ?? []
         let markColor = windowLook.tintColor ?? workgroup?.colorTag.color ?? .secondary
         return GlassSessionOrbFace(
@@ -468,6 +499,10 @@ struct VisionTerminalWorkgroupView: View {
             endpointIDs: tabs.map { EndpointID(rawValue: $0.server.id) },
             kind: .ssh
         ) {
+            // The terminal in front, or the one printing where the window follows activity (the
+            // owner: "front tab, or whichever is active"). Read as the orb draws, not as the window
+            // does (`TerminalActivityFollower`).
+            let shown = (follows ? activity.lastSessionID : nil) ?? selected
             let front = shown.flatMap { sessionManager.session(for: $0) } ?? sessionManager.selectedSession(inWorkgroup: workgroupID)
             return front?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
         }

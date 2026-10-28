@@ -274,11 +274,24 @@ enum GlassDemoMode {
             // its device choice. Invented names, as the rest of the demo's.
             shell.demoOtherDevices([("Studio Mac", [("alpha", .ssh, 3), ("build", .ssh, 2)]),
                                     ("Vision Pro (Lab)", [("bravo", .rdp, 2), ("alpha", .database, 1)])])
-        case "terminal-ring":
+        case "terminal-ring", "terminal-agents", "terminal-agents-grid":
             // 2026-10-15: ten terminals in one window, for its orb's ring (`--demo-session-orb`, and
-            // `--demo-orb-names` to see where every name sits).
-            terminal.requestDemoTabs(names: ["build", "logs", "api", "web", "db", "cache", "jobs", "deploy", "docs", "tests"],
-                                     output: Data(terminalTranscript.utf8), grid: false)
+            // `--demo-orb-names` to see where every name sits). `terminal-agents` (2026-10-27): five
+            // named as coding agents name their terminals, long enough that an open name crosses the
+            // ring, as the owner's did in the dock, each writing ten times a second as one at work
+            // does (the owner, that day: "the hyper refresh is back and the gear no longer works");
+            // `terminal-agents-grid` in the grid, where Auto-focus on activity brings one forward.
+            if surface.hasPrefix("terminal-agents") {
+                let ticks = (1...6).map { Data("\r\n\u{1B}[2m  ⎿  reading line \($0)\u{1B}[0m".utf8) }
+                terminal.requestDemoTabs(names: ["✳ Storefront checkout redesign", "✳ Fix the flaky login tests",
+                                                 "✳ Migrate orders to Postgres", "✳ Draft the release notes",
+                                                 "✳ Review the search indexing"],
+                                         output: Data(agentTranscript.utf8), grid: surface == "terminal-agents-grid",
+                                         ticks: ticks, every: .milliseconds(100))
+            } else {
+                terminal.requestDemoTabs(names: ["build", "logs", "api", "web", "db", "cache", "jobs", "deploy", "docs", "tests"],
+                                         output: Data(terminalTranscript.utf8), grid: false)
+            }
         case "terminal-tabs", "terminal-grid":
             // W31: one window with two terminals as its tabs, shown in tabs and in the grid, for
             // checking that one bottom bar shows. The shell reports its folder (OSC 7), so Open

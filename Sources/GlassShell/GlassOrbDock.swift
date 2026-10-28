@@ -316,6 +316,13 @@ public struct GlassOrbDockView: View {
     /// Each orb's place in the dock as last laid out, Connections' too: where a carried orb lands,
     /// and which way its dots' names open.
     @State private var frames: [String: CGRect] = [:]
+    /// Where the dock is scrolled to, and what lies above and below what it shows: the arrows at
+    /// its ends (the owner, 2026-10-27: "We need end arrows to show that there's more to scroll to
+    /// in the dock").
+    @State private var scroll = ScrollPosition()
+    @State private var room = GlassOrbDockRoom()
+    /// An orb just docked, scrolled into sight once it has its place.
+    @State private var arrived: String?
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -326,7 +333,8 @@ public struct GlassOrbDockView: View {
     /// About six orbs with rings; past it, a second row.
     static let widest: CGFloat = 1700
     /// Three rows; past them it scrolls.
-    static let tallest: CGFloat = 3 * height
+    static let rows = 3
+    static let tallest: CGFloat = CGFloat(rows) * height
     /// The narrowest window visionOS makes.
     static let narrowest: CGFloat = GlassConnectionsWindowSize.narrowestWindow
     /// Between the dock's edge and its orbs.
@@ -365,15 +373,15 @@ public struct GlassOrbDockView: View {
                     connectionsMenu
                 }
                 .frame(height: Self.height)
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.row)) } action: {
-                        frames[Self.connectionsID] = $0
-                    }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.row)) } action: {
+                    frames[Self.connectionsID] = $0
+                }
                 // Each orb a little in front of the ones after it, toward where names open: a later
                 // orb's dots covered an open name (the owner, 2026-10-26: "I was looking at the one on
                 // the left and the one to the right opened"). More than a ring's own depth apart.
                 ForEach(Array(cells.enumerated()), id: \.element.id) { index, cell in
                     movable(dockCell(cell), id: cell.id, among: cells)
-                        .offset(z: CGFloat(cells.count - 1 - index) * (GlassOrbRingLayout.liftSpan + 1))
+                        .offset(z: Self.depth(of: cells.count - 1 - index))
                 }
             }
             // Clear of the dock's edge, now it may have a glass of its own.
@@ -389,15 +397,51 @@ public struct GlassOrbDockView: View {
             }
             .coordinateSpace(.named(Self.row))
         }
+        .scrollPosition($scroll)
+        .onScrollGeometryChange(for: GlassOrbDockRoom.self) { geometry in
+            GlassOrbDockRoom(offset: geometry.contentOffset.y, shown: geometry.containerSize.height,
+                             content: geometry.contentSize.height)
+        } action: { _, room in self.room = room }
         // An orb carried, not the dock.
         .scrollDisabled(held != nil)
         .scrollIndicators(.hidden)
         .frame(minWidth: Self.narrowest, maxWidth: .infinity, minHeight: Self.height, maxHeight: .infinity,
                alignment: .topLeading)
+        // More above or below: an arrow at that end, which a pinch scrolls a row; in front of the
+        // orbs, which stand a little in front of the dock and of each other.
+        .overlay(alignment: .top) {
+            if room.above > 1 { moreArrow(up: true).offset(z: Self.depth(of: cells.count)) }
+        }
+        .overlay(alignment: .bottom) {
+            if room.below > 1 { moreArrow(up: false).offset(z: Self.depth(of: cells.count)) }
+        }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { resized(to: $0) }
         .background { GlassWindowSizerView(sizer: sizer).accessibilityHidden(true) }
         // Orbs come and go, or Settings fits it to them again.
         .onChange(of: fit, initial: true) { _, fit in fitToOrbs(fit) }
+        // An orb docked where the dock doesn't reach: it grows to its row, or scrolls to it.
+        .onChange(of: cells.map(\.id)) { old, new in
+            guard let id = new.last(where: { !old.contains($0) }), let index = new.firstIndex(of: id) else { return }
+            if let given = GlassConnectionsWindowSize.stored(keptSize) {
+                let grown = GlassOrbFlow.showing(index + 1, of: sizes, within: given, inset: Self.inset,
+                                                 gapAfterFirst: Self.connectionsGap, rows: Self.rows)
+                if grown != given {
+                    Self.logger.info("dock grown to \(Int(grown.height)) for \(id, privacy: .public)")
+                    keptSize = GlassConnectionsWindowSize.stored(grown)
+                }
+            }
+            arrived = id
+        }
+        .task(id: arrived) {
+            guard let id = arrived else { return }
+            // Its place, and the dock's new size.
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled, let frame = frames[id] else { return }
+            arrived = nil
+            if frame.minY - Self.inset < room.offset - 1 || frame.maxY + Self.inset > room.offset + room.shown + 1 {
+                withAnimation(.smooth) { scroll.scrollTo(y: min(frame.minY - Self.inset, room.content - room.shown)) }
+            }
+        }
         // Resized: once the hand has let go, the size given is kept and the dock snaps within it.
         .task(id: resizes) {
             guard resizes > 0 else { return }
@@ -529,6 +573,33 @@ public struct GlassOrbDockView: View {
         let point = CGPoint(x: start.midX + orb.by.width, y: start.midY + orb.by.height)
         return GlassOrbDockOrder.landing(at: point, frames: cells.map { frames[$0.id] ?? .null },
                                          before: frames[Self.connectionsID])
+    }
+
+    /// How far in front of the dock `steps` orbs stand: more than a ring's own depth apart.
+    static func depth(of steps: Int) -> CGFloat { CGFloat(steps) * (GlassOrbRingLayout.liftSpan + 1) }
+
+    /// An arrow at the dock's end where there is more; a pinch scrolls a row that way.
+    private func moreArrow(up: Bool) -> some View {
+        Button {
+            withAnimation(.smooth) { scrollRow(up: up) }
+        } label: {
+            Label(up ? "More Above" : "More Below", systemImage: up ? "chevron.up" : "chevron.down")
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                .frame(width: 44)
+        }
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .padding(6)
+        .accessibilityIdentifier(up ? "orb-dock-more-above" : "orb-dock-more-below")
+    }
+
+    /// To the next row's top, or the last before: rows meet the dock's edge as they do unscrolled.
+    private func scrollRow(up: Bool) {
+        let tops = Set(frames.values.map { ($0.minY - Self.inset).rounded() }).sorted()
+        let end = max(room.content - room.shown, 0)
+        let next = up ? tops.last { $0 < room.offset - 1 } ?? 0 : tops.first { $0 > room.offset + 1 } ?? end
+        scroll.scrollTo(y: min(max(next, 0), end))
     }
 
     /// The room either side of an orb's middle within the dock, for its dots' names
@@ -786,6 +857,17 @@ public struct GlassOrbDockView: View {
         default: nil
         }
     }
+}
+
+/// Where the dock is scrolled to: its offset, the height it shows, and its content's height.
+struct GlassOrbDockRoom: Equatable {
+    var offset: CGFloat = 0
+    var shown: CGFloat = 0
+    var content: CGFloat = 0
+
+    /// What lies above what is shown, and below it.
+    var above: CGFloat { offset }
+    var below: CGFloat { content - offset - shown }
 }
 
 /// The orbs in rows that wrap, as `GlassOrbFlow` lays them out.

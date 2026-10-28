@@ -365,6 +365,8 @@ struct GlassSessionOrbView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.layoutDirection) private var layoutDirection
     @Namespace private var looks
+    /// Each opening dot's name capsule as laid out, by tab: how far it reaches when it opens.
+    @State private var nameWidths: [String: CGFloat] = [:]
 
     /// What looking at the orb, or at a tab's dot, shows. Only the orb and the dots set their group
     /// going; what they show follows (`.followsGroup`). Left to the default, every tab's picture —
@@ -386,11 +388,13 @@ struct GlassSessionOrbView: View {
 
     var body: some View {
         let tabs = face.ring(services: GlassSessionOrbServices.dots(for: face))
+        let leading = expandsDots ? tabs.indices.map { opensLeading($0, of: tabs.count) } : []
+        let ways = expandsDots ? makingWay(on: tabs, leading: leading) : []
         GlassOrbRingLayout(count: tabs.count, namesFromDots: expandsDots) {
             orb(tabs)
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                 if expandsDots {
-                    openingDot(tab, opensLeading: opensLeading(index, of: tabs.count))
+                    openingDot(tab, opensLeading: leading[index], makingWayFor: ways[index])
                         .offset(z: GlassOrbRingLayout.lift(of: index, count: tabs.count))
                 } else {
                     dot(tab)
@@ -489,6 +493,32 @@ struct GlassSessionOrbView: View {
         .accessibilityIdentifier("session-orb-tab-\(tab.id)")
     }
 
+    /// Whether the dot at `index` opens its name toward the leading side: too little room past it
+    /// toward the dock's trailing edge, and more the other way.
+    private func opensLeading(_ index: Int, of count: Int) -> Bool {
+        guard let nameRoom else { return false }
+        let offset = GlassOrbRing.center(of: index, count: count, radius: GlassOrbRingLayout.ringRadius).x
+        let along = layoutDirection == .rightToLeft ? -offset : offset
+        return GlassOrbNameSide.opensLeading(
+            trailingRoom: nameRoom.trailing - along, leadingRoom: nameRoom.leading + along,
+            needs: GlassOrbNameSide.reach(dotDiameter: GlassOrbRingLayout.dotDiameter, nameWidth: GlassOrbRingLayout.nameWidth))
+    }
+
+    /// For each dot, the tabs whose open names pass under it (`GlassOrbRing.makingWay`): names opening
+    /// toward the leading side, which cross the dots standing in front of them.
+    private func makingWay(on tabs: [GlassSessionOrbTab], leading: [Bool]) -> [[GlassSessionOrbTab]] {
+        var ways = Array(repeating: [GlassSessionOrbTab](), count: tabs.count)
+        for (index, tab) in tabs.enumerated() {
+            guard let width = nameWidths[tab.id] else { continue }
+            for under in GlassOrbRing.makingWay(for: index, count: tabs.count, opensLeading: leading[index], width: width,
+                                                radius: GlassOrbRingLayout.ringRadius,
+                                                dotDiameter: GlassOrbRingLayout.dotDiameter) {
+                ways[under].append(tab)
+            }
+        }
+        return ways
+    }
+
     /// A dot that opens into its icon and name while looked at: the icon on a circle of its own, as
     /// a window's dots are, and behind it the name's capsule running to the trailing side, out of
     /// sight until the icon is looked at (the owner, 2026-10-25: "the natural state remain the
@@ -502,21 +532,15 @@ struct GlassSessionOrbView: View {
     /// on the leading side stands a little in front of what lies on the trailing side, where names
     /// open (`GlassOrbRingLayout.lift`, and the dock's row).
     ///
+    /// A name opening toward the leading side, near the dock's trailing edge, passes under the dots in
+    /// front of it instead: they make way, clear while it is open (the owner, 2026-10-27: "left seems
+    /// to overlap even when looking at the right"). No effect can bring the looked-at dot forward.
+    ///
     /// In front of the orb, so an open name crossing it stays over it ("they need to remain on
     /// top!"): drawn after the orb, it was still under the sphere's glass, and an effect the system
     /// draws cannot bring anything forward.
-    /// Whether the dot at `index` opens its name toward the leading side: too little room past it
-    /// toward the dock's trailing edge, and more the other way.
-    private func opensLeading(_ index: Int, of count: Int) -> Bool {
-        guard let nameRoom else { return false }
-        let offset = GlassOrbRingLayout.ringRadius * cos(-Double.pi / 2 + 2 * Double.pi * Double(index) / Double(max(count, 1)))
-        let along = layoutDirection == .rightToLeft ? -offset : offset
-        return GlassOrbNameSide.opensLeading(
-            trailingRoom: nameRoom.trailing - along, leadingRoom: nameRoom.leading + along,
-            needs: GlassOrbNameSide.reach(dotDiameter: GlassOrbRingLayout.dotDiameter, nameWidth: GlassOrbRingLayout.nameWidth))
-    }
-
-    private func openingDot(_ tab: GlassSessionOrbTab, opensLeading: Bool = false) -> some View {
+    private func openingDot(_ tab: GlassSessionOrbTab, opensLeading: Bool = false,
+                            makingWayFor names: [GlassSessionOrbTab] = []) -> some View {
         let side = GlassOrbRingLayout.dotDiameter
         // Opening toward the leading side is drawn as a right-to-left dot is.
         let rightToLeft = (layoutDirection == .rightToLeft) != opensLeading
@@ -534,6 +558,7 @@ struct GlassSessionOrbView: View {
         } label: {
             ZStack(alignment: .leading) {
                 name.hidden()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { nameWidths[tab.id] = $0 }
                     .glassBackgroundEffect(in: .capsule)
                     .hoverEffect(GlassOrbOpenEffect(rightToLeft: rightToLeft).hoverEffectPhaseOverride(Self.namesOverride(tab.title)),
                                  in: shown(by: tab))
@@ -543,6 +568,7 @@ struct GlassSessionOrbView: View {
                     .frame(width: side, height: side)
                     .glassBackgroundEffect(in: .circle)
                     .hoverEffect(GlassOrbGrowEffect(), in: shown(by: tab))
+                    .modifier(GlassOrbMakingWay(names: names.map { (shown(by: $0), Self.namesOverride($0.title)) }))
             }
             .contentShape(.hoverEffect, GlassOrbLeadingCircle(rightToLeft: rightToLeft))
             .contentShape(.interaction, GlassOrbLeadingCircle(rightToLeft: rightToLeft))
@@ -648,6 +674,27 @@ struct GlassOrbOpenEffect: CustomHoverEffect {
     }
 }
 
+/// Clears a dot while a name that passes under it is open (`GlassOrbRing.makingWay`).
+struct GlassOrbMakeWayEffect: CustomHoverEffect {
+    func body(content: Content) -> some CustomHoverEffect {
+        content.hoverEffect { effect, isActive, _ in
+            effect.opacity(isActive ? 0 : 1)
+        }
+    }
+}
+
+/// A dot clear while any of the names that pass under it is open: one effect for each, following that
+/// name's dot's look.
+private struct GlassOrbMakingWay: ViewModifier {
+    let names: [(group: HoverEffectGroup, override: HoverEffectPhaseOverride?)]
+
+    func body(content: Content) -> some View {
+        names.reduce(AnyView(content)) { view, name in
+            AnyView(view.hoverEffect(GlassOrbMakeWayEffect().hoverEffectPhaseOverride(name.override), in: name.group))
+        }
+    }
+}
+
 /// The circle at a capsule's icon end: all of an opening dot that can be looked at or pinched.
 struct GlassOrbLeadingCircle: Shape {
     let rightToLeft: Bool
@@ -694,8 +741,7 @@ struct GlassOrbRingLayout: Layout {
     /// in front of the orb are each their own layer, and `zIndex` did not order them (the
     /// simulator, 2026-10-26). The same in a right-to-left language: the layout is mirrored.
     static func lift(of index: Int, count: Int) -> CGFloat {
-        let across = cos(-Double.pi / 2 + 2 * Double.pi * Double(index) / Double(max(count, 1)))
-        return openingLift + liftSpan * CGFloat(1 - across) / 2
+        openingLift + liftSpan * GlassOrbRing.standing(of: index, count: count)
     }
     /// From the trailing-most dot to the leading-most: about 3 mm, unseen except where they overlap.
     static let liftSpan: CGFloat = 4

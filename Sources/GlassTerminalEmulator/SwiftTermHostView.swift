@@ -1097,6 +1097,11 @@ public final class SwiftTermHostModel: ObservableObject {
             terminalEngine.receive(notice)
             droppedPendingRendererByteCount = 0
         }
+        // Output that arrived before the terminal was on screen had settled before its diagrams'
+        // marks were there to look (`TerminalDiagramMarks` looks again as output settles): look now
+        // it has landed. Without it a diagram printed while the window was opening, or brought back,
+        // went unmarked (the visionOS simulator, 2026-10-27).
+        refreshDiagrams()
     }
 
     private func enqueuePendingRendererData(_ data: Data) {

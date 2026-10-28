@@ -131,7 +131,9 @@ public final class GlassTerminalRuntime {
         case demoScreen(name: String, draw: @MainActor (_ rows: Int, _ columns: Int) -> Data, windowSettings: GlassWindowOverrides)
         /// Screenshots: one window holding a demo terminal on each of `names`, the first in front;
         /// on Vision Pro, shown in the grid when `grid` (W31: one bottom bar in tabs and in grid).
-        case demoTabs(names: [String], output: Data, grid: Bool, windowSettings: GlassWindowOverrides)
+        /// `ticks` and `titles`, when given, as `demoReplay`'s, in every one of them.
+        case demoTabs(names: [String], output: Data, grid: Bool, windowSettings: GlassWindowOverrides, ticks: [Data],
+                      titles: [String], every: Duration)
         /// Screenshots: the Files window over a session that connects to nothing, opened at
         /// `path`. It shows the window's frame and header, and the browser's own "not connected"
         /// state where a listing would be.
@@ -596,8 +598,10 @@ public final class GlassTerminalRuntime {
     /// Screenshots only: one window with a demo terminal on each of `names` as its tabs, each
     /// showing `output`; on Vision Pro in the grid when `grid`.
     public func requestDemoTabs(names: [String], output: Data, grid: Bool = false,
-                                windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
-        enqueue(.demoTabs(names: names, output: output, grid: grid, windowSettings: windowSettings))
+                                windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
+                                ticks: [Data] = [], titles: [String] = [], every: Duration = .milliseconds(400)) {
+        enqueue(.demoTabs(names: names, output: output, grid: grid, windowSettings: windowSettings,
+                          ticks: ticks, titles: titles, every: every))
     }
     /// Screenshots only: a terminal window's own settings (W22) — lighter glass with a tint, a
     /// larger font and a bar cursor — over the demo's Appearance.

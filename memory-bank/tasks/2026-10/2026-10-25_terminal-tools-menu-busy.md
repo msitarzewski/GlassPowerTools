@@ -70,3 +70,30 @@ local (the sheet on screen 60 ms later, closed 5 s after), on a quiet terminal (
 on a busy terminal is recorded. "tools built" is not an opening: every terminal's menu is built two to four times as
 the app starts (11:51), and one terminal's five times at 12:51 with the bar drawn 40 times in 2 s, after half an hour
 idle (likely the headset put back on), with no choice after it. Next: his try on a busy terminal, with the time.
+
+## 2026-10-27 — the cause found: the whole window drawn again per printing terminal (0.4.539)
+The owner, on 0.4.538: "the hyper refresh is back and the gear no longer works … I can see the refresh....it's pretty
+crazy." The headset's file (`<work>/headset/screen-sharing-2230.log`, copied 22:28 UTC): the bar drawn 72 to 96 times
+in 2 s, no `tools chose` since 12:47 UTC (Settings worked then, on a quiet bar). Bursts of 20 or more go back to
+2026-10-26 16:51 UTC, so not from the day's builds.
+- **Cause:** `VisionTerminalWorkgroupView`'s body read `TerminalWindowActivity.lastSessionID`, the terminal that
+  printed last: always, through Auto-focus on activity's `.onChange`, and through the orb's face where the window
+  follows activity (on by default since 0.4.535). With several terminals printing in one window it changes with every
+  chunk from another (each terminal notes at most four times a second), and each change drew the whole window again,
+  its bar and tools menu with it.
+- **Fix:** Auto-focus is watched by `TerminalActivityFollower`, a view of its own, present only in the grid and
+  carousel where the window follows activity; the orb reads the last to print as it draws, inside its picture. And
+  the terminal in front keeps its place while it still prints (`TerminalActivityFocus`, all platforms, tested):
+  following every change moved a grid's front terminal about twice a second with five agents at work.
+- **Measured** in the visionOS simulator with the new demo `terminal-agents` (five tabs in one window, each writing
+  ten times a second), a temporary unified-log line beside `noteBarDrawn` (removed): tabs, the bar 30 to 45 draws in
+  2 s before, none in 30 s after. `terminal-agents-grid`: 61 changes of the front terminal in 30 s and the bar 20 to 70
+  draws in 2 s before; none of either after.
+- `TerminalActivityFocusTests` fails with the in-front check taken out (source restored byte for byte).
+- **Not seen:** a quiet front terminal giving way to one still printing, in the simulator (the demo's agents never
+  stop); the unit test covers the rule. The gear under five busy agents is the headset's to try: the runner cannot
+  pinch in a never-idle app.
+- **Found on the way (after 0.4.539, not yet built for devices):** `testADiagramHasAMarkThatShowsIt` failed (4 of 4,
+  with and without the change above). In the test's launches the mark was not drawn at all: the demo's output arrived
+  before the window, settled before the marks were there, and their first look came before the queued output reached
+  the terminal. `SwiftTermHostModel.flushPending` now looks for diagrams once queued output lands. The test passes.

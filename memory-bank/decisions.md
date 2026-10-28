@@ -1850,11 +1850,18 @@ default) and **the nearest whole rows** for the snap. So the dock runs no head t
 Mode's; a resized dock, once the hand lets go, snaps to the widest row its orbs make at that width and to every row or
 the whole rows nearest its height, and snaps within the size given again as orbs come and go. Connections' hold menu
 is a menu whose pinch is its primary action: a `.contextMenu` on that button never opened, in the simulator either.
+Then: "We need end arrows to show that there's more to scroll to in the dock. I just dropped a window in there and it
+didn't display because the dock window shrunk." So arrows at the ends where there is more (a pinch scrolls a row), and
+an orb docked below the rows shown grows the dock to its row, up to three; past them the dock scrolls to it.
+Then: "the terminal/session icons that need to render to the right conflict in space with larger labels to the left";
+a name that turns left for want of room crosses dots standing in front of it, and no hover effect can bring the dot
+looked at forward, so those dots clear while that name is open.
 
 **Status:** Approved 2026-10-25; built through the eighth round (0.4.534) and committed 2026-10-26 at his word. The
 headset has seen rounds one to five and nine; the sixth to eighth are his to confirm. The ninth (the flex, names,
 scroll, Connections' menu, sides, kept pictures, auto-focus on) is 0.4.535 and the tenth (the crash, the snap, the
-menu, the side setting) 0.4.536, both committed 2026-10-27 at his word. Task note
+menu, the side setting) 0.4.536, both committed 2026-10-27 at his word; the twelfth (arrows, an arrival shown,
+0.4.538) and thirteenth (names that turn left no longer covered, 0.4.539) committed 2026-10-27 at his word. Task note
 `tasks/2026-10/2026-10-25_orb-dock.md`.
 
 ## D89 — Focus Mode environments on Vision Pro — Approved 2026-10-26

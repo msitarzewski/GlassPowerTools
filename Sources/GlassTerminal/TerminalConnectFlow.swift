@@ -350,7 +350,7 @@ struct TerminalConnectFlow: ViewModifier {
             sessionManager.registerSession(session)
             session.state = .connected
             presentTerminalWindow(for: session, windowSettings: windowSettings)
-        case .demoTabs(let names, let output, let grid, let windowSettings):
+        case .demoTabs(let names, let output, let grid, let windowSettings, let ticks, let titles, let every):
             // The same connectionless sessions, as the tabs of one window.
             let sessions = names.map { name in
                 let session = TerminalSession(server: ServerConfiguration(name: name, host: "192.0.2.10", username: "ann"),
@@ -360,6 +360,21 @@ struct TerminalConnectFlow: ViewModifier {
                 session.state = .connected
                 session.feedTerminalData(output)
                 return session
+            }
+            // Each writing as `demoReplay`'s does, a little apart, as agents at work in one window.
+            for (index, session) in sessions.enumerated() where !ticks.isEmpty {
+                Task { @MainActor [weak session] in
+                    try? await Task.sleep(for: every * Double(index) / Double(sessions.count))
+                    var next = 0
+                    while session != nil {
+                        session?.feedTerminalData(ticks[next % ticks.count])
+                        if !titles.isEmpty, let name = session?.server.name {
+                            session?.demoPaneTitle("\(titles[next % titles.count]) \(name)")
+                        }
+                        next &+= 1
+                        try? await Task.sleep(for: every)
+                    }
+                }
             }
             guard let first = sessions.first else { return }
             #if os(visionOS)

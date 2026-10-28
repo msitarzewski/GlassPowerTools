@@ -510,12 +510,16 @@ Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages>
 **Vision Pro** (D74 and the headset terminal; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`):
 - An app is never told where a person looks. Every look effect is a system hover effect; effects in one
   `HoverEffectGroup` show together, and a member left at the default `.activatesGroup` starts the group.
+- A hover effect cannot change depth: `HoverEffectContent` in the visionOS 27 SDK offers opacity, an offset in x and
+  y, rotation, an affine transform, a clip and scale. What a look must bring forward stands forward always, or what
+  is in front of it fades (the orb dock's names, 2026-10-27). A view's effect can follow another view's group.
 - A pinch is touch type `direct`, a trackpad `indirectPointer`. SwiftTerm's iOS edit menu (`UIMenuController`)
   never shows on visionOS.
 - tmux 3.8 turns `mouse` on with no configuration (a private server started with `-f /dev/null` reports it), so a
   drag goes to tmux unless the app stands in the way.
-- The visionOS simulator cannot drive looks, the trackpad or a held SwiftUI menu (the runner turns a hold into a
-  tap); those are checked on the headset.
+- The visionOS simulator cannot drive looks or the trackpad; those are checked on the headset. A hold does open a
+  `.contextMenu` in the runner (corrected 2026-10-27: an earlier note here said it turned a hold into a tap, and a
+  real defect was blamed on the runner). The runner cannot pinch in an app that never goes idle.
 
 **iPhone and iPad, iOS 27.2** (`tasks/2026-10/2026-10-14_all-windows-agents-clipboard.md`): a toolbar's plain
 button is drawn natively, so SwiftUI gestures on it never fire, and the library's SwiftUI-drawn ⚡ carries no

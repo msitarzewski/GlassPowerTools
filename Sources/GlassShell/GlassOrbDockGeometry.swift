@@ -82,6 +82,20 @@ public enum GlassOrbFlow {
                       height: max((height + 2 * inset).rounded(.up), minimum.height))
     }
 
+    /// `bounds` grown to show the item at `index` — an orb just docked, which a dock snapped to fewer
+    /// rows had hidden (the owner, 2026-10-27: "I just dropped a window in there and it didn't
+    /// display because the dock window shrunk") — when its row is one of the first `rows`; else
+    /// `bounds`, and the dock scrolls to it.
+    public static func showing(_ index: Int, of sizes: [CGSize], within bounds: CGSize, inset: CGFloat,
+                               gapAfterFirst: CGFloat = 0, rows: Int) -> CGSize {
+        let (frames, bottoms) = layout(of: sizes, width: max(bounds.width - 2 * inset, 0), gapAfterFirst: gapAfterFirst)
+        guard frames.indices.contains(index),
+              let row = bottoms.firstIndex(where: { $0 >= frames[index].maxY - 0.5 }), row < rows else { return bounds }
+        let shown = snapped(sizes, within: bounds, inset: inset, gapAfterFirst: gapAfterFirst).height - 2 * inset
+        guard bottoms[row] > shown + 0.5 else { return bounds }
+        return CGSize(width: bounds.width, height: bottoms[row] + 2 * inset)
+    }
+
     /// What `frames` take up, from the origin.
     public static func size(of frames: [CGRect]) -> CGSize {
         CGSize(width: frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
@@ -124,6 +138,41 @@ public enum GlassOrbNameSide {
     /// edge is less than a name needs, and the leading side has more.
     public static func opensLeading(trailingRoom: CGFloat, leadingRoom: CGFloat, needs: CGFloat) -> Bool {
         trailingRoom < needs && leadingRoom > trailingRoom
+    }
+}
+
+/// A ring's dots as `GlassOrbRingLayout` lays them out: evenly around the orb from its top, in the
+/// ring's own space, x growing toward the trailing side (mirrored with the layout in a right-to-left
+/// language).
+public enum GlassOrbRing {
+    /// The middle of dot `index` of `count`, `radius` from the orb's.
+    public static func center(of index: Int, count: Int, radius: CGFloat) -> CGPoint {
+        let angle = -Double.pi / 2 + 2 * Double.pi * Double(index) / Double(max(count, 1))
+        return CGPoint(x: radius * cos(angle), y: radius * sin(angle))
+    }
+
+    /// How far dot `index` stands toward the front, from 0 (the trailing-most) to 1 (the leading-most),
+    /// so a name opening toward the trailing side lies over the dots it crosses (`GlassOrbRingLayout.lift`).
+    public static func standing(of index: Int, count: Int) -> CGFloat {
+        (1 - center(of: index, count: count, radius: 1).x) / 2
+    }
+
+    /// The dots standing in front of dot `index`'s open name that lie across it, whose capsule is
+    /// `width` long from its dot's far edge. Only a name opening toward the leading side
+    /// (`GlassOrbNameSide`) has any: they make way while it is open, rather than cover it (the owner,
+    /// 2026-10-27: "left seems to overlap even when looking at the right").
+    public static func makingWay(for index: Int, count: Int, opensLeading: Bool, width: CGFloat,
+                                 radius: CGFloat, dotDiameter: CGFloat) -> [Int] {
+        let dot = center(of: index, count: count, radius: radius)
+        // The capsule is its dot's circle drawn along a line to the far end.
+        let end = dot.x + (opensLeading ? -1 : 1) * max(width - dotDiameter, 0)
+        let (low, high) = (min(dot.x, end), max(dot.x, end))
+        return (0..<count).filter { other in
+            guard other != index, standing(of: other, count: count) > standing(of: index, count: count) else { return false }
+            let point = center(of: other, count: count, radius: radius)
+            // More than a point of the dot over the capsule.
+            return hypot(point.x - min(max(point.x, low), high), point.y - dot.y) < dotDiameter - 1
+        }
     }
 }
 

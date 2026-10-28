@@ -111,7 +111,8 @@ Each is built; where only a simulator or a test has seen it, the owner's devices
   orb; look at a dot for its name (it opens left near the dock's right edge), pinch an orb to bring its window back,
   hold and carry an orb in any direction to reorder; a quick pinch-drag scrolls. The dock is resized like any window:
   its orbs wrap into rows as a flexbox does, a column when it is one orb wide, and once the hand lets go it snaps to
-  the widest row and the nearest whole rows, keeping the size given. A window comes back above a wide dock and beside
+  the widest row and the nearest whole rows, keeping the size given; an orb docked below them grows it to show that
+  row (up to three), and arrows at its ends show there is more to scroll to. A window comes back above a wide dock and beside
   a tall one: away from where the person turned in Focus Mode, else on the side set in Settings (Windows From a Tall
   Dock). Connections is a third larger and set apart; held, it offers favorite and recent machines and Dock Settings.
   Its own Opacity and Glass start from Appearance. After a relaunch, windows come back as they were left — open, in
