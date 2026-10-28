@@ -130,9 +130,9 @@ struct D26DesktopRelaunchTests {
         let (relaunched, secondDesktop) = await launch(over: root)
         await relaunched.load()
         let second = try await relaunched.adoptService(kind: .rdp, hostName: "bravo",
-                                                       address: "10.0.0.9", serviceName: "Desktop on bravo")
+                                                       address: "198.51.100.9", serviceName: "Desktop on bravo")
         try await secondDesktop.app.save(DesktopConnection(id: second, name: "Desktop on bravo",
-                                                          host: "10.0.0.9", username: "casey"),
+                                                          host: "198.51.100.9", username: "casey"),
                                          password: nil)
 
         #expect(secondDesktop.app.connections.map(\.name).sorted()

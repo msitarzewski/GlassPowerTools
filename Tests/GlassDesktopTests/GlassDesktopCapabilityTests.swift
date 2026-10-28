@@ -19,7 +19,7 @@ private func makeRuntime() async throws -> (GlassDesktopRuntime, URL) {
     return (GlassDesktopRuntime(app: app), root)
 }
 
-private func host(_ name: String = "foxtrot", address: String = "10.0.0.9") throws -> HostProfile {
+private func host(_ name: String = "foxtrot", address: String = "198.51.100.9") throws -> HostProfile {
     try HostProfile(id: HostID(rawValue: UUID()), displayName: name, address: address)
 }
 
@@ -64,8 +64,8 @@ struct GlassDesktopCapabilityTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         let machine = try host()
-        let vnc = DesktopConnection(name: "alpha", host: "10.0.0.9", port: 5900, username: "casey", protocol: .vnc)
-        let rdp = DesktopConnection(name: "bravo", host: "10.0.0.9", username: "casey")
+        let vnc = DesktopConnection(name: "alpha", host: "198.51.100.9", port: 5900, username: "casey", protocol: .vnc)
+        let rdp = DesktopConnection(name: "bravo", host: "198.51.100.9", username: "casey")
         try await runtime.app.save(vnc, password: nil)
         try await runtime.app.save(rdp, password: nil)
         func link(_ connection: DesktopConnection) -> HostServiceLink {
@@ -97,10 +97,10 @@ struct GlassDesktopCapabilityTests {
         draft.username = "casey"
         draft.password = "correct-horse"
         #expect(draft.validate(address: machine.address ?? "").isEmpty)
-        try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
+        try await draft.commit(endpointID: endpoint, host: machine, address: "198.51.100.9")
 
         let saved = try #require(runtime.connection(for: endpoint))
-        #expect(saved.host == "10.0.0.9", "the address is the host's, passed in at commit")
+        #expect(saved.host == "198.51.100.9", "the address is the host's, passed in at commit")
         #expect(saved.port == 3389, "an untouched port follows the protocol")
         #expect(saved.hostID == machine.id)
         #expect(saved.protocol == .rdp)
@@ -124,9 +124,9 @@ struct GlassDesktopCapabilityTests {
         draft.audioEnabled = true
         draft.password = "hunter2"
         // No user name: a VNC server may be password-only, so it must not block the save.
-        #expect(draft.validate(address: "10.0.0.9").isEmpty)
+        #expect(draft.validate(address: "198.51.100.9").isEmpty)
         #expect(!draft.showsRDPOnlyFields)
-        try await draft.commit(endpointID: endpoint, host: try host(), address: "10.0.0.9")
+        try await draft.commit(endpointID: endpoint, host: try host(), address: "198.51.100.9")
 
         let saved = try #require(runtime.connection(for: endpoint))
         #expect(saved.port == 5900, "the protocol moves an untouched port")
@@ -147,9 +147,9 @@ struct GlassDesktopCapabilityTests {
         draft.username = String(repeating: "a", count: 64)
         // The record throws on this (ARD packs the account into a fixed block); the sheet should
         // say so on the field rather than failing the save with a thrown error.
-        #expect(draft.validate(address: "10.0.0.9").contains { $0.field == "username" })
+        #expect(draft.validate(address: "198.51.100.9").contains { $0.field == "username" })
         draft.username = String(repeating: "a", count: 63)
-        #expect(draft.validate(address: "10.0.0.9").isEmpty)
+        #expect(draft.validate(address: "198.51.100.9").isEmpty)
     }
 
     @Test("The sheet's Screen Sharing note follows the user name: a Mac account is encrypted, a password alone is not")
@@ -195,7 +195,7 @@ struct GlassDesktopCapabilityTests {
         let draft = try #require(capability.makeSetupDraft() as? DesktopServiceDraft)
         draft.username = "casey"
         draft.password = "correct-horse"
-        try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
+        try await draft.commit(endpointID: endpoint, host: machine, address: "198.51.100.9")
         #expect(runtime.connection(for: endpoint) != nil)
 
         let link = HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "foxtrot", credentialID: nil)
@@ -229,7 +229,7 @@ struct GlassDesktopCapabilityTests {
         let draft = try #require(capability.makeSetupDraft() as? DesktopServiceDraft)
         draft.username = "casey"
         draft.password = "correct-horse"
-        try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
+        try await draft.commit(endpointID: endpoint, host: machine, address: "198.51.100.9")
 
         var outcome: GlassCapabilityOutcome?
         let link = HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "foxtrot", credentialID: nil)
@@ -264,15 +264,15 @@ struct GlassDesktopCapabilityTests {
         draft.username = "casey"
         draft.password = "correct-horse"
         var machine = try host()
-        try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
+        try await draft.commit(endpointID: endpoint, host: machine, address: "198.51.100.9")
 
         machine.services = [HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "foxtrot", credentialID: nil)]
-        capability.hostAddressDidChange(host: machine, address: "10.0.0.22")
+        capability.hostAddressDidChange(host: machine, address: "198.51.100.22")
         // The capability persists on a task of its own: until it lands, up to 30 s. A fixed 200 ms
         // stood for that (2026-10-24).
-        for _ in 0..<3_000 where runtime.connection(for: endpoint)?.host != "10.0.0.22" {
+        for _ in 0..<3_000 where runtime.connection(for: endpoint)?.host != "198.51.100.22" {
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(runtime.connection(for: endpoint)?.host == "10.0.0.22")
+        #expect(runtime.connection(for: endpoint)?.host == "198.51.100.22")
     }
 }

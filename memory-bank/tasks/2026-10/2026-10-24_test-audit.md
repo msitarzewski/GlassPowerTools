@@ -117,7 +117,7 @@ Static scan: `<work>/test-audit.py` → test-audit.txt (EARLY-RETURN 36, NO-ASSE
   below the ephemeral range; seeded ZRLE test; iCloud stale-completion tests use `mainActorTurns()` (exact
   ordering) instead of 10 ms sleeps; glas_sh 10 ms polls 30 s.
 - Private names removed from code and tests: the test VM's name, a machine's MySQL, a private-range address
-  (now 10.0.0.20), a person's name, a tailnet host name, the macOS VM's name and its key's file name; RDPKit's
+  (then 10.0.0.20; since 2026-10-27 every test address is in a documentation range, 198.51.100.20), a person's name, a tailnet host name, the macOS VM's name and its key's file name; RDPKit's
   upstream author's machine and account (GLASSDT-PATCHES.md); Citadel's (PATCHES.md).
 
 ## Done since (later the same day)

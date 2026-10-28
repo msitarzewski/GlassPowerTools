@@ -61,11 +61,11 @@ struct GlassShellTunnelHopTests {
         // Oldest first: this one supplies `host.address`, and carries no SSH service. The dates are
         // set apart: two made a moment apart can read back equal from the catalog, and a tie is
         // broken by id, so which machine the host *is* would be a coin toss.
-        try await store.upsert(try HostProfile(displayName: "db", address: "10.0.0.1",
+        try await store.upsert(try HostProfile(displayName: "db", address: "198.51.100.1",
                                                services: [databaseLink()],
                                                createdAt: Date(timeIntervalSince1970: 1_700_000_000)))
         // Same display name, different machine, and this is the one with SSH.
-        try await store.upsert(try HostProfile(displayName: "db", address: "10.0.0.99",
+        try await store.upsert(try HostProfile(displayName: "db", address: "198.51.100.99",
                                                services: [sshLink()],
                                                createdAt: Date(timeIntervalSince1970: 1_700_000_060)))
         await model.load()
@@ -73,7 +73,7 @@ struct GlassShellTunnelHopTests {
         let host = try #require(model.catalogHosts.first { $0.displayName == "db" })
         #expect(host.members.count == 2, "the two records group under one row, which is the premise")
 
-        // The only SSH service belongs to 10.0.0.99 while the host is 10.0.0.1: refuse rather than
+        // The only SSH service belongs to 198.51.100.99 while the host is 198.51.100.1: refuse rather than
         // send this database's credentials to a machine the user did not choose.
         #expect(model.sshMember(of: host) == nil)
         #expect(!model.hostAccess(for: host.id).canForwardPorts)
@@ -86,7 +86,7 @@ struct GlassShellTunnelHopTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = HostCatalogStore(fileURL: model.catalogFileURL)
-        try await store.upsert(try HostProfile(displayName: "box", address: "10.0.0.5",
+        try await store.upsert(try HostProfile(displayName: "box", address: "198.51.100.5",
                                                services: [sshLink(), databaseLink()]))
         await model.load()
 
@@ -95,7 +95,7 @@ struct GlassShellTunnelHopTests {
         // capability is registered, which is the case in a bare test model, so it cannot tell a
         // correct choice from a refused one.
         let member = try #require(model.sshMember(of: host), "one machine, its own SSH service")
-        #expect(member.address == "10.0.0.5")
+        #expect(member.address == "198.51.100.5")
     }
 
     /// Two records for the same machine — the case grouping exists for — must still tunnel.
@@ -105,9 +105,9 @@ struct GlassShellTunnelHopTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = HostCatalogStore(fileURL: model.catalogFileURL)
-        try await store.upsert(try HostProfile(displayName: "dup", address: "10.0.0.7",
+        try await store.upsert(try HostProfile(displayName: "dup", address: "198.51.100.7",
                                                services: [databaseLink()]))
-        try await store.upsert(try HostProfile(displayName: "dup", address: "10.0.0.7",
+        try await store.upsert(try HostProfile(displayName: "dup", address: "198.51.100.7",
                                                services: [sshLink()]))
         await model.load()
 
@@ -117,7 +117,7 @@ struct GlassShellTunnelHopTests {
         #expect(host.members.count == 1)
         let member = try #require(model.sshMember(of: host),
                                   "same address, so the SSH service reaches the right machine")
-        #expect(member.address == "10.0.0.7")
+        #expect(member.address == "198.51.100.7")
     }
 
     /// Trust and the forward must choose the same member, or a user could approve a fingerprint
@@ -129,11 +129,11 @@ struct GlassShellTunnelHopTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = HostCatalogStore(fileURL: model.catalogFileURL)
-        // Dates set apart, as above, so 10.0.0.1 is the host's own machine on every run.
-        try await store.upsert(try HostProfile(displayName: "split", address: "10.0.0.1",
+        // Dates set apart, as above, so 198.51.100.1 is the host's own machine on every run.
+        try await store.upsert(try HostProfile(displayName: "split", address: "198.51.100.1",
                                                services: [databaseLink()],
                                                createdAt: Date(timeIntervalSince1970: 1_700_000_000)))
-        try await store.upsert(try HostProfile(displayName: "split", address: "10.0.0.99",
+        try await store.upsert(try HostProfile(displayName: "split", address: "198.51.100.99",
                                                services: [sshLink()],
                                                createdAt: Date(timeIntervalSince1970: 1_700_000_060)))
         await model.load()

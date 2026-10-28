@@ -146,13 +146,13 @@ struct GlassShellLocalHostTests {
         // A discovered machine named exactly like the device's host: grouping is by normalised
         // name, so this is the case that would silently swallow the local host if it went
         // through `GlassShellHostGrouping` like everything else.
-        _ = try await model.addHost(displayName: GlassLocalHost.displayName, address: "10.0.0.9")
+        _ = try await model.addHost(displayName: GlassLocalHost.displayName, address: "198.51.100.9")
         await model.load()
 
         #expect(model.hosts.count == 2)
         #expect(model.hosts.filter(\.isLocal).count == 1)
         let discovered = try #require(model.catalogHosts.first)
-        #expect(discovered.id != GlassLocalHost.id && discovered.address == "10.0.0.9")
+        #expect(discovered.id != GlassLocalHost.id && discovered.address == "198.51.100.9")
         #expect(model.localHost?.services.isEmpty == true, "the discovered machine's services stayed on it")
     }
 
@@ -163,7 +163,7 @@ struct GlassShellLocalHostTests {
         await model.load()
 
         await #expect(throws: GlassShellError.localHostHasNoAddress) {
-            try await model.setHostAddress("10.0.0.4", for: GlassLocalHost.id)
+            try await model.setHostAddress("198.51.100.4", for: GlassLocalHost.id)
         }
         #expect(model.localHost?.address == nil)
     }
@@ -268,7 +268,7 @@ struct GlassShellLocalHostTests {
         let setup = GlassShellSetupModel(model: model, mode: .editHost(local))
         #expect(setup.editedHost == nil, "the delete section is what editedHost drives")
 
-        let remote = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let remote = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         await model.load()
         let remoteHost = try #require(model.host(remote.id))
         #expect(GlassShellSetupModel(model: model, mode: .editHost(remoteHost)).editedHost != nil)
@@ -305,7 +305,7 @@ struct GlassShellLocalHostTests {
         registry.register(terminal)
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
         model.connectAll(hostID: host.id)
@@ -323,7 +323,7 @@ struct GlassShellLocalHostTests {
         registry.register(database)
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
-        let created = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let created = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         for name in ["Terminal", "Terminal 2", "Terminal 3"] {
             _ = try await model.addService(kind: .ssh, displayName: name, to: created.id)
         }

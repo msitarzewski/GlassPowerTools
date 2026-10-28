@@ -178,8 +178,8 @@ struct DatabaseConnectAbandonedMessageTests {
     @Test("Refused at an address the machine reaches: that address")
     func refusedElsewhere() {
         let message = DatabaseConnectionFailure.message(for: DatabaseConnectAbandoned.refused("Connection refused"),
-                                                        config: config(target: "10.0.0.7"))
-        #expect(message.contains("found nothing listening at 10.0.0.7:13306"), "\(message)")
+                                                        config: config(target: "198.51.100.7"))
+        #expect(message.contains("found nothing listening at 198.51.100.7:13306"), "\(message)")
         let through = DatabaseConnectionFailure.message(for: DatabaseConnectAbandoned.refused("Connection refused"),
                                                         config: config(through: UUID()))
         #expect(through.contains("found nothing listening at 203.0.113.5:13306"), "\(through)")

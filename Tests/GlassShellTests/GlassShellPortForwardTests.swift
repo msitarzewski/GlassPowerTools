@@ -67,11 +67,11 @@ struct GlassShellPortForwardTests {
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
         let access = model.hostAccess(for: host.id)
-        #expect(access.address == "10.0.0.9")
+        #expect(access.address == "198.51.100.9")
         #expect(access.canForwardPorts)
 
         let forward = try await access.forwardPort(port: 5_432)
@@ -93,9 +93,9 @@ struct GlassShellPortForwardTests {
 
         let app = try await model.addHost(displayName: "App", address: "203.0.113.5")
         let appTerminal = try await model.addService(kind: .ssh, displayName: "Terminal", to: app.id)
-        let db = try await model.addHost(displayName: "Production DB", address: "10.0.0.12")
+        let db = try await model.addHost(displayName: "Production DB", address: "198.51.100.12")
         _ = try await model.addService(kind: .database, displayName: "MySQL", to: db.id)
-        _ = try await model.addHost(displayName: "No terminal", address: "10.0.0.13")
+        _ = try await model.addHost(displayName: "No terminal", address: "198.51.100.13")
 
         let access = model.hostAccess(for: db.id)
         #expect(!access.canForwardPorts, "the database server has no Terminal of its own")
@@ -103,13 +103,13 @@ struct GlassShellPortForwardTests {
         #expect(access.tunnelChoices.first?.serviceID == appTerminal.endpointID)
         #expect(model.hostAccess(for: app.id).tunnelChoices.isEmpty, "a machine is not offered as its own way through")
 
-        _ = try await access.forwardPort(through: appTerminal.endpointID, toHost: "10.0.0.12", port: 3_306)
+        _ = try await access.forwardPort(through: appTerminal.endpointID, toHost: "198.51.100.12", port: 3_306)
         #expect(ssh.requests.count == 1)
-        #expect(ssh.requests[0].host == "App" && ssh.requests[0].remoteHost == "10.0.0.12" && ssh.requests[0].port == 3_306)
+        #expect(ssh.requests[0].host == "App" && ssh.requests[0].remoteHost == "198.51.100.12" && ssh.requests[0].port == 3_306)
 
         // A Terminal service that has gone is said plainly, not tunnelled somewhere else.
         await #expect(throws: GlassPortForwardError.self) {
-            _ = try await access.forwardPort(through: EndpointID(), toHost: "10.0.0.12", port: 3_306)
+            _ = try await access.forwardPort(through: EndpointID(), toHost: "198.51.100.12", port: 3_306)
         }
         #expect(ssh.requests.count == 1)
     }
@@ -121,7 +121,7 @@ struct GlassShellPortForwardTests {
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let host = try await model.addHost(displayName: "DBOnly", address: "10.0.0.10")
+        let host = try await model.addHost(displayName: "DBOnly", address: "198.51.100.10")
         _ = try await model.addService(kind: .database, displayName: "Postgres", to: host.id)
 
         let access = model.hostAccess(for: host.id)
@@ -133,7 +133,7 @@ struct GlassShellPortForwardTests {
     func noCapabilityMeansNoForward() async throws {
         let (model, root) = try makeModel(registry: GlassCapabilityRegistry())
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
         #expect(!model.hostAccess(for: host.id).canForwardPorts)
     }
@@ -144,7 +144,7 @@ struct GlassShellPortForwardTests {
         registry.register(SilentCapability())
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
         let access = model.hostAccess(for: host.id)
@@ -161,7 +161,7 @@ struct GlassShellPortForwardTests {
         registry.register(ssh)
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
         let access = model.hostAccess(for: host.id)
@@ -174,11 +174,11 @@ struct GlassShellPortForwardTests {
     func failuresPropagate() async throws {
         let registry = GlassCapabilityRegistry()
         let ssh = ForwardingCapability()
-        ssh.failure = GlassPortForwardError.hostNotTrusted(name: "10.0.0.9")
+        ssh.failure = GlassPortForwardError.hostNotTrusted(name: "198.51.100.9")
         registry.register(ssh)
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
         do {
@@ -189,7 +189,7 @@ struct GlassShellPortForwardTests {
                 Issue.record("wrong error: \(error)")
                 return
             }
-            #expect(name == "10.0.0.9")
+            #expect(name == "198.51.100.9")
             // The message sends the user somewhere real rather than saying "failed".
             #expect(error.errorDescription?.contains("Terminal service") == true)
         }
@@ -229,7 +229,7 @@ struct GlassShellPortForwardTests {
         registry.register(ssh)
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
         let forward = try await model.hostAccess(for: host.id).forwardPort(port: 3_306)

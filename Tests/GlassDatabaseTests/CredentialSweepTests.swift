@@ -54,7 +54,7 @@ struct CredentialSweepTests {
     private func config(engine: DatabaseEngineType = .mysql,
                         policy: CredentialStoragePolicy = .appOnly) -> DatabaseConnectionConfig {
         var connection = DatabaseConnectionConfig(
-            name: "fixture", engine: engine, host: "10.0.0.1", port: 3306,
+            name: "fixture", engine: engine, host: "198.51.100.1", port: 3306,
             username: "u", defaultDatabase: "d")
         connection.databaseCredentialPolicy = policy
         return connection

@@ -209,11 +209,11 @@ struct GlassShellSetupTests {
         #expect(!setup.showsOrganizeSection)
         #expect(await setup.save() == nil && setup.hostIssue(.address) != nil, "a service needs the machine's address")
 
-        setup.address = "10.0.0.9"
+        setup.address = "198.51.100.9"
         let id = try #require(await setup.save())
         let host = try #require(model.host(id))
-        #expect(host.address == "10.0.0.9" && host.services.map(\.kind) == [.ssh])
-        #expect(ssh.made.first?.commits.first?.2 == "10.0.0.9")
+        #expect(host.address == "198.51.100.9" && host.services.map(\.kind) == [.ssh])
+        #expect(ssh.made.first?.commits.first?.2 == "198.51.100.9")
 
         // With an address the host fields are locked and Save goes straight to the commit.
         let again = GlassShellSetupModel(model: model, mode: .addService(host, .ssh))

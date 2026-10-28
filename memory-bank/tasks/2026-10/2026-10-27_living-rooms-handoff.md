@@ -314,3 +314,79 @@ is a SwiftUI attachment of the space's `RealityView` (`FocusRoomDigitalClockView
   October 27" at 22:09; the orb's place orange in four of eight captures 2 s apart and bare wall in the others; the log
   names both anchors.
 - Not seen: the loft, which has neither a `clock_digital` nor events yet (the asset side's to add); the headset.
+
+## Phase 3, fulfilled by the asset (2026-10-27, late evening, the GlassSpaceMaker session)
+The `Loft.usdz` in the owner's Downloads (72.6 MB, sha256 begins `057c19eb7de808a1`, `usdchecker --arkit` passes) now carries the anchors below, and
+the `Loft.events/` beside it the events; both are also in iCloud Drive ▸ Glass Power Tools ▸ Environments beside
+`Loft.sounds/` (unchanged). `snd_clock` moved to the wall clock's new place. Verified with `usdrecord` from the seat,
+with each event referenced under its anchor: the plate stands upright on the header, the flock crosses mid-view, the
+airship slides level across the left bay, the streak falls above Midtown.
+
+**Two rules for anyone building a room in Blender.** (1) Blender bakes the Z-up to Y-up turn into the root of every file
+it exports, so an event file dropped under a plain empty would lie on its side: every anchor is tilted into a Y-up frame
+of its own, `rotateXYZ (90, 0, psi)` in the room's frame, so that its local +Y is up and its local +Z faces
+`(sin psi, -cos psi)` in the room (x east, y north); an event authored moving along its own +X then moves along
+`(cos psi, sin psi)`. The test room's anchors, written by RealityKit, need no tilt. (2) From the seat the ceiling line
+hides the sky above about 20° at the north glass and 14° at the west glass, so sky events sit at 8–16° up.
+
+| Anchor | Room position x, y, z (m) | psi | What happens there |
+|---|---|---|---|
+| `clock_digital` | 0, 4.90, 3.30 | 0 (faces south, into the room) | the time-and-date panel, on the steel header above the centre bay of the north glass; scale 1, so 0.5 m wide, 5 m from the seat, 19° up |
+| `event_sky_north` | 0, 70, 20 | 0 | the flock crossing the north view eastward, 70 m out |
+| `event_sky_west` | -70, 0, 15 | -90 | the flock crossing the west view southward |
+| `event_far_nw` | -1200, 1600, 320 | 0 | the airship, far out over the city, moving east |
+| `event_far_n` | 600, 2600, 380 | 180 | the airship moving west |
+| `event_sky_high_n` | -400, 3000, 650 | 20 | the meteor streak over Midtown, about 12° up |
+| `event_sky_high_w` | -2500, 1500, 500 | -50 | the meteor streak over the Hudson, about 10° up |
+
+`Loft.events/events.json`, as shipped (files built by `events.py` in the GlassSpaceMaker scratchpad, each `usdchecker --arkit` clean):
+
+```json
+{
+  "version": 1,
+  "events": [
+    {
+      "id": "flock",
+      "file": "flock.usdz",
+      "anchors": [
+        "event_sky_north",
+        "event_sky_west"
+      ],
+      "every": [
+        240,
+        720
+      ]
+    },
+    {
+      "id": "blimp",
+      "file": "blimp.usdz",
+      "anchors": [
+        "event_far_nw",
+        "event_far_n"
+      ],
+      "every": [
+        1200,
+        3000
+      ]
+    },
+    {
+      "id": "meteor",
+      "file": "meteor.usdz",
+      "anchors": [
+        "event_sky_high_n",
+        "event_sky_high_w"
+      ],
+      "every": [
+        600,
+        1800
+      ]
+    }
+  ]
+}
+```
+
+- `flock.usdz` (459 KB, 12 s): 24 starlings, dark pre-lit silhouettes with a blend-shape flap, 160 m in 12 s in a cloud that breathes.
+- `blimp.usdz` (176 KB, 120 s): a 60 m airship with a lit flank sign and nav lights, 1.4 km in two minutes, nose along its path.
+- `meteor.usdz` (4 KB, 1.5 s): a 300 m streak falling for two thirds of a second, then scaled away.
+- Pre-lit as the loft's own movers: black metallic base with the look in the emission, so they are the same under any lighting.
+- `every` is the wait before each showing, so the first airship comes 20–50 minutes in; the flock 4–12 minutes.

@@ -308,7 +308,7 @@ struct HostCatalogTombstoneMergeTests {
     }
 
     private func alpha(deletedAt: Date?, updatedAt: Date, id: HostID = HostID()) throws -> HostProfile {
-        try HostProfile(id: id, displayName: "alpha", address: "10.0.0.1",
+        try HostProfile(id: id, displayName: "alpha", address: "198.51.100.1",
                         services: deletedAt == nil ? [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")] : [],
                         createdAt: Date(timeIntervalSince1970: 1), updatedAt: updatedAt, deletedAt: deletedAt)
     }

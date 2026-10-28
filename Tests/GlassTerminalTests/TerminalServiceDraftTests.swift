@@ -67,20 +67,20 @@ struct TerminalServiceDraftTests {
         let (servers, settings, suite) = managers()
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         let draft = TerminalServiceDraft(serverManager: servers, settingsManager: settings)
-        var issues = draft.validate(address: "10.0.0.1")
+        var issues = draft.validate(address: "198.51.100.1")
         #expect(issues.map(\.field) == ["username", "password"], "password is the default method")
         draft.username = "u"
         draft.authMethod = .sshKey
-        issues = draft.validate(address: "10.0.0.1")
+        issues = draft.validate(address: "198.51.100.1")
         #expect(issues.map(\.field) == ["sshKey"], "no key in the catalog: the key is the issue")
         let key = StoredSSHKey(name: "k", algorithm: "ssh-ed25519")
         settings.sshKeys = [key]
         draft.normalizeSelectedSSHKey()
         #expect(draft.sshKeyID == key.id, "the only key is selected")
-        #expect(draft.validate(address: "10.0.0.1").isEmpty)
+        #expect(draft.validate(address: "198.51.100.1").isEmpty)
         draft.port = "70000"
-        #expect(draft.validate(address: "10.0.0.1").map(\.field) == ["port"])
-        draft.focusFirstIssue(draft.validate(address: "10.0.0.1"))
+        #expect(draft.validate(address: "198.51.100.1").map(\.field) == ["port"])
+        draft.focusFirstIssue(draft.validate(address: "198.51.100.1"))
         #expect(draft.attemptedSave && draft.focusRequest == .port)
     }
 

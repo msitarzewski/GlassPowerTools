@@ -107,9 +107,9 @@ struct D26RelaunchTests {
         await model2.load()
         let manager2 = runtime2.sessionManager.serverManager
         let second = try await model2.adoptService(kind: .ssh, hostName: "bravo",
-                                                   address: "10.0.0.9", serviceName: "Terminal")
+                                                   address: "198.51.100.9", serviceName: "Terminal")
         let another = ServerConfiguration(id: second.rawValue, name: "Terminal on bravo",
-                                          host: "10.0.0.9", port: 22, username: "casey",
+                                          host: "198.51.100.9", port: 22, username: "casey",
                                           authMethod: .sshKey)
         try await manager2.addServerOrThrow(another)
 

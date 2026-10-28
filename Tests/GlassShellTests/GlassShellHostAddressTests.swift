@@ -68,14 +68,14 @@ struct GlassShellHostAddressTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let ssh = AddressAwareCapability(kind: .ssh), rdp = AddressAwareCapability(kind: .rdp)
         model.registry.register(ssh); model.registry.register(rdp)
-        let host = try await model.addHost(displayName: "box", address: "10.0.0.1")
+        let host = try await model.addHost(displayName: "box", address: "198.51.100.1")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
-        try await model.updateHost(host.id, displayName: "box", address: "10.0.0.2", aliases: [], tags: [])
-        #expect(ssh.addressChanges.map(\.1) == ["10.0.0.2"], "the ssh capability owns a service on the record")
+        try await model.updateHost(host.id, displayName: "box", address: "198.51.100.2", aliases: [], tags: [])
+        #expect(ssh.addressChanges.map(\.1) == ["198.51.100.2"], "the ssh capability owns a service on the record")
         #expect(rdp.addressChanges.isEmpty, "no rdp service on the host: nothing to update")
 
-        try await model.updateHost(host.id, displayName: "box renamed", address: "10.0.0.2", aliases: ["b"], tags: ["Lab"])
+        try await model.updateHost(host.id, displayName: "box renamed", address: "198.51.100.2", aliases: ["b"], tags: ["Lab"])
         #expect(ssh.addressChanges.count == 1, "an unchanged address is not announced")
 
         try await model.updateHost(host.id, displayName: "box renamed", address: "", aliases: [], tags: [])
@@ -98,7 +98,7 @@ struct GlassShellHostAddressTests {
         // what it has; nothing in this app prompts for a setup on connect.
         let foreign = try await model.addHost(displayName: "foreign")
         let saved = try await model.addService(kind: .ssh, displayName: "Terminal", to: foreign.id)
-        ssh.savedAddresses[saved.endpointID] = "10.0.0.5"
+        ssh.savedAddresses[saved.endpointID] = "198.51.100.5"
         model.connect(hostID: foreign.id, endpointID: saved.endpointID)
         #expect(ssh.openedWith.count == 2)
         #expect(model.errorMessage == nil)
@@ -113,21 +113,21 @@ struct GlassShellHostAddressTests {
         let host = try await model.addHost(displayName: "old")
         let saved = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
         let pending = try await model.addService(kind: .ssh, displayName: "Second terminal", to: host.id)
-        ssh.savedAddresses[saved.endpointID] = "10.0.0.7"
+        ssh.savedAddresses[saved.endpointID] = "198.51.100.7"
         #expect(model.host(host.id)?.address == nil)
 
         await model.load()
-        #expect(model.host(host.id)?.address == "10.0.0.7", "adopted from the saved record on load")
+        #expect(model.host(host.id)?.address == "198.51.100.7", "adopted from the saved record on load")
 
         // Connecting the other service hands the capability the adopted address.
         model.connect(hostID: host.id, endpointID: pending.endpointID)
-        #expect(ssh.openedWith.map(\.address) == ["10.0.0.7"])
+        #expect(ssh.openedWith.map(\.address) == ["198.51.100.7"])
 
         // Disagreeing records are not guessed at.
         let torn = try await model.addHost(displayName: "torn")
         let a = try await model.addService(kind: .ssh, displayName: "A", to: torn.id)
         let b = try await model.addService(kind: .ssh, displayName: "B", to: torn.id)
-        ssh.savedAddresses[a.endpointID] = "10.1.0.1"; ssh.savedAddresses[b.endpointID] = "10.1.0.2"
+        ssh.savedAddresses[a.endpointID] = "198.51.100.101"; ssh.savedAddresses[b.endpointID] = "198.51.100.102"
         await model.load()
         #expect(model.host(torn.id)?.address == nil, "two different saved addresses: left for the user")
         #expect(model.knownAddress(for: try #require(model.host(torn.id))) == nil)
@@ -138,18 +138,18 @@ struct GlassShellHostAddressTests {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         let sibling = HostCatalogStore(fileURL: root.appendingPathComponent("group/GlassHostCatalog/hosts.json"))
-        let a = try HostProfile(displayName: "Terminal box", address: "10.9.9.9",
+        let a = try HostProfile(displayName: "Terminal box", address: "198.51.100.199",
                                 services: [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")],
                                 createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1))
-        let b = try HostProfile(displayName: "Desktop box", address: "10.9.9.9",
+        let b = try HostProfile(displayName: "Desktop box", address: "198.51.100.199",
                                 services: [HostServiceLink(endpointID: EndpointID(), kind: .rdp, displayName: "d")],
                                 createdAt: Date(timeIntervalSince1970: 2), updatedAt: Date(timeIntervalSince1970: 2))
         let loop1 = try HostProfile(displayName: "Local A", address: "127.0.0.1")
         let loop2 = try HostProfile(displayName: "Local B", address: "127.0.0.1")
         // Same name, different addresses: grouped by name, and the disagreement is visible.
-        let c1 = try HostProfile(displayName: "drift", address: "10.1.1.1",
+        let c1 = try HostProfile(displayName: "drift", address: "198.51.100.111",
                                  createdAt: Date(timeIntervalSince1970: 3), updatedAt: Date(timeIntervalSince1970: 3))
-        let c2 = try HostProfile(displayName: "drift", address: "10.1.1.2",
+        let c2 = try HostProfile(displayName: "drift", address: "198.51.100.112",
                                  createdAt: Date(timeIntervalSince1970: 4), updatedAt: Date(timeIntervalSince1970: 4))
         for record in [a, b, loop1, loop2, c1, c2] { try await sibling.upsert(record) }
         await model.load()
@@ -157,17 +157,17 @@ struct GlassShellHostAddressTests {
         let grouped = try #require(model.host(a.id))
         // Two records that agree on the address are one record after load, not a lasting group
         // (2026-09-21); `b` is folded into `a`, and `b.id` still resolves to it.
-        #expect(grouped.members.map(\.id) == [b.id] && grouped.address == "10.9.9.9" && grouped.addresses == ["10.9.9.9"],
+        #expect(grouped.members.map(\.id) == [b.id] && grouped.address == "198.51.100.199" && grouped.addresses == ["198.51.100.199"],
                 "the most recently updated member survives the fold")
         #expect(grouped.services.count == 2)
         #expect(model.host(a.id)?.id == b.id)
 
         let drift = try #require(model.host(c1.id))
-        #expect(drift.addresses == ["10.1.1.1", "10.1.1.2"] && drift.address == "10.1.1.1", "canonical first; both surfaced")
-        try await model.updateHost(drift.id, displayName: "drift", address: "10.1.1.2", aliases: [], tags: [])
+        #expect(drift.addresses == ["198.51.100.111", "198.51.100.112"] && drift.address == "198.51.100.111", "canonical first; both surfaced")
+        try await model.updateHost(drift.id, displayName: "drift", address: "198.51.100.112", aliases: [], tags: [])
         let settled = try #require(model.host(c1.id))
-        #expect(settled.addresses == ["10.1.1.2"], "one edit applies to every member record")
-        #expect(try await sibling.snapshot().filter { $0.displayName == "drift" }.allSatisfy { $0.address == "10.1.1.2" })
+        #expect(settled.addresses == ["198.51.100.112"], "one edit applies to every member record")
+        #expect(try await sibling.snapshot().filter { $0.displayName == "drift" }.allSatisfy { $0.address == "198.51.100.112" })
     }
 }
 

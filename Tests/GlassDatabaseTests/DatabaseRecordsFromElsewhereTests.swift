@@ -42,12 +42,12 @@ struct DatabaseRecordsFromElsewhereTests {
 
         // Another device gives Web its address; it arrives here through sync.
         var addressed = web
-        addressed.tunnelTargetHost = "10.0.0.7"
+        addressed.tunnelTargetHost = "198.51.100.7"
         try put(addressed, in: store)
 
         await manager.updateLastConnected(staging.id)
 
-        #expect(try stored(store, web.id)?.tunnelTargetHost == "10.0.0.7", "an older copy went back over the newer one")
+        #expect(try stored(store, web.id)?.tunnelTargetHost == "198.51.100.7", "an older copy went back over the newer one")
         #expect(try stored(store, staging.id)?.lastConnected != nil)
     }
 

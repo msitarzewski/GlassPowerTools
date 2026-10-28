@@ -31,8 +31,13 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-10-27 — RESUME HERE: the orb dock's ninth to thirteenth rounds, the terminal redraw storm, and living rooms committed (0.4.535–0.4.541)
-- **Committed 2026-10-27 at his word ("Commit this and update the memory bank"), not pushed:** the dock's ninth round
+## 2026-10-27 — RESUME HERE: the orb dock's ninth to thirteenth rounds, the terminal redraw storm, and living rooms committed and pushed (0.4.535–0.4.541)
+- **Pushed 2026-10-27 at his word ("push it"):** eight commits, `dcad5dcb`…`61a3bd0f` (0.4.495–0.4.541), each scanned for
+  private names and addresses first. Then, at his word, the tests' private-range example addresses (`10.x`) became
+  documentation-range ones (`198.51.100.x`, which no test there used), except where a test needs an address on the
+  local network (the Local Network checks: `10.0.0.20`, `10.20.30.40`, beside `172.16.x` and `192.168.x`); and this
+  block's "not pushed" was put right.
+- **Committed 2026-10-27 at his word ("Commit this and update the memory bank"):** the dock's ninth round
   (0.4.535: orbs that wrap, names that turn, a scroll that always scrolls, Connections larger with a hold menu, windows
   beside a tall dock, docked pictures across a relaunch, Auto-focus on Activity on by default) and tenth (0.4.536: the
   crash on a vertical resize, the snap to whole rows, the hold menu that never opened, the tall dock's side from Focus
@@ -54,9 +59,8 @@ use the disposable test VM only).
 - **And a diagram's mark, after 0.4.539 (not on devices yet):** the UI suite around the redraw fix found
   `testADiagramHasAMarkThatShowsIt` failing with and without it: a diagram printed before its window opened was never
   looked for. `SwiftTermHostModel.flushPending` looks once queued output lands; the test passes.
-- **0.4.538, 0.4.539 and the diagram fix committed 2026-10-27 at his word ("commit this and update the memory bank"),
-  not pushed.**
-- **Then living rooms (D89), 0.4.540, committed at his word, not pushed:** the GlassSpaceMaker session's handoff built
+- **0.4.538, 0.4.539 and the diagram fix committed 2026-10-27 at his word ("commit this and update the memory bank").**
+- **Then living rooms (D89), 0.4.540, committed at his word:** the GlassSpaceMaker session's handoff built
   (a room's motion, a clock on the headset's time, sound from `<Room>.sounds/`, Room Sound); the fixed loft put in
   his iCloud Environments; on the headset: "holy shit it works~!!!". Mac, iPhone and headset run 0.4.540, each read
   back. `tasks/2026-10/2026-10-27_living-rooms-handoff.md`.
@@ -382,7 +386,7 @@ test audit, with 0.4.522 on 2026-10-25. Not pushed. The "not committed" notes be
 - **Connection Details show where the tunnel goes, 0.4.517 (his "yes, show where the tunnel really goes").** The
   overview's Endpoint was `host:port`, the machine's own address, even for a tunnel on to a Database address — so
   the lost address could not be seen there. One rule now, `DatabaseConnectionConfig.reachedHost` (the address
-  `forwardProvider` aims at; nil = the machine's loopback), feeds `endpointDescription` ("10.0.0.12:13306", or
+  `forwardProvider` aims at; nil = the machine's loopback), feeds `endpointDescription` ("198.51.100.12:13306", or
   "Port N on this machine"), the tunnel's aim, and both failure wordings. The Tunnel row names the machine a
   tunnel goes through (`runtime.tunnelAccess` choices, as the setup sheet finds it); it said "this machine's" for
   both routes. Test `endpointIsWhereTheConnectionEnds` failed 3 ways on the old wording; database suite 350 pass.

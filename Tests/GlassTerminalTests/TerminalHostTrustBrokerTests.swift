@@ -18,7 +18,7 @@ import GlassSSHTransport
 @Suite("Host trust broker", .timeLimit(.minutes(1)))
 struct TerminalHostTrustBrokerTests {
 
-    private func challenge(host: String = "10.0.0.9",
+    private func challenge(host: String = "198.51.100.9",
                            reason: SSHHostTrustReason = .unknown) -> SSHHostTrustChallenge {
         SSHHostTrustChallenge(host: host, port: 22, algorithm: "ssh-ed25519",
                               fingerprintSHA256: "AAAA", keyDataBase64: "AAAA", reason: reason)

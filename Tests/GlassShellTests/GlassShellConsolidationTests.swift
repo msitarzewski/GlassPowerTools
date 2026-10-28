@@ -77,12 +77,12 @@ struct GlassShellConsolidationTests {
     func aliasOverlapGroups() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        try await sibling.upsert(try record("Alpha Foxtrot", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0))
-        try await sibling.upsert(try record("bravo-desktop", aliases: ["10.0.0.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
+        try await sibling.upsert(try record("Alpha Foxtrot", aliases: ["198.51.100.5"], kinds: [.ssh], createdAt: t0))
+        try await sibling.upsert(try record("bravo-desktop", aliases: ["198.51.100.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
         await model.load()
         #expect(model.catalogHosts.count == 1)
         #expect(model.catalogHosts.first?.services.count == 2)
-        #expect(model.catalogHosts.first?.aliases == ["10.0.0.5"])
+        #expect(model.catalogHosts.first?.aliases == ["198.51.100.5"])
     }
 
     @Test("Unrelated names stay separate, and loopback aliases never group")
@@ -233,7 +233,7 @@ struct GlassShellConsolidationTests {
     func consolidateMergesInCatalog() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let older = try record("bravo", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0)
+        let older = try record("bravo", aliases: ["198.51.100.5"], kinds: [.ssh], createdAt: t0)
         let newer = try record("bravo", aliases: ["bravo.local"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         await model.load()
@@ -242,7 +242,7 @@ struct GlassShellConsolidationTests {
         #expect(stored.count == 1)
         #expect(stored.first?.id == newer.id, "the most recently updated member survives")
         #expect(stored.first?.services.count == 2)
-        #expect(Set(stored.first?.aliases ?? []) == ["10.0.0.5", "bravo.local"])
+        #expect(Set(stored.first?.aliases ?? []) == ["198.51.100.5", "bravo.local"])
         #expect(model.catalogHosts.count == 1 && model.records.count == 1)
     }
 
@@ -392,10 +392,10 @@ struct GlassShellAutoConsolidationTests {
         }
         let terminal = Removing()
         model.registry.register(terminal)
-        let a = try HostProfile(displayName: "alpha", address: "10.0.0.9",
+        let a = try HostProfile(displayName: "alpha", address: "198.51.100.9",
                                 services: [link(.ssh, "Terminal on alpha", id: "AAAAAAAA-0000-0000-0000-000000000001")],
                                 createdAt: t0, updatedAt: t0)
-        let b = try HostProfile(displayName: "alpha", address: "10.0.0.9",
+        let b = try HostProfile(displayName: "alpha", address: "198.51.100.9",
                                 services: [link(.ssh, "terminal on ALPHA", id: "BBBBBBBB-0000-0000-0000-000000000001")],
                                 createdAt: t0.addingTimeInterval(1), updatedAt: t0.addingTimeInterval(1))
         try await sibling.upsert(a); try await sibling.upsert(b)
@@ -448,18 +448,18 @@ struct GlassShellFoldTargetTests {
     @Test func theMostRecentlyUpdatedMemberSurvives() throws {
         // Oldest created, but most recently updated: this is alpha on 2026-09-21 — the Mac's
         // record, touched on the 18th, while older duplicates were tombstones elsewhere.
-        let stale = try HostProfile(displayName: "alpha", address: "10.0.0.1",
+        let stale = try HostProfile(displayName: "alpha", address: "198.51.100.1",
                                     createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100))
-        let touched = try HostProfile(displayName: "alpha", address: "10.0.0.1",
+        let touched = try HostProfile(displayName: "alpha", address: "198.51.100.1",
                                       createdAt: Date(timeIntervalSince1970: 50), updatedAt: Date(timeIntervalSince1970: 900))
         #expect(GlassShellModel.foldTarget(among: [stale, touched]).id == touched.id)
         #expect(GlassShellModel.foldTarget(among: [touched, stale]).id == touched.id, "order of arrival is irrelevant")
     }
 
     @Test func anEmptyRecordNeverWinsOverOneWithServices() throws {
-        let empty = try HostProfile(displayName: "alpha", address: "10.0.0.1",
+        let empty = try HostProfile(displayName: "alpha", address: "198.51.100.1",
                                     createdAt: Date(timeIntervalSince1970: 900), updatedAt: Date(timeIntervalSince1970: 900))
-        let carrying = try HostProfile(displayName: "alpha", address: "10.0.0.1",
+        let carrying = try HostProfile(displayName: "alpha", address: "198.51.100.1",
                                        services: [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")],
                                        createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100))
         #expect(GlassShellModel.foldTarget(among: [empty, carrying]).id == carrying.id,
@@ -468,10 +468,10 @@ struct GlassShellFoldTargetTests {
 
     @Test func aTieGoesToTheSmallestID() throws {
         let a = try HostProfile(id: HostID(rawValue: UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000000")!),
-                                displayName: "alpha", address: "10.0.0.1",
+                                displayName: "alpha", address: "198.51.100.1",
                                 createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1))
         let b = try HostProfile(id: HostID(rawValue: UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000000")!),
-                                displayName: "alpha", address: "10.0.0.1",
+                                displayName: "alpha", address: "198.51.100.1",
                                 createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1))
         #expect(GlassShellModel.foldTarget(among: [b, a]).id == a.id)
     }

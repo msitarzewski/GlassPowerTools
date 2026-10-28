@@ -63,8 +63,8 @@ struct GlassActiveConnectionsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
         let bravoTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
-        try await store.upsert(try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal]))
-        try await store.upsert(try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [bravoTerminal]))
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "198.51.100.1", services: [alphaTerminal]))
+        try await store.upsert(try HostProfile(displayName: "bravo", address: "198.51.100.2", services: [bravoTerminal]))
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
         terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID])]
         terminal.running = [running("tmux:glass-2", on: alphaTerminal.endpointID),
@@ -96,7 +96,7 @@ struct GlassActiveConnectionsTests {
         let (model, root, store) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
-        try await store.upsert(try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal]))
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "198.51.100.1", services: [alphaTerminal]))
         final class Holder { var holds = true }
         let holder = Holder()
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
@@ -277,8 +277,8 @@ struct GlassActiveConnectionsTests {
         let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
         let alphaDatabase = HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on alpha")
         let foxtrotTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
-        let alpha = try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal, alphaDatabase])
-        let foxtrot = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [foxtrotTerminal])
+        let alpha = try HostProfile(displayName: "alpha", address: "198.51.100.1", services: [alphaTerminal, alphaDatabase])
+        let foxtrot = try HostProfile(displayName: "bravo", address: "198.51.100.2", services: [foxtrotTerminal])
         try await store.upsert(alpha); try await store.upsert(foxtrot)
 
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
@@ -309,9 +309,9 @@ struct GlassActiveConnectionsTests {
         let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
         let alphaDatabase = HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on alpha")
         let bravoDesktop = HostServiceLink(endpointID: EndpointID(), kind: .rdp, displayName: "Desktop on bravo")
-        let alpha = try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal, alphaDatabase])
-        let bravo = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [bravoDesktop])
-        let empty = try HostProfile(displayName: "charlie", address: "10.0.0.3", services: [])
+        let alpha = try HostProfile(displayName: "alpha", address: "198.51.100.1", services: [alphaTerminal, alphaDatabase])
+        let bravo = try HostProfile(displayName: "bravo", address: "198.51.100.2", services: [bravoDesktop])
+        let empty = try HostProfile(displayName: "charlie", address: "198.51.100.3", services: [])
         try await store.upsert(alpha); try await store.upsert(bravo); try await store.upsert(empty)
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
         terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID])]

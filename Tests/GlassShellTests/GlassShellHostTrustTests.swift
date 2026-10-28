@@ -63,7 +63,7 @@ struct GlassShellHostTrustTests {
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
 
         #expect(await model.hostAccess(for: host.id).resolveHostTrust() == .trusted)
@@ -79,7 +79,7 @@ struct GlassShellHostTrustTests {
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
         #expect(await model.hostAccess(for: host.id).resolveHostTrust() == .declined)
     }
@@ -91,7 +91,7 @@ struct GlassShellHostTrustTests {
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let host = try await model.addHost(displayName: "DBOnly", address: "10.0.0.10")
+        let host = try await model.addHost(displayName: "DBOnly", address: "198.51.100.10")
         _ = try await model.addService(kind: .database, displayName: "Postgres", to: host.id)
         #expect(await model.hostAccess(for: host.id).resolveHostTrust() == .unavailable)
     }
@@ -100,7 +100,7 @@ struct GlassShellHostTrustTests {
     func noCapabilityIsUnavailable() async throws {
         let (model, root) = try makeModel(registry: GlassCapabilityRegistry())
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
         #expect(await model.hostAccess(for: host.id).resolveHostTrust() == .unavailable)
     }
@@ -112,7 +112,7 @@ struct GlassShellHostTrustTests {
         let (model, root) = try makeModel(registry: registry)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let host = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let host = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
         #expect(await model.hostAccess(for: host.id).resolveHostTrust() == .unavailable)
     }
@@ -125,13 +125,13 @@ struct GlassShellHostTrustTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         // No SSH service: neither is possible, so the sheet cannot promise what connect cannot do.
-        let dbOnly = try await model.addHost(displayName: "DBOnly", address: "10.0.0.10")
+        let dbOnly = try await model.addHost(displayName: "DBOnly", address: "198.51.100.10")
         _ = try await model.addService(kind: .database, displayName: "Postgres", to: dbOnly.id)
         let dbAccess = model.hostAccess(for: dbOnly.id)
         #expect(!dbAccess.canForwardPorts)
         #expect(await dbAccess.resolveHostTrust() == .unavailable)
 
-        let box = try await model.addHost(displayName: "Box", address: "10.0.0.9")
+        let box = try await model.addHost(displayName: "Box", address: "198.51.100.9")
         _ = try await model.addService(kind: .ssh, displayName: "Terminal", to: box.id)
         let boxAccess = model.hostAccess(for: box.id)
         #expect(boxAccess.canForwardPorts)

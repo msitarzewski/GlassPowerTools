@@ -38,14 +38,14 @@ struct GlassServiceRecordsChangedFromTests {
     @Test func aRecordNotChangedKeepsAFieldThisBuildDoesNotKnow() async throws {
         let store = GlassInMemoryServiceStore(defaultKind: .rdp)
         let kept = UUID(), edited = UUID()
-        put(#"{"id":"\#(kept.uuidString)","name":"alpha","address":"10.0.0.7"}"#, kept, in: store)
+        put(#"{"id":"\#(kept.uuidString)","name":"alpha","address":"198.51.100.7"}"#, kept, in: store)
         put(#"{"id":"\#(edited.uuidString)","name":"bravo"}"#, edited, in: store)
         let base = Array(records(store).all().values)
 
         let changed = base.map { $0.id == edited ? Record(id: edited, name: "bravo, renamed") : $0 }
         try await records(store).replaceAll(with: changed, changedFrom: base)
 
-        #expect(object(store, kept)?["address"] == "10.0.0.7", "re-encoded by a build without the field, and written")
+        #expect(object(store, kept)?["address"] == "198.51.100.7", "re-encoded by a build without the field, and written")
         #expect(object(store, edited)?["name"] == "bravo, renamed")
     }
 
