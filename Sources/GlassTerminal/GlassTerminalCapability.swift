@@ -1535,11 +1535,11 @@ final class GlassTerminalDirectoryLister: GlassHostDirectoryLister {
     }
 
     /// The editor's `git` for a project here (2026-10-23): an exec channel on this connection,
-    /// counted against the server's sessions as the terminal's commands are (W21). A minute is
-    /// longer than any status or diff should take; a slower one is a machine in trouble.
-    func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+    /// counted against the server's sessions as the terminal's commands are (W21), given at most
+    /// `timeLimit`.
+    func runCommand(_ command: String, timeLimit: Duration) async throws -> GlassHostCommandOutput {
         guard let transport else { throw GlassPortForwardError.unavailable }
-        let output = try await transport.run(command, maxResponseBytes: Self.commandOutputCeiling, timeout: .seconds(60))
+        let output = try await transport.run(command, maxResponseBytes: Self.commandOutputCeiling, timeout: timeLimit)
         return GlassHostCommandOutput(exitStatus: output.exitStatus,
                                       standardOutput: output.standardOutput,
                                       standardError: output.standardError)

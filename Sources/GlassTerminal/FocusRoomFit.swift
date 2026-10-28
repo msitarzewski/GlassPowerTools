@@ -196,6 +196,16 @@ nonisolated enum FocusLocomotion {
     static let reach = 20.0
     /// A surface this level or more can be stood on.
     static let levelEnough = 0.6
+    /// How far above or below the floor a surface may be and still be the floor: a rug, a threshold.
+    static let floorTolerance = 0.12
+
+    /// Whether a pinch may land on a surface: level, and the floor — never a desk's top, a shelf, a
+    /// bed or a step (the owner, 2026-10-28: "we need to enforce a 'floor only' locomotion.
+    /// Sometimes I get moved to the top of the desk surface"). `height` and `floor` in the same
+    /// frame, metres.
+    static func canLand(normalY: Double, height: Double, floor: Double) -> Bool {
+        normalY >= levelEnough && abs(height - floor) <= floorTolerance
+    }
 
     /// The heading of a horizontal direction.
     static func heading(dx: Double, dz: Double) -> Double { atan2(-dx, -dz) }

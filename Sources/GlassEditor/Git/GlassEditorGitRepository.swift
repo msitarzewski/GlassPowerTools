@@ -416,6 +416,136 @@ public final class GlassEditorGitRepository {
         await settled()
     }
 
+    // MARK: The remote (the owner, 2026-10-28: "build the git integration into the editor as we'd
+    // planned": push and pull were what was left)
+
+    /// A push, a pull or a fetch under way.
+    public enum NetworkAction: Sendable, Equatable {
+        case fetching, pulling, pushing
+
+        public var words: String {
+            switch self {
+            case .fetching: "Fetching…"
+            case .pulling: "Pulling…"
+            case .pushing: "Pushing…"
+            }
+        }
+    }
+
+    public private(set) var networkAction: NetworkAction?
+
+    /// Whether a push has something to send: commits the upstream doesn't have, or a branch it
+    /// doesn't have yet.
+    public var canPush: Bool { status.branch != nil && (status.upstream == nil || status.ahead > 0) }
+    /// Whether there is an upstream to pull from or fetch.
+    public var canPull: Bool { status.upstream != nil }
+
+    /// Asks the remote what it has, so ahead and behind are current.
+    public func fetch() async {
+        await network(.fetching, GlassEditorGitCommand.fetch, doing: "fetch")
+    }
+
+    /// Takes the upstream's commits when the branch can simply move up to them, and answers the
+    /// files that changed, as paths in the project, for open ones to be read again.
+    public func pull() async -> [String] {
+        // What the branch is now, not when git was last asked.
+        await refreshed()
+        let before = status.commit
+        guard await network(.pulling, GlassEditorGitCommand.pull, doing: "pull"),
+              let before, let after = status.commit, before != after,
+              let changed = try? await runner.git(GlassEditorGitCommand.changed(from: before, to: after), in: projectPath),
+              changed.succeeded else { return [] }
+        return changed.standardOutput.split(separator: 0)
+            .compactMap { absolutePath(String(decoding: $0, as: UTF8.self)) }
+    }
+
+    /// Sends the branch's commits to its upstream; a branch with none is published to the remote
+    /// (`origin`, or the only one there is) and follows it from then on.
+    public func push() async {
+        // Whether the branch has an upstream now, not when git was last asked.
+        await refreshed()
+        guard status.upstream == nil else {
+            await network(.pushing, GlassEditorGitCommand.push, doing: "push")
+            return
+        }
+        guard let branch = status.branch else {
+            actionProblem = "There's no branch to push: this is a commit on its own (a detached HEAD). Make a branch in a terminal (git switch -c name), then push."
+            return
+        }
+        let names = (try? await runner.git(GlassEditorGitCommand.remotes, in: projectPath))
+            .map { String(decoding: $0.standardOutput, as: UTF8.self).split(whereSeparator: \.isNewline).map(String.init) } ?? []
+        guard let remote = names.contains("origin") ? "origin" : (names.count == 1 ? names.first : nil) else {
+            actionProblem = names.isEmpty
+                ? "This repository has no remote to push to. Add one in a terminal (git remote add origin <address>), then push."
+                : "This repository has several remotes and none is origin. Push \(branch) once in a terminal (git push -u <remote> \(branch)), then push from here."
+            return
+        }
+        await network(.pushing, GlassEditorGitCommand.publish(branch, to: remote), doing: "push")
+    }
+
+    /// One push, pull or fetch, one action at a time; then asks git what changed. Whether it worked.
+    @discardableResult
+    private func network(_ action: NetworkAction, _ arguments: [String], doing verb: String) async -> Bool {
+        guard !isWorking else { return false }
+        isWorking = true
+        networkAction = action
+        defer {
+            isWorking = false
+            networkAction = nil
+        }
+        await settled()
+        var worked = false
+        do {
+            let answer = try await runner.git(arguments, in: projectPath, timeLimit: GlassEditorGitCommand.networkTimeLimit)
+            worked = answer.succeeded
+            actionProblem = worked ? nil : networkProblem(answer, doing: verb)
+        } catch GlassEditorGitError.tookTooLong {
+            actionProblem = "The remote didn't finish within ten minutes, so the \(verb) was stopped. Check the connection, then try again."
+        } catch let error as GlassEditorGitError {
+            actionProblem = error.explanation(on: machine)
+        } catch {
+            actionProblem = "Git couldn't be asked to \(verb) on \(machine ?? "this Mac"): \(error.localizedDescription)"
+        }
+        await refreshed()
+        return worked
+    }
+
+    /// Why a push, a pull or a fetch failed, in words that say what to do; else as any refusal.
+    func networkProblem(_ answer: GlassEditorCommandOutput, doing verb: String) -> String {
+        let said = String(decoding: answer.standardError, as: UTF8.self)
+        let place = machine ?? "this Mac"
+        let upstream = status.upstream ?? "its upstream"
+        func says(_ phrases: String...) -> Bool { phrases.contains { said.localizedCaseInsensitiveContains($0) } }
+        if says("Host key verification failed") {
+            return "\(place) doesn't know the remote's host key yet. Connect to it once in a terminal there (for GitHub: ssh -T git@github.com), then try again."
+        }
+        if says("Permission denied (publickey", "could not read Username", "could not read Password",
+                "Authentication failed", "terminal prompts disabled", "Invalid username or password") {
+            return "The remote wouldn't let \(place) in. Run git \(verb) once in a terminal there to set up its key or password, then try again."
+        }
+        if says("Could not resolve host", "Network is unreachable", "Connection timed out", "Connection refused",
+                "Operation timed out", "unable to access") {
+            let reason = answer.complaint.map { ": \($0)" } ?? "."
+            return "\(place) couldn't reach the remote\(reason)"
+        }
+        if says("[rejected]", "failed to push some refs"), says("fetch first", "non-fast-forward", "behind its remote") {
+            return "\(upstream) has commits this branch doesn't. Pull first, then push."
+        }
+        if says("Not possible to fast-forward", "Diverging branches") {
+            return "This branch and \(upstream) have both moved on, so they can't simply be lined up. Merge or rebase them in a terminal, then push."
+        }
+        if says("would be overwritten by merge", "Your local changes to the following files") {
+            return "Pulling would overwrite your uncommitted changes to some files. Commit them (or stash them in a terminal) first."
+        }
+        if says("untracked working tree files would be overwritten") {
+            return "Pulling would overwrite files that aren't in git yet. Move them aside or commit them first."
+        }
+        if says("There is no tracking information", "has no upstream branch") {
+            return "This branch doesn't follow a branch on the remote. Push it first, which publishes it."
+        }
+        return problem(answer, doing: verb)
+    }
+
     /// Folders under the project that are repositories of their own, which "stage everything"
     /// leaves alone.
     private var nestedRepositories: [String] {

@@ -7,7 +7,9 @@
 //  right?"). Look down and a ring shows where the head is aimed. Pinch the floor where you look: a
 //  green target. Move the pinching hand the way you want to face — left to face left, away to face
 //  on, back to turn round — and let go to go; raise it to cancel. Pinch the sky or a wall and swing
-//  the hand to turn 45°. A room's own floors, stairs and landings can be stood on.
+//  the hand to turn 45°. Only the floor can be landed on: a pinch on a desk, a shelf or a step shows
+//  the target greyed and goes nowhere (the owner, 2026-10-28: "we need to enforce a 'floor only'
+//  locomotion").
 //
 //  The person never moves: the world does (`FocusWorldPose`), through a moment of dark. visionOS
 //  fades a fully immersive space for anyone who walks about 1.5 m from where they began, so this is
@@ -85,6 +87,18 @@ final class FocusWalking {
         var yaw: Double
         var handStart: SIMD3<Float>
         var cancelled = false
+        /// On something that isn't the floor: shown, and never gone to.
+        var offFloor = false
+    }
+
+    /// Where a pinch would take the person.
+    fileprivate enum Landing {
+        /// The floor, there.
+        case floor(SIMD3<Float>)
+        /// Level, but not the floor: a desk's top, a shelf, a step.
+        case offFloor(SIMD3<Float>)
+        /// A wall or a ceiling, which turns instead.
+        case wall
     }
 
     init() {
@@ -278,7 +292,7 @@ final class FocusWalking {
             let movement = hand - press.handStart
             var next = press
             next.yaw = FocusLocomotion.handHeading(dx: Double(movement.x), dz: Double(movement.z), current: press.yaw)
-            next.cancelled = Double(movement.y) > FocusLocomotion.liftToCancel
+            next.cancelled = press.offFloor || Double(movement.y) > FocusLocomotion.liftToCancel
             self.press = next
             showTarget(next)
             return
@@ -286,12 +300,15 @@ final class FocusWalking {
         guard swing == nil else { return }
         let group = value.entity.components[CollisionComponent.self]?.filter.group ?? []
         let pinched = value.convert(value.startLocation3D, from: .local, to: .scene)
-        if !group.isDisjoint(with: Self.standable), let landing = landing(at: pinched) {
-            let started = Press(spot: landing, yaw: headSpot().yaw, handStart: handStart(value) ?? hand)
+        let landing: Landing = group.isDisjoint(with: Self.standable) ? .wall : landing(at: pinched)
+        switch landing {
+        case .floor(let spot), .offFloor(let spot):
+            var started = Press(spot: spot, yaw: headSpot().yaw, handStart: handStart(value) ?? hand)
+            if case .offFloor = landing { started.offFloor = true; started.cancelled = true }
             press = started
             ring.isEnabled = false
             showTarget(started)
-        } else {
+        case .wall:
             swing = heading(to: handStart(value) ?? pinched)
         }
     }
@@ -310,18 +327,28 @@ final class FocusWalking {
         }
     }
 
-    /// Where a pinch at `point` (around the person) lands: on the floor or a room's level surface it
-    /// was on; nil for a wall or a ceiling, which turn instead.
-    fileprivate func landing(at point: SIMD3<Float>) -> SIMD3<Float>? {
-        guard let scene = world.scene else { return point }
+    /// Where a pinch at `point` (around the person) lands: the floor it was on; a level surface that
+    /// isn't the floor, where it won't go; or a wall or a ceiling, which turn instead.
+    fileprivate func landing(at point: SIMD3<Float>) -> Landing {
+        let floor = Double(floorHeight)
+        guard let scene = world.scene else { return .floor(point) }
         let eye = headPosition()
         let toward = point - eye
         let distance = simd_length(toward)
-        guard distance > 0.01 else { return nil }
+        guard distance > 0.01 else { return .wall }
         let hit = scene.raycast(origin: eye, direction: toward / distance, length: distance + 0.05,
                                 query: .nearest, mask: Self.standable).first
-        guard let hit else { return point }
-        return Double(hit.normal.y) >= FocusLocomotion.levelEnough ? hit.position : nil
+        guard let hit else {
+            return FocusLocomotion.canLand(normalY: 1, height: Double(point.y), floor: floor) ? .floor(point) : .offFloor(point)
+        }
+        guard Double(hit.normal.y) >= FocusLocomotion.levelEnough else { return .wall }
+        return FocusLocomotion.canLand(normalY: Double(hit.normal.y), height: Double(hit.position.y), floor: floor)
+            ? .floor(hit.position) : .offFloor(hit.position)
+    }
+
+    /// The floor's height around the person: the top of the floor forced under every environment.
+    private var floorHeight: Float {
+        ground.position(relativeTo: nil).y + 0.01
     }
 
     // MARK: - Moving
@@ -364,7 +391,7 @@ final class FocusWalking {
               let aim = head.pose(), Double(aim.forward.y) < FocusLocomotion.lookingDown,
               let hit = scene.raycast(origin: aim.position, direction: aim.forward, length: Float(FocusLocomotion.reach),
                                       query: .nearest, mask: Self.standable).first,
-              Double(hit.normal.y) >= FocusLocomotion.levelEnough else {
+              FocusLocomotion.canLand(normalY: Double(hit.normal.y), height: Double(hit.position.y), floor: Double(floorHeight)) else {
             if ring.isEnabled { ring.isEnabled = false }
             return
         }
@@ -506,8 +533,8 @@ extension FocusWalking {
     /// The simulator can't pinch the floor: a teleport toward a point around the person, landing as
     /// a pinch there would (`--demo-teleport x,y,z,heading°`).
     func demoTeleport(toward point: SIMD3<Float>, yaw: Double) {
-        guard let landing = landing(at: point) else {
-            Self.log.info("demo teleport toward \(point, privacy: .public): a wall, no landing")
+        guard case .floor(let landing) = landing(at: point) else {
+            Self.log.info("demo teleport toward \(point, privacy: .public): not the floor, no landing")
             return
         }
         Self.log.info("demo teleport lands at \(landing, privacy: .public)")
@@ -517,8 +544,14 @@ extension FocusWalking {
 
     /// The target as a pinch shows it (`--demo-walk-target x,y,z,heading°`).
     func demoShowTarget(at point: SIMD3<Float>, yaw: Double, cancelled: Bool = false) {
-        guard let landing = landing(at: point) else { return }
-        showTarget(Press(spot: landing, yaw: yaw, handStart: .zero, cancelled: cancelled))
+        switch landing(at: point) {
+        case .floor(let landing):
+            showTarget(Press(spot: landing, yaw: yaw, handStart: .zero, cancelled: cancelled))
+        case .offFloor(let spot):
+            showTarget(Press(spot: spot, yaw: yaw, handStart: .zero, cancelled: true, offFloor: true))
+        case .wall:
+            return
+        }
     }
 }
 

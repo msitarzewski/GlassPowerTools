@@ -158,16 +158,21 @@ public protocol GlassHostDirectoryLister: AnyObject, Sendable {
     /// The path a relative one is resolved against — the account's home directory, usually.
     func realPath(_ path: String) async throws -> String
     /// Runs a command on the machine, over the same connection, and answers with how it ended and
-    /// what it wrote: the editor's `git` for a project there (2026-10-23). Default: this lister
-    /// cannot run anything.
-    func runCommand(_ command: String) async throws -> GlassHostCommandOutput
+    /// what it wrote: the editor's `git` for a project there (2026-10-23), given at most `timeLimit`
+    /// (a push or a pull can take minutes, 2026-10-28). Default: this lister cannot run anything.
+    func runCommand(_ command: String, timeLimit: Duration) async throws -> GlassHostCommandOutput
     /// Drops the connection. Calling it more than once is harmless.
     func close() async
 }
 
 public extension GlassHostDirectoryLister {
-    func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+    func runCommand(_ command: String, timeLimit: Duration) async throws -> GlassHostCommandOutput {
         throw GlassPortForwardError.unavailable
+    }
+
+    /// A command given a minute: longer than any status or diff should take.
+    func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+        try await runCommand(command, timeLimit: .seconds(60))
     }
 }
 

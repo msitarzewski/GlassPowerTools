@@ -501,7 +501,10 @@ public struct GlassEditorWorkspaceView: View {
                     // The branch, and how many files differ from its last commit: Changes, a press
                     // away (2026-10-23). Only in a repository, where there is a branch to name.
                     if let repository = workspace.repositories[project.id], repository.isRepository {
-                        GlassEditorBranchButton(repository: repository) { workspace.showChanges(of: project.id) }
+                        GlassEditorBranchButton(repository: repository,
+                                                pull: { Task { await workspace.pull(project.id) } }) {
+                            workspace.showChanges(of: project.id)
+                        }
                     }
                     Spacer(minLength: 0)
                     Button("Refresh", systemImage: "arrow.clockwise") {

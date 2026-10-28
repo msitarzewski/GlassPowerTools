@@ -30,7 +30,7 @@ struct GlassTerminalReconnectingListerTests {
         }
         func stat(_ path: String) async throws -> GlassHostFileStamp? { try answer(nil) }
         func realPath(_ path: String) async throws -> String { try answer(path) }
-        func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
+        func runCommand(_ command: String, timeLimit: Duration) async throws -> GlassHostCommandOutput {
             try answer(GlassHostCommandOutput(exitStatus: 0, standardOutput: contents))
         }
         func close() async { lock.withLock { closed = true } }

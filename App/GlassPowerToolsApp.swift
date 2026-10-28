@@ -305,9 +305,9 @@ struct GlassPowerToolsApp: App {
                         }
                     )
                 }
-            } command: { command in
+            } command: { command, timeLimit in
                 // `git` for the project, on the same connection (2026-10-23).
-                let output = try await lister.runCommand(command)
+                let output = try await lister.runCommand(command, timeLimit: timeLimit)
                 return GlassEditorCommandOutput(exitStatus: output.exitStatus,
                                                 standardOutput: output.standardOutput,
                                                 standardError: output.standardError)

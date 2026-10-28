@@ -120,3 +120,34 @@ its repository's root asks before committing files staged outside its folder, wh
 - **State:** 0.4.520 built for all three (21:35): the Mac reads 0.4.520 and runs, no new crash report; the iPhone
   has it; the Vision Pro was unreachable again (CoreDeviceError 4016). Not committed. Next: his use of it; ⌘↩ in
   the running app beside the Query menu's ⌘↩.
+
+## Push, pull and fetch (the owner, 2026-10-28: "build the git integration into the editor as we'd planned")
+What was left from 10-23: push and pull (hunk staging, reverting from the gutter and marks with line numbers hidden
+are still not done).
+- **Commands** (`GlassEditorGitCommand`): `fetch --quiet`; `pull --no-rebase --ff-only --quiet` (a merge or a rebase
+  is a terminal's decision; `--no-rebase` sets a configured `pull.rebase` aside); `push --quiet`; a branch with no
+  upstream published with `push --set-upstream` to `origin`, or the only remote; `remote`; `diff --name-only -z` between
+  the commits a pull moved across. Ten minutes for these (`networkTimeLimit`): the runners take a time limit now
+  (`GlassEditorGitRunner.git(_:in:timeLimit:)`; the shell's `GlassHostDirectoryLister.runCommand(_:timeLimit:)`, the
+  one-argument form a minute as before).
+- **Repository:** `fetch`, `pull` (answers the files changed, as project paths), `push`, `networkAction`, `canPush`,
+  `canPull`; push and pull ask git for the status first. Refusals in words that say what to do
+  (`networkProblem`): a host key not known yet, the remote not letting the machine in, the remote unreachable, a push
+  the remote is ahead of ("Pull first"), a pull that can't fast-forward ("both moved on"), local changes or untracked
+  files a pull would overwrite, no upstream, no remote, ten minutes up.
+- **Workspace:** `pull(_:)` reads again every open file the pull changed: one with no unsaved edits takes it at once;
+  one with edits keeps them and says so (its save asks which to keep).
+- **UI:** the Changes tab's top line has Pull N, Push N (only past zero) and Fetch, or Publish Branch; "Pulling…" and
+  the like while one runs; a problem shows under the top line even with nothing left to commit. The footer's branch
+  button stays a button (a click shows Changes) with ↑N ↓N beside the count, and Pull, Push, Fetch or Publish Branch
+  on a right-click or a hold. As a `Menu` its label lost the count and the arrows: a Mac draws a menu's label as one
+  title (seen drawn offscreen, then fixed).
+- **Tests:** against this Mac's git with a bare repository as the remote: published, pushed, fetched, pulled, and an
+  open file taking the pull; a push the remote is ahead of and a pull that can't fast-forward, both refused in words,
+  nothing merged. Scripted: no remote, a refused key, an unknown host key, an unreachable host, ten minutes up. Each
+  seen failing with its part broken (the reload alone too). Editor 198, core 325, UI 115, shell 371, terminal 1038.
+- **Seen:** the editor window drawn offscreen (a throwaway test, removed) with a repository one ahead and one behind:
+  "main ↓ Pull 1 ↑ Push 1" and Fetch on the top line, "main 1 ↑1 ↓1" in the footer (`<work>/git-remote.png`).
+- **Installed (2026-10-28):** 0.4.544 on all three devices, each read back; the Mac runs it with no new crash report.
+- **Not seen:** a push or a pull over a server's SSH connection (the same commands through the exec channel); the
+  headset.

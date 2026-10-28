@@ -149,8 +149,8 @@ nonisolated final class GlassTerminalReconnectingLister: GlassHostDirectoryListe
         try await run { try await $0.realPath(path) }
     }
 
-    func runCommand(_ command: String) async throws -> GlassHostCommandOutput {
-        try await run { try await $0.runCommand(command) }
+    func runCommand(_ command: String, timeLimit: Duration) async throws -> GlassHostCommandOutput {
+        try await run { try await $0.runCommand(command, timeLimit: timeLimit) }
     }
 
     func close() async {

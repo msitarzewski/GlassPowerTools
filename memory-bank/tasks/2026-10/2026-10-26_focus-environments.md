@@ -151,6 +151,20 @@ room with sliders for scale, the Mirador gallery's locomotion once the size is r
 ## Not seen
 iCloud Drive (the simulator has no account), a drop from Files, the headset itself.
 
+## Floor only, and fine positioning asked for (2026-10-28)
+The owner: "we need to enforce a 'floor only' locomotion. Sometimes I get moved to the top of the desk surface
+(clearly not the floor) and it's a pain. How can we allow micro adjustments? Right now it's almost impossible to get
+the right position as it relates to the desk surface."
+- **Floor only (0.4.543, built):** a pinch lands only on a level surface within 12 cm of the floor
+  (`FocusLocomotion.canLand`, `floorTolerance`, tested; a rug or a threshold is the floor, a desk's top or a step is
+  not). Pinching a desk shows the target greyed and goes nowhere; the look-down ring shows on the floor only. A room's
+  platforms and stairs can't be landed on any more (the simulator's test room's platform included). Seen in the
+  simulator: `--demo-teleport` toward the test room's desk top "not the floor, no landing", toward its floor landed.
+  `FocusRoomFitTests.floorOnly` fails with the height check out.
+- **Fine positioning, his choice of four:** a nudge pad (a small window from the moon's menu: 2 cm steps, hold to
+  repeat, 1° turns, the room 1 cm up or down, Keep This Spot as the room's start) and slide by hand (pinch the floor
+  at your feet and drag: you move with the hand at half its movement, no fade). Not built yet: he turned to git.
+
 ## Open
 - Sketchfab: KitBash bought it from Epic in August 2026; its Download API's future is unannounced. Not built.
 - Live data in environments: proposed to the owner.

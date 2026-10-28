@@ -384,6 +384,33 @@ struct GlassEditorGitCommitTests {
         #expect(repository.actionProblem == "Write a message for the commit first.")
     }
 
+    @Test func aPushOrPullThatCantGetInOrHasNowhereToGoSaysWhatToDo() async throws {
+        let git = ScriptedGit()
+        let repository = await ready(git, entries: [])
+        git.answers["remote"] = output("")
+        await repository.push()
+        #expect(repository.actionProblem?.contains("no remote to push to") == true, "\(repository.actionProblem ?? "")")
+
+        git.answers["remote"] = output("origin\n")
+        git.answers["push"] = output("", status: 128, error: "git@example.com: Permission denied (publickey).\nfatal: Could not read from remote repository.\n")
+        await repository.push()
+        #expect(repository.actionProblem?.contains("wouldn't let alpha in") == true, "\(repository.actionProblem ?? "")")
+        #expect(git.asked.contains { $0.suffix(3) == ["--set-upstream", "origin", "main"] }, "published to origin")
+
+        git.answers["push"] = output("", status: 128, error: "Host key verification failed.\nfatal: Could not read from remote repository.\n")
+        await repository.push()
+        #expect(repository.actionProblem?.contains("host key") == true, "\(repository.actionProblem ?? "")")
+
+        git.answers["push"] = output("", status: 128, error: "ssh: Could not resolve host: example.com\n")
+        await repository.push()
+        #expect(repository.actionProblem == "alpha couldn't reach the remote: ssh: Could not resolve host: example.com",
+                "\(repository.actionProblem ?? "")")
+
+        git.thrown = .tookTooLong
+        await repository.fetch()
+        #expect(repository.actionProblem?.contains("within ten minutes") == true, "\(repository.actionProblem ?? "")")
+    }
+
     @Test func aFilesLastCommitIsReadOnceAndANewFileWasEmpty() async throws {
         let git = ScriptedGit()
         let repository = await ready(git, prefix: "app/", projectPath: "/srv/repo/app", entries: [
@@ -602,6 +629,95 @@ struct GlassEditorLocalGitTests {
         // Closed, its marks stop.
         workspace.close(fresh.id, force: true)
         #expect(fresh.model.lineChanges.isEmpty)
+    }
+
+    // MARK: The remote (2026-10-28)
+
+    /// A bare repository standing for the remote, and the project's repository following it as
+    /// `origin`, nothing pushed yet.
+    private func makeRepositoryWithARemote() async throws -> (root: URL, remote: URL) {
+        let root = try await makeCommittableRepository()
+        let remote = root.deletingLastPathComponent().appendingPathComponent("EditorGitRemote-\(UUID().uuidString).git")
+        try await git(["init", "-q", "--bare", "-b", "trunk", remote.path(percentEncoded: false)], in: root)
+        try await git(["remote", "add", "origin", remote.path(percentEncoded: false)], in: root)
+        return (root, remote)
+    }
+
+    /// Another clone of the remote, committing as someone else would.
+    private func otherClone(of remote: URL) async throws -> URL {
+        let other = remote.deletingLastPathComponent().appendingPathComponent("EditorGitOther-\(UUID().uuidString)")
+        try await git(["clone", "-q", remote.path(percentEncoded: false), other.path(percentEncoded: false)],
+                      in: remote.deletingLastPathComponent())
+        for (key, value) in [("user.name", "Other"), ("user.email", "other@example.com"), ("commit.gpgsign", "false"),
+                             ("core.hooksPath", ".git/hooks")] {
+            try await git(["config", key, value], in: other)
+        }
+        return other
+    }
+
+    @Test func aBranchIsPublishedPushedAndPulledAndOpenFilesTakeThePull() async throws {
+        let (root, remote) = try await makeRepositoryWithARemote()
+        defer { for url in [root, remote] { try? FileManager.default.removeItem(at: url) } }
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.git.\(UUID().uuidString)")!)
+        let project = try #require(workspace.openProject(root))
+        let repository = try #require(workspace.repositories[project.id])
+        await repository.settled()
+        #expect(repository.status.upstream == nil && repository.canPush, "a branch the remote doesn't have can be published")
+
+        await repository.push()
+        #expect(repository.actionProblem == nil, "\(repository.actionProblem ?? "")")
+        #expect(repository.status.upstream == "origin/trunk")
+        #expect(repository.status.ahead == 0 && !repository.canPush)
+        let published = try await git(["rev-parse", "trunk"], in: remote)
+        #expect(published.standardOutput == (try await git(["rev-parse", "HEAD"], in: root)).standardOutput)
+
+        try Data("four\n".utf8).write(to: root.appendingPathComponent("b.txt"))
+        repository.commitMessage = "Four"
+        #expect(await repository.commit() == .committed)
+        #expect(repository.status.ahead == 1 && repository.canPush)
+        await repository.push()
+        #expect(repository.actionProblem == nil && repository.status.ahead == 0)
+
+        // Someone else changes a.txt, which is open here with nothing unsaved.
+        let other = try await otherClone(of: remote); defer { try? FileManager.default.removeItem(at: other) }
+        try Data("one\ntwo\nthree\nfour\n".utf8).write(to: other.appendingPathComponent("Sources/a.txt"))
+        try await git(["commit", "-q", "-am", "Another line"], in: other)
+        try await git(["push", "-q"], in: other)
+        let document = try #require(await workspace.open(path: root.appendingPathComponent("Sources/a.txt").path(percentEncoded: false)))
+        #expect(document.model.text == "one\ntwo\nthree\n")
+
+        await repository.fetch()
+        #expect(repository.actionProblem == nil && repository.status.behind == 1)
+        await workspace.pull(project.id)
+        #expect(repository.actionProblem == nil, "\(repository.actionProblem ?? "")")
+        #expect(repository.status.behind == 0)
+        #expect(document.model.text == "one\ntwo\nthree\nfour\n", "the open file took the pull")
+        #expect(!document.isDirty)
+    }
+
+    @Test func aPushTheRemoteIsAheadOfAndAPullThatCantFastForwardSayWhatToDo() async throws {
+        let (root, remote) = try await makeRepositoryWithARemote()
+        defer { for url in [root, remote] { try? FileManager.default.removeItem(at: url) } }
+        let repository = GlassEditorGitRepository(projectPath: root.path(percentEncoded: false), machine: nil,
+                                                  runner: GlassEditorLocalGit.shared, access: GlassEditorLocalFileAccess())
+        await repository.settled()
+        await repository.push()
+        #expect(repository.status.upstream == "origin/trunk", "published: \(repository.actionProblem ?? "no problem said"), branch \(repository.status.branch ?? "none")")
+        let other = try await otherClone(of: remote); defer { try? FileManager.default.removeItem(at: other) }
+        try Data("theirs\n".utf8).write(to: other.appendingPathComponent("b.txt"))
+        try await git(["commit", "-q", "-am", "Theirs"], in: other)
+        try await git(["push", "-q"], in: other)
+        try Data("ours\n".utf8).write(to: root.appendingPathComponent("b.txt"))
+        repository.commitMessage = "Ours"
+        #expect(await repository.commit() == .committed)
+
+        await repository.push()
+        #expect(repository.actionProblem?.contains("Pull first") == true, "\(repository.actionProblem ?? "")")
+        await repository.fetch()
+        #expect(repository.status.ahead == 1 && repository.status.behind == 1)
+        await repository.pull()
+        #expect(repository.actionProblem?.contains("both moved on") == true, "\(repository.actionProblem ?? "")")
+        #expect(repository.status.ahead == 1 && repository.status.behind == 1, "nothing was merged")
     }
 
     @Test func aFolderOutsideARepositoryHasNoBranch() async throws {

@@ -55,6 +55,15 @@ public protocol GlassEditorGitRunner {
     /// Runs `git` with `arguments`, in `directory`, and answers however it ended. Throws only when
     /// git could not be run at all.
     func git(_ arguments: [String], in directory: String) async throws -> GlassEditorCommandOutput
+    /// The same, given `timeLimit` seconds instead of a minute: a push, a pull or a fetch, which
+    /// wait on the network.
+    func git(_ arguments: [String], in directory: String, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput
+}
+
+public extension GlassEditorGitRunner {
+    func git(_ arguments: [String], in directory: String, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput {
+        try await git(arguments, in: directory)
+    }
 }
 
 /// Why git could not be run. Worded by `explanation(on:)`, which is told the machine's name: the
@@ -144,6 +153,34 @@ enum GlassEditorGitCommand {
     static func commit(message: String) -> [String] {
         global + ["commit", "--quiet", "-m", message]
     }
+
+    // MARK: The remote (2026-10-28)
+
+    /// How long a push, a pull or a fetch may take: the network, and the server's hooks.
+    static let networkTimeLimit: TimeInterval = 600
+
+    /// The remotes' names, one a line.
+    static let remotes = global + ["remote"]
+
+    /// What the remote has now, for how far ahead and behind the branch is.
+    static let fetch = global + ["fetch", "--quiet"]
+
+    /// The upstream's commits, taken only when the branch can simply move up to them: a merge or a
+    /// rebase is a decision for a terminal. `--no-rebase` sets a configured `pull.rebase` aside,
+    /// which would make it a rebase.
+    static let pull = global + ["pull", "--no-rebase", "--ff-only", "--quiet"]
+
+    static let push = global + ["push", "--quiet"]
+
+    /// A branch the remote doesn't have yet, pushed, and followed from now on.
+    static func publish(_ branch: String, to remote: String) -> [String] {
+        global + ["push", "--quiet", "--set-upstream", remote, branch]
+    }
+
+    /// The files two commits differ in, from the repository's root.
+    static func changed(from old: String, to new: String) -> [String] {
+        global + ["diff", "--name-only", "--no-relative", "-z", old, new]
+    }
 }
 
 // MARK: This Mac
@@ -158,13 +195,17 @@ public struct GlassEditorLocalGit: GlassEditorGitRunner {
     /// On a dispatch queue rather than a task: waiting for a process blocks its thread, and
     /// Swift's concurrency pool has a thread per core to share with the whole app.
     public func git(_ arguments: [String], in directory: String) async throws -> GlassEditorCommandOutput {
+        try await git(arguments, in: directory, timeLimit: Self.timeLimit)
+    }
+
+    public func git(_ arguments: [String], in directory: String, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let executable = Self.executable else {
                     continuation.resume(throwing: GlassEditorGitError.notInstalled)
                     return
                 }
-                continuation.resume(with: Result { try Self.run(executable, arguments, in: directory) })
+                continuation.resume(with: Result { try Self.run(executable, arguments, in: directory, timeLimit: timeLimit) })
             }
         }
     }
@@ -202,7 +243,7 @@ public struct GlassEditorLocalGit: GlassEditorGitRunner {
     /// Runs it and reads both streams at once: a diff larger than a pipe's buffer stops git until
     /// it is read, and reading one stream to its end first would wait for ever on the other.
     nonisolated static func run(_ executable: String, _ arguments: [String],
-                                in directory: String) throws -> GlassEditorCommandOutput {
+                                in directory: String, timeLimit: TimeInterval = GlassEditorLocalGit.timeLimit) throws -> GlassEditorCommandOutput {
         let process = Process()
         process.executableURL = URL(filePath: executable)
         process.arguments = arguments
@@ -275,7 +316,8 @@ public struct GlassEditorLocalGit: GlassEditorGitRunner {
 
 /// `git` over a project's own SSH connection: a command line for the machine's shell.
 public struct GlassEditorRemoteGit: GlassEditorGitRunner {
-    public typealias Command = @MainActor (String) async throws -> GlassEditorCommandOutput
+    /// Runs a command line on the machine, given at most a time.
+    public typealias Command = @MainActor (String, Duration) async throws -> GlassEditorCommandOutput
 
     private let command: Command
 
@@ -284,7 +326,11 @@ public struct GlassEditorRemoteGit: GlassEditorGitRunner {
     }
 
     public func git(_ arguments: [String], in directory: String) async throws -> GlassEditorCommandOutput {
-        let output = try await command(Self.commandLine(arguments, in: directory))
+        try await git(arguments, in: directory, timeLimit: 60)
+    }
+
+    public func git(_ arguments: [String], in directory: String, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput {
+        let output = try await command(Self.commandLine(arguments, in: directory), .seconds(timeLimit))
         // The shell's "command not found".
         if output.exitStatus == 127 { throw GlassEditorGitError.notInstalled }
         return output

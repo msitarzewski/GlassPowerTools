@@ -64,9 +64,15 @@ use the disposable test VM only).
   (a room's motion, a clock on the headset's time, sound from `<Room>.sounds/`, Room Sound); the fixed loft put in
   his iCloud Environments; on the headset: "holy shit it works~!!!". Mac, iPhone and headset run 0.4.540, each read
   back. `tasks/2026-10/2026-10-27_living-rooms-handoff.md`.
+- **Rain Garden (2026-10-28, the GlassSpaceMaker session):** a second room, `RainGarden.usdz` + `RainGarden.sounds/` + `RainGarden.events/`, in iCloud Environments beside the loft; rain, drips and ripples are blend-shape animations, the first thing to confirm on the headset. Section at the end of `tasks/2026-10/2026-10-27_living-rooms-handoff.md`.
 - **The gear confirmed fixed on the headset** (the owner, after 0.4.540–0.4.541: "the gear menu was indeed fixed as of
   the last build"): the redraw storm fix of 0.4.539 holds.
-- **Then (2026-10-28) a menu in the empty space of a Vision Pro terminal sidebar, 0.4.542 on all three devices (read back), not committed:** held, what
+- **Then (2026-10-28), committed and pushed at his word ("commit and push, then build the nudge pad"):** Focus Mode lands only on the floor (0.4.543; `2026-10-26_focus-environments.md`,
+  "Floor only"); push, pull and fetch in the editor (0.4.544; `2026-10-23_editor-git.md`, the last section). **Next, his
+  choice:** a nudge pad and slide by hand for fine positioning in Focus Mode (same environments note). Open: his "the
+  vision pro didn't connect when the app restarted" after 0.4.543's install; the headset's log shows ten terminals
+  coming back at 06:25 and 06:30 UTC and nothing about connecting; he moved on ("GREAT!") before saying what didn't.
+- **Then (2026-10-28) a menu in the empty space of a Vision Pro terminal sidebar, 0.4.542 on all three devices (read back), committed and pushed (64d9045d):** held, what
   the bar's + offers (`tasks/2026-10/2026-10-28_vision-sidebar-empty-menu.md`). On the way: the runner's holds at a
   point of an ornament miss; tests hold elements.
 - **Then phase 3 ("go ahead with phase 3"), 0.4.541 on all three devices (read back), committed at his word:** a digital clock and date panel at a `clock_digital`

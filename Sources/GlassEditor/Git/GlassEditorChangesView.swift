@@ -44,6 +44,20 @@ struct GlassEditorChangesView: View {
                     commitBar(repository)
                     Divider()
                 }
+                // What a stage, a commit, a push or a pull couldn't do: shown whether or not there
+                // is anything left to commit, as a push comes after the last commit.
+                if let problem = repository.actionProblem {
+                    Label(problem, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, GlassSpatialMetrics.isSpatial ? 20 : 12)
+                        .padding(.vertical, 6)
+                        .accessibilityIdentifier("editor-commit-problem")
+                    Divider()
+                }
                 content(repository)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -84,11 +98,8 @@ struct GlassEditorChangesView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .accessibilityIdentifier("editor-changes-branch")
-            if status.upstream != nil, status.ahead > 0 || status.behind > 0 {
-                Text("↑\(status.ahead) ↓\(status.behind)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .help("\(status.ahead) commits to push, \(status.behind) to pull, against \(status.upstream ?? "")")
+            if repository.state == .ready {
+                remote(repository)
             }
             Spacer(minLength: 0)
             if repository.state == .ready, !status.changes.isEmpty {
@@ -110,6 +121,64 @@ struct GlassEditorChangesView: View {
         .frame(minHeight: GlassSpatialMetrics.footerHeight)
         .background(.bar)
     }
+
+    // MARK: The remote
+
+    /// Pull, Push and Fetch, with how far the branch is behind and ahead of its upstream; Publish for
+    /// a branch the remote doesn't have yet. What is under way says so instead.
+    @ViewBuilder
+    private func remote(_ repository: GlassEditorGitRepository) -> some View {
+        let status = repository.status
+        if let action = repository.networkAction {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(action.words).font(.caption).foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier("editor-remote-working")
+        } else if status.branch != nil {
+            HStack(spacing: 2) {
+                if let upstream = status.upstream {
+                    Button {
+                        Task { await workspace.pull(projectID) }
+                    } label: {
+                        Label(status.behind > 0 ? "Pull \(status.behind)" : "Pull", systemImage: "arrow.down")
+                    }
+                    .disabled(repository.isWorking)
+                    .help(status.behind > 0 ? "Pull \(Self.commits(status.behind)) from \(upstream)" : "Pull from \(upstream)")
+                    .accessibilityLabel(status.behind > 0 ? "Pull \(Self.commits(status.behind))" : "Pull")
+                    .accessibilityIdentifier("editor-pull")
+                    Button {
+                        Task { await repository.push() }
+                    } label: {
+                        Label(status.ahead > 0 ? "Push \(status.ahead)" : "Push", systemImage: "arrow.up")
+                    }
+                    .disabled(repository.isWorking || !repository.canPush)
+                    .help(status.ahead > 0 ? "Push \(Self.commits(status.ahead)) to \(upstream)" : "Nothing to push to \(upstream)")
+                    .accessibilityLabel(status.ahead > 0 ? "Push \(Self.commits(status.ahead))" : "Push")
+                    .accessibilityIdentifier("editor-push")
+                    Button("Fetch", systemImage: "arrow.triangle.2.circlepath") {
+                        Task { await repository.fetch() }
+                    }
+                    .labelStyle(.iconOnly)
+                    .disabled(repository.isWorking)
+                    .help("Ask \(upstream) what's new, without changing anything here")
+                    .accessibilityIdentifier("editor-fetch")
+                } else {
+                    Button("Publish Branch", systemImage: "icloud.and.arrow.up") {
+                        Task { await repository.push() }
+                    }
+                    .disabled(repository.isWorking)
+                    .help("Push \(status.headName) to the remote, and follow it from now on")
+                    .accessibilityIdentifier("editor-publish")
+                }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption.monospacedDigit())
+        }
+    }
+
+    /// "1 commit", "3 commits".
+    static func commits(_ count: Int) -> String { count == 1 ? "1 commit" : "\(count) commits" }
 
     // MARK: Committing
 
@@ -158,14 +227,6 @@ struct GlassEditorChangesView: View {
                 }
             }
             .font(.caption)
-            if let problem = repository.actionProblem {
-                Label(problem, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("editor-commit-problem")
-            }
         }
         .padding(.horizontal, GlassSpatialMetrics.isSpatial ? 20 : 12)
         .padding(.vertical, 8)
@@ -547,13 +608,47 @@ enum GlassEditorPasteboard {
 /// it opens Changes.
 struct GlassEditorBranchButton: View {
     let repository: GlassEditorGitRepository
+    /// Pulls through the workspace, which reads again the open files the pull changes.
+    let pull: () -> Void
     let action: () -> Void
 
     private var count: Int { repository.status.changes.count }
     private var isReady: Bool { repository.state == .ready }
 
+    /// A click shows Changes, as it always has; held or right-clicked, it pulls, pushes and fetches
+    /// (2026-10-28). A button with a menu rather than a `Menu`: a Mac draws a menu's label as one
+    /// title, which dropped the counts.
     var body: some View {
         Button(action: action) {
+            label
+        }
+        .buttonStyle(.borderless)
+        .contextMenu {
+            Button("Show Changes", systemImage: "list.bullet.rectangle", action: action)
+            if isReady, repository.status.branch != nil {
+                Divider()
+                if let upstream = repository.status.upstream {
+                    Button(repository.status.behind > 0 ? "Pull \(GlassEditorChangesView.commits(repository.status.behind))" : "Pull",
+                           systemImage: "arrow.down", action: pull)
+                        .help("Pull from \(upstream)")
+                        .disabled(repository.isWorking)
+                    Button(repository.status.ahead > 0 ? "Push \(GlassEditorChangesView.commits(repository.status.ahead))" : "Push",
+                           systemImage: "arrow.up") { Task { await repository.push() } }
+                        .disabled(repository.isWorking || !repository.canPush)
+                    Button("Fetch", systemImage: "arrow.triangle.2.circlepath") { Task { await repository.fetch() } }
+                        .disabled(repository.isWorking)
+                } else {
+                    Button("Publish Branch", systemImage: "icloud.and.arrow.up") { Task { await repository.push() } }
+                        .disabled(repository.isWorking)
+                }
+            }
+        }
+        .help(help)
+        .accessibilityLabel(help)
+        .accessibilityIdentifier("editor-branch")
+    }
+
+    private var label: some View {
             HStack(spacing: 4) {
                 Image(systemName: isReady ? "arrow.triangle.branch" : "exclamationmark.triangle")
                 Text(isReady ? repository.status.headName : "Git")
@@ -565,20 +660,38 @@ struct GlassEditorBranchButton: View {
                         .padding(.horizontal, 5)
                         .background(Capsule().fill(Color.orange.opacity(0.25)))
                 }
+                if isReady, repository.status.upstream != nil, repository.status.ahead + repository.status.behind > 0 {
+                    Text(Self.aheadBehind(repository.status))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                if repository.networkAction != nil {
+                    ProgressView().controlSize(.mini)
+                }
             }
             .font(.caption)
-        }
-        .buttonStyle(.borderless)
-        .help(help)
-        .accessibilityLabel(help)
-        .accessibilityIdentifier("editor-branch")
+    }
+
+    /// ", 2 commits to push, 1 to pull", against an upstream.
+    private var remoteHelp: String {
+        let status = repository.status
+        guard status.upstream != nil else { return "" }
+        let parts = [status.ahead > 0 ? "\(GlassEditorChangesView.commits(status.ahead)) to push" : nil,
+                     status.behind > 0 ? "\(status.behind) to pull" : nil].compactMap { $0 }
+        return parts.isEmpty ? "" : ", " + parts.joined(separator: ", ")
+    }
+
+    /// "↑2 ↓1", either left out at zero.
+    static func aheadBehind(_ status: GlassEditorGitStatus) -> String {
+        [status.ahead > 0 ? "↑\(status.ahead)" : nil, status.behind > 0 ? "↓\(status.behind)" : nil]
+            .compactMap { $0 }.joined(separator: " ")
     }
 
     private var help: String {
         switch repository.state {
         case .ready:
-            count == 0 ? "Changes: none on \(repository.status.headName)"
-                : "Changes: \(count) file\(count == 1 ? "" : "s") on \(repository.status.headName)"
+            (count == 0 ? "Changes: none on \(repository.status.headName)"
+                : "Changes: \(count) file\(count == 1 ? "" : "s") on \(repository.status.headName)") + remoteHelp
         case .unavailable(let reason): reason
         case .checking, .notARepository: "Changes"
         }

@@ -1145,6 +1145,35 @@ public final class GlassEditorWorkspace {
         repository(owning: path)?.refresh()
     }
 
+    /// Pulls a project's repository, then reads again every open file the pull changed: one with no
+    /// unsaved edits takes the new version at once; one with edits keeps them, and its save asks
+    /// which to keep, as for any change made underneath it.
+    public func pull(_ projectID: GlassEditorProject.ID) async {
+        guard let repository = repositories[projectID] else { return }
+        let changed = Set(await repository.pull().map(GlassEditorProject.normalized))
+        guard !changed.isEmpty else { return }
+        var kept: [String] = []
+        for document in documents where document.isText {
+            guard let path = document.path, changed.contains(GlassEditorProject.normalized(path)) else { continue }
+            if document.isDirty {
+                kept.append(document.displayName)
+                continue
+            }
+            writing.insert(document.id)
+            do {
+                try await document.reload(through: access(for: document))
+                seenOnReturn[document.id] = nil
+            } catch {
+                message = "\(document.displayName) changed in the pull and couldn't be read again: \(error.localizedDescription)"
+            }
+            writing.remove(document.id)
+        }
+        updateLineMarkers()
+        if !kept.isEmpty {
+            message = "The pull changed \(kept.joined(separator: ", ")) too. Your unsaved edits are kept; saving will ask which version to keep."
+        }
+    }
+
     /// The project's **Changes** tab: every changed file's lines since the last commit. Opened
     /// once per project and chosen again after that; it reads the lines while it is open.
     @discardableResult

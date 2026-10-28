@@ -413,3 +413,55 @@ for it (the query's `DidUpdate` re-lists when it lands), or coordinate the read 
 newer version is on its way. Until then, on the headset: Files ▸ iCloud Drive ▸ Glass Power Tools ▸ Environments,
 long-press `Loft.usdz` ▸ Remove Download, tap it to download again (72.6 MB), then open the loft again (relaunch the
 app if the loft was open). The log line to look for: `Room life: … digital clock true …`.
+
+## Rain Garden: the second room (2026-10-28, the GlassSpaceMaker session)
+
+The owner: "Now let's build another... you choose the environment, but it should be a great place for a human to focus.
+Be super detailed. Let's push the limits!" The room: a 12-tatami ryokan writing room in the cedar hills above Kyoto,
+mid-afternoon in steady June rain, its north wall slid open onto an engawa, a moss garden with a koi pond, a stone
+lantern, a tsukubai, hydrangeas, Japanese maples, a bamboo grove, a woven fence and a misty cedar hillside.
+
+**Files** (in `~/Downloads` and already in iCloud Drive ▸ Glass Power Tools ▸ Environments, beside the loft):
+`RainGarden.usdz` (sha256 `e3e69433e082fb5f…`, `79.0 MB`), `RainGarden.sounds/` (14 sounds + `sounds.json`),
+`RainGarden.events/` (`egret.usdz`, `swallows.usdz`, `crows.usdz`, `events.json`). A new file name, so no stale copy
+on the headset (see the section above).
+
+**Same contract as the loft**: `metersPerUnit 1`, Y-up, `cam_pov` at the writing seat (0, -0.4, 1.6 in Blender
+terms; floor at 0, garden ground at -0.5, pond water at -0.6); everything animated under `moving` (600 s loop at
+24 fps); `clock` on the east wall at (2.70, 0.91, 1.45) facing the room, hands `clock_hour/minute/second` + `clock_cap`
+as `clock`'s direct children, rest at 12; `clock_digital` on the ranma transom above the centre bay at (0, 1.74, 2.08),
+0.5 m wide, facing the room; `snd_*` emitters; `event_*` anchors as Y-up frames.
+
+**What moves (host plays `availableAnimations` as for the loft):** three rain sheets, a line of eave drips, pond
+ripples, water beads at the cascade and the kakei spout, six koi under the water (each with a tail), 31 bamboo culms
+swaying, the three maple crowns breathing, nine mist cards drifting among the far trunks, the clock's pendulum (1 s
+period, matches the tick), the furin's paper strip.
+
+**New in this room, worth a check on the headset:** rain, drips, beads and ripples are **blend-shape animations**
+(UsdSkel BlendShapes with per-frame `blendShapeWeights`, 7 meshes, 135 targets in all), the same mechanism as the
+loft's bird flap but carrying the whole effect. If the rain stands still while the koi swim, blend shapes are not
+playing; report that first. Transparency: the rain, ripples, mist, the water (55 %), the cascade sheet and the furin
+bell are `UsdPreviewSurface` opacity from textures, black metallic base with emission (pre-lit), as the loft's glass.
+
+**Sounds (`RainGarden.sounds/sounds.json`):** `rain` (ambient bed, stereo, 120 s loop, -11 dB) is the room; spatial
+loops at their emitters: `drips` (`snd_eave`), `pond` (`snd_pond`), `kakei` (`snd_kakei`), `falls` (`snd_falls`),
+`clock` (`snd_clock`, -27 dB); one-shots on `every`: `sozu` clack 28-52 s (`snd_sozu`), `furin` 25-110 s, `uguisu`
+70-260 s (`snd_forest_w`, 18 m out), `kajika` frog 40-170 s (`snd_falls`), `crow` 120-420 s (`snd_forest_e`),
+`bell` 15-35 min (`snd_temple`, 48 m out, gain 0), `thunder` 12-40 min (`snd_sky`, 40 m out), `bamboo` gust 45-150 s
+(`snd_bamboo`). Far emitters were brought within ~50 m because `SpatialAudioComponent(gain:)` rolls off 6 dB per
+doubling; if the bell or the warbler are too faint, raise their gain in `sounds.json` rather than moving anything.
+
+**Events (`RainGarden.events/events.json`):** `egret` (112 s: flies in from behind the pond, lands in the shallows
+at `event_pond_bank` or on the east bank at `event_moss` facing the room, looks around, dips twice, leaves to the
+east) every 10-25 min; `swallows` (three, 2.6 s, skimming the pond at `event_pond_air_e/w`) every 1.5-5 min; `crows`
+(two, 14 s, far across at `event_sky_far_e/w`, 26 m out, 5.5 m up) every 5-15 min. All authored along +X around the
+origin as the contract says; the anchors carry the Y-up frame and heading.
+
+**Standing spots:** the tatami, the engawa deck (the rain falls just past its edge), the stepping stones and the moss
+are standable; nothing under `moving` is. From the engawa the sky and the maple crowns open up; from the seat the eave
+frames the garden below about 10 degrees, as a real engawa does.
+
+**Known limits:** the sōzu is still (a tip-and-clack event would vanish between showings under the current events
+contract; a per-event `sound` field would make it possible). The koi's fins are pre-lit, their bodies baked. The
+hillside beyond the stone wall is a dome from the seat's viewpoint, so it slides a little against the fence when
+standing elsewhere.

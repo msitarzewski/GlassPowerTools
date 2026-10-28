@@ -124,6 +124,16 @@ struct FocusRoomFitTests {
         #expect(close(abs(FocusLocomotion.handHeading(dx: 0, dz: 0.2, current: 0)), .pi), "towards them: round")
     }
 
+    @Test("Only the floor is landed on: a rug or a threshold is; a desk's top, a step and a wall are not")
+    func floorOnly() {
+        #expect(FocusLocomotion.canLand(normalY: 1, height: 0, floor: 0), "the floor")
+        #expect(FocusLocomotion.canLand(normalY: 1, height: 0.04, floor: 0), "a rug")
+        #expect(FocusLocomotion.canLand(normalY: 1, height: 1.2, floor: 1.2), "a floor that stands higher in the scene")
+        #expect(!FocusLocomotion.canLand(normalY: 1, height: 0.75, floor: 0), "a desk's top")
+        #expect(!FocusLocomotion.canLand(normalY: 1, height: 0.18, floor: 0), "a step")
+        #expect(!FocusLocomotion.canLand(normalY: 0.1, height: 0, floor: 0), "a wall at floor height")
+    }
+
     @Test("A swing past eight degrees on the sky turns 45° its way; less turns nothing")
     func flickTurns() {
         let degree = Double.pi / 180
