@@ -548,7 +548,12 @@ struct GlassPowerToolsApp: App {
         // terminal there, a `.command` run in one, a link connected — without a Connections window
         // coming up too (the owner, 2026-10-13).
         MacTerminalAppDelegate.openURLs = { urls in
-            for url in urls {
+            // Terminal profiles opened together come in together: one summary, not one each.
+            let profiles = urls.filter { $0.isFileURL && $0.pathExtension.lowercased() == "terminal" }
+            if !profiles.isEmpty, GlassUITestRun.defaults == nil {
+                GlassWidgetRequests.shared.post(.importTerminalThemes(profiles))
+            }
+            for url in urls where !profiles.contains(url) {
                 guard let request = GlassWidgetRequest.forOpened(url, isMac: true) else { continue }
                 if GlassUITestRun.defaults == nil {
                     GlassWidgetRequests.shared.post(request)
@@ -632,7 +637,8 @@ struct GlassPowerToolsApp: App {
                     terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
                 },
                 savedQueries: savedQueries,
-                openSavedQuery: { database.openSavedQuery($0) }))
+                openSavedQuery: { database.openSavedQuery($0) },
+                importTerminalThemes: { await terminal.importTerminalThemes($0) }))
         }
         #if os(macOS)
         // D38: Sparkle's scheduled checks, in a build that names a feed and a signing key — and

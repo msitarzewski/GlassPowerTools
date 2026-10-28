@@ -71,6 +71,21 @@ If the project is a folder inside its repository, files staged elsewhere in the 
 
 If git won't commit, **Changes** says why under the message, for example when git doesn't yet know your name and email on that machine, or when a hook stopped the commit.
 
+### Pull, push and fetch
+
+The top of **Changes** shows what is waiting to move between this branch and the branch it follows on the remote:
+
+- **Pull** with a count, when the remote has commits this branch doesn't. A pull only ever moves the branch forward. Open files the pull changed are read again; one with unsaved edits keeps them, the editor says so, and saving it asks which version to keep.
+- **Push** with a count, when this branch has commits the remote doesn't.
+- **Fetch** asks the remote what's new, so the counts are current.
+- **Publish Branch**, in place of these, when the remote doesn't have this branch yet: it pushes the branch and makes it follow the remote's.
+
+While one runs, **Changes** says **Pulling…**, **Pushing…** or **Fetching…**. The branch at the foot of the file list shows the same counts as ↑ and ↓; right-click it, or pinch and hold it, for **Pull**, **Push** and **Fetch** (or **Publish Branch**) without opening **Changes**.
+
+When git can't go ahead, **Changes** says why and what to do. For example: the remote has commits this branch doesn't (pull first, then push); the branch and the remote have both moved on (merge or rebase them in a terminal); the remote's host key isn't known yet, or its key or password isn't set up (connect, or run the command once, in a terminal on that machine); there's no remote. A pull, push or fetch that takes longer than ten minutes is stopped.
+
+As with everything else here, a project on a server pulls and pushes on the server, with that machine's git, keys and remotes.
+
 ### Marks beside the lines
 
 An open file in a git project marks its changed lines beside the line numbers:

@@ -154,6 +154,9 @@ nonisolated struct ICloudPortableTerminalPreferences: Codable, Equatable, Sendab
     var focusOpensImmersed: Bool? = nil
     /// Focus Mode's room sound on Vision Pro, 0…1 (2026-10-27), optional for the same reason.
     var focusEnvironmentSound: Double? = nil
+    /// The scheme from the Terminal Themes folder All Terminals draw with (2026-10-28), by its
+    /// identifier; empty for your theme. Optional for the same reason: absent leaves it be.
+    var terminalScheme: String? = nil
 
     func validate() throws {
         guard (0...100_000).contains(maximumScrollbackLines) else {
@@ -181,6 +184,9 @@ nonisolated struct ICloudPortableTerminalPreferences: Codable, Equatable, Sendab
         }
         if let focusEnvironmentSound, !focusEnvironmentSound.isFinite || !(0...1).contains(focusEnvironmentSound) {
             throw ICloudSettingsSyncError.invalidPayload("Focus Mode's room sound must be a finite 0...1 value.")
+        }
+        if let terminalScheme, !terminalScheme.isEmpty, UUID(uuidString: terminalScheme) == nil {
+            throw ICloudSettingsSyncError.invalidPayload("A terminal scheme is named by its identifier.")
         }
         if let focusEnvironment, focusEnvironment.count > FocusEnvironmentFiles.longestID {
             throw ICloudSettingsSyncError.invalidPayload("Focus environments must be named in at most \(FocusEnvironmentFiles.longestID) characters.")

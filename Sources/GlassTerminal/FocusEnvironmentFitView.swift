@@ -179,9 +179,13 @@ struct FocusEnvironmentFitView: View {
     }
 
     private var floorText: String {
-        let floor = stage.fit.floor
+        Self.floorWords(stage.fit.floor)
+    }
+
+    /// "Raised 3 cm".
+    static func floorWords(_ floor: Double) -> String {
         if abs(floor) < 0.005 { return "Standing on the floor" }
-        return floor > 0 ? "Raised \(Self.length(floor))" : "Lowered \(Self.length(-floor))"
+        return floor > 0 ? "Raised \(length(floor))" : "Lowered \(length(-floor))"
     }
 
     private var startFooter: String {

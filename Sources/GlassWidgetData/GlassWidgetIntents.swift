@@ -43,14 +43,18 @@ public enum GlassWidgetRequest: Sendable, Equatable, Codable {
     /// The Mac's share extension (D72, the owner chose "mac only"): files copied into the App Group,
     /// to send to a folder on a machine; the copies go once they are sent.
     case sendFiles([URL], machine: UUID, folder: String?)
+    /// Terminal profiles (`.terminal`) opened with the app — Open With, AirDrop, Files — into the
+    /// terminal's Terminal Themes (2026-10-28); one alone becomes what All Terminals use.
+    case importTerminalThemes([URL])
 
     /// What opening `url` with the app asks for — the Finder's Open With, a folder or script dropped
-    /// on the Dock icon, a link (D72): an `ssh://` link connects; on the Mac a folder opens a terminal
-    /// there and a `.command` script runs in one; anything else goes to the editor. Nil for a link
-    /// the app does not handle.
+    /// on the Dock icon, a link (D72): an `ssh://` link connects; a Terminal profile becomes a terminal
+    /// theme; on the Mac a folder opens a terminal there and a `.command` script runs in one; anything
+    /// else goes to the editor. Nil for a link the app does not handle.
     public static func forOpened(_ url: URL, isMac: Bool) -> GlassWidgetRequest? {
         if url.scheme?.lowercased() == "ssh" { return .openSSHLink(url) }
         guard url.isFileURL else { return nil }
+        if url.pathExtension.lowercased() == "terminal" { return .importTerminalThemes([url]) }
         if isMac {
             let isFolder = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? url.hasDirectoryPath
             let isPackage = (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) ?? false

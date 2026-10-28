@@ -136,6 +136,94 @@ final class FocusEnvironmentUITests: XCTestCase {
         element("focus-fit-done").tap()
     }
 
+    /// Fine Position (the owner, 2026-10-28: "How can we allow micro adjustments? Right now it's
+    /// almost impossible to get the right position as it relates to the desk surface"): from the
+    /// moon's pinch-and-hold menu while Focus Mode is open, steps of 2 cm and turns of 1°, held to keep
+    /// going, read back as how far the person stands from their start; the room a centimetre up or
+    /// down; Keep This Spot making where they stand the start.
+    func testFinePositionStepsTurnsRaisesAndKeepsTheSpot() {
+        launch("terminal", ["--demo-environment-room", "--demo-focus", "file:Test Room.reality", "--demo-focus-immersed",
+                            "-blinkingCursor", "NO"])
+        let moon = element("terminal-focus-mode")
+        XCTAssertTrue(moon.waitForExistence(timeout: 30), "no moon in the terminal's bar")
+        XCTAssertTrue(said(by: moon, "Exit Focus Mode", within: 30), "Focus Mode didn't open: \(words(moon))")
+        moon.press(forDuration: 1.5)
+        let fine = app.buttons["Fine Position…"].firstMatch
+        XCTAssertTrue(fine.waitForExistence(timeout: 10), "the moon's menu has no Fine Position")
+        fine.tap()
+
+        let from = element("focus-nudge-from-start")
+        let keep = element("focus-nudge-keep")
+        XCTAssertTrue(from.waitForExistence(timeout: 30), "Fine Position didn't open")
+        // Where the room starts the person depends on whether their head was tracked yet as it
+        // opened, so the steps are counted from a spot kept first.
+        XCTAssertTrue(keep.wait(for: \.isEnabled, toEqual: true, timeout: 60), "the room never opened")
+        keep.tap()
+        XCTAssertTrue(said(by: from, "Where you start", within: 10), "Keep This Spot didn't make it the start: \(words(from))")
+        for _ in 0..<3 { element("focus-nudge-forward").tap() }
+        XCTAssertTrue(said(by: from, "6 cm ahead", within: 10), words(from))
+        for _ in 0..<2 { element("focus-nudge-right").tap() }
+        XCTAssertTrue(said(by: from, "6 cm ahead, 4 cm right", within: 10), words(from))
+        element("focus-nudge-turn-left").tap()
+        XCTAssertTrue(said(by: from, "6 cm ahead, 4 cm right, turned 1° left", within: 10), words(from))
+        // Held, it keeps going.
+        element("focus-nudge-forward").press(forDuration: 2)
+        let ahead = centimetres(ahead: words(from))
+        XCTAssertGreaterThan(ahead ?? 0, 10, "holding Step Forward didn't keep stepping: \(words(from))")
+
+        keep.tap()
+        XCTAssertTrue(said(by: from, "Where you start", within: 10), "kept again: \(words(from))")
+
+        // The room's height, from wherever an earlier run left it, and back.
+        let height = element("focus-nudge-height")
+        guard let before = raised(height) else { return XCTFail("the room's height reads \(words(height))") }
+        element("focus-nudge-raise").tap()
+        element("focus-nudge-raise").tap()
+        XCTAssertTrue(waitFor(height, raisedBy: before + 2), "two raises: \(words(height))")
+        element("focus-nudge-lower").tap()
+        XCTAssertTrue(waitFor(height, raisedBy: before + 1), "then a lowering: \(words(height))")
+        element("focus-nudge-lower").tap()
+        XCTAssertTrue(waitFor(height, raisedBy: before), words(height))
+        // Long enough for the height to be kept.
+        sleep(2)
+    }
+
+    /// A room whose lowest point isn't its floor (the loft's sky reaches 6 km below it, Rain Garden's
+    /// 400 m): a pinch on its floor lands, measured from the floor the person stands on. Nothing can
+    /// pinch here, so `--demo-teleport` stands in for one, and Fine Position reads back where it went.
+    func testAFloorUnderASkyIsLandedOn() {
+        launch("terminal", ["--demo-environment-room", "--demo-room-sky", "--demo-focus", "file:Test Room.reality",
+                            "--demo-focus-immersed", "--demo-fine-position", "--demo-teleport", "0,0,-1.5,0",
+                            "-blinkingCursor", "NO"])
+        let from = element("focus-nudge-from-start")
+        XCTAssertTrue(from.waitForExistence(timeout: 60), "Fine Position didn't open")
+        XCTAssertTrue(said(by: from, "1.5 m ahead", within: 60), "the floor ahead wasn't landed on: \(words(from))")
+    }
+
+    /// "6 cm ahead" → 6, "1.2 m ahead" → 120.
+    private func centimetres(ahead text: String) -> Int? {
+        if let match = text.firstMatch(of: #/(\d+) cm ahead/#) { return Int(match.1) }
+        if let match = text.firstMatch(of: #/(\d+\.\d) m ahead/#) { return Double(match.1).map { Int(($0 * 100).rounded()) } }
+        return nil
+    }
+
+    /// "Raised 3 cm" → 3, "Lowered 2 cm" → −2, "Standing on the floor" → 0.
+    private func raised(_ element: XCUIElement) -> Int? {
+        let text = words(element)
+        if text.contains("Standing on the floor") { return 0 }
+        guard let match = text.firstMatch(of: #/(Raised|Lowered) (\d+) cm/#), let amount = Int(match.2) else { return nil }
+        return match.1 == "Raised" ? amount : -amount
+    }
+
+    private func waitFor(_ element: XCUIElement, raisedBy centimetres: Int) -> Bool {
+        let deadline = Date().addingTimeInterval(10)
+        repeat {
+            if raised(element) == centimetres { return true }
+            Thread.sleep(forTimeInterval: 0.5)
+        } while Date() < deadline
+        return false
+    }
+
     private func words(_ element: XCUIElement) -> String {
         element.exists ? "\(element.label) \(element.value as? String ?? "")" : "(gone)"
     }

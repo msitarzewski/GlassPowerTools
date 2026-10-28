@@ -76,6 +76,15 @@ nonisolated struct FocusRoomFit: Codable, Equatable, Sendable {
 
     static let sizes: ClosedRange<Double> = 0.25...4
     static let floors: ClosedRange<Double> = -5...5
+    /// The fine positioning pad's step for the room's height.
+    static let floorStep = 0.01
+
+    /// Raised by `metres` (lowered, below zero), to the centimetre and within its range.
+    func raised(by metres: Double) -> FocusRoomFit {
+        var fit = self
+        fit.floor = min(max(((floor + metres) * 100).rounded() / 100, Self.floors.lowerBound), Self.floors.upperBound)
+        return fit
+    }
 
     /// The scale on the model as RealityKit read it, the file's own units already applied.
     func scale(fileMetresPerUnit: Double) -> Double {
@@ -116,6 +125,9 @@ nonisolated struct FocusRoomFit: Codable, Equatable, Sendable {
 nonisolated struct FocusRoomPose: Equatable, Sendable {
     var scale: Double
     var offset: SIMD3<Double>
+    /// How far the room's floor stands above the person's own, wherever they start or land in it: the
+    /// fit's floor. A desk lined up with theirs stays lined up.
+    var raise: Double
 
     /// A model with these bounds (metres, the file's units applied), placed as `FocusRoomPlacement`
     /// places it at its fitted size, then raised by the fit's floor.
@@ -124,6 +136,19 @@ nonisolated struct FocusRoomPose: Equatable, Sendable {
         let placed = FocusRoomPlacement.offset(min: min * Float(scale), max: max * Float(scale))
         self.scale = scale
         offset = SIMD3<Double>(placed) + [0, fit.floor, 0]
+        raise = fit.floor
+    }
+
+    /// The world's pose that stands the person at `start` (the file's coordinates), the room's floor
+    /// `raise` above theirs.
+    func pose(startingAt start: FocusSpot, under head: FocusSpot) -> FocusWorldPose {
+        FocusWorldPose(placing: inWorld(start), under: head, raised: raise)
+    }
+
+    /// Where the person stands in `world`, as a start to keep beside the file: the room's floor under
+    /// their head, facing their way. `pose(startingAt:under:)` puts them back there.
+    func start(standingIn world: FocusWorldPose, head: FocusSpot) -> FocusSpot {
+        inFile(world.inWorld(FocusSpot(x: head.x, y: raise, z: head.z, yaw: head.yaw)))
     }
 
     /// A spot in the file's coordinates, where it is in the world.
@@ -150,13 +175,14 @@ nonisolated struct FocusWorldPose: Equatable, Sendable {
     static let identity = FocusWorldPose()
 
     /// The pose that puts `spot`, a place in the world, under the person's head, which is at `head`
-    /// around them (its `y` unused), turned so they face the spot's heading. Its floor comes up to
-    /// theirs. Mirador's `originForSpot`, for a world that moves instead of the person.
-    init(placing spot: FocusSpot, under head: FocusSpot) {
+    /// around them (its `y` unused), turned so they face the spot's heading. Its floor comes to
+    /// theirs, or `raised` above it. Mirador's `originForSpot`, for a world that moves instead of
+    /// the person.
+    init(placing spot: FocusSpot, under head: FocusSpot, raised: Double = 0) {
         let turn = head.yaw - spot.yaw
         let (cos, sin) = (Foundation.cos(turn), Foundation.sin(turn))
         x = head.x - (cos * spot.x + sin * spot.z)
-        y = -spot.y
+        y = raised - spot.y
         z = head.z - (-sin * spot.x + cos * spot.z)
         yaw = turn
     }
@@ -231,9 +257,39 @@ nonisolated enum FocusLocomotion {
 
     /// The pose the world takes to turn the person by `angle` where they stand.
     static func turning(_ world: FocusWorldPose, by angle: Double, head: FocusSpot) -> FocusWorldPose {
+        nudging(world, forward: 0, right: 0, turn: angle, head: head)
+    }
+
+    /// The fine positioning pad's steps (the owner, 2026-10-28: "How can we allow micro
+    /// adjustments? Right now it's almost impossible to get the right position as it relates to the
+    /// desk surface").
+    static let nudgeStep = 0.02
+    static let nudgeTurn = Double.pi / 180
+
+    /// The pose the world takes to move the person `forward` and `right` (metres, the way they face)
+    /// and turn them by `turn`, on the floor they're on.
+    static func nudging(_ world: FocusWorldPose, forward: Double, right: Double, turn: Double, head: FocusSpot) -> FocusWorldPose {
         var here = world.inWorld(head)
-        here.yaw += angle
+        here.x += -sin(here.yaw) * forward + cos(here.yaw) * right
+        here.z += -cos(here.yaw) * forward - sin(here.yaw) * right
+        here.yaw += turn
         here.y = -world.y
         return FocusWorldPose(placing: here, under: head)
+    }
+}
+
+/// How far one spot is from another in the first's own frame: metres ahead and to the right, and the
+/// turn, a positive one to the left. The pad's "from where you start".
+nonisolated struct FocusOffset: Equatable, Sendable {
+    var ahead: Double
+    var right: Double
+    var turn: Double
+
+    /// `to` from `from`, both in a room's file, its scale applied.
+    init(from: FocusSpot, to: FocusSpot, scale: Double) {
+        let (dx, dz) = ((to.x - from.x) * scale, (to.z - from.z) * scale)
+        ahead = -sin(from.yaw) * dx - cos(from.yaw) * dz
+        right = cos(from.yaw) * dx - sin(from.yaw) * dz
+        turn = FocusLocomotion.angleBetween(from.yaw, to.yaw)
     }
 }

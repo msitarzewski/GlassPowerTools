@@ -1909,3 +1909,22 @@ room-file contract is the handoff note's. Phase 3 ("go ahead with phase 3"): a d
 headset. Living rooms built 2026-10-27 (phases 1 and 2 of the handoff; phase 3 each its own approval), 0.4.540, and seen
 working on his headset that evening ("holy shit it works~!!!"); committed 2026-10-27 at his word. Task notes
 `tasks/2026-10/2026-10-26_focus-environments.md`, `tasks/2026-10/2026-10-27_living-rooms-handoff.md`.
+
+## D90 — Terminal color schemes from Terminal profiles — Implemented 2026-10-28 (storage and background: this session's choices, awaiting the owner's word)
+**Owner, 2026-10-28:** a zip of 148 macOS Terminal profiles from a user: "Let's make these work, first class style! It's a
+user request." Then "Highlight colors, etc. I don't think we have highlight/text customization on the 'looks' we built."
+
+**Decision:**
+- A `.terminal` profile is read on every device without AppKit (`TerminalProfileReader`), its colours as the Mac's
+  `NSColor` gives them (held to it in a test). Only colours and a font are read, never commands, folders or shells.
+- **Schemes live as files** in iCloud Drive ▸ Glass Power Tools ▸ Terminal Themes, not in the synced theme library:
+  that library is one iCloud key-value entry (≤ 64 themes, 384 KB) sharing the app's 1 MB with workgroups, projects
+  and favorites, and 148 would crowd them. Files have no limit, show in Files and the Finder, and delete everywhere.
+- A scheme is named by a UUID made from its file name, the same on every device. All Terminals' choice syncs as a new
+  optional preference (empty: your theme; absent from older builds: unchanged); a window's is its theme setting, a
+  UUID as before. A device without the file draws your theme until it comes.
+- **A scheme's background is honoured** (the importer dropped it before): its colours are made for it; the window's
+  opacity still decides how much of it shows (Glass stays). Its font isn't taken: your font stays.
+- To change a scheme's colours, Copy to Your Themes makes it an ordinary theme for the Themes editor.
+- **Not done:** a bold text colour (SwiftTerm has none to set); bundling the 148 in the app (their origins and
+  licences are unchecked: iTerm2-Color-Schemes is MIT, each scheme's author varies).

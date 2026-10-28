@@ -165,6 +165,32 @@ the right position as it relates to the desk surface."
   repeat, 1° turns, the room 1 cm up or down, Keep This Spot as the room's start) and slide by hand (pinch the floor
   at your feet and drag: you move with the hand at half its movement, no fade). Not built yet: he turned to git.
 
+## Fine Position, and the floor a pinch must find (2026-10-28, 0.4.545)
+The owner: "commit and push, then build the nudge pad"; then "Let's create a build and ship it when you're ready."
+- **Found on the way, a defect of 0.4.543:** floor-only measured from the floor forced under the environment, which a
+  room places at its lowest point. The loft's sky reaches 5998 m below its floor and Rain Garden's 398 m (measured on
+  the Mac with RealityKit, `Entity(contentsOf:)` and `visualBounds`), so in both every pinch on the floor showed the
+  greyed target and went nowhere. Now measured from the floor the person stands on (`FocusWalking.raise`): every start
+  and landing puts it there. The simulator's test room had no sky, so 0.4.543's check passed; `--demo-room-sky` gives
+  it one 40 m down.
+- **The room's height sticks:** the fit's floor was undone by any start (a start was placed at the person's feet), so
+  Try Out's floor slider only lasted while it was open. Now a room raised 3 cm stays 3 cm up wherever the person starts
+  or lands (`FocusRoomPose.raise`, `pose(startingAt:under:)`, `FocusWorldPose(placing:under:raised:)`), and Start Here
+  and Keep This Spot keep the room's floor under the head, not the person's (`start(standingIn:head:)`).
+- **Fine Position** (`FocusEnvironmentNudgeView`): a `Window` from the moon's pinch-and-hold menu while Focus Mode is
+  open, placed by the system as a utility panel (below the window, near the hands), sized to its content. A pad:
+  turns of 1° in its top corners, steps of 2 cm the way the person faces (`FocusLocomotion.nudging`, no fade), every
+  button repeating while held (`buttonRepeatBehavior`); "From where you start" read back after each move
+  (`FocusOffset`, the stage's `moves`); the room 1 cm up or down (`FocusRoomFit.raised(by:)`, kept a second after the
+  last press); Keep This Spot (kept at once). It closes with Focus Mode. Nothing in the way is checked: lining a desk
+  up may mean standing in it.
+- **Tests:** unit, 5 new (by hand and round trips: a raised room kept and opened again; the loft's measure), each
+  seen failing with its part broken; terminal 1043. UI: `testFinePositionStepsTurnsRaisesAndKeepsTheSpot` (from the
+  moon's menu; steps, turn, a 2 s hold past one step, Keep, height up and back) and `testAFloorUnderASkyIsLandedOn`
+  (`--demo-teleport` read back as "1.5 m ahead"); both fail with their part broken (hold stepped once, 8 cm; the old
+  floor refused the landing). Focus Mode's UI tests 5 of 5. Captured: the panel below the terminal window, the menu.
+- **Not seen:** the headset. Slide by hand, his second choice, not built.
+
 ## Open
 - Sketchfab: KitBash bought it from Epic in August 2026; its Download API's future is unannounced. Not built.
 - Live data in environments: proposed to the owner.

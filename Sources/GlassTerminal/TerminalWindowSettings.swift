@@ -39,7 +39,8 @@ nonisolated enum TerminalWindowSettings {
     static let interactiveGlass = GlassWindowSetting<Bool>("terminal.interactiveGlass", title: "Interactive Glass")
 
     // Text.
-    /// A theme from the library, by identifier. One not on this device draws with All Terminals'.
+    /// A theme from the library, or a scheme from the Terminal Themes folder, by identifier. One not
+    /// on this device draws with All Terminals'.
     static let theme = GlassWindowSetting<String>("terminal.theme", title: "Theme") { raw in
         guard let id = UUID(uuidString: raw) else { return nil }
         return (id == TerminalTheme.legacyDefaultID ? TerminalTheme.defaultID : id).uuidString
@@ -171,11 +172,12 @@ struct TerminalWindowProfile: Equatable {
     }
 
     init(window: GlassWindowOverrides, look: TerminalLook, theme global: TerminalTheme, library: TerminalThemeLibrary,
+         schemes: TerminalSchemeLibrary = .shared,
          cursorStyle: String, blinkingCursor: Bool, keepsScrollback: Bool, scrollbackLines: Int,
          bellEnabled: Bool, visualBell: Bool, pathPreviews: TerminalPathPreviews = .mouseover,
          whenResized: TerminalResizeBehavior = .changeGrid) {
         self.look = look
-        self.theme = Self.theme(window, over: global, library: library)
+        self.theme = Self.theme(window, over: global, library: library, schemes: schemes)
         self.cursorStyle = window.value(of: TerminalWindowSettings.cursorStyle, over: cursorStyle)
         self.blinkingCursor = window.value(of: TerminalWindowSettings.blinkingCursor, over: blinkingCursor)
         self.scrollbackLines = window.value(of: TerminalWindowSettings.keepsScrollback, over: keepsScrollback)
@@ -193,21 +195,25 @@ struct TerminalWindowProfile: Equatable {
     /// the settings are observable, and so is whatever holds the window's.
     static func resolved(_ window: GlassWindowOverrides, settings: SettingsManager) -> TerminalWindowProfile {
         TerminalWindowProfile(window: window, look: TerminalLook.resolved(window, settings: settings),
-                              theme: settings.currentTheme, library: settings.themeLibrary,
+                              theme: settings.allTerminalsTheme, library: settings.themeLibrary,
                               cursorStyle: settings.cursorStyle, blinkingCursor: settings.blinkingCursor,
                               keepsScrollback: settings.saveScrollback, scrollbackLines: settings.maxScrollbackLines,
                               bellEnabled: settings.bellEnabled, visualBell: settings.visualBell,
                               pathPreviews: settings.pathPreviews, whenResized: settings.whenResized)
     }
 
-    /// The window's theme — one from the library, while the library has it — else `global`, with
-    /// the window's font over the theme's.
+    /// The window's theme — one from the library, or a scheme from the Terminal Themes folder in
+    /// `global`'s font, while this device has it — else `global`, with the window's font over the
+    /// theme's.
     static func theme(_ window: GlassWindowOverrides, over global: TerminalTheme,
-                      library: TerminalThemeLibrary) -> TerminalTheme {
+                      library: TerminalThemeLibrary, schemes: TerminalSchemeLibrary = .shared) -> TerminalTheme {
         var theme = global
-        if let id = window[TerminalWindowSettings.theme].flatMap(UUID.init(uuidString:)),
-           let chosen = library.records.first(where: { $0.id == id && !$0.isDeleted })?.theme {
-            theme = chosen
+        if let id = window[TerminalWindowSettings.theme].flatMap(UUID.init(uuidString:)) {
+            if let chosen = library.records.first(where: { $0.id == id && !$0.isDeleted })?.theme {
+                theme = chosen
+            } else if let scheme = schemes.theme(forID: id, font: global) {
+                theme = scheme
+            }
         }
         if let family = window[TerminalWindowSettings.fontFamily] { theme.fontName = family }
         if let size = window[TerminalWindowSettings.fontSize] { theme.fontSize = CGFloat(size) }
@@ -216,9 +222,11 @@ struct TerminalWindowProfile: Equatable {
         return theme
     }
 
-    /// Whether the window names a theme this device's library doesn't hold (yet: themes sync).
-    static func isMissingTheme(_ window: GlassWindowOverrides, library: TerminalThemeLibrary) -> Bool {
+    /// Whether the window names a theme this device doesn't have (yet: themes sync, and schemes
+    /// come with iCloud Drive).
+    static func isMissingTheme(_ window: GlassWindowOverrides, library: TerminalThemeLibrary,
+                               schemes: TerminalSchemeLibrary = .shared) -> Bool {
         guard let id = window[TerminalWindowSettings.theme].flatMap(UUID.init(uuidString:)) else { return false }
-        return !library.records.contains { $0.id == id && !$0.isDeleted }
+        return !library.records.contains { $0.id == id && !$0.isDeleted } && schemes.scheme(withID: id)?.theme == nil
     }
 }

@@ -638,6 +638,13 @@ struct TerminalWindowView: View {
         }
         // `--demo-try-out <identifier>`: Try Out's window for one of the person's 3D environments.
         let arguments = ProcessInfo.processInfo.arguments
+        // `--demo-fine-position`: Fine Position's window, once Focus Mode has opened.
+        if arguments.contains("--demo-fine-position") {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(4))
+                openWindow(id: FocusEnvironmentNudgeView.windowID)
+            }
+        }
         if let index = arguments.firstIndex(of: "--demo-try-out"), arguments.indices.contains(index + 1) {
             let id = arguments[index + 1]
             Task { @MainActor in
@@ -668,6 +675,8 @@ struct TerminalWindowView: View {
         // The moon's menu lists the person's own environments too.
         FocusEnvironmentLibrary.shared.start()
         #endif
+        // A scheme from the Terminal Themes folder may be what this window draws with.
+        TerminalSchemeLibrary.shared.start()
         rejectPendingHostKeyChallengeInStrictMode()
         updateTerminalFocusOwnership(
             competingControlPresented: session.pendingHostKeyChallenge != nil || showingErrorCard
@@ -696,7 +705,7 @@ struct TerminalWindowView: View {
     }
 
     /// The moon's pinch-and-hold menu: the library, this window's environment checked. Choosing one
-    /// keeps it for the window and shows it.
+    /// keeps it for the window and shows it. While Focus Mode is open, Fine Position too.
     @ViewBuilder
     private var focusEnvironmentMenu: some View {
         Picker("Focus Environment", selection: Binding(get: { focusEnvironmentID }, set: chooseFocusEnvironment)) {
@@ -705,6 +714,12 @@ struct TerminalWindowView: View {
             }
         }
         .pickerStyle(.inline)
+        if isImmersiveFocusActive {
+            Divider()
+            Button("Fine Position…", systemImage: "dpad") {
+                openWindow(id: FocusEnvironmentNudgeView.windowID)
+            }
+        }
     }
 
     private func chooseFocusEnvironment(_ id: String) {
@@ -1919,6 +1934,7 @@ struct TerminalWindowView: View {
             // Pinch and hold: this window's environment, chosen and shown (2026-10-26).
             .contextMenu { focusEnvironmentMenu }
             .accessibilityLabel(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
+            .accessibilityIdentifier("terminal-focus-mode")
             .help(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
             #elseif os(macOS)
             Button {

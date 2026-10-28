@@ -64,6 +64,44 @@ struct FocusRoomFitTests {
 
     // MARK: - Placing
 
+    @Test("The room goes up and down a centimetre at a time, to the centimetre, within its range")
+    func roomHeightSteps() {
+        var fit = FocusRoomFit()
+        for _ in 0..<3 { fit = fit.raised(by: FocusRoomFit.floorStep) }
+        #expect(fit.floor == 0.03, "three steps are 3 cm, not 3.0000000000000002")
+        fit = fit.raised(by: -FocusRoomFit.floorStep)
+        #expect(fit.floor == 0.02)
+        #expect(FocusRoomFit(floor: 4.995).raised(by: 0.01).floor == FocusRoomFit.floors.upperBound)
+        #expect(FocusRoomFit(floor: -5).raised(by: -0.01).floor == FocusRoomFit.floors.lowerBound)
+    }
+
+    @Test("A room raised to line its desk up stays raised where the person starts and lands; a start kept there brings them back")
+    func aRaisedRoomStaysRaised() throws {
+        // The loft's measure: a sky round it reaching 6 km below its floor, its camera on the floor.
+        let pose = FocusRoomPose(min: [-6000, -5998.4, -7000], max: [6000, 6001.6, 6000], fit: FocusRoomFit(floor: 0.03),
+                                 fileMetresPerUnit: 1)
+        let camera = FocusSpot(x: 0, y: 0, z: 0, yaw: 0)
+        let head = FocusSpot(x: 0.1, y: 0, z: -0.2, yaw: 0.6)
+        let world = pose.pose(startingAt: camera, under: head)
+        let floor = world.around(pose.inWorld(camera))
+        #expect(close(floor.x, head.x, within: 1e-9) && close(floor.z, head.z, within: 1e-9), "started at the camera")
+        #expect(close(floor.y, 0.03, within: 1e-9), "the room's floor 3 cm above the person's, not at their feet")
+        #expect(FocusLocomotion.canLand(normalY: 1, height: floor.y, floor: pose.raise),
+                "and it is the floor a pinch may land on, not the bottom of the sky 6 km down")
+
+        // Kept where they stand, and opened again: the same place, the same height.
+        let kept = pose.start(standingIn: world, head: head)
+        #expect(close(kept.y, 0, within: 1e-9), "kept on the room's floor, not 3 cm under it")
+        let again = pose.pose(startingAt: kept, under: head)
+        #expect(close(again.x, world.x, within: 1e-9) && close(again.y, world.y, within: 1e-9)
+                && close(again.z, world.z, within: 1e-9) && close(again.yaw, world.yaw, within: 1e-9))
+
+        // Landing on the room's floor elsewhere keeps it raised.
+        let there = pose.inWorld(FocusSpot(x: 2, y: 0, z: -1, yaw: 1))
+        let landed = FocusWorldPose(placing: there, under: head, raised: pose.raise)
+        #expect(close(landed.around(there).y, 0.03, within: 1e-9))
+    }
+
     @Test("Fitted, a room still stands around the person with its floor at their feet, then raised by the fit's floor")
     func fittedRoomStandsAroundThePerson() {
         // A 6 × 3 × 4 m room as the file says, its corner at the origin.
@@ -96,6 +134,8 @@ struct FocusRoomFitTests {
         #expect(close(there.y, 0), "its floor is at theirs: an upper floor comes down to them")
         #expect(close(FocusLocomotion.angleBetween(there.yaw, head.yaw), 0), "they face the spot's heading")
         #expect(close(world.inWorld(head), FocusSpot(x: spot.x, y: -world.y, z: spot.z, yaw: spot.yaw)))
+        #expect(close(FocusWorldPose(placing: spot, under: head, raised: 0.05).around(spot).y, 0.05),
+                "or raised above theirs")
     }
 
     @Test("Mirador's origin for a spot, worked by hand: turned a quarter, the world swings round the person")
@@ -141,6 +181,44 @@ struct FocusRoomFitTests {
         #expect(FocusLocomotion.turn(swingFrom: 0, to: 10 * degree) == .pi / 4, "swung left, turned left")
         #expect(FocusLocomotion.turn(swingFrom: 0.1, to: 0.1 - 10 * degree) == -.pi / 4)
         #expect(FocusLocomotion.turn(swingFrom: .pi - 2 * degree, to: -.pi + 8 * degree) == .pi / 4, "across ±180°")
+    }
+
+    @Test("A nudge steps the person 2 cm the way they face or to their right, by hand: the world moves the other way")
+    func aNudgeByHand() {
+        // Standing at the origin facing −z: forward is −z, right is +x.
+        let stepped = FocusLocomotion.nudging(.identity, forward: 0.02, right: 0.03, turn: 0, head: FocusSpot(x: 0, z: 0))
+        #expect(close(stepped.x, -0.03) && close(stepped.z, 0.02) && close(stepped.y, 0) && close(stepped.yaw, 0))
+        // Facing −x (a quarter turn left): forward is −x, right is −z.
+        let turned = FocusLocomotion.nudging(.identity, forward: 0.02, right: 0.03, turn: 0,
+                                             head: FocusSpot(x: 0, z: 0, yaw: .pi / 2))
+        let here = turned.inWorld(FocusSpot(x: 0, z: 0, yaw: .pi / 2))
+        #expect(close(here.x, -0.02) && close(here.z, -0.03))
+    }
+
+    @Test("Nudges in a world already moved go the way the person faces in it, keep their floor, and are read back as steps from where they began")
+    func nudgesAreReadBack() {
+        let head = FocusSpot(x: 0.2, y: 0, z: 0.1, yaw: 0.3)
+        let world = FocusWorldPose(placing: FocusSpot(x: 4, y: 3, z: -2, yaw: 1), under: head)
+        let before = world.inWorld(head)
+        var moved = world
+        moved = FocusLocomotion.nudging(moved, forward: FocusLocomotion.nudgeStep, right: 0, turn: 0, head: head)
+        moved = FocusLocomotion.nudging(moved, forward: FocusLocomotion.nudgeStep, right: 0, turn: 0, head: head)
+        moved = FocusLocomotion.nudging(moved, forward: 0, right: -FocusLocomotion.nudgeStep, turn: 0, head: head)
+        moved = FocusLocomotion.nudging(moved, forward: 0, right: 0, turn: FocusLocomotion.nudgeTurn, head: head)
+        let after = moved.inWorld(head)
+        #expect(close(after.y, before.y), "on the floor they were on")
+        #expect(close(after.x - before.x, -sin(1) * 0.04 - cos(1) * 0.02) && close(after.z - before.z, -cos(1) * 0.04 + sin(1) * 0.02),
+                "4 cm the way they face in the world (1 rad), 2 cm to its left")
+        let offset = FocusOffset(from: before, to: after, scale: 1)
+        #expect(close(offset.ahead, 0.04) && close(offset.right, -0.02) && close(offset.turn, .pi / 180))
+    }
+
+    @Test("How far from a start, in its own frame and the room's size, by hand")
+    func offsetByHand() {
+        // Facing −x, a room at twice its file's size: −0.1 in x is 10 cm ahead, −0.06 in z is 6 cm right.
+        let offset = FocusOffset(from: FocusSpot(x: 0, z: 0, yaw: .pi / 2), to: FocusSpot(x: -0.05, z: -0.03, yaw: .pi / 2 - 0.1),
+                                 scale: 2)
+        #expect(close(offset.ahead, 0.1) && close(offset.right, 0.06) && close(offset.turn, -0.1))
     }
 
     @Test("A snap turn keeps the person where they stand and on the floor they're on")

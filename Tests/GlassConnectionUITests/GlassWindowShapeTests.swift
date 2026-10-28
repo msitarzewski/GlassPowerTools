@@ -88,6 +88,10 @@ struct GlassWindowShapeTests {
                                      ".glassSpatialWindowGlass(strength:"]),
                                    "the database draws Apple's glass itself, at the window's Glass, with Opacity's paint over it in the window's shape; its columns are our own"),
         // W39: the orb ("minimized") is no longer a window of its own; Connections becomes it.
+        // D88: the orb dock, where windows shrunk into their orbs gather.
+        "GlassOrbDock.windowID": (("GlassOrbDock.swift",
+                                   ["GlassLayeredWindow(paintsTheme: true) { content }", ".glassSpatialWindowGlass()"]),
+                                  "the dock draws Apple's glass itself, with Opacity's paint over it in the window's shape (GlassOrbDockLook); clear at 0% of both"),
     ]
 
     @Test func everyPlainWindowIsRecordedWithWhatShapesIt() throws {

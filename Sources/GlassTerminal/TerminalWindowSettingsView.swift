@@ -83,7 +83,7 @@ struct TerminalOverridesSettingsView: View {
         // The font the window's theme brings, which its own font follows until set here.
         let themeFont = TerminalWindowProfile.theme(
             settings.removing([TerminalWindowSettings.fontFamily.key, TerminalWindowSettings.fontSize.key]),
-            over: global.currentTheme, library: global.themeLibrary)
+            over: global.allTerminalsTheme, library: global.themeLibrary)
 
         Form {
             #if !os(macOS)
@@ -131,11 +131,21 @@ struct TerminalOverridesSettingsView: View {
 
             Section("Theme") {
                 GlassWindowSettingRow(TerminalWindowSettings.theme, overrides: $settings,
-                                      global: global.currentTheme.id.uuidString, inheritsFrom: Source.allTerminals) { value in
+                                      global: global.allTerminalsTheme.id.uuidString, inheritsFrom: Source.allTerminals) { value in
                     GlassSettingLabeled("Theme") {
                         Picker("Theme", selection: themeSelection(value, global: global)) {
-                            ForEach(global.themeLibrary.activeRecords) { record in
-                                Text(record.theme.name).tag(record.id.uuidString)
+                            Section("Your Themes") {
+                                ForEach(global.themeLibrary.activeRecords) { record in
+                                    Text(record.theme.name).tag(record.id.uuidString)
+                                }
+                            }
+                            // The Terminal Themes folder's schemes (Choose Theme imports them).
+                            if !usableSchemes.isEmpty {
+                                Section("Terminal Themes") {
+                                    ForEach(usableSchemes) { scheme in
+                                        Text(scheme.name).tag(scheme.id.uuidString)
+                                    }
+                                }
                             }
                         }
                         .accessibilityIdentifier("terminal-window-theme")
@@ -316,14 +326,20 @@ struct TerminalOverridesSettingsView: View {
         // No extra padding: a grouped form brings its own margins (as All Terminals).
     }
 
-    /// The theme picker's selection: the window's theme while the library has it, else the one it
+    /// The schemes this device has read, to choose from.
+    private var usableSchemes: [TerminalScheme] {
+        TerminalSchemeLibrary.shared.schemes.filter { $0.theme != nil }
+    }
+
+    /// The theme picker's selection: the window's theme while this device has it, else the one it
     /// draws with — All Terminals' — so the picker always shows a theme it lists.
     private func themeSelection(_ value: Binding<String>, global: SettingsManager) -> Binding<String> {
         Binding(
             get: {
                 let id = value.wrappedValue
-                return global.themeLibrary.activeRecords.contains { $0.id.uuidString == id }
-                    ? id : global.currentTheme.id.uuidString
+                let listed = global.themeLibrary.activeRecords.contains { $0.id.uuidString == id }
+                    || usableSchemes.contains { $0.id.uuidString == id }
+                return listed ? id : global.allTerminalsTheme.id.uuidString
             },
             set: { value.wrappedValue = $0 }
         )

@@ -6,6 +6,27 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.547</title>
+      <pubDate>Wed, 28 Oct 2026 20:17:15 GMT</pubDate>
+      <sparkle:version>547</sparkle:version>
+      <sparkle:shortVersionString>0.4.547</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.547</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.547</h2>
+<ul>
+  <li><b>Terminal color schemes.</b> Import macOS Terminal profiles (.terminal files, or a folder of them) and choose among them in a terminal's Settings ▸ All Terminals ▸ Theme ▸ Choose…, each shown in its own colors. They're kept in iCloud Drive ▸ Glass Power Tools ▸ Terminal Themes for every device, and This Window can use one too. Background, text, selection, cursor and all sixteen colors come across; your font stays. Open With Glass Power Tools on a .terminal file adds it.</li>
+  <li><b>Git in the editor.</b> A project's branch at the foot of its files, a Changes tab, change marks beside the lines, staging and committing, and now Pull, Push, Fetch and Publish Branch, with plain words when one can't go ahead.</li>
+  <li><b>Four more terminal looks:</b> Coding Agent, Aurora, Starfield and Blueprint. A Workgroup can have a look of its own.</li>
+  <li><b>Mermaid diagrams</b> a program prints in a terminal, as Claude Code does, are marked and open as pictures. Tabs show the coding agent they're running.</li>
+  <li><b>New terminals from the sidebar:</b> right-click its empty space for what the toolbar's + offers.</li>
+  <li><b>⌘F finds in the editor</b>, with Find Next and Find Previous.</li>
+  <li>A database that won't connect says why, and its Connection Details show where the tunnel goes. A remote desktop that ends the session says why.</li>
+  <li>Saved connections changed on another device stay changed. Cancel and the time limit stop any SQLite query. A tmux server the app started can be stopped.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.547/GlassPowerTools-0.4.547.zip" length="27810936" type="application/octet-stream" sparkle:edSignature="a1YceZrS+3AeGXgb4glyXsBLI4Y/3A+1k10Oo3J9kjGUdWI39c6B6oIHuz5Sjuv48aIGb0TC1BpzKIGix7w0CA=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.494</title>
       <pubDate>Tue, 20 Oct 2026 16:07:46 GMT</pubDate>
       <sparkle:version>494</sparkle:version>

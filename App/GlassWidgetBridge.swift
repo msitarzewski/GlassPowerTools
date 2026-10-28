@@ -55,6 +55,8 @@ enum GlassWidgetBridge {
         var savedQueries: @MainActor () -> [GlassWidgetSnapshot.SavedQuery]
         /// A saved query into a new SQL tab: the connection to connect when none is live, else nil.
         var openSavedQuery: @MainActor (UUID) -> UUID?
+        /// Terminal profiles into the terminal's Terminal Themes; what happened, in words.
+        var importTerminalThemes: @MainActor ([URL]) async -> String
     }
 
     private static var started = false
@@ -114,11 +116,11 @@ enum GlassWidgetBridge {
         }
     }
 
-    /// What a send from the share sheet did, said where the person is: an alert on the Mac.
-    private static func say(_ message: String) {
+    /// What a request did, said where the person is: an alert on the Mac.
+    private static func say(_ message: String, title: String = "Send to a Machine") {
         #if os(macOS)
         let alert = NSAlert()
-        alert.messageText = "Send to a Machine"
+        alert.messageText = title
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
         NSApp.activate()
@@ -176,6 +178,11 @@ enum GlassWidgetBridge {
         case .openSSHLink(let link):
             ensureLibrary()
             actions?.openSSHLink(link)
+        case .importTerminalThemes(let profiles):
+            Task { @MainActor in
+                guard let message = await actions?.importTerminalThemes(profiles), !message.isEmpty else { return }
+                Self.say(message, title: "Terminal Themes")
+            }
         case let .sendFiles(files, machine, folder):
             // From the Mac's share extension: sent as Shortcuts' Send Files is, then said.
             Task { @MainActor in

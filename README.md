@@ -21,7 +21,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPLv3-c8102e" alt="Licence: GPLv3"></a>
   <img src="https://img.shields.io/badge/runs%20on-Vision%20Pro%20%7C%20Mac%20%7C%20iPad%20%7C%20iPhone-555" alt="Runs on Vision Pro, Mac, iPad and iPhone">
-  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.494-2e7d32" alt="Mac: 0.4.494"></a>
+  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.547-2e7d32" alt="Mac: 0.4.547"></a>
   <a href="https://github.com/sponsors/msitarzewski"><img src="https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
@@ -196,9 +196,11 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   local shell on the Mac. Terminals kept in tmux, on servers and on the Mac, outlive the app and can
   be picked up on another device, and with tmux 3.2 or later the terminal keeps every line itself, so
   you scroll and select through the whole history. Windows scale as well as resize, and each can have
-  a look of its own. On the Mac, a file whose path a terminal prints previews over it, SQL it prints
-  opens in the query editor on that machine's database, and the folder button opens the shell's
-  folder in the Finder, Files or the Editor.
+  a look of its own. Color schemes come from macOS Terminal profiles, any number of them, kept in
+  iCloud Drive for every device. On the Mac, a file whose path a terminal prints previews over it,
+  SQL it prints opens in the query editor on that machine's database, and the folder button opens the
+  shell's folder in the Finder, Files or the Editor. On Vision Pro, Focus Mode surrounds you with an
+  environment, built in or your own 3D room or 360° photo, to walk about in.
 - **Databases:** MySQL, PostgreSQL and SQLite — browse, filter and edit rows, follow foreign keys,
   see a live diagram of every table and key (in three dimensions on Vision Pro), write and explain
   queries (or ask the on-device assistant for one), reach a database directly with TLS, through its
@@ -209,7 +211,8 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   and images, and see-through glass on Mac and Vision Pro.
 - **Editor:** files on this device or on a server, projects with a file tree, syntax highlighting
   for fifteen languages, and previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV;
-  images, PDFs, video, audio and 3D models open as themselves. On the Mac it can be your default
+  images, PDFs, video, audio and 3D models open as themselves. Git: changes, marks beside the lines,
+  staging, committing, pull, push and fetch, here or on a server. On the Mac it can be your default
   text editor.
 - **Everywhere you are:** the library, favorites, workgroups and projects sync through iCloud, and
   credentials through iCloud Keychain; keys made in the Secure Enclave stay on their device. Your
@@ -252,7 +255,7 @@ claims on the website were checked against the code and its test records.
 
 ## Status
 
-The Mac app is at 0.4.494 (its first release was 0.4.491): download it from
+The Mac app is at 0.4.547 (its first release was 0.4.491): download it from
 [glasspowertools.com](https://glasspowertools.com) or this repository's
 [releases](https://github.com/msitarzewski/GlassPowerTools/releases). It is signed with a Developer ID,
 notarized by Apple, and updates itself through Sparkle. It cannot be in the Mac App Store, because a

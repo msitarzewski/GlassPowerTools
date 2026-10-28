@@ -402,38 +402,49 @@ struct GeneralSettingsView: View {
 struct TerminalSettingsView: View {
     @Environment(SettingsManager.self) private var settingsManager
     @State private var showingThemeEditor = false
+    @State private var showingThemeChooser = false
     
     var body: some View {
         @Bindable var settings = settingsManager
+        let theme = settingsManager.allTerminalsTheme
         
         Form {
-            Section("Theme") {
+            Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(settingsManager.currentTheme.name)
+                        Text(theme.name)
                             .font(.headline)
+                            .accessibilityIdentifier("terminal-settings-theme-name")
                         
-                        Text("Font: \(settingsManager.currentTheme.fontName) \(Int(settingsManager.currentTheme.fontSize))pt")
+                        Text("Font: \(theme.fontName) \(Int(theme.fontSize))pt")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     
                     Spacer()
                     
+                    // Two buttons in one row: each its own, or a tap on either presses both.
+                    Button("Choose…") {
+                        showingThemeChooser = true
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("terminal-settings-choose-theme")
                     Button("Edit Theme") {
                         showingThemeEditor = true
                     }
+                    .buttonStyle(.borderless)
                 }
                 
                 // Color preview
                 LazyVGrid(columns: previewColumns, spacing: 12) {
                     ForEach([
-                        ("Background", settingsManager.currentTheme.background.color),
-                        ("Foreground", settingsManager.currentTheme.foreground.color),
-                        ("Red", settingsManager.currentTheme.red.color),
-                        ("Green", settingsManager.currentTheme.green.color),
-                        ("Blue", settingsManager.currentTheme.blue.color),
-                        ("Yellow", settingsManager.currentTheme.yellow.color)
+                        ("Background", theme.background.color),
+                        ("Foreground", theme.foreground.color),
+                        ("Selection", theme.selection.color),
+                        ("Red", theme.red.color),
+                        ("Green", theme.green.color),
+                        ("Blue", theme.blue.color),
+                        ("Yellow", theme.yellow.color)
                     ], id: \.0) { name, color in
                         VStack(spacing: 4) {
                             Circle()
@@ -451,6 +462,14 @@ struct TerminalSettingsView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("\(name) color preview")
                     }
+                }
+            } header: {
+                Text("Theme")
+            } footer: {
+                if settingsManager.terminalScheme != nil {
+                    Text(settingsManager.allTerminalsTheme.id == settingsManager.terminalScheme
+                         ? "From Terminal Themes in iCloud Drive. To change its colors, copy it to your themes in Choose, then edit it."
+                         : "The scheme All Terminals use isn't on this device yet, so they use your theme until it arrives.")
                 }
             }
             
@@ -616,6 +635,9 @@ struct TerminalSettingsView: View {
         .formStyle(.grouped)
         // No extra padding: a grouped form brings its own margins, and a second set made these
         // pages sit inset from the shell's in the Mac's Settings window (2026-09-25).
+        .sheet(isPresented: $showingThemeChooser) {
+            TerminalThemeChooserView()
+        }
         .sheet(isPresented: $showingThemeEditor) {
             ThemeEditorView()
                 .environment(settingsManager)
@@ -1444,6 +1466,11 @@ struct ThemeEditorView: View {
         guard settingsManager.replaceThemeLibrary(themeLibraryDraft) else {
             themeImportError = "The theme library contains an invalid theme and was not saved."
             return
+        }
+        // The theme saved here is what All Terminals use, in place of a scheme from Terminal Themes.
+        if settingsManager.terminalScheme != nil {
+            settingsManager.terminalScheme = nil
+            settingsManager.saveSettings()
         }
         dismiss()
     }

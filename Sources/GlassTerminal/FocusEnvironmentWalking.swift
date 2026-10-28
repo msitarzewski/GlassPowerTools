@@ -9,7 +9,8 @@
 //  on, back to turn round — and let go to go; raise it to cancel. Pinch the sky or a wall and swing
 //  the hand to turn 45°. Only the floor can be landed on: a pinch on a desk, a shelf or a step shows
 //  the target greyed and goes nowhere (the owner, 2026-10-28: "we need to enforce a 'floor only'
-//  locomotion").
+//  locomotion"). For the last few centimetres, Fine Position steps 2 cm and turns 1° at a time
+//  (`FocusEnvironmentNudgeView`).
 //
 //  The person never moves: the world does (`FocusWorldPose`), through a moment of dark. visionOS
 //  fades a fully immersive space for anyone who walks about 1.5 m from where they began, so this is
@@ -71,6 +72,8 @@ final class FocusWalking {
     var soundLevel: Double = 0.7 {
         didSet { soundscape?.setLevel(soundLevel) }
     }
+    /// Told each time the person has moved, for Fine Position's "from where you start".
+    var moved: (() -> Void)?
 
     static let groundGroup = CollisionGroup(rawValue: 1 << 20)
     static let roomGroup = CollisionGroup(rawValue: 1 << 21)
@@ -190,10 +193,17 @@ final class FocusWalking {
         roomHolder.position = SIMD3<Float>(placed.offset)
     }
 
-    /// Where the person stands now, in the room file's own coordinates (Start Here); nil without a room.
+    /// Where the person stands now, in the room file's own coordinates (Start Here, Keep This Spot);
+    /// nil without a room.
     func placeInFile() -> FocusSpot? {
-        guard let roomPose else { return nil }
-        return roomPose.inFile(pose.inWorld(headSpot()))
+        roomPose?.start(standingIn: pose, head: headSpot())
+    }
+
+    /// How far the person stands from where the room starts them; nil without a room, or for one
+    /// that starts them nowhere in particular.
+    func fromStart(_ fit: FocusRoomFit) -> FocusOffset? {
+        guard let roomPose, let start = fit.start ?? room?.camera, let here = placeInFile() else { return nil }
+        return FocusOffset(from: start, to: here, scale: roomPose.scale)
     }
 
     /// The fitted room's size, metres, for Try Out's readout.
@@ -204,7 +214,7 @@ final class FocusWalking {
 
     private func startingPose(fit: FocusRoomFit) -> FocusWorldPose {
         guard let roomPose, let start = fit.start ?? room?.camera else { return .identity }
-        return FocusWorldPose(placing: roomPose.inWorld(start), under: headSpot())
+        return roomPose.pose(startingAt: start, under: headSpot())
     }
 
     private func setWalks(_ walks: Bool) {
@@ -321,7 +331,7 @@ final class FocusWalking {
             guard !press.cancelled else { return }
             let landing = pose.inWorld(FocusSpot(x: Double(press.spot.x), y: Double(press.spot.y),
                                                  z: Double(press.spot.z), yaw: press.yaw))
-            move(to: FocusWorldPose(placing: landing, under: headSpot()))
+            move(to: FocusWorldPose(placing: landing, under: headSpot(), raised: raise))
         } else if let swing, let turn = FocusLocomotion.turn(swingFrom: swing, to: heading(to: handPosition(value))) {
             move(to: FocusLocomotion.turning(pose, by: turn, head: headSpot()))
         }
@@ -330,7 +340,7 @@ final class FocusWalking {
     /// Where a pinch at `point` (around the person) lands: the floor it was on; a level surface that
     /// isn't the floor, where it won't go; or a wall or a ceiling, which turn instead.
     fileprivate func landing(at point: SIMD3<Float>) -> Landing {
-        let floor = Double(floorHeight)
+        let floor = raise
         guard let scene = world.scene else { return .floor(point) }
         let eye = headPosition()
         let toward = point - eye
@@ -346,12 +356,24 @@ final class FocusWalking {
             ? .floor(hit.position) : .offFloor(hit.position)
     }
 
-    /// The floor's height around the person: the top of the floor forced under every environment.
-    private var floorHeight: Float {
-        ground.position(relativeTo: nil).y + 0.01
+    /// The height of the floor the person stands on, around them: their own floor, or a room's raised
+    /// by its fit. Every start and landing puts the floor there, so it is the floor a pinch must find
+    /// — not the floor forced under the environment, which under a room with a sky round it (the
+    /// loft's, Rain Garden's) is kilometres down, where the bottom of the sky stands.
+    private var raise: Double {
+        roomPose?.raise ?? 0
     }
 
     // MARK: - Moving
+
+    /// A small step or turn where the person stands, from Fine Position: no dark, as a couple of
+    /// centimetres is no journey. Nothing in the way is asked about: lining a desk up with one's own
+    /// may mean standing in it.
+    func nudge(forward: Double = 0, right: Double = 0, turn: Double = 0) {
+        guard walks, !moving else { return }
+        pose = FocusLocomotion.nudging(pose, forward: forward, right: right, turn: turn, head: headSpot())
+        apply(pose)
+    }
 
     /// Through a moment of dark, as Mirador's curtain: out, move, in. One move at a time.
     fileprivate func move(to next: FocusWorldPose) {
@@ -381,6 +403,7 @@ final class FocusWalking {
         world.transform = Transform(scale: .one,
                                     rotation: simd_quatf(angle: Float(pose.yaw), axis: [0, 1, 0]),
                                     translation: [Float(pose.x), Float(pose.y), Float(pose.z)])
+        moved?()
     }
 
     // MARK: - The ring and the target
@@ -391,7 +414,7 @@ final class FocusWalking {
               let aim = head.pose(), Double(aim.forward.y) < FocusLocomotion.lookingDown,
               let hit = scene.raycast(origin: aim.position, direction: aim.forward, length: Float(FocusLocomotion.reach),
                                       query: .nearest, mask: Self.standable).first,
-              FocusLocomotion.canLand(normalY: Double(hit.normal.y), height: Double(hit.position.y), floor: Double(floorHeight)) else {
+              FocusLocomotion.canLand(normalY: Double(hit.normal.y), height: Double(hit.position.y), floor: raise) else {
             if ring.isEnabled { ring.isEnabled = false }
             return
         }
@@ -539,7 +562,7 @@ extension FocusWalking {
         }
         Self.log.info("demo teleport lands at \(landing, privacy: .public)")
         let spot = pose.inWorld(FocusSpot(x: Double(landing.x), y: Double(landing.y), z: Double(landing.z), yaw: yaw))
-        move(to: FocusWorldPose(placing: spot, under: headSpot()))
+        move(to: FocusWorldPose(placing: spot, under: headSpot(), raised: raise))
     }
 
     /// The target as a pinch shows it (`--demo-walk-target x,y,z,heading°`).
@@ -559,7 +582,9 @@ extension FocusWalking {
 /// m, a doorway behind the person, a platform 1.2 m up with steps to it, a desk, and a camera by the
 /// door looking in. A living room's host parts too (2026-10-27): a `clock_digital` on the far wall,
 /// and an orb that shows at `event_left` or `event_right` every few seconds (`Test Room.events/`).
-/// Made again at each launch that asks for it, so it carries what the host has learnt since.
+/// With `--demo-room-sky`, a sky round it reaching 40 m below its floor, as the loft's (6 km) and
+/// Rain Garden's (400 m) do: a room whose lowest point isn't its floor. Made again at each launch
+/// that asks for it, so it carries what the host has learnt since.
 @MainActor
 enum FocusDemoRoom {
     static let fileName = "Test Room.reality"
@@ -583,6 +608,10 @@ enum FocusDemoRoom {
         add(.generateBox(size: [0.5, 0.4, 1]), at: [0.65, 0.2, -1.4], wood)
         add(.generateBox(size: [0.5, 0.8, 1]), at: [0.65, 0.4, -2.4], wood)
         add(.generateBox(size: [1.4, 0.05, 0.7]), at: [-1.5, 0.75, -2.2], wood)
+        if ProcessInfo.processInfo.arguments.contains("--demo-room-sky") {
+            // Seen from inside, its faces are culled: there to be measured, not seen.
+            add(.generateSphere(radius: 40), at: [0, 0, 0], UIColor(red: 0.3, green: 0.4, blue: 0.6, alpha: 1))
+        }
         let camera = PerspectiveCamera()
         camera.position = [0, 1.6, 2.4]
         room.addChild(camera)

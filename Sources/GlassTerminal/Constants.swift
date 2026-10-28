@@ -34,6 +34,7 @@ nonisolated enum UserDefaultsKeys {
     static let pathPreviews = "pathPreviews"
     static let whenResized = "whenResized"
     static let focusEnvironment = "focusEnvironment"
+    static let terminalScheme = "terminalScheme"
     static let focusOpensImmersed = "focusOpensImmersed"
     static let focusEnvironmentSound = "focusEnvironmentSound"
     static let errorSuggestions = "errorSuggestions"

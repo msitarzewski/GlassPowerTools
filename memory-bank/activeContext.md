@@ -72,6 +72,20 @@ use the disposable test VM only).
   choice:** a nudge pad and slide by hand for fine positioning in Focus Mode (same environments note). Open: his "the
   vision pro didn't connect when the app restarted" after 0.4.543's install; the headset's log shows ten terminals
   coming back at 06:25 and 06:30 UTC and nothing about connecting; he moved on ("GREAT!") before saying what didn't.
+- **Then (2026-10-28) the Mac's third release, 0.4.547** (his "build and deploy the Mac version"): notarized and stapled,
+  the feed entry added, release notes/README/site/help brought current (`tasks/2026-10/2026-10-28_release-0.4.547.md`).
+  Commit, push, the GitHub release and the site deploy follow his word; TestFlight's external testing is drafted
+  (test information, review notes, an external group) and waits on his details and word.
+- **Then (2026-10-28) Terminal color schemes, 0.4.546 (Mac read back; headset and iPhone installing as they wake), not committed (D90):**
+  a user's 148 Terminal profiles "first class": iCloud Drive ▸ Terminal Themes, Choose Theme (Settings ▸ Terminal ▸
+  Theme ▸ Choose…), This Window, Open With. `tasks/2026-10/2026-10-28_terminal-schemes.md`. His "highlight/text
+  customization": the theme always had them (Themes editor); schemes bring theirs, and Copy to Your Themes makes one
+  editable. Not drawn: a bold colour (SwiftTerm has none). Storage and the honoured background are D90's choices,
+  awaiting his word.
+- **Then (2026-10-28) Fine Position, 0.4.545 on all three devices (read back), not committed:** the nudge pad from
+  the moon's hold menu, and two defects found on the way: 0.4.543's floor-only refused every floor in the loft and
+  Rain Garden (it measured from their skies' bottoms, kilometres down), and a room's raised floor was undone by any
+  start. `2026-10-26_focus-environments.md`, "Fine Position". Next: his word on the headset; slide by hand.
 - **Then (2026-10-28) a menu in the empty space of a Vision Pro terminal sidebar, 0.4.542 on all three devices (read back), committed and pushed (64d9045d):** held, what
   the bar's + offers (`tasks/2026-10/2026-10-28_vision-sidebar-empty-menu.md`). On the way: the runner's holds at a
   point of an ornament miss; tests hold elements.

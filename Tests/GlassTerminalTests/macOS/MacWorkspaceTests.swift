@@ -1360,7 +1360,9 @@ struct MacWorkspaceTests {
 
         #expect(imported.id == fallback.id)
         #expect(imported.name == "Imported Apple Profile")
-        #expect(imported.background == fallbackBackground)
+        // The profile's own background, since 2026-10-28: a scheme's colours are made for it.
+        #expect(imported.background != fallbackBackground)
+        #expect(imported.background.red > 0.9 && imported.background.blue > 0.85)
         #expect(imported.foreground.red > 0.9)
         #expect(imported.red.red > 0.75)
         #expect(imported.fontName == "Menlo-Regular")
@@ -1410,9 +1412,10 @@ struct MacWorkspaceTests {
         )
 
         #expect(imported.name == "Clear Dark")
-        #expect(imported.fontName == "SF Mono")
+        #expect(imported.fontName == "SF Mono", "Terminal's own SF Mono Terminal is SF Mono here")
         #expect(imported.fontSize == 12)
-        #expect(imported.background == fallbackBackground)
+        #expect(imported.background != fallbackBackground, "Clear Dark's own background")
+        #expect(imported.background.blue > imported.background.red && imported.background.blue < 0.25)
         #expect(imported.ansiColors.count == 16)
         #expect(imported.preferredAppearance == .dark)
     }

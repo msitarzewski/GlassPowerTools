@@ -222,6 +222,14 @@ public struct GlassTerminalScenes: Scene {
         }
         .defaultSize(width: 460, height: 680)
         .restorationBehavior(.disabled)
+        // Fine Position: Focus Mode's steps of a couple of centimetres, in a small window the system
+        // places beside the person.
+        Window("Fine Position", id: FocusEnvironmentNudgeView.windowID) {
+            FocusEnvironmentNudgeView()
+        }
+        .defaultWindowPlacement { _, _ in WindowPlacement(.utilityPanel) }
+        .windowResizability(.contentSize)
+        .restorationBehavior(.disabled)
         #endif
     }
 

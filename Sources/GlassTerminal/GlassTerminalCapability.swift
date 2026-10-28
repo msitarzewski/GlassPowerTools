@@ -239,6 +239,26 @@ public final class GlassTerminalRuntime {
     /// root, since the library is the shell's; nil means the bolt is not offered.
     public var showActiveConnections: GlassShowActiveConnections?
 
+    /// Terminal profiles opened with the app — Open With, AirDrop, Files (2026-10-28) — into
+    /// Terminal Themes; one alone is what All Terminals use from now on. What happened, in words.
+    public func importTerminalThemes(_ urls: [URL]) async -> String {
+        settingsManager.loadPersistentStateIfNeeded()
+        let library = TerminalSchemeLibrary.shared
+        library.start()
+        await library.ready()
+        let outcome = await library.add(urls)
+        var said: [String] = []
+        if outcome.added.count == 1, let name = outcome.added.first {
+            settingsManager.chooseScheme(TerminalSchemeFiles.id(forFileNamed: name))
+            said.append("“\((name as NSString).deletingPathExtension)” is in Terminal Themes, and All Terminals use it now. To choose another: a terminal window's Settings ▸ All Terminals ▸ Theme ▸ Choose….")
+        } else if !outcome.added.isEmpty {
+            said.append("\(outcome.added.count) themes are in Terminal Themes. To use one: a terminal window's Settings ▸ All Terminals ▸ Theme ▸ Choose….")
+        }
+        said += outcome.problems.prefix(5).map { "“\($0.name)” wasn't added: \($0.problem)" }
+        if outcome.problems.count > 5 { said.append("\(outcome.problems.count - 5) more weren't added.") }
+        return said.joined(separator: "\n\n")
+    }
+
     public init(layers: GlassLayerStore? = nil, windowRecovery: GlassWindowRecoveryManager? = nil) {
         let layers = layers ?? GlassLayerStore()
         self.layers = layers

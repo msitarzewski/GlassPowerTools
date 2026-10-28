@@ -176,6 +176,10 @@ class SettingsManager {
     /// What surrounds the person in Focus Mode on Vision Pro (2026-10-26): an environment's
     /// identifier (`FocusEnvironment`). This Window can say otherwise for one window.
     var focusEnvironment: String = FocusEnvironment.defaultID
+    /// The scheme from the Terminal Themes folder All Terminals draw with (`TerminalSchemeLibrary`,
+    /// 2026-10-28), by its identifier; nil for your theme (`currentTheme`). This Window can say
+    /// otherwise for one window.
+    var terminalScheme: UUID?
     /// Focus Mode opening all the way around the person, instead of partway with the Digital Crown
     /// to dial it in (the owner, 2026-10-26: "Leave immersion to the user … [ ] Open Immersed").
     /// The Crown still brings the room back either way. Off by default, as Focus Mode always opened.
@@ -365,6 +369,7 @@ class SettingsManager {
            FocusEnvironmentFiles.isValidID(saved) {
             focusEnvironment = saved
         }
+        terminalScheme = settingsDefaults.string(forKey: UserDefaultsKeys.terminalScheme).flatMap(UUID.init(uuidString:))
         if settingsDefaults.object(forKey: UserDefaultsKeys.focusOpensImmersed) != nil {
             focusOpensImmersed = settingsDefaults.bool(forKey: UserDefaultsKeys.focusOpensImmersed)
         }
@@ -446,6 +451,7 @@ class SettingsManager {
         settingsDefaults.set(pathPreviews.rawValue, forKey: UserDefaultsKeys.pathPreviews)
         settingsDefaults.set(whenResized.rawValue, forKey: UserDefaultsKeys.whenResized)
         settingsDefaults.set(focusEnvironment, forKey: UserDefaultsKeys.focusEnvironment)
+        settingsDefaults.set(terminalScheme?.uuidString ?? "", forKey: UserDefaultsKeys.terminalScheme)
         settingsDefaults.set(focusOpensImmersed, forKey: UserDefaultsKeys.focusOpensImmersed)
         settingsDefaults.set(focusEnvironmentSound, forKey: UserDefaultsKeys.focusEnvironmentSound)
         settingsDefaults.set(errorSuggestions, forKey: UserDefaultsKeys.errorSuggestions)
@@ -1253,6 +1259,51 @@ class SettingsManager {
         persistThemeLibrary()
     }
 
+    /// The scheme another device chose for All Terminals: empty is your theme; absent, a device
+    /// from before schemes, which leaves this one's choice be.
+    nonisolated static func scheme(synced: String?, current: UUID?) -> UUID? {
+        guard let synced else { return current }
+        return UUID(uuidString: synced)
+    }
+
+    /// What All Terminals draw with: the scheme chosen from the Terminal Themes folder, in your
+    /// theme's font, while this device has it; else your theme. Read in a view's body, it follows
+    /// both the choice and the folder.
+    var allTerminalsTheme: TerminalTheme {
+        guard let terminalScheme,
+              let scheme = TerminalSchemeLibrary.shared.theme(forID: terminalScheme, font: currentTheme) else { return currentTheme }
+        return scheme
+    }
+
+    /// All Terminals draw with a scheme from the Terminal Themes folder.
+    func chooseScheme(_ id: UUID) {
+        terminalScheme = id
+        saveSettings()
+    }
+
+    /// All Terminals draw with one of your themes, and no scheme.
+    func chooseTheme(_ id: UUID) {
+        guard themeLibraryLoadError == nil, themeLibrary.select(id) else { return }
+        terminalScheme = nil
+        persistThemeLibrary()
+        saveSettings()
+    }
+
+    /// One of your themes made from a scheme's colors, to change as you like (Themes); its name says
+    /// where it came from. Nil when the library is full.
+    @discardableResult
+    func copyScheme(_ scheme: TerminalScheme) -> UUID? {
+        guard let colors = scheme.theme else { return nil }
+        var copy = colors.reidentified(name: scheme.name)
+        copy.fontName = currentTheme.fontName
+        copy.fontSize = currentTheme.fontSize
+        guard let id = addImportedTheme(copy) else { return nil }
+        // The copy, the same colors, is what All Terminals use now.
+        terminalScheme = nil
+        saveSettings()
+        return id
+    }
+
     func saveTheme(_ theme: TerminalTheme) {
         guard themeLibraryLoadError == nil, theme.isValidForPersistence else { return }
         themeLibrary.upsert(theme)
@@ -1498,6 +1549,7 @@ class SettingsManager {
         if let synced = preferences.focusEnvironment, FocusEnvironmentFiles.isValidID(synced) {
             focusEnvironment = synced
         }
+        terminalScheme = Self.scheme(synced: preferences.terminalScheme, current: terminalScheme)
         if let synced = preferences.focusOpensImmersed {
             focusOpensImmersed = synced
         }
@@ -1540,7 +1592,8 @@ class SettingsManager {
                 whenResized: whenResized.rawValue,
                 focusEnvironment: Self.sentFromVisionPro(focusEnvironment),
                 focusOpensImmersed: Self.sentFromVisionPro(focusOpensImmersed),
-                focusEnvironmentSound: Self.sentFromVisionPro(focusEnvironmentSound)
+                focusEnvironmentSound: Self.sentFromVisionPro(focusEnvironmentSound),
+                terminalScheme: terminalScheme?.uuidString ?? ""
             )
         )
     }

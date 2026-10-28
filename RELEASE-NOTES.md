@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491, and the latest is 0.4.494 (both 20 October 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.547 (28 October 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to TestFlight for internal testing; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.494)
+## What it holds (0.4.547)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -47,6 +47,10 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - On the Mac, a file whose path a terminal prints previews over the terminal; files dropped on a
   terminal have their paths typed, and on a server they are uploaded first. AI coding agents are
   recognised on tabs and cards.
+- Color schemes from macOS Terminal profiles, any number, kept in iCloud Drive for every device and
+  chosen with a preview of each, for every terminal or one window.
+- On Vision Pro, Focus Mode surrounds you with a built-in environment or your own 3D room or 360°
+  photo, which you can walk about in, with a room's own motion, clocks and sounds.
 
 ### Databases
 - MySQL, PostgreSQL and SQLite: browse, filter and edit rows with a review before every write,
@@ -68,13 +72,15 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - Files on this device or on a server, projects with a file tree, syntax highlighting, and previews
   for Markdown (with Mermaid diagrams), HTML, SVG and CSV. Images, PDFs, video, audio and 3D models
   open as themselves. On the Mac it can be your default text editor.
+- Git: a project's branch and changes, change marks beside the lines, staging and committing, and
+  pull, push and fetch, on this Mac or on a server over the project's SSH connection.
 
 ### Across the system
 - Widgets (Machines, Machine, Active), Siri and Shortcuts, Spotlight, Controls, Handoff and
   `ssh://` links. On the Mac: the Finder's Services, toolbar button and Quick Action, Share ▸ Send to
   a Machine, Open With and the Dock menu.
 - Light, Dark or System for the whole app on the Mac, iPhone and iPad; window opacity and glass
-  everywhere; and on Vision Pro, session windows that shrink into an orb.
+  everywhere; and on Vision Pro, session windows that shrink into an orb, or into one dock.
 
 ### Known limits
 - The Mac app runs outside App Sandbox (a terminal cannot work inside it), so it will be distributed
@@ -86,7 +92,49 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
-### Next (not yet released)
+### 0.4.495 – 0.4.547 (21 – 28 October 2026)
+- **0.4.547 is the Mac's third release**, through Sparkle.
+- **Terminal color schemes.** Bring in macOS Terminal profiles — `.terminal` files, or a folder of
+  them, as color-scheme collections come — and choose among them in a terminal's Settings ▸ All
+  Terminals ▸ Theme ▸ **Choose…**, where each is drawn small in its own colors: its background, text, a
+  highlighted word and its sixteen colors. They're kept in iCloud Drive ▸ Glass Power Tools ▸
+  Terminal Themes, so every device has them, and Files and the Finder can add more. This Window can
+  use one for one window, and the choice for all terminals syncs. A scheme brings its background,
+  text, selection, cursor and sixteen colors, read on every device as Terminal reads them; your font
+  stays. Copy to Your Themes makes one an ordinary theme to change. Open With Glass Power Tools on a
+  `.terminal` file, AirDrop or Files adds it, and one file on its own becomes the scheme in use. A
+  profile's bold-text color is not drawn: the terminal draws bold in the text's color, or bright.
+- **Pull, Push and Fetch in the editor.** Changes shows Pull and Push with how many commits each
+  would move, and Fetch; a branch the remote doesn't have yet offers **Publish Branch**. The branch
+  button at the foot of the file list shows ↑ and ↓ counts, with the same on a right-click or a
+  hold. A pull only ever moves the branch forward, and open files it changed are read again unless
+  they hold unsaved edits. When git refuses — the remote has moved on, the key or the host isn't set
+  up, there's no remote — it says what to do. A project on a server pulls and pushes there.
+- **The orb dock on Vision Pro.** With Settings ▸ Appearance ▸ Orbs ▸ Shrink to Orb set to Into the
+  Dock, a window shrunk to its orb falls into one dock you can move and resize, beside Connections'
+  orb; terminals, databases, desktops and editors keep running while docked. A pinch brings a window
+  back where it was. Orbs wrap in rows or stand in a column, names turn to stay clear of their
+  neighbours, arrows show more to scroll to, and an orb held can be carried to another place.
+- **Focus Mode environments on Vision Pro.** Focus Mode can surround you with a built-in — Night Sky,
+  Dusk, Grid, Studio — or your own 3D room or 360° photo, kept in iCloud Drive ▸ Glass Power Tools ▸
+  Environments, for every window or one (This Window, or a pinch and hold on the moon). **Open
+  Immersed** opens it all the way round. **Try Out** fits a room: what its numbers are in, its size,
+  its floor, where you start. Inside, look down and pinch the floor to go there, choosing your facing
+  with your hand; pinch the sky to turn. Only the floor is landed on, never a desk's top. **Fine
+  Position**, from the moon's menu, steps you 2 cm and turns you 1° at a time and raises or lowers the
+  room a centimetre, held to keep going, and keeps your spot as the room's start. A room can bring
+  its own life: what moves in it, a clock on the headset's time, a digital clock and date, sounds
+  beside it (Room Sound sets how loud), and things that happen now and then.
+- **A picture pasted in a terminal goes to the machine.** On iPhone, iPad and Vision Pro a picture
+  or a file on the clipboard is copied to the machine and its path typed, as a dropped one is.
+- **Vision Pro's terminal windows stay responsive while agents work.** A window was drawn again
+  whenever any of its terminals printed, many times a second with a few coding agents at work, and
+  its tools menu stopped answering. The front terminal now keeps its place while it prints, and
+  the menu is rebuilt only when what it shows changes.
+- **Every headset crash since 0.4.508 is fixed.** All seven were a terminal's picture — for All
+  Windows' cards, an orb, the dock — drawn while SwiftUI was updating; it's drawn just after now.
+- **A menu in the empty space of a Vision Pro terminal sidebar**, held: what the bar's + offers, as a
+  Mac sidebar's right-click does.
 - **Four more terminal looks.** **Coding Agent** shows the agent each terminal is running, Claude
   Code, Codex, Gemini CLI or another, behind its text in the agent's own colour: a smoke drifts and
   the mark breathes while the agent works; when it stops and waits for you, the mark holds still and

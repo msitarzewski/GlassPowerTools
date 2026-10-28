@@ -64,8 +64,29 @@ Beside the tools menu:
 
 - **Open Folder Here**, once the remote shell reports its current directory. It opens that folder in the file browser. **On Vision Pro**, pinch and hold it for **Open in Files** and **Open in Editor**; **on Mac**, **Open Folder in Editor** is in the tools menu. **Open in Editor** opens that machine's project whose folder is the shell's, or holds it, and otherwise opens the folder as a project in the Editor.
 - **Scale Text**, **on Vision Pro, Mac and iPad**: see [Scale the text with the window](#scale-the-text-with-the-window).
-- **Focus Mode**. **On Vision Pro** it surrounds you with a dimmed environment. **On Mac** it makes the window full screen.
+- **Focus Mode**. **On Vision Pro** it surrounds you with an environment: the room dimmed, a built-in, or a 3D room or 360° photo of your own; see [Focus Mode on Vision Pro](#focus-mode-on-vision-pro). **On Mac** it makes the window full screen.
 - **AI Assistant**, when Apple Intelligence is available (**on Vision Pro**, in the tools menu). It suggests a command from a description; **Review & Run** shows the exact command and asks before sending it. When a command fails, it can explain the error and suggest a fix; a fix that is advice rather than a command is shown to read, with nothing to run. If the suggestions keep coming, for example while a test run prints "failed" on purpose, open the menu beside the suggestion's close button: **Pause in This Terminal** stops them in this terminal until it closes, and **Turn Off Error Suggestions** stops them everywhere, until you turn **Suggest fixes for errors** back on in **Settings** ▸ **Connections**.
+
+## Focus Mode on Vision Pro
+
+The moon in a terminal window's bar opens Focus Mode around you, and closes it. Pinch and hold the moon to choose what surrounds you for this window; while Focus Mode is open, the same menu has **Fine Position…**.
+
+**Settings** ▸ **All Terminals** ▸ **Focus Mode** chooses for every window: **Dimmed Room** (the starting setting), the built-ins **Night Sky**, **Dusk**, **Grid** and **Studio**, and your own. **This Window** can choose one for one window.
+
+- **Add Environment…** adds a 3D room (USDZ or Reality) or a 360° photo, a picture twice as wide as it is tall; you can also drop one on the list. Yours are kept in **iCloud Drive ▸ Glass Power Tools ▸ Environments**, so a file put there from your Mac or iPhone appears on your Vision Pro too. Pinch and hold one to delete it.
+- **Open Immersed** opens Focus Mode all the way around you instead of partway; the Digital Crown still brings your room back.
+- **Room Sound** is how loud a room's own sounds are.
+- **Try Out and Fit…** opens a 3D room around you with a window to fit it: what its numbers are in (a room that's far too big or small usually has the wrong units), its size, how far its floor is raised or lowered, and **Start Here** for where you begin. **Done** keeps the fit for that room on every Vision Pro.
+
+### Move about inside
+
+- **Go somewhere:** look down at the floor where you want to go and pinch. A green target shows; move your hand the way you want to face, then let go. Raise your hand to cancel. Only the floor can be landed on: pinching a desk's top, a shelf or a step shows the target grey, and nothing happens.
+- **Turn:** pinch the sky or a wall and swing your hand left or right to turn 45°.
+- **Fine Position…**, from the moon's menu, opens a small window beside you: the arrows step you 2 cm the way you face, the corners turn you 1°, and **Room Height** raises or lowers the room 1 cm, for lining a room's desk up with yours. Hold a button to keep going. It shows how far you are from where the room starts you. **Keep This Spot** makes where you stand, facing the way you face, where the room starts you on every Vision Pro.
+
+### A room's own life
+
+A 3D room can bring more with it: whatever moves in it plays (stills with Reduce Motion), a clock in it keeps the headset's time, a digital clock and date can stand in it, sounds play from a folder named like the room beside it (`Loft.sounds` beside `Loft.usdz`), and now and then something happens, from a folder named `Loft.events`.
 
 ## Text size
 

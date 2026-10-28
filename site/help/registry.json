@@ -20,7 +20,7 @@
       {"slug": "terminal-files", "title": "Browse and transfer files over SFTP", "summary": "Open the file browser, upload and download, create, rename, move and delete items, and edit remote files in the Editor."},
       {"slug": "terminal-port-forwarding", "title": "Forward ports through an SSH session", "summary": "Add local, remote and SOCKS5 port forwards to a live SSH session, start and stop them, and fix common failures."},
       {"slug": "terminal-workgroups", "title": "Save and open terminal Workgroups", "summary": "Create Workgroups of terminal tabs with startup commands, open them on each platform, and swap in SSH for Mac-only local tabs."},
-      {"slug": "terminal-settings", "title": "Terminal settings, themes and snippets", "summary": "The Connections, Terminal and Snippets settings pages, text size, resizing and previews, theme editing, a terminal window's own settings, SSH config import and Tailscale."},
+      {"slug": "terminal-settings", "title": "Terminal settings, themes and snippets", "summary": "The Connections, Terminal and Snippets settings pages, text size, resizing and previews, choosing a theme, color schemes from Terminal profiles, theme editing, a terminal window's own settings, SSH config import and Tailscale."},
       {"slug": "terminal-looks", "title": "Backgrounds and glowing text", "summary": "Give a terminal window a look: a picture, Digital Rain, Synthwave or a phosphor screen behind the text, phosphor palettes and a glow, and Readability to keep the text clear."}
     ]},
     {"name": "Databases", "pages": [
@@ -44,7 +44,7 @@
     ]},
     {"name": "Editor", "pages": [
       {"slug": "editor-opening", "title": "Open the Editor", "summary": "Ways into the Editor on each platform, what an editor window holds, new documents, and how to leave or close it."},
-      {"slug": "editor-projects", "title": "Work with Projects", "summary": "Open folders on this device or on a server as projects, see what changed in git and commit it, manage the Projects list, and how it syncs between devices."},
+      {"slug": "editor-projects", "title": "Work with Projects", "summary": "Open folders on this device or on a server as projects, see what changed in git, commit it, pull, push and fetch, manage the Projects list, and how it syncs between devices."},
       {"slug": "editor-files-and-tabs", "title": "Files, Folders and Tabs", "summary": "Browse a project's files, preview and keep tabs, create new files locally or on a server, and open files on their own."},
       {"slug": "editor-saving", "title": "Save Your Work", "summary": "Save with ⌘S or the toolbar, choose where a new document goes, handle files that changed, and close unsaved documents."},
       {"slug": "editor-languages", "title": "Languages, Find and the Status Bar", "summary": "The 15 highlighted languages and their extensions, changing a file's language, the status bar, Go to Line, and Find and Replace."},

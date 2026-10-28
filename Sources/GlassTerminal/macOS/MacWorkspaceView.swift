@@ -378,6 +378,8 @@ struct MacWorkspaceView: View {
             SharedDefaults.migrateIfNeeded()
             sessionManager.preloadPersistentStateIfNeeded()
             settingsManager.loadPersistentStateIfNeeded()
+            // A scheme from the Terminal Themes folder may be what this window draws with.
+            TerminalSchemeLibrary.shared.start()
             if !appliedOpeningPreferences {
                 appliedOpeningPreferences = true
                 if let preset = currentWorkgroupPreset {

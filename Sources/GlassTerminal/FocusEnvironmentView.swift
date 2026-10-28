@@ -36,8 +36,10 @@ final class FocusEnvironmentStage {
     /// What the room on show says of itself, once it has loaded; nil for anything else.
     var room: RoomFacts?
     var isOpen = false
-    /// The open space's walking, for Try Out's Start Here.
+    /// The open space's walking, for Try Out's Start Here and Fine Position.
     @ObservationIgnored weak var walking: FocusWalking?
+    /// Counts the person's moves, so Fine Position reads again how far they are from their start.
+    var moves = 0
 
     struct RoomFacts: Equatable {
         /// The file's own `metersPerUnit`.
@@ -90,6 +92,7 @@ struct FocusEnvironmentView: View {
             library.start()
             stage.isOpen = true
             stage.walking = walking
+            walking.moved = { [stage] in stage.moves &+= 1 }
         }
         .onDisappear {
             stage.note = nil

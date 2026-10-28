@@ -30,6 +30,18 @@ struct GlassOpenedURLTests {
         #expect(GlassWidgetRequest.forOpened(script, isMac: false) == .openInEditor([script]))
     }
 
+    @Test("A Terminal profile opened with the app becomes a terminal theme, on every device, whatever its case")
+    func terminalProfiles() throws {
+        let tango = URL(fileURLWithPath: "/tmp/Tango Dark.terminal")
+        #expect(GlassWidgetRequest.forOpened(tango, isMac: true) == .importTerminalThemes([tango]))
+        #expect(GlassWidgetRequest.forOpened(tango, isMac: false) == .importTerminalThemes([tango]))
+        let shouting = URL(fileURLWithPath: "/tmp/GLACIER.TERMINAL")
+        #expect(GlassWidgetRequest.forOpened(shouting, isMac: false) == .importTerminalThemes([shouting]))
+        let request = GlassWidgetRequest.importTerminalThemes([tango])
+        #expect(try JSONDecoder().decode(GlassWidgetRequest.self, from: JSONEncoder().encode(request)) == request,
+                "an extension can leave it for the app")
+    }
+
     @Test("an ssh link is a connection; another scheme is not the app's")
     func links() throws {
         let ssh = try #require(URL(string: "ssh://ann@alpha.example.com:2222"))

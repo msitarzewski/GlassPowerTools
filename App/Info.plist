@@ -18,6 +18,18 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
+			<string>Terminal settings</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.apple.terminal.settings</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
 			<string>Text</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
@@ -109,6 +121,26 @@
 			<string>Glass Power Tools terminal tab</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.glasspowertools.terminal-workgroup-tab</string>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Terminal settings</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.apple.terminal.settings</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>terminal</string>
+				</array>
+			</dict>
 		</dict>
 	</array>
 </dict>
