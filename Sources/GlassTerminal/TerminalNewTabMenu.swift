@@ -54,6 +54,26 @@ struct TerminalNewTabMenu<Label: View>: View {
     /// Opens a terminal on the server in this window: a new one, or attached to a running tmux session.
     let open: @MainActor (ServerConfiguration, TerminalTmuxAttachment?) -> Void
     @ViewBuilder let label: () -> Label
+    @Environment(GlassTerminalRuntime.self) private var runtime: GlassTerminalRuntime?
+
+    var body: some View {
+        Menu {
+            TerminalNewTabMenuItems(open: open)
+        } label: {
+            label()
+        } primaryAction: {
+            pickServer()
+        }
+        // The terminals listed are Active's; asked again when that list is old.
+        .task { await runtime?.refreshRunningSessionsIfDue?() }
+    }
+}
+
+/// What the + lists when held: each saved server with New Terminal and the terminals running there.
+/// A Vision Pro tab sidebar's empty space lists them too (`VisionTerminalWorkgroupView`).
+struct TerminalNewTabMenuItems: View {
+    /// Opens a terminal on the server in this window: a new one, or attached to a running tmux session.
+    let open: @MainActor (ServerConfiguration, TerminalTmuxAttachment?) -> Void
     @Environment(SessionManager.self) private var sessionManager
     @Environment(GlassTerminalRuntime.self) private var runtime: GlassTerminalRuntime?
 
@@ -68,33 +88,25 @@ struct TerminalNewTabMenu<Label: View>: View {
     }
 
     var body: some View {
-        Menu {
-            ForEach(entries) { entry in
-                Menu(entry.title) {
-                    Button("New Terminal", systemImage: "plus") { open(entry.server, nil) }
-                    if !entry.running.isEmpty {
-                        Section("Running") {
-                            ForEach(entry.running) { running in
-                                Button {
-                                    if let name = running.attachment?.name {
-                                        open(entry.server, TerminalTmuxAttachment(name: name))
-                                    }
-                                } label: {
-                                    Text(running.title)
-                                    if let subtitle = running.subtitle { Text(subtitle) }
+        ForEach(entries) { entry in
+            Menu(entry.title) {
+                Button("New Terminal", systemImage: "plus") { open(entry.server, nil) }
+                if !entry.running.isEmpty {
+                    Section("Running") {
+                        ForEach(entry.running) { running in
+                            Button {
+                                if let name = running.attachment?.name {
+                                    open(entry.server, TerminalTmuxAttachment(name: name))
                                 }
+                            } label: {
+                                Text(running.title)
+                                if let subtitle = running.subtitle { Text(subtitle) }
                             }
                         }
                     }
                 }
             }
-        } label: {
-            label()
-        } primaryAction: {
-            pickServer()
         }
-        // The terminals listed are Active's; asked again when that list is old.
-        .task { await runtime?.refreshRunningSessionsIfDue?() }
     }
 }
 #endif

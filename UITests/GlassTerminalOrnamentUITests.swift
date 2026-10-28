@@ -149,6 +149,21 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
     /// A window's tabs are its sidebar from the second terminal on (2026-10-21), as a Mac window's
     /// are: a row per terminal, which a pinch shows; none with one terminal, and none in the grid.
     /// Apple's tab bar, which held them before, is gone.
+    /// "There's no context menu in the empty space in a tab sidebar in visionOS" (the owner,
+    /// 2026-10-27): held below its rows, the sidebar offers what the bar's + does.
+    func testTheSidebarsEmptySpaceOffersANewTerminal() {
+        launch("terminal-tabs")
+        // Held by the element: a hold at a point of an ornament's own space landed elsewhere (the
+        // runner, 2026-10-27).
+        let empty = elements("vision-terminal-sidebar-empty").firstMatch
+        XCTAssertTrue(empty.waitForExistence(timeout: 40), "two terminals and no space below the sidebar's rows")
+        XCTAssertGreaterThan(empty.frame.height, 300, "the space below the rows doesn't reach the sidebar's foot: \(empty.frame)")
+        empty.press(forDuration: 1.5)
+        XCTAssertTrue(app.buttons["New Terminal Tab…"].waitForExistence(timeout: 5), "no menu in the sidebar's empty space")
+        // For the capture from outside.
+        sleep(4)
+    }
+
     func testTwoTerminalsHaveASidebar() {
         launch("terminal-tabs")
         let sidebar = elements("vision-terminal-sidebar").firstMatch

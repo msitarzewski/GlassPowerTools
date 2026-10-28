@@ -327,6 +327,9 @@ struct VisionTerminalWorkgroupView: View {
     @State private var dropTargetSessionID: UUID?
     /// Whether the window shows its sidebar, as its bar's toggle leaves it.
     @State private var showsSidebar = true
+    /// The sidebar's height and its rows', so the space below the rows reaches its foot.
+    @State private var sidebarHeight: CGFloat = 0
+    @State private var sidebarRowsHeight: CGFloat = 0
     /// A sidebar row's corners, where it is tinted and highlighted.
     private static var sidebarRowCornerRadius: CGFloat { 16 }
 
@@ -848,6 +851,7 @@ struct VisionTerminalWorkgroupView: View {
         // the family's own tab rows are (`GlassWorkspaceTabBar`).
         ScrollView {
             VStack(spacing: 2) {
+                VStack(spacing: 2) {
                 ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
                     let shown = selectedSessionID == session.id
                     let shape = RoundedRectangle(cornerRadius: Self.sidebarRowCornerRadius, style: .continuous)
@@ -876,10 +880,34 @@ struct VisionTerminalWorkgroupView: View {
                     .accessibilityAddTraits(shown ? .isSelected : [])
                     .accessibilityIdentifier("vision-terminal-sidebar-row-\(session.id.uuidString)")
                 }
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { sidebarRowsHeight = $0 }
+                // The space below the rows, down to the sidebar's foot (a scroll view stretches
+                // nothing, so it is sized): held, what the bar's + lists, as a Mac window's sidebar
+                // offers in its empty space (the owner, 2026-10-27: "there's no context menu in the
+                // empty space in a tab sidebar in visionOS"). A pinch does nothing, as a click there
+                // on a Mac does; nothing lights where nothing is. VoiceOver hears it as New Terminal
+                // Tab, which opens the picker as the bar's + does, the menu's choices its actions.
+                Button {} label: {
+                    Color.clear
+                        .frame(maxWidth: .infinity)
+                        .frame(height: max(44, sidebarHeight - sidebarRowsHeight - 10))
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .hoverEffectDisabled()
+                .contextMenu {
+                    Button("New Terminal Tab…", systemImage: "plus") { showingSavedHostPicker = true }
+                    TerminalNewTabMenuItems(open: { openSavedHost($0, tmux: $1) })
+                }
+                .accessibilityLabel("New Terminal Tab")
+                .accessibilityAction { showingSavedHostPicker = true }
+                .accessibilityIdentifier("vision-terminal-sidebar-empty")
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { sidebarHeight = $0 }
         // A tab from another window let go below the rows joins after the last.
         .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
             acceptDroppedTabs(tabs, at: nil)

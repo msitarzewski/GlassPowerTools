@@ -115,6 +115,7 @@ source applications are obsolete and no longer compile.
 | [The tools menu while agents work](tasks/2026-10/2026-10-25_terminal-tools-menu-busy.md) | The gear menu on a busy terminal on the headset: the window was drawn again whenever another of its terminals printed; fixed in 0.4.539, confirmed on the headset |
 | [Focus Mode environments (D89)](tasks/2026-10/2026-10-26_focus-environments.md) | Built-in and your own environments, Open Immersed, Try Out with fits, and Mirador's teleport inside |
 | [Living rooms: the loft and the host hook](tasks/2026-10/2026-10-27_living-rooms-handoff.md) | The GlassSpaceMaker session's handoff and what was built from it: a room's motion, a clock on the headset's time, sound from a folder beside the file, Room Sound; seen working on the headset |
+| [A menu in a Vision Pro terminal sidebar's empty space](tasks/2026-10/2026-10-28_vision-sidebar-empty-menu.md) | Held below the rows, what the bar's + offers, as on the Mac; the runner's coordinate holds in ornaments miss |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

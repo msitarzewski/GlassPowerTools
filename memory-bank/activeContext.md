@@ -66,6 +66,9 @@ use the disposable test VM only).
   back. `tasks/2026-10/2026-10-27_living-rooms-handoff.md`.
 - **The gear confirmed fixed on the headset** (the owner, after 0.4.540–0.4.541: "the gear menu was indeed fixed as of
   the last build"): the redraw storm fix of 0.4.539 holds.
+- **Then (2026-10-28) a menu in the empty space of a Vision Pro terminal sidebar, 0.4.542 on all three devices (read back), not committed:** held, what
+  the bar's + offers (`tasks/2026-10/2026-10-28_vision-sidebar-empty-menu.md`). On the way: the runner's holds at a
+  point of an ornament miss; tests hold elements.
 - **Then phase 3 ("go ahead with phase 3"), 0.4.541 on all three devices (read back), committed at his word:** a digital clock and date panel at a `clock_digital`
   Xform, and events from `<Room>.events/events.json` shown now and then at `event_<name>` anchors (the contract is in
   the handoff note's "Phase 3, as built"). Seen in the simulator's test room; the loft has neither yet, the asset

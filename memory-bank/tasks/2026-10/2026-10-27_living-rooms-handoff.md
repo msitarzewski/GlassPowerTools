@@ -390,3 +390,26 @@ hides the sky above about 20° at the north glass and 14° at the west glass, so
 - `meteor.usdz` (4 KB, 1.5 s): a 300 m streak falling for two thirds of a second, then scaled away.
 - Pre-lit as the loft's own movers: black metallic base with the look in the emission, so they are the same under any lighting.
 - `every` is the wait before each showing, so the first airship comes 20–50 minutes in; the flock 4–12 minutes.
+
+## A replaced room file reaches a headset stale (2026-10-28, the GlassSpaceMaker session)
+
+The owner, on 0.4.541/0.4.542 with the 23:28 loft in iCloud: "I do not see a digital clock". Checked from the Mac the same
+night: `Loft.usdz` (sha256 `057c19eb7de808a1…`, with `clock_digital` and the seven `event_*` anchors, read back with
+`usdtree`), `Loft.sounds/` and `Loft.events/` all report `ubiquitousItemIsUploaded` true, status Current, no conflicts.
+The headset downloaded the loft once, at 21:50 (the hands-fix build, which has no `clock_digital`). A file replaced in
+iCloud reaches another device as a **stale local copy** until something asks for the new version:
+
+- `Sources/GlassTerminal/FocusEnvironments.swift:463-465` counts `.downloaded` as downloaded; Apple defines
+  `NSURLUbiquitousItemDownloadingStatusDownloaded` as "a local copy of this item is available, but it is stale".
+- `download(_:)` at `FocusEnvironments.swift:420-421` asks iCloud only when `!isDownloaded`, so a stale copy is never asked for.
+- `Sources/GlassTerminal/FocusEnvironmentView.swift:352` loads with `Entity(contentsOf:)` straight from the URL, with no
+  `NSFileCoordinator` read (a coordinated read waits for the latest version). The sidecars' `manifest(named:in:)` does
+  coordinate its read, but asks only for `.icloud` stand-ins.
+- `.task(id: stage.environmentID)` at `FocusEnvironmentView.swift:85` reloads on a change of room, not of the room's
+  file: a loft left open since 21:50 shows the old file until the environment is switched or the app relaunched.
+
+Suggested, host side, small: in `list(_:)` treat `.downloaded` as not current and call `startDownloadingUbiquitousItem`
+for it (the query's `DidUpdate` re-lists when it lands), or coordinate the read in `room(_:)`; and let the picker say a
+newer version is on its way. Until then, on the headset: Files ▸ iCloud Drive ▸ Glass Power Tools ▸ Environments,
+long-press `Loft.usdz` ▸ Remove Download, tap it to download again (72.6 MB), then open the loft again (relaunch the
+app if the loft was open). The log line to look for: `Room life: … digital clock true …`.
