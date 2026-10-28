@@ -97,3 +97,7 @@ in 2 s, no `tools chose` since 12:47 UTC (Settings worked then, on a quiet bar).
   with and without the change above). In the test's launches the mark was not drawn at all: the demo's output arrived
   before the window, settled before the marks were there, and their first look came before the queued output reached
   the terminal. `SwiftTermHostModel.flushPending` now looks for diagrams once queued output lands. The test passes.
+
+## 2026-10-27 night — fixed on the headset
+The owner, after 0.4.540–0.4.541: "the gear menu was indeed fixed as of the last build." The gear works with agents
+at work since the window stopped being drawn again per printing terminal (0.4.539). Closed.

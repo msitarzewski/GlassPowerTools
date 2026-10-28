@@ -1,6 +1,9 @@
 # 2026-10-27 — Living rooms: the Tribeca loft arrives, and the host hook to build (handoff)
 
 ## State and authorization
+**Phase 3 BUILT 2026-10-27 too** (the owner: "go ahead with phase 3"): the digital clock and the events, to the
+contract in "Phase 3, as built" at the end; live screens stay dropped.
+
 **BUILT 2026-10-27, phases 1 and 2** (the owner: "That's the one... get're done!"), and **seen working on his headset**
 the same evening (0.4.540, the fixed loft from iCloud: "holy shit it works~!!!"); see "Built" at the end. Phase 3
 waits for its own approval. What follows up to "Built" is the plan as handed over.
@@ -268,3 +271,46 @@ Downloads is the first draft of this note and is superseded by it.
 - **On the headset (2026-10-27, about 21:50):** the owner, in the fixed loft from iCloud on 0.4.540: "holy shit it
   works~!!!". Not yet reported part by part (the clock, each sound, Room Sound, Reduce Motion), and the headset's
   memory with the loft is unmeasured.
+
+## Phase 3, as built (2026-10-27, this repository's session)
+The plan gave each piece a sentence; the contract below is this session's, for the asset side to build to.
+
+**The digital clock and date panel.** An empty Xform named `clock_digital` at the panel's centre, its local +Z facing
+into the room and +Y up (as the wall clock's dial). The host shows the time (the device's 12- or 24-hour form) and
+the weekday and date on a dark rounded face, 0.5 m wide, times the Xform's own scale; it follows the room's fit. It
+is a SwiftUI attachment of the space's `RealityView` (`FocusRoomDigitalClockView`), placed by
+`FocusRoomLife.placeDigitalClock`. A room with no `clock_digital` has none.
+
+**Events now and then.** `<Room>.events/` beside the file (as `.sounds`), with `events.json`:
+
+```json
+{
+  "version": 1,
+  "events": [
+    { "id": "flock", "file": "flock.usdz", "anchors": ["event_sky_west", "event_sky_east"], "every": [120, 600] },
+    { "id": "ferry", "file": "ferry.usdz", "anchors": ["event_river"], "every": [300, 900], "seconds": 45 }
+  ]
+}
+```
+
+- `file`: a USDZ (or Reality) file in the folder, a plain name. Its root is placed at the anchor's origin, facing as
+  the anchor faces, so author it around (0, 0, 0). Its own motion (time samples, skeletons) plays once each time.
+- `anchors`: empty Xforms named `event_<name>` in the room; each time, one present in the room is chosen at random.
+- `every`: `[from, to]` seconds between showings, chosen at random each time.
+- `seconds` (optional): how long it stays; by default as long as its motion lasts, else 10 s; at most 600.
+- Loaded once and hidden until it happens; hidden again after. None with Reduce Motion. An event whose anchors are
+  all missing, whose file names a path, or whose `every` is back to front is skipped and logged. Nothing under an
+  `event_` Xform or `clock_digital` is stood on.
+
+### Validation
+- `FocusRoomLifeTests` 13 (four new: the panel placed and sized, events read and filtered, how long one stays, the
+  folder beside the file; two extended: nothing under `clock_digital` or an `event_` anchor stood on, a sound named by a
+  path skipped). Six mutations, each caught; one gap found by them (the bad-path and back-to-front events named an
+  anchor the test room lacked) and the test data fixed. Terminal unit tests 1037.
+- `FocusEnvironmentUITests.testARoomWithADigitalClockShowsTheTime`: the simulator's test room (now with a
+  `clock_digital`, `event_left`, `event_right` and an orb event every 3–6 s, `--demo-environment-room`) shows the panel;
+  it fails with the anchor renamed. All three Focus Mode UI tests pass.
+- Captures (`<work>/captures-living/phase3-*.png`): the panel on the test room's far wall reading "10:09 PM / Tuesday,
+  October 27" at 22:09; the orb's place orange in four of eight captures 2 s apart and bare wall in the others; the log
+  names both anchors.
+- Not seen: the loft, which has neither a `clock_digital` nor events yet (the asset side's to add); the headset.

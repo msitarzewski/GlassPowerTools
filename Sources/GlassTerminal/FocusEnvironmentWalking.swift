@@ -61,6 +61,10 @@ final class FocusWalking {
     private var motion: [AnimationPlaybackController] = []
     private var clock: FocusRoomClockHands?
     private var soundscape: FocusRoomSoundscape?
+    private var happenings: FocusRoomHappenings?
+    /// The digital clock and date panel, made by the space's view (an attachment), placed in a room
+    /// that has a `clock_digital`.
+    var digitalClock: Entity?
     /// Settings' Room Sound, 0 to 1.
     var soundLevel: Double = 0.7 {
         didSet { soundscape?.setLevel(soundLevel) }
@@ -206,7 +210,8 @@ final class FocusWalking {
     /// somewhere in its loop, so each visit starts elsewhere and its birds and aircraft come when
     /// they will (still with Reduce Motion); its clock on the headset's time; its sounds.
     private func startLife(_ loaded: FocusEnvironmentScenes.LoadedRoom) {
-        if !UIAccessibility.isReduceMotionEnabled {
+        let still = UIAccessibility.isReduceMotionEnabled
+        if !still {
             for animation in loaded.model.availableAnimations {
                 let loop = animation.definition.duration
                 let controller = loaded.model.playAnimation(animation.repeat(), transitionDuration: 0, startsPaused: false)
@@ -218,11 +223,23 @@ final class FocusWalking {
         if let sounds = loaded.sounds, let folder = loaded.file.map(FocusRoomSounds.folder(beside:)) {
             soundscape = FocusRoomSoundscape(sounds, folder: folder, in: loaded.model, level: soundLevel)
         }
-        Self.log.info("Room life: \(self.motion.count, privacy: .public) animations, clock \(self.clock != nil, privacy: .public), \(loaded.sounds?.sounds.count ?? 0, privacy: .public) sounds")
+        var panel = false
+        if let digitalClock {
+            panel = FocusRoomLife.placeDigitalClock(digitalClock, panelWidth: digitalClock.visualBounds(relativeTo: digitalClock).extents.x,
+                                                    in: loaded.model)
+        }
+        // What happens now and then is motion too.
+        if !still, let events = loaded.events, let folder = loaded.file.map(FocusRoomEvents.folder(beside:)) {
+            happenings = FocusRoomHappenings(events, folder: folder, in: loaded.model)
+        }
+        Self.log.info("Room life: \(self.motion.count, privacy: .public) animations, clock \(self.clock != nil, privacy: .public), digital clock \(panel, privacy: .public), \(loaded.sounds?.sounds.count ?? 0, privacy: .public) sounds, \(still ? 0 : loaded.events?.events.count ?? 0, privacy: .public) events")
     }
 
     /// Before the next environment, or as the space closes: silent and still.
     func endLife() {
+        happenings?.stop()
+        happenings = nil
+        digitalClock?.removeFromParent()
         soundscape?.stop()
         soundscape = nil
         motion.forEach { $0.stop() }
@@ -507,14 +524,15 @@ extension FocusWalking {
 
 /// A room for the simulator, which has no iCloud to bring one (`--demo-environment-room`): 6 × 3 × 6
 /// m, a doorway behind the person, a platform 1.2 m up with steps to it, a desk, and a camera by the
-/// door looking in.
+/// door looking in. A living room's host parts too (2026-10-27): a `clock_digital` on the far wall,
+/// and an orb that shows at `event_left` or `event_right` every few seconds (`Test Room.events/`).
+/// Made again at each launch that asks for it, so it carries what the host has learnt since.
 @MainActor
 enum FocusDemoRoom {
     static let fileName = "Test Room.reality"
 
     static func make(in folder: URL) async {
         let file = folder.appendingPathComponent(fileName)
-        guard !FileManager.default.fileExists(atPath: file.path) else { return }
         let room = Entity()
         func add(_ mesh: MeshResource, at position: SIMD3<Float>, _ colour: UIColor) {
             let entity = ModelEntity(mesh: mesh, materials: [SimpleMaterial(color: colour, roughness: 0.8, isMetallic: false)])
@@ -535,9 +553,27 @@ enum FocusDemoRoom {
         let camera = PerspectiveCamera()
         camera.position = [0, 1.6, 2.4]
         room.addChild(camera)
+        let anchors: [(String, SIMD3<Float>)] = [(FocusRoomLife.digitalClockName, [0, 2.1, -2.94]),
+                                                 ("event_left", [-1.6, 1.5, -1.2]), ("event_right", [1.6, 1.5, 0.6])]
+        for (name, position) in anchors {
+            let anchor = Entity()
+            anchor.name = name
+            anchor.position = position
+            room.addChild(anchor)
+        }
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: file)
             try await room.write(to: file)
+            let events = FocusRoomEvents.folder(beside: file)
+            try? FileManager.default.removeItem(at: events)
+            try FileManager.default.createDirectory(at: events, withIntermediateDirectories: true)
+            var glow = UnlitMaterial(color: UIColor(red: 1, green: 0.62, blue: 0.2, alpha: 1))
+            glow.faceCulling = .none
+            try await ModelEntity(mesh: .generateSphere(radius: 0.15), materials: [glow])
+                .write(to: events.appendingPathComponent("Orb.reality"))
+            try Data(#"{"version": 1, "events": [{"id": "orb", "file": "Orb.reality", "anchors": ["event_left", "event_right"], "every": [3, 6], "seconds": 4}]}"#.utf8)
+                .write(to: events.appendingPathComponent("events.json"))
         } catch {
             Logger(subsystem: "com.glasspowertools", category: "FocusEnvironments")
                 .error("The demo room couldn't be written: \(String(describing: error), privacy: .public)")

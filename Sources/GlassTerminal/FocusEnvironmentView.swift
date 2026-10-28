@@ -68,9 +68,14 @@ struct FocusEnvironmentView: View {
     private static let log = Logger(subsystem: "com.glasspowertools", category: "FocusEnvironments")
 
     var body: some View {
-        RealityView { content in
+        RealityView { content, attachments in
             content.add(root)
             walking.install(in: root, content: content)
+            walking.digitalClock = attachments.entity(for: FocusRoomDigitalClockView.attachmentID)
+        } update: { _, _ in
+        } attachments: {
+            // Placed by a room that has a `clock_digital` (`FocusRoomLife`).
+            Attachment(id: FocusRoomDigitalClockView.attachmentID) { FocusRoomDigitalClockView() }
         }
         .gesture(DragGesture(minimumDistance: 0)
             .targetedToAnyEntity()
@@ -329,6 +334,8 @@ enum FocusEnvironmentScenes {
         var file: URL? = nil
         /// Its `<Room>.sounds` folder's list, when it has one on this device (`FocusRoomSounds`).
         var sounds: FocusRoomSounds? = nil
+        /// Its `<Room>.events` folder's list, likewise (`FocusRoomEvents`).
+        var events: FocusRoomEvents? = nil
         /// Metres, the file's units applied, in its own coordinates.
         let min: SIMD3<Float>
         let max: SIMD3<Float>
@@ -346,8 +353,10 @@ enum FocusEnvironmentScenes {
         let bounds = model.visualBounds(relativeTo: nil)
         let unit = Double(model.scale.x)
         // Read off the main thread, as iCloud may fetch it.
-        let sounds = await Task.detached(priority: .userInitiated) { FocusRoomSounds.read(beside: file) }.value
-        return LoadedRoom(model: model, file: file, sounds: sounds, min: bounds.min, max: bounds.max,
+        let (sounds, events) = await Task.detached(priority: .userInitiated) {
+            (FocusRoomSounds.read(beside: file), FocusRoomEvents.read(beside: file))
+        }.value
+        return LoadedRoom(model: model, file: file, sounds: sounds, events: events, min: bounds.min, max: bounds.max,
                           fileMetresPerUnit: unit.isFinite && unit > 0 ? unit : 1,
                           camera: camera(in: model, floor: bounds.min.y))
     }

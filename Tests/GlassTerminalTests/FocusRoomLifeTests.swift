@@ -69,20 +69,41 @@ struct FocusRoomLifeTests {
         #expect(FocusRoomClockHands(in: Entity()) == nil, "a room with no clock")
     }
 
-    @Test("What moves is never stood on: a room's floor is, its cars and clock hands are not")
+    @Test("What moves is never stood on: a room's floor is; its cars, clock hands, digital clock and events are not")
     func nothingMovingToStandOn() {
         let room = Entity(), floor = Entity(), moving = Entity(), car = Entity(), clock = Entity(), hand = Entity()
+        let digital = Entity(), event = Entity(), orb = Entity()
         floor.name = "floor"
         moving.name = "moving"
         car.name = "car"
         clock.name = "clock"
         hand.name = "clock_hour"
+        digital.name = "clock_digital"
+        event.name = "event_sky"
+        orb.name = "orb"
         room.addChild(floor)
         room.addChild(moving)
         moving.addChild(car)
         room.addChild(clock)
         clock.addChild(hand)
+        room.addChild(digital)
+        room.addChild(event)
+        event.addChild(orb)
         #expect(FocusRoomLife.standableDescendants(of: room).map(\.name) == ["floor"])
+    }
+
+    @Test("The digital clock goes at the room's clock_digital, half a metre across times its own scale; no anchor, no panel")
+    func digitalClockPlaced() {
+        let room = Entity(), wall = Entity(), anchor = Entity(), panel = Entity()
+        anchor.name = "clock_digital"
+        room.addChild(wall)
+        wall.addChild(anchor)
+        #expect(FocusRoomLife.placeDigitalClock(panel, panelWidth: 2, in: room))
+        #expect(panel.parent === anchor)
+        #expect(panel.scale == SIMD3(repeating: 0.25), "2 m as drawn, shown 0.5 m across")
+        let bare = Entity(), loose = Entity()
+        #expect(!FocusRoomLife.placeDigitalClock(loose, panelWidth: 2, in: bare))
+        #expect(loose.parent == nil)
     }
     #endif
 
@@ -150,6 +171,9 @@ struct FocusRoomLifeTests {
         let sounds = try #require(FocusRoomSounds.decoded(from: Data(Self.loftSounds.utf8)))
         let has: Set<String> = ["snd_city", "snd_rack"]
         #expect(sounds.playable(hasEntity: { has.contains($0) }).map(\.id) == ["city", "rack", "hvac", "siren"])
+        var outside = sounds
+        outside.sounds[2].file = "../../Library/hum.m4a"
+        #expect(!outside.playable(hasEntity: { has.contains($0) }).map(\.id).contains("hvac"), "a sound named by a path")
     }
 
     @Test("The sounds are in a folder named as the room, beside it: none is a silent room; one iCloud hasn't brought is silent this time")
@@ -166,6 +190,55 @@ struct FocusRoomLifeTests {
         #expect(FocusRoomSounds.read(beside: room)?.sounds.count == 6)
         try Data().write(to: sounds.appendingPathComponent(".clock_tick.m4a.icloud"))
         #expect(FocusRoomSounds.read(beside: room) == nil, "a file still in iCloud")
+    }
+
+    // MARK: - Events
+
+    private static let events = """
+    {
+      "version": 1,
+      "events": [
+        { "id": "flock", "file": "flock.usdz", "anchors": ["event_sky_west", "event_sky_east"], "every": [120, 600] },
+        { "id": "ferry", "file": "ferry.usdz", "anchors": ["event_river"], "every": [300, 900], "seconds": 45 },
+        { "id": "away",  "file": "../outside.usdz", "anchors": ["event_sky_east"], "every": [60, 120] },
+        { "id": "never", "file": "never.usdz", "anchors": ["event_sky_east"], "every": [600, 60] }
+      ]
+    }
+    """
+
+    @Test("Events read from their list; one happens only where the room has an anchor for it, from a file in its own folder, with a wait that makes sense")
+    func eventsRead() throws {
+        let list = try #require(FocusRoomEvents.decoded(from: Data(Self.events.utf8)))
+        #expect(list.events.map(\.id) == ["flock", "ferry", "away", "never"])
+        #expect(list.events[0].interval == 120...600)
+        let room: Set<String> = ["event_sky_east"]
+        #expect(list.playable(hasEntity: { room.contains($0) }).map(\.id) == ["flock"],
+                "the ferry has no river here; one names a path; one's wait is back to front")
+        #expect(FocusRoomEvents.decoded(from: Data("{\"events\": {}}".utf8)) == nil)
+    }
+
+    @Test("An event stays as long as it is told, else as long as its motion, else 10 s; never past ten minutes")
+    func eventLength() {
+        #expect(FocusRoomEvents.Event.showing(motionSeconds: 12, declared: 45) == 45)
+        #expect(FocusRoomEvents.Event.showing(motionSeconds: 12, declared: nil) == 12)
+        #expect(FocusRoomEvents.Event.showing(motionSeconds: nil, declared: nil) == 10)
+        #expect(FocusRoomEvents.Event.showing(motionSeconds: 0, declared: -3) == 10)
+        #expect(FocusRoomEvents.Event.showing(motionSeconds: .infinity, declared: 5000) == 600)
+    }
+
+    @Test("Events are in a folder named as the room, beside it, read only when all of it is here")
+    func eventsBesideTheRoom() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("FocusRoomEvents-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let room = folder.appendingPathComponent("Loft.usdz")
+        let events = FocusRoomEvents.folder(beside: room)
+        #expect(events.lastPathComponent == "Loft.events")
+        #expect(FocusRoomEvents.read(beside: room) == nil, "no folder")
+        try FileManager.default.createDirectory(at: events, withIntermediateDirectories: true)
+        try Data(Self.events.utf8).write(to: events.appendingPathComponent("events.json"))
+        #expect(FocusRoomEvents.read(beside: room)?.events.count == 4)
+        try Data().write(to: events.appendingPathComponent(".flock.usdz.icloud"))
+        #expect(FocusRoomEvents.read(beside: room) == nil, "a file still in iCloud")
     }
 
     // MARK: - Room Sound

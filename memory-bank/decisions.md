@@ -1902,7 +1902,8 @@ GlassSpaceMaker session's handoff. A room file's own motion plays round and roun
 (still with Reduce Motion); a `clock` Xform's hands keep the headset's time; a `<Room>.sounds/` folder beside the
 file plays its sounds (spatial, ambient, head-locked; some now and then); nothing under `moving` or `clock` is stood
 on; Settings ▸ Terminal ▸ Focus Mode has Room Sound (0–100%, 70% to begin with, synced from Vision Pro only). The
-room-file contract is the handoff note's.
+room-file contract is the handoff note's. Phase 3 ("go ahead with phase 3"): a digital clock and date panel at a
+`clock_digital` Xform, and events from `<Room>.events/events.json` shown now and then at `event_<name>` Xforms.
 
 **Status:** Approved and built 2026-10-26 (0.4.530–0.4.533); committed 2026-10-26 at his word. Not yet seen on the
 headset. Living rooms built 2026-10-27 (phases 1 and 2 of the handoff; phase 3 each its own approval), 0.4.540, and seen

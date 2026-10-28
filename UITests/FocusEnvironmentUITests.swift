@@ -89,6 +89,17 @@ final class FocusEnvironmentUITests: XCTestCase {
         XCTAssertTrue(shown.contains("Night Sky"), "This Window shows \(shown), not All Terminals' Night Sky")
     }
 
+    /// A living room's digital clock (2026-10-27, the handoff's third phase): the simulator's test room
+    /// has a `clock_digital`, and Focus Mode puts the time and date there.
+    func testARoomWithADigitalClockShowsTheTime() {
+        launch("terminal", ["--demo-environment-room", "--demo-focus", "file:Test Room.reality", "--demo-focus-immersed",
+                            "-blinkingCursor", "NO"])
+        let clock = element("focus-room-digital-clock")
+        XCTAssertTrue(clock.waitForExistence(timeout: 60), "no digital clock in the test room")
+        // For the capture from outside.
+        sleep(10)
+    }
+
     /// Try Out (the owner, 2026-10-26: a "try out" room with sliders for scale): a 3D room opened all
     /// the way round with a window to fit it. Saying what its numbers are in changes its size at once,
     /// and Done keeps the fit beside the file for the next time. The simulator's room is made by
