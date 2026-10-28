@@ -18,6 +18,8 @@ import QuickLookThumbnailing
 struct FocusEnvironmentLibrarySection: View {
     @Binding var chosen: String
     @Binding var opensImmersed: Bool
+    /// How loud a room's own sounds are, 0 to 1.
+    @Binding var soundLevel: Double
     @Environment(\.openWindow) private var openWindow
     private let library = FocusEnvironmentLibrary.shared
     @State private var pictures = FocusEnvironmentPictures.shared
@@ -57,6 +59,17 @@ struct FocusEnvironmentLibrarySection: View {
             }
             Toggle("Open Immersed", isOn: $opensImmersed)
                 .accessibilityIdentifier("focus-environment-opens-immersed")
+            LabeledContent("Room Sound") {
+                Slider(value: $soundLevel, in: 0...1) {
+                    Text("Room Sound")
+                } minimumValueLabel: {
+                    Image(systemName: "speaker.slash")
+                } maximumValueLabel: {
+                    Image(systemName: "speaker.wave.3")
+                }
+                .frame(maxWidth: 320)
+                .accessibilityIdentifier("focus-environment-sound")
+            }
         } header: {
             Text("Focus Mode")
         } footer: {
@@ -92,7 +105,7 @@ struct FocusEnvironmentLibrarySection: View {
 
     private var footer: String {
         let what = "What surrounds you in Focus Mode, the moon in a terminal's bar. Add a 3D room (USDZ or Reality) or a 360° photo, a picture twice as wide as it is tall."
-        let window = "A window can have its own in This Window, or from the moon's pinch-and-hold menu. Open Immersed starts Focus Mode all the way around you instead of partway; the Digital Crown still brings your room back."
+        let window = "A window can have its own in This Window, or from the moon's pinch-and-hold menu. Open Immersed starts Focus Mode all the way around you instead of partway; the Digital Crown still brings your room back. Room Sound is how loud a room's own sounds are, from a folder named like the room beside it (Loft.sounds beside Loft.usdz)."
         switch library.storage {
         case .iCloud:
             return "\(what) Yours are in iCloud Drive ▸ Glass Power Tools ▸ Environments, so a file put there from your Mac or iPhone appears here too. \(window)"

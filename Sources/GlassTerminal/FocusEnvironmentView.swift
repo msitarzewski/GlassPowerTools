@@ -63,6 +63,7 @@ struct FocusEnvironmentView: View {
     @State private var root = Entity()
     /// The world the environment is in, which moves as the person does, and what moves it.
     @State private var walking = FocusWalking()
+    @Environment(SettingsManager.self) private var settings
 
     private static let log = Logger(subsystem: "com.glasspowertools", category: "FocusEnvironments")
 
@@ -79,6 +80,7 @@ struct FocusEnvironmentView: View {
         .task(id: stage.environmentID) { await show(stage.environmentID) }
         .task { await walking.trackHead() }
         .onChange(of: stage.fit) { _, fit in walking.place(fit) }
+        .onChange(of: settings.focusEnvironmentSound, initial: true) { _, level in walking.soundLevel = level }
         .onAppear {
             library.start()
             stage.isOpen = true
@@ -90,6 +92,7 @@ struct FocusEnvironmentView: View {
             stage.room = nil
             stage.walking = nil
             walking.stopTrackingHead()
+            walking.endLife()
         }
     }
 
@@ -319,9 +322,13 @@ enum FocusEnvironmentScenes {
         return image
     }
 
-    /// A 3D file as it came: its bounds, its units, and its own camera.
+    /// A 3D file as it came: its bounds, its units, its own camera, and the sounds beside it.
     struct LoadedRoom {
         let model: Entity
+        /// The file it came from; nil for a room made in code.
+        var file: URL? = nil
+        /// Its `<Room>.sounds` folder's list, when it has one on this device (`FocusRoomSounds`).
+        var sounds: FocusRoomSounds? = nil
         /// Metres, the file's units applied, in its own coordinates.
         let min: SIMD3<Float>
         let max: SIMD3<Float>
@@ -338,7 +345,9 @@ enum FocusEnvironmentScenes {
         let model = try await Entity(contentsOf: file)
         let bounds = model.visualBounds(relativeTo: nil)
         let unit = Double(model.scale.x)
-        return LoadedRoom(model: model, min: bounds.min, max: bounds.max,
+        // Read off the main thread, as iCloud may fetch it.
+        let sounds = await Task.detached(priority: .userInitiated) { FocusRoomSounds.read(beside: file) }.value
+        return LoadedRoom(model: model, file: file, sounds: sounds, min: bounds.min, max: bounds.max,
                           fileMetresPerUnit: unit.isFinite && unit > 0 ? unit : 1,
                           camera: camera(in: model, floor: bounds.min.y))
     }

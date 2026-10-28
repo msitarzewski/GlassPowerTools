@@ -35,6 +35,7 @@ nonisolated enum UserDefaultsKeys {
     static let whenResized = "whenResized"
     static let focusEnvironment = "focusEnvironment"
     static let focusOpensImmersed = "focusOpensImmersed"
+    static let focusEnvironmentSound = "focusEnvironmentSound"
     static let errorSuggestions = "errorSuggestions"
     static let fontFollowsSystemTextSize = "fontFollowsSystemTextSize"
     static let joinsWrappedPastes = "joinsWrappedPastes"

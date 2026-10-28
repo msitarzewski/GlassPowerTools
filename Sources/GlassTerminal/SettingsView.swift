@@ -596,11 +596,15 @@ struct TerminalSettingsView: View {
             #if os(visionOS)
             // Focus Mode's surroundings (2026-10-26), for every window; This Window for one.
             FocusEnvironmentLibrarySection(chosen: $settings.focusEnvironment,
-                                           opensImmersed: $settings.focusOpensImmersed)
+                                           opensImmersed: $settings.focusOpensImmersed,
+                                           soundLevel: $settings.focusEnvironmentSound)
                 .onChange(of: settings.focusEnvironment) { _, _ in
                     settings.saveSettings()
                 }
                 .onChange(of: settings.focusOpensImmersed) { _, _ in
+                    settings.saveSettings()
+                }
+                .onChange(of: settings.focusEnvironmentSound) { _, _ in
                     settings.saveSettings()
                 }
             #endif

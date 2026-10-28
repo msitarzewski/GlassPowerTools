@@ -57,6 +57,14 @@ final class FocusWalking {
     private var updates: EventSubscription?
     /// Counts environments shown, so surfaces made for one aren't put on the next.
     private var shown = 0
+    /// A room's own life (`FocusRoomLife.swift`): its motion playing, its clock, its sounds.
+    private var motion: [AnimationPlaybackController] = []
+    private var clock: FocusRoomClockHands?
+    private var soundscape: FocusRoomSoundscape?
+    /// Settings' Room Sound, 0 to 1.
+    var soundLevel: Double = 0.7 {
+        didSet { soundscape?.setLevel(soundLevel) }
+    }
 
     static let groundGroup = CollisionGroup(rawValue: 1 << 20)
     static let roomGroup = CollisionGroup(rawValue: 1 << 21)
@@ -112,7 +120,10 @@ final class FocusWalking {
         (target, arrow, targetMaterial) = Self.targetEntity()
         root.addChild(target)
         updates = realityContent.subscribe(to: SceneEvents.Update.self) { [weak self] _ in
-            MainActor.assumeIsolated { self?.followHead() }
+            MainActor.assumeIsolated {
+                self?.followHead()
+                self?.clock?.tick(now: .now)
+            }
         }
     }
 
@@ -129,6 +140,7 @@ final class FocusWalking {
 
     /// A new environment: its content, walkable or not, and where the person starts in it.
     func show(_ scene: Entity?, room loaded: FocusEnvironmentScenes.LoadedRoom?, fit: FocusRoomFit, walks: Bool) {
+        endLife()
         content.children.removeAll()
         roomHolder.children.removeAll()
         groundLook?.removeFromParent()
@@ -142,6 +154,7 @@ final class FocusWalking {
             if groundLook == nil { groundLook = Self.groundLookEntity() }
             if let groundLook { world.addChild(groundLook) }
             place(fit)
+            startLife(loaded)
             let showing = shown
             Task { await self.makeStandable(loaded.model, showing: showing) }
         }
@@ -189,11 +202,40 @@ final class FocusWalking {
         }
     }
 
+    /// A room's life, once it is in the scene: the motion it carries playing round and round from
+    /// somewhere in its loop, so each visit starts elsewhere and its birds and aircraft come when
+    /// they will (still with Reduce Motion); its clock on the headset's time; its sounds.
+    private func startLife(_ loaded: FocusEnvironmentScenes.LoadedRoom) {
+        if !UIAccessibility.isReduceMotionEnabled {
+            for animation in loaded.model.availableAnimations {
+                let loop = animation.definition.duration
+                let controller = loaded.model.playAnimation(animation.repeat(), transitionDuration: 0, startsPaused: false)
+                if loop.isFinite, loop > 0 { controller.time = .random(in: 0..<loop) }
+                motion.append(controller)
+            }
+        }
+        clock = FocusRoomClockHands(in: loaded.model)
+        if let sounds = loaded.sounds, let folder = loaded.file.map(FocusRoomSounds.folder(beside:)) {
+            soundscape = FocusRoomSoundscape(sounds, folder: folder, in: loaded.model, level: soundLevel)
+        }
+        Self.log.info("Room life: \(self.motion.count, privacy: .public) animations, clock \(self.clock != nil, privacy: .public), \(loaded.sounds?.sounds.count ?? 0, privacy: .public) sounds")
+    }
+
+    /// Before the next environment, or as the space closes: silent and still.
+    func endLife() {
+        soundscape?.stop()
+        soundscape = nil
+        motion.forEach { $0.stop() }
+        motion = []
+        clock = nil
+    }
+
     /// A room's surfaces, made somewhere to stand and to pinch: its floors, stairs and landings to
     /// land on, its walls and ceilings to turn by. Made after it shows, as a big room takes a moment.
+    /// Not what moves in it (`FocusRoomLife.standableDescendants`): no standing on a car.
     private func makeStandable(_ model: Entity, showing: Int) async {
         var made = 0
-        for entity in Self.descendants(of: model) {
+        for entity in FocusRoomLife.standableDescendants(of: model) {
             guard let mesh = entity.components[ModelComponent.self]?.mesh else { continue }
             do {
                 let shape = try await ShapeResource.generateStaticMesh(from: mesh)
@@ -357,10 +399,6 @@ final class FocusWalking {
     }
 
     // MARK: - Pieces
-
-    private static func descendants(of entity: Entity) -> [Entity] {
-        entity.children.flatMap { [$0] + descendants(of: $0) }
-    }
 
     /// Mirador's ring: 20 to 24 cm, white, a little see-through.
     private static func ringEntity() -> Entity {

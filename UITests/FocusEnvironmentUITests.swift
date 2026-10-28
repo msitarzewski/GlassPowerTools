@@ -67,6 +67,11 @@ final class FocusEnvironmentUITests: XCTestCase {
         XCTAssertEqual(immersed.value as? String, "0", "Open Immersed should start off, as Focus Mode always opened")
         immersed.tap()
         XCTAssertEqual(immersed.value as? String, "1", "Open Immersed didn't turn on")
+        // Room Sound (2026-10-27): how loud a living room's own sounds are, 70% to begin with.
+        let sound = app.sliders["focus-environment-sound"].firstMatch
+        reveal(sound)
+        XCTAssertTrue(sound.exists, "Room Sound is missing")
+        XCTAssertEqual(sound.value as? String, "70%", "Room Sound should start at 70%")
         reveal(night, back: true)
 
         night.tap()

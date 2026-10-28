@@ -1896,5 +1896,15 @@ but the environments are spatial and only work (today) on Vision Pro."
   a wall to turn 45°), onto a room's own floors and landings too. The world moves, never the person; a floor is
   forced under every walkable environment. Head position from ARKit world tracking, which asks nothing of the person.
 
+**Living rooms (2026-10-27):** "Is there a way to animate these somehow? Maybe make a clock show system time? … Cars
+moving, people walking. Occasional birds and planes (random)", "What about audio?", and his "get're done" on the
+GlassSpaceMaker session's handoff. A room file's own motion plays round and round from a random place in its loop
+(still with Reduce Motion); a `clock` Xform's hands keep the headset's time; a `<Room>.sounds/` folder beside the
+file plays its sounds (spatial, ambient, head-locked; some now and then); nothing under `moving` or `clock` is stood
+on; Settings ▸ Terminal ▸ Focus Mode has Room Sound (0–100%, 70% to begin with, synced from Vision Pro only). The
+room-file contract is the handoff note's.
+
 **Status:** Approved and built 2026-10-26 (0.4.530–0.4.533); committed 2026-10-26 at his word. Not yet seen on the
-headset. Task note `tasks/2026-10/2026-10-26_focus-environments.md`.
+headset. Living rooms built 2026-10-27 (phases 1 and 2 of the handoff; phase 3 each its own approval), 0.4.540, and seen
+working on his headset that evening ("holy shit it works~!!!"); committed 2026-10-27 at his word. Task notes
+`tasks/2026-10/2026-10-26_focus-environments.md`, `tasks/2026-10/2026-10-27_living-rooms-handoff.md`.

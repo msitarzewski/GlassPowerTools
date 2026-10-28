@@ -180,6 +180,9 @@ class SettingsManager {
     /// to dial it in (the owner, 2026-10-26: "Leave immersion to the user … [ ] Open Immersed").
     /// The Crown still brings the room back either way. Off by default, as Focus Mode always opened.
     var focusOpensImmersed: Bool = false
+    /// How loud a room's own sounds are in Focus Mode, 0 (none) to 1 (2026-10-27: the living rooms'
+    /// city, fans and clock, `FocusRoomSounds`).
+    var focusEnvironmentSound: Double = 0.7
     /// Apple Intelligence explaining an error the output shows, with a fix to review (2026-10-04).
     /// On by default; off here, or from the card itself (the owner, 2026-10-14: "a need to pause on
     /// device AI suggestions … it's monitoring the output of an eval").
@@ -365,6 +368,10 @@ class SettingsManager {
         if settingsDefaults.object(forKey: UserDefaultsKeys.focusOpensImmersed) != nil {
             focusOpensImmersed = settingsDefaults.bool(forKey: UserDefaultsKeys.focusOpensImmersed)
         }
+        if settingsDefaults.object(forKey: UserDefaultsKeys.focusEnvironmentSound) != nil {
+            let saved = settingsDefaults.double(forKey: UserDefaultsKeys.focusEnvironmentSound)
+            if saved.isFinite { focusEnvironmentSound = min(1, max(0, saved)) }
+        }
         if settingsDefaults.object(forKey: UserDefaultsKeys.joinsWrappedPastes) != nil {
             joinsWrappedPastes = settingsDefaults.bool(forKey: UserDefaultsKeys.joinsWrappedPastes)
         }
@@ -440,6 +447,7 @@ class SettingsManager {
         settingsDefaults.set(whenResized.rawValue, forKey: UserDefaultsKeys.whenResized)
         settingsDefaults.set(focusEnvironment, forKey: UserDefaultsKeys.focusEnvironment)
         settingsDefaults.set(focusOpensImmersed, forKey: UserDefaultsKeys.focusOpensImmersed)
+        settingsDefaults.set(focusEnvironmentSound, forKey: UserDefaultsKeys.focusEnvironmentSound)
         settingsDefaults.set(errorSuggestions, forKey: UserDefaultsKeys.errorSuggestions)
         settingsDefaults.set(fontFollowsSystemTextSize, forKey: UserDefaultsKeys.fontFollowsSystemTextSize)
         settingsDefaults.set(joinsWrappedPastes, forKey: UserDefaultsKeys.joinsWrappedPastes)
@@ -1493,6 +1501,9 @@ class SettingsManager {
         if let synced = preferences.focusOpensImmersed {
             focusOpensImmersed = synced
         }
+        if let synced = preferences.focusEnvironmentSound {
+            focusEnvironmentSound = synced
+        }
         // `glassFrost`, `windowOpacity` and `blurBackground` are the shell's layer state
         // (Settings → Appearance), still carried in the payload for glas.sh's readers but not
         // applied here: the store is shared with glas.sh (D3) and applying its payload at launch
@@ -1528,7 +1539,8 @@ class SettingsManager {
                 pathPreviews: pathPreviews.rawValue,
                 whenResized: whenResized.rawValue,
                 focusEnvironment: Self.sentFromVisionPro(focusEnvironment),
-                focusOpensImmersed: Self.sentFromVisionPro(focusOpensImmersed)
+                focusOpensImmersed: Self.sentFromVisionPro(focusOpensImmersed),
+                focusEnvironmentSound: Self.sentFromVisionPro(focusEnvironmentSound)
             )
         )
     }

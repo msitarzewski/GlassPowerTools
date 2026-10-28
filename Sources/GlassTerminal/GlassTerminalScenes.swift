@@ -205,6 +205,7 @@ public struct GlassTerminalScenes: Scene {
         .restorationBehavior(.disabled)
         ImmersiveSpace(id: "focus-environment") {
             FocusEnvironmentView()
+                .environment(settingsManager)
                 // Steps aside for Show All Windows around the person, and comes back after it.
                 .glassImmersiveSpacePresence("focus-environment")
         }

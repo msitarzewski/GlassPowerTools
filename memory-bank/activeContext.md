@@ -31,7 +31,7 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-10-27 — RESUME HERE: the orb dock's ninth to thirteenth rounds and the terminal redraw storm committed (0.4.535–0.4.539)
+## 2026-10-27 — RESUME HERE: the orb dock's ninth to thirteenth rounds, the terminal redraw storm, and living rooms committed (0.4.535–0.4.540)
 - **Committed 2026-10-27 at his word ("Commit this and update the memory bank"), not pushed:** the dock's ninth round
   (0.4.535: orbs that wrap, names that turn, a scroll that always scrolls, Connections larger with a hold menu, windows
   beside a tall dock, docked pictures across a relaunch, Auto-focus on Activity on by default) and tenth (0.4.536: the
@@ -55,7 +55,11 @@ use the disposable test VM only).
   `testADiagramHasAMarkThatShowsIt` failing with and without it: a diagram printed before its window opened was never
   looked for. `SwiftTermHostModel.flushPending` looks once queued output lands; the test passes.
 - **0.4.538, 0.4.539 and the diagram fix committed 2026-10-27 at his word ("commit this and update the memory bank"),
-  not pushed.** Mac, iPhone and headset run 0.4.539, each read back.
+  not pushed.**
+- **Then living rooms (D89), 0.4.540, committed at his word, not pushed:** the GlassSpaceMaker session's handoff built
+  (a room's motion, a clock on the headset's time, sound from `<Room>.sounds/`, Room Sound); the fixed loft put in
+  his iCloud Environments; on the headset: "holy shit it works~!!!". Mac, iPhone and headset run 0.4.540, each read
+  back. `tasks/2026-10/2026-10-27_living-rooms-handoff.md`.
 - **Next, his to try on the headset:** the gear with several agents at work; a docked orb's names at the dock's
   right edge; hold Connections (the menu); resize the dock tall and wide several times (the
   crash; no automated test reaches it); let go of a resize (the snap; whether visionOS reports the hand on the corner,
@@ -83,6 +87,12 @@ use the disposable test VM only).
   seen failing with its break), 0.4.531.
 - **Try Out, fits, and Mirador's teleport inside** (his "Yes, build all three", 2026-10-26): built and tested in the
   simulator (unit, UI, captures; breaks caught); the headset not yet. Task note has the details and what isn't seen.
+- **Living rooms (2026-10-27), built at his "get're done" as 0.4.540 (on all three devices, read back), seen working on
+  his headset ("holy shit it works~!!!"), committed at his word:** a room's own motion plays, a `clock`
+  keeps the headset's time, a `<Room>.sounds/` folder plays, Room Sound in Settings (D89). Seen in the simulator on
+  `AnimTest.usdz` and the loft. The loft's clock hands first sat between its dial and the wall; the asset session moved
+  them in front (21:34), and that loft, with its sounds, is in his iCloud Environments.
+  `tasks/2026-10/2026-10-27_living-rooms-handoff.md`, "Built".
 - **Orb dock, sixth round (0.4.532):** his "We lost hover/view focus on the terminal/service icons … only show a stub":
   the fifth round's name layer reverted; the dot opens itself again, as in 0.4.527; overlaps ordered by depth.
   `tasks/2026-10/2026-10-25_orb-dock.md`. The headset is his to confirm.

@@ -152,6 +152,8 @@ nonisolated struct ICloudPortableTerminalPreferences: Codable, Equatable, Sendab
     var focusEnvironment: String? = nil
     /// Focus Mode opening immersed on Vision Pro (2026-10-26), optional for the same reason.
     var focusOpensImmersed: Bool? = nil
+    /// Focus Mode's room sound on Vision Pro, 0…1 (2026-10-27), optional for the same reason.
+    var focusEnvironmentSound: Double? = nil
 
     func validate() throws {
         guard (0...100_000).contains(maximumScrollbackLines) else {
@@ -176,6 +178,9 @@ nonisolated struct ICloudPortableTerminalPreferences: Codable, Equatable, Sendab
         }
         guard !glassTint.isEmpty, glassTint.count <= 64 else {
             throw ICloudSettingsSyncError.invalidPayload("Glass tint values must contain 1...64 characters.")
+        }
+        if let focusEnvironmentSound, !focusEnvironmentSound.isFinite || !(0...1).contains(focusEnvironmentSound) {
+            throw ICloudSettingsSyncError.invalidPayload("Focus Mode's room sound must be a finite 0...1 value.")
         }
         if let focusEnvironment, focusEnvironment.count > FocusEnvironmentFiles.longestID {
             throw ICloudSettingsSyncError.invalidPayload("Focus environments must be named in at most \(FocusEnvironmentFiles.longestID) characters.")
