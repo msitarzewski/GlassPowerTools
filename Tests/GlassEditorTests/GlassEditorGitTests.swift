@@ -46,6 +46,17 @@ struct GlassEditorGitParsingTests {
         #expect(status.changes[3].isStaged == true && status.changes[3].isUnstaged == true)
     }
 
+    /// `--ignored=matching`: an ignored folder once, with its slash, and a file that matches a
+    /// pattern; neither is a change (2026-10-29). A rename says where it came from.
+    @Test func ignoredPathsAreReadAndAreNotChanges() {
+        let fields = ["# branch.head main", "! .build/", "! notes/debug.log",
+                      "2 R. N... 100644 100644 100644 aaaa aaaa R100 renamed.txt", "old name.txt"]
+        let status = GlassEditorGitStatus.parse(Data((fields.joined(separator: "\0") + "\0").utf8))
+        #expect(status.ignored == [".build/", "notes/debug.log"])
+        #expect(status.changes.map(\.path) == ["renamed.txt"])
+        #expect(status.changes[0].description == "Renamed from old name.txt")
+    }
+
     @Test func aRepositoryWithNoCommitAndADetachedHeadSayWhereTheyAre() {
         let initial = GlassEditorGitStatus.parse(Data("# branch.oid (initial)\0# branch.head trunk\0".utf8))
         #expect(initial.commit == nil)
@@ -232,6 +243,45 @@ struct GlassEditorGitRepositoryTests {
         #expect(!git.asked.contains { $0.contains("diff") })
     }
 
+    /// The tree's other states (2026-10-29): a folder holding a conflict, files and a whole folder
+    /// deleted, and what `.gitignore` leaves out, in a project below the repository's root.
+    @Test func conflictsDeletionsAndIgnoredPathsAreFoundByFolder() async {
+        let git = ScriptedGit()
+        git.answers["rev-parse"] = output("Sources/\n")
+        git.answers["status"] = output([
+            "# branch.oid abc", "# branch.head main",
+            "u UU N... 100644 100644 100644 100644 a b c Sources/App/Merge.swift",
+            "1 .D N... 100644 100644 000000 a a Sources/App/Gone.swift",
+            "1 D. N... 100644 000000 000000 a a Sources/Old/One.swift",
+            "1 D. N... 100644 000000 000000 a a Sources/Old/Deeper/Two.swift",
+            "1 .M N... 100644 100644 100644 a b Sources/Kept/Edited.swift",
+            "1 .D N... 100644 100644 000000 a a Sources/Kept/Removed.swift",
+            "! Sources/.build/",
+            "! Sources/App/debug.log",
+        ].joined(separator: "\0") + "\0")
+        let repository = GlassEditorGitRepository(projectPath: "/srv/repo/Sources", machine: "alpha", runner: git,
+                                                  access: MemoryFiles(files: [:]))
+        repository.refresh()
+        await repository.settled()
+        #expect(repository.folderHasConflicts("/srv/repo/Sources/App"))
+        #expect(repository.folderHasConflicts("/srv/repo/Sources"))
+        #expect(!repository.folderHasConflicts("/srv/repo/Sources/Kept"))
+
+        let app = repository.deletions(in: "/srv/repo/Sources/App")
+        #expect(app.files == ["/srv/repo/Sources/App/Gone.swift"])
+        #expect(app.folders.isEmpty, "App still has a file that is there")
+        let top = repository.deletions(in: "/srv/repo/Sources")
+        #expect(top.folders == ["/srv/repo/Sources/Old"], "Kept has an edited file, so it stands")
+        #expect(repository.deletions(in: "/srv/repo/Sources/Old").folders == ["/srv/repo/Sources/Old/Deeper"])
+        #expect(repository.deletions(in: "/srv/repo/Sources/Old/Deeper").files == ["/srv/repo/Sources/Old/Deeper/Two.swift"])
+
+        #expect(repository.isIgnored("/srv/repo/Sources/.build"))
+        #expect(repository.isIgnored("/srv/repo/Sources/.build/debug/App.o"), "inside an ignored folder")
+        #expect(repository.isIgnored("/srv/repo/Sources/App/debug.log"))
+        #expect(!repository.isIgnored("/srv/repo/Sources/App/Merge.swift"))
+        #expect(repository.change(atPath: "/srv/repo/Sources/App/debug.log") == nil, "ignored is not a change")
+    }
+
     @Test func changesReadsTheDiffAndNewFilesWhole() async throws {
         let git = ScriptedGit()
         git.answers["rev-parse"] = output("")
@@ -242,10 +292,14 @@ struct GlassEditorGitRepositoryTests {
         repository.showsDiffs = true
         await repository.settled()
         #expect(repository.hasReadDiffs)
-        #expect(repository.diffs["a.txt"]?.hunks.first?.lines.map(\.text) == ["old", "new"])
-        #expect(repository.diffs["b.txt"]?.hunks.first?.lines.map(\.text) == ["fresh"])
-        let diff = try #require(git.asked.first { $0.contains("diff") })
-        #expect(diff.contains("HEAD"))
+        #expect(repository.unstagedDiffs["a.txt"]?.hunks.first?.lines.map(\.text) == ["old", "new"])
+        #expect(repository.unstagedDiffs["b.txt"]?.hunks.first?.lines.map(\.text) == ["fresh"])
+        // Two diffs: what is staged, against the last commit, and what isn't, against the index.
+        let diffs = git.asked.filter { $0.contains("diff") }
+        #expect(diffs.count == 2)
+        let diff = try #require(diffs.first)
+        #expect(diff.contains("--cached") && diff.contains("HEAD"))
+        #expect(!diffs[1].contains("--cached") && !diffs[1].contains("HEAD"))
         #expect(diff.contains("--no-ext-diff") && diff.contains("--src-prefix=a/") && diff.contains("--no-relative"))
     }
 
@@ -323,7 +377,8 @@ struct GlassEditorGitCommitTests {
         let reset = try #require(git.asked.first { $0.contains("reset") })
         #expect(Array(reset.drop { $0 != "reset" }) == ["reset", "-q", "--", ":(top,literal)src/a b.txt"])
         // Each is followed by asking git what it did.
-        #expect(git.asked.last?.contains("status") == true)
+        let resetAt = try #require(git.asked.lastIndex { $0.contains("reset") })
+        #expect(git.asked[(resetAt + 1)...].contains { $0.contains("status") })
         #expect(repository.actionProblem == nil && !repository.isWorking)
     }
 
@@ -487,11 +542,12 @@ struct GlassEditorLocalGitTests {
         let changes = try #require(workspace.showChanges())
         #expect(changes.changesOfProject == project.id && !changes.isText && !changes.hasNeverBeenSaved)
         await repository.settled()
-        let lines = try #require(repository.diffs["Sources/a.txt"]?.hunks.first?.lines)
+        let lines = try #require(repository.unstagedDiffs["Sources/a.txt"]?.hunks.first?.lines)
         #expect(lines.map(\.kind) == [.context, .removed, .added, .context])
         #expect(lines.map(\.text) == ["one", "two", "2", "three"])
-        #expect(repository.diffs["b.txt"]?.newPath == nil)
-        #expect(repository.diffs["Sources/c.txt"]?.hunks.first?.lines.map(\.text) == ["new"])
+        #expect(repository.unstagedDiffs["b.txt"]?.newPath == nil)
+        #expect(repository.unstagedDiffs["Sources/c.txt"]?.hunks.first?.lines.map(\.text) == ["new"])
+        #expect(repository.stagedDiffs.isEmpty, "nothing is staged")
 
         // Chosen again, not opened twice; closing it stops the reading.
         #expect(workspace.showChanges()?.id == changes.id)
@@ -513,7 +569,7 @@ struct GlassEditorLocalGitTests {
         await repository.settled()
         #expect(repository.status.commit == nil)
         #expect(repository.status.headName == "trunk")
-        #expect(repository.diffs["a.txt"]?.hunks.first?.lines.map(\.kind) == [.added])
+        #expect(repository.stagedDiffs["a.txt"]?.hunks.first?.lines.map(\.kind) == [.added])
         #expect(repository.diffProblem == nil)
     }
 

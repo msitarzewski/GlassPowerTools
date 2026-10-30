@@ -294,6 +294,93 @@ struct MacWorkgroupTmuxTests {
         }
     }
 
+    /// 2026-10-29: "We haven't even touched 'multiple Macs' in this software yet."
+    @Test("each terminal opens on its machine: another Mac's over SSH on its session there, in its folder; an SSH one to this Mac as a local tab")
+    func launcherOpensEachOnItsMachine() throws {
+        let thisMac = UUID(), otherMac = UUID(), linux = UUID()
+        let preset = LayoutPreset(name: "Desk", sessionIntents: [
+            .init(kind: .local, startupCommand: "./start.sh", localDirectory: "/srv/shop", tmuxSession: "glass-7", macServerID: otherMac),
+            .init(kind: .local, localDirectory: "/srv/blog", tmuxSession: "glass-8", macServerID: thisMac),
+            .init(kind: .local, localDirectory: "/srv/old", tmuxSession: "glass-9"),
+            .init(serverID: thisMac, startupCommand: "htop", tmuxSession: "glass-10"),
+            .init(serverID: linux, tmuxSession: "work"),
+            .init(kind: .local, startupCommand: "make", localDirectory: "/srv/plain", withoutTmux: true, macServerID: otherMac)
+        ])
+        let broker = MacStartupCommandBroker()
+        let request = try MacWorkgroupLauncher.launch(preset: preset, broker: broker, thisMac: thisMac, openWindow: { _ in })[0]
+        let tabs = request.tabs
+        let panes = tabs.flatMap { $0.initialState?.root?.panes ?? [] }
+        #expect(panes.map(\.intent.kind) == [.ssh, .local, .local, .local, .ssh, .ssh])
+        #expect(panes.map(\.intent.serverID) == [otherMac, nil, nil, nil, linux, otherMac])
+        #expect(panes.map(\.intent.tmuxSession) == ["glass-7", "glass-8", "glass-9", "glass-10", "work", nil])
+        #expect(panes.map(\.intent.sshDirectory) == ["/srv/shop", nil, nil, nil, nil, nil], "another Mac's session is made again in its folder")
+        #expect(panes.map(\.intent.localDirectory) == [nil, "/srv/blog", "/srv/old", nil, nil, nil])
+        #expect(panes.map(\.intent.sourceSessionIndex) == [0, 1, 2, 3, 4, 5])
+        let commands = zip(tabs, panes).map { tab, pane in
+            tab.paneStartupTicketIDs?[pane.id].flatMap { broker.claim($0)?.command }
+        }
+        #expect(commands == ["./start.sh", nil, nil, "htop", nil, "cd -- '/srv/plain' && { make; }"])
+
+        // Without this Mac's record, as before: local terminals run here, SSH ones connect.
+        let unknown = try MacWorkgroupLauncher.launch(preset: preset, broker: MacStartupCommandBroker(), thisMac: nil, openWindow: { _ in })[0]
+        #expect(unknown.tabs.flatMap { $0.initialState?.root?.panes ?? [] }.map(\.intent.kind) == [.ssh, .ssh, .local, .ssh, .ssh, .ssh],
+                "another Mac's terminals still go there; this Mac's own record is just another server")
+    }
+
+    @Test("once the library says which machine this Mac is, workgroups open in its windows record it on their Mac terminals")
+    func openWorkgroupsRecordThisMac() throws {
+        let suite = "MacWorkgroupTmuxTests.\(UUID())"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let fake = MacLocalTmuxTests.FakeServer()
+        let previous = MacLocalTmux.server
+        MacLocalTmux.server = fake.server
+        defer { MacLocalTmux.server = previous }
+        fake.running = ["glass-44"]
+        let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
+        let otherMac = UUID()
+        let preset = LayoutPreset(name: "Build", sessionIntents: [
+            .init(kind: .local, tmuxSession: "glass-44"),
+            .init(kind: .local, tmuxSession: "glass-45", macServerID: otherMac)
+        ])
+        settings.upsertLayoutPreset(preset)
+        let request = try MacWorkgroupLauncher.launch(preset: preset, broker: MacStartupCommandBroker(), thisMac: nil,
+                                                      openWindow: { _ in })[0]
+        let registry = MacWorkspacePreviewRegistry()
+        let controller = MacWorkspaceWindowController(request: request, defaults: defaults)
+        let window = NSWindow()
+        window.isReleasedWhenClosed = false
+        registry.register(controller, window: window)
+
+        registry.recordThisMacOnOpenWorkgroups(settingsManager: settings)
+        #expect(settings.layoutPresets.first?.sessionIntents.map(\.macServerID) == [nil, otherMac], "the library doesn't know this Mac yet")
+        let thisMac = UUID()
+        settings.thisMacServerID = { thisMac }
+        registry.recordThisMacOnOpenWorkgroups(settingsManager: settings)
+        #expect(settings.layoutPresets.first?.sessionIntents.map(\.macServerID) == [thisMac, otherMac])
+        for tab in controller.tabs { tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false)) }
+        withExtendedLifetime(window) {}
+    }
+
+    @Test("a workgroup is open already when an SSH tab to this Mac shows the session its local terminal saved")
+    func openOnThisMacEitherWay() async throws {
+        try await withDefaults { defaults in
+            let thisMac = UUID()
+            let preset = LayoutPreset(name: "Desk", sessionIntents: [.init(kind: .local, tmuxSession: "glass-10")])
+            let registry = MacWorkspacePreviewRegistry()
+            // An SSH tab: a local one would ask this Mac's real tmux whether its session runs.
+            var ssh = MacWorkspacePaneIntent.ssh(serverID: thisMac)
+            ssh.sshTmuxSession = "glass-10"
+            let controller = MacWorkspaceWindowController(request: MacWorkspaceLaunchRequest(initialPaneIntent: ssh), defaults: defaults)
+            let window = NSWindow()
+            window.isReleasedWhenClosed = false
+            registry.register(controller, window: window)
+            #expect(registry.locate(workgroup: preset, thisMac: nil) == nil, "without this Mac's record, another machine")
+            #expect(registry.locate(workgroup: preset, thisMac: thisMac)?.controller === controller)
+            withExtendedLifetime(window) {}
+        }
+    }
+
     @Test("opening a workgroup already open brings its window forward: the one opened from it, or one showing its sessions")
     func openWorkgroupComesForward() async throws {
         try await withDefaults { defaults in

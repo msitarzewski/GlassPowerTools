@@ -17,6 +17,33 @@ struct MacWorkspaceFocusedActions {
     let toggleSecureKeyboardEntry: () -> Void
 }
 
+/// Split Right and Split Down in a pane's gear menu, worded as the Terminal menu's (the owner,
+/// 2026-10-29: "Move split pane into the gear menu"). The window's toolbar had a split button of
+/// its own. Supplied by the window, which owns the panes, to the pane in front.
+@MainActor
+struct MacPaneSplitActions {
+    let canSplit: Bool
+    let split: (MacWorkspaceSplitAxis) -> Void
+}
+
+extension EnvironmentValues {
+    @Entry var macPaneSplit: MacPaneSplitActions? = nil
+}
+
+/// The gear menu's two rows. No key equivalents: ⌘D and ⇧⌘D are the menu bar's (rule 39).
+struct MacPaneSplitMenuItems: View {
+    let actions: MacPaneSplitActions?
+
+    var body: some View {
+        if let actions {
+            Button("Split Right", systemImage: "rectangle.split.2x1") { actions.split(.horizontal) }
+                .disabled(!actions.canSplit)
+            Button("Split Down", systemImage: "rectangle.split.1x2") { actions.split(.vertical) }
+                .disabled(!actions.canSplit)
+        }
+    }
+}
+
 @MainActor
 struct MacNewWorkspaceTabAction {
     let isEnabled: Bool

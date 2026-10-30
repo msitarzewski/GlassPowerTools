@@ -52,6 +52,10 @@ struct TerminalPreviewBar: View {
     let open: (@MainActor () -> Void)?
     let revealTitle: String
     let reveal: (@MainActor () -> Void)?
+    /// Open in Preview, for a file the Mac's Preview opens (2026-10-29).
+    var preview: (@MainActor () -> Void)? = nil
+    /// Watch Log File, for a log: its end followed in a tab of its own (2026-10-29).
+    var watch: (@MainActor () -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -64,14 +68,41 @@ struct TerminalPreviewBar: View {
                 Button(revealTitle, systemImage: "folder") { reveal() }
                     .labelStyle(.iconOnly)
                     .help(revealTitle)
+                    .modifier(TerminalPreviewBarButton())
+            }
+            if let watch {
+                Button("Watch Log File", systemImage: "doc.text.magnifyingglass") { watch() }
+                    .labelStyle(.iconOnly)
+                    .help("Watch Log File")
+                    .modifier(TerminalPreviewBarButton())
+            }
+            if let preview {
+                Button("Open in Preview", systemImage: "photo") { preview() }
+                    .help("Open in Preview")
+                    .modifier(TerminalPreviewBarButton())
             }
             if let open {
                 Button("Open in Editor", systemImage: "pencil") { open() }
                     .help("Open in Editor")
+                    .modifier(TerminalPreviewBarButton())
             }
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+/// On the Mac a bar button never takes the keyboard. Any key closes the preview and goes on to the
+/// terminal, so the keyboard could never use one; but with keyboard navigation on, the first of
+/// them took it as the preview opened and drew its focus ring (the owner, 2026-10-29: "that outline
+/// again!!!").
+private struct TerminalPreviewBarButton: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        content.focusable(false)
+        #else
+        content
+        #endif
     }
 }

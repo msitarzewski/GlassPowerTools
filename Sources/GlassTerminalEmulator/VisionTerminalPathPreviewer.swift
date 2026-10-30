@@ -169,9 +169,17 @@ final class VisionTerminalPathPreviewer: NSObject, UIPopoverPresentationControll
                 self?.close()
             }
         }
+        // A log: Watch Log File, its end followed in a tab of its own (2026-10-29).
+        var watch: (@MainActor () -> Void)?
+        if TerminalLogFile.isLog(path), let watchFile = model.onWatchFile {
+            watch = { [weak self] in
+                watchFile(path)
+                self?.close()
+            }
+        }
         return AnyView(VStack(spacing: 0) {
             TerminalPreviewBar(name: (path as NSString).lastPathComponent, open: open,
-                               revealTitle: model.revealPathTitle, reveal: reveal)
+                               revealTitle: model.revealPathTitle, reveal: reveal, watch: watch)
             Divider()
             content.frame(maxWidth: .infinity, maxHeight: .infinity)
         }

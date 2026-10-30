@@ -228,7 +228,8 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
 
     /// The preview under a bar with the file's name and what can be done with it: Open in Editor,
     /// to change it (the owner, 2026-10-16: "allow edit, or preview where appropriate"), and Show in
-    /// Finder or Files — the path menu's own actions, so a file on a server opens there.
+    /// Finder or Files — the path menu's own actions, so a file on a server opens there; Open in
+    /// Preview for what Preview opens, and Watch Log File for a log (2026-10-29).
     private func framed(_ content: AnyView, path: String, model: SwiftTermHostModel) -> AnyView {
         var open: (@MainActor () -> Void)?
         if let openPath = model.onOpenPath {
@@ -244,9 +245,24 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
                 self?.close()
             }
         }
+        // A log: Watch Log File, its end followed in a tab of its own (2026-10-29).
+        var watch: (@MainActor () -> Void)?
+        if TerminalLogFile.isLog(path), let watchFile = model.onWatchFile {
+            watch = { [weak self] in
+                watchFile(path)
+                self?.close()
+            }
+        }
+        var preview: (@MainActor () -> Void)?
+        if let openInPreview = model.onOpenInPreview, MacPreviewApp.opens(path) {
+            preview = { [weak self] in
+                openInPreview(path)
+                self?.close()
+            }
+        }
         return AnyView(VStack(spacing: 0) {
             TerminalPreviewBar(name: (path as NSString).lastPathComponent, open: open,
-                                  revealTitle: model.revealPathTitle, reveal: reveal)
+                               revealTitle: model.revealPathTitle, reveal: reveal, preview: preview, watch: watch)
             Divider()
             content.frame(maxWidth: .infinity, maxHeight: .infinity)
         }

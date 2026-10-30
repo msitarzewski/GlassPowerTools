@@ -16,15 +16,18 @@ public struct GlassTerminalScenes: Scene {
     private var sessionManager: SessionManager { runtime.sessionManager }
     private var settingsManager: SettingsManager { runtime.settingsManager }
     private var windowRecoveryManager: WindowRecoveryManager { runtime.windowRecoveryManager }
-    /// Something another capability needs present in the Mac's Files window — the editor's window
-    /// presenter, so Open in Editor shows its window while Connections is closed. Supplied by the
-    /// composition root, the only place that knows both; the terminal never learns what it is.
-    private let filesWindowAccessory: (@MainActor () -> AnyView)?
+    /// Something another capability needs present in every terminal and Files window — the editor's
+    /// window presenter, so Open in Editor shows its window while Connections is closed. Supplied by
+    /// the composition root, the only place that knows both; the terminal never learns what it is.
+    /// Terminal windows had none, so a terminal's Open Folder in Editor on a folder in a saved
+    /// project opened a window nothing showed (the owner, 2026-10-29: "Open folder in editor fails
+    /// on mac right now"; only terminal windows were open).
+    private let windowAccessory: (@MainActor () -> AnyView)?
 
     public init(runtime: GlassTerminalRuntime,
-                filesWindowAccessory: (@MainActor () -> AnyView)? = nil) {
+                windowAccessory: (@MainActor () -> AnyView)? = nil) {
         self.runtime = runtime
-        self.filesWindowAccessory = filesWindowAccessory
+        self.windowAccessory = windowAccessory
     }
 
     public var body: some Scene {
@@ -60,6 +63,7 @@ public struct GlassTerminalScenes: Scene {
                 .environment(sessionManager)
                 .environment(settingsManager)
                 .glassLayers(runtime.layers)
+                .background { windowAccessory?() }
         }
         .defaultSize(width: 1180, height: 760)
         .defaultLaunchBehavior(.suppressed)
@@ -88,7 +92,7 @@ public struct GlassTerminalScenes: Scene {
                 }
             }
             .glassLayers(runtime.layers)
-            .background { filesWindowAccessory?() }
+            .background { windowAccessory?() }
         }
         .defaultSize(width: 820, height: 620)
         #if DEBUG
@@ -115,6 +119,7 @@ public struct GlassTerminalScenes: Scene {
                     // W15: an open window comes back after a relaunch; one closed by hand does not.
                     // The app's own list, not the system's restoration, which stays off below.
                     .modifier(TerminalWorkgroupWindowPresence(workgroupID: workgroupID))
+                    .background { windowAccessory?() }
             } else {
                 // A window with no workgroup: one made by dropping a terminal dragged out of the
                 // library (D72), which becomes that terminal where it stands; or the old "not found".

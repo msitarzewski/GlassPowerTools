@@ -24,6 +24,42 @@ import GlassTerminalEmulator
 @MainActor
 public func glassTerminalRecordSelection(to write: @escaping (String) -> Void) {
     TerminalSelectionDiagnostics.record = write
+    MainThreadStalls.watch()
+}
+
+/// How long the main thread kept a moment's work waiting, written every five seconds that it kept
+/// one waiting longer than a typed key should (2026-10-29: slow typing and a moving tools menu on
+/// a headset no profiler could reach over the network).
+@MainActor
+enum MainThreadStalls {
+    private static var watching = false
+
+    static func watch() {
+        guard !watching else { return }
+        watching = true
+        Task.detached(priority: .utility) {
+            var stalls = 0, longest = Duration.zero, since = ContinuousClock.now
+            while true {
+                try? await Task.sleep(for: .milliseconds(100))
+                let asked = ContinuousClock.now
+                await MainActor.run {}
+                let waited = ContinuousClock.now - asked
+                if waited >= .milliseconds(150) {
+                    stalls += 1
+                    longest = max(longest, waited)
+                    await MainActor.run { TerminalRefreshCounts.shared.note(.waits) }
+                }
+                guard ContinuousClock.now - since >= .seconds(5) else { continue }
+                if stalls > 0 {
+                    let words = "main thread kept waiting \(stalls) times in 5s, longest \(Int(longest / .milliseconds(1))) ms"
+                    await MainActor.run { TerminalSelectionDiagnostics.record?(words) }
+                }
+                stalls = 0
+                longest = .zero
+                since = .now
+            }
+        }
+    }
 }
 #endif
 
@@ -171,6 +207,9 @@ public final class GlassTerminalRuntime {
     /// A file on this device as its preview over a terminal shows it (2026-10-16): the editor's
     /// preview, Quick Look's for most. Set by the composition root; the Mac's terminals use it.
     public var filePreview: (@MainActor (URL) -> AnyView)?
+    /// Whether a path names a log, as the terminal's previews and link menus decide it: a log's
+    /// preview shows its end, followed (`TerminalLogFile`, 2026-10-29).
+    public static func namesLog(_ path: String) -> Bool { TerminalLogFile.isLog(path) }
     /// A Mermaid diagram a terminal shows as text, drawn (2026-10-21): the editor's own Mermaid, as
     /// its Markdown preview draws one. Set by the composition root; with none, no diagram is marked.
     public var diagramView: (@MainActor (String) -> AnyView)?
@@ -183,6 +222,13 @@ public final class GlassTerminalRuntime {
     /// Whether a saved server is this Mac's own library machine (D86), which the shell knows: its
     /// tmux sessions are This Mac's, listed once from here rather than asked for again over SSH.
     public var isThisMacServer: (@MainActor (UUID) -> Bool)?
+    /// This Mac's own Terminal service in the library (D86), the other way round: workgroups record
+    /// it on the local terminals this Mac saves or runs, so other devices open them here
+    /// (2026-10-29). Nil off a Mac, and on a Mac the library does not know as itself.
+    public var thisMacServerID: (@MainActor () -> UUID?)? {
+        get { settingsManager.thisMacServerID }
+        set { settingsManager.thisMacServerID = newValue }
+    }
     /// The app's one runtime, for a terminal's tab to reach the editor and Files from a path's
     /// menu. Set as it is made.
     public nonisolated(unsafe) static weak var current: GlassTerminalRuntime?
@@ -1172,6 +1218,10 @@ public final class GlassTerminalCapability: GlassCapability {
         runtime.sessionManager.serverManager.reloadFromStore()
         // W15: the last run's terminal windows and tabs can come back now.
         runtime.noteCatalogLoaded()
+        #if os(macOS)
+        // The library says which machine this Mac is: workgroups open here record it (2026-10-29).
+        MacWorkspacePreviewRegistry.shared.recordThisMacOnOpenWorkgroups(settingsManager: runtime.settingsManager)
+        #endif
     }
 
     public func libraryToolbarItems() -> AnyView {

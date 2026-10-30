@@ -73,10 +73,35 @@ struct GlassRemoteChangeTests {
         // Posted until a sync follows: the model starts listening a moment after it subscribes, and
         // a notification before that is not heard — as a push at launch isn't, before the library
         // reconciles on coming to the front.
+        // Addressed to this model: the tests run side by side, and other tests' models listen too.
         #expect(await until {
-            NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: nil)
+            NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: model)
             return backend.fetchCount > before
         }, "the push is only useful if something syncs on it")
+    }
+
+    @Test("A change notice addressed to another library doesn't sync this one; one for every library does")
+    func remoteChangeForAnotherModel() async throws {
+        let (model, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (other, otherRoot) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let backend = RecordingBackend()
+        model.enableCatalogSync(backend)
+        #expect(await until { backend.subscribed })
+        // Heard at all: the listener starts a moment after it subscribes.
+        #expect(await until {
+            NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: nil)
+            return backend.fetchCount > 0
+        })
+        try await Task.sleep(for: .milliseconds(100))
+        let before = backend.fetchCount
+        for _ in 0..<5 {
+            NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: other)
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(backend.fetchCount == before, "another library's notice")
+        withExtendedLifetime(other) {}
     }
 
     /// Push is best-effort on every Apple platform. A device that cannot register must still be a

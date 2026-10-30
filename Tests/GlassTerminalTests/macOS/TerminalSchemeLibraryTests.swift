@@ -178,5 +178,22 @@ struct TerminalSchemeLibraryTests {
         #expect(!String(decoding: older, as: UTF8.self).contains("terminalScheme"))
         #expect(try JSONDecoder().decode(ICloudPortableTerminalPreferences.self, from: older).terminalScheme == nil)
     }
+
+    @Test("A folder of many schemes read at once is listed a few times, not once a scheme: each listing asks iCloud about every file (2026-10-29)")
+    func readingManyListsAFewTimes() async throws {
+        let source = try folder(), destination = try folder()
+        defer { try? FileManager.default.removeItem(at: source); try? FileManager.default.removeItem(at: destination) }
+        for index in 0..<24 {
+            try profile("Scheme \(index)", background: NSColor(deviceRed: 0, green: 0, blue: Double(index) / 24, alpha: 1),
+                        text: NSColor.white.usingColorSpace(.deviceRGB)!, in: source)
+        }
+        let library = TerminalSchemeLibrary(deviceFolder: destination)
+        let before = library.listingsTaken
+        await library.add([source])
+        await read(library)
+        #expect(library.schemes.count == 24)
+        #expect(library.schemes.allSatisfy { $0.theme != nil }, "every one read")
+        #expect(library.listingsTaken - before <= 4, "listed \(library.listingsTaken - before) times for 24 schemes")
+    }
 }
 #endif

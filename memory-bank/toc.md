@@ -116,6 +116,10 @@ source applications are obsolete and no longer compile.
 | [Focus Mode environments (D89)](tasks/2026-10/2026-10-26_focus-environments.md) | Built-in and your own environments, Open Immersed, Try Out with fits, and Mirador's teleport inside |
 | [Living rooms: the loft and the host hook](tasks/2026-10/2026-10-27_living-rooms-handoff.md) | The GlassSpaceMaker session's handoff and what was built from it: a room's motion, a clock on the headset's time, sound from a folder beside the file, Room Sound; seen working on the headset |
 | [A menu in a Vision Pro terminal sidebar's empty space](tasks/2026-10/2026-10-28_vision-sidebar-empty-menu.md) | Held below the rows, what the bar's + offers, as on the Mac; the runner's coordinate holds in ornaments miss |
+| [Git in the editor, end to end](tasks/2026-10/2026-10-28_git-first-class.md) | Changes, staging, commit, history, branches, stashes, conflicts and references, on every platform |
+| [Icon suite exploration](tasks/2026-10/2026-10-28_icon-suite-exploration.md) | Parked: colour directions for the family's icons |
+| [The headset's stalls](tasks/2026-10/2026-10-29_headset-stalls.md) | Half-second keystrokes on the headset: the Terminal Themes folder read on the main thread |
+| [Workgroups across machines (D91), and the rest of the app for more than one Mac](tasks/2026-10/2026-10-30_workgroup-machines.md) | Mac terminals belong to their Mac; SSH key records kept across devices; the sweep's other findings |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

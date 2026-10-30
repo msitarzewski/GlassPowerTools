@@ -24,6 +24,8 @@ public struct GlassEditorGitStatus: Equatable, Sendable {
     public var behind = 0
     /// In the order git gave them, which is by path.
     public var changes: [GlassEditorGitChange] = []
+    /// What `.gitignore` leaves out: a folder once, with its `/`, and files matching a pattern.
+    public var ignored: [String] = []
 
     public init() {}
 
@@ -69,8 +71,9 @@ public struct GlassEditorGitStatus: Equatable, Sendable {
             case "?":
                 status.changes.append(GlassEditorGitChange(path: String(entry.dropFirst(2)), kind: .untracked,
                                                            isStaged: false, isUnstaged: true))
+            case "!":
+                status.ignored.append(String(entry.dropFirst(2)))
             default:
-                // "!" is an ignored file, which nothing here asks for.
                 continue
             }
         }
@@ -163,8 +166,8 @@ public struct GlassEditorGitChange: Equatable, Sendable, Identifiable {
         case .modified: "Modified"
         case .added: "Added"
         case .deleted: "Deleted"
-        case .renamed: "Renamed"
-        case .copied: "Copied"
+        case .renamed: originalPath.map { "Renamed from \($0)" } ?? "Renamed"
+        case .copied: originalPath.map { "Copied from \($0)" } ?? "Copied"
         case .typeChanged: "Type changed"
         case .untracked: "New, not yet added to git"
         case .conflicted: "Conflict"

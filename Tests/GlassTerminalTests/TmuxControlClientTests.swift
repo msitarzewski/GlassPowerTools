@@ -15,6 +15,7 @@ struct TmuxControlClientTests {
         var live = 0
         var exited: String??
         var grids: [String] = []
+        var renamed: [String] = []
 
         mutating func receive(_ text: String) { apply(client.receive(Data(text.utf8))) }
         mutating func type(_ text: String) { apply(client.input(Data(text.utf8))) }
@@ -27,6 +28,7 @@ struct TmuxControlClientTests {
                 case .live: live += 1
                 case .exited(let reason): exited = .some(reason)
                 case .showGrid(let columns, let rows, let own): grids.append("\(columns)x\(rows)\(own ? " own" : "")")
+                case .renamed(let name): renamed.append(name)
                 }
             }
         }
@@ -267,6 +269,19 @@ struct TmuxControlClientTests {
         #expect(exchange.takeSent().isEmpty, "its own claim's switch: the pane isn't read again")
         exchange.receive("%session-changed $2 bravo\r\n")
         #expect(exchange.takeSent().first?.hasPrefix("display-message") == true, "another session: asked for its pane")
+    }
+
+    /// tmux 3.8 writes the session's id first, as recorded on 2026-10-29 (`%session-renamed $0 renamed`);
+    /// its manual writes the name alone. Another session's rename is not this client's.
+    @Test("%session-renamed: the client's own session goes by its new name, in either form; another's is ignored")
+    func renamed() {
+        var exchange = attached()
+        _ = exchange.takeSent()
+        exchange.receive("%session-renamed $1 work\r\n")
+        exchange.receive("%session-renamed $7 elsewhere\r\n")
+        exchange.receive("%session-renamed glass-4\r\n")
+        #expect(exchange.renamed == ["work", "glass-4"])
+        #expect(exchange.takeSent().isEmpty, "nothing to read again: the pane is the same")
     }
 
     @Test("%exit: the client ends, the ST is passed over, and what follows is the shell's")

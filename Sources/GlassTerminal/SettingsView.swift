@@ -626,6 +626,7 @@ struct TerminalSettingsView: View {
                 .onChange(of: settings.focusEnvironmentSound) { _, _ in
                     settings.saveSettings()
                 }
+            TerminalRefreshCountsSection()
             #endif
 
             #if os(macOS)

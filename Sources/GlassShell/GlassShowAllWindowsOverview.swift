@@ -219,8 +219,9 @@ struct GlassAllWindowsCard: View {
                 TimelineView(.animation(minimumInterval: 1, paused: !refreshes)) { _ in
                     if let snapshot = session.snapshot?() {
                         // The card's width filled, its newest part kept: a phone's terminal is
-                        // tall, and fitted whole it was a sliver (2026-10-14, the simulator).
-                        Color.clear.overlay(alignment: .bottom) {
+                        // tall, and fitted whole it was a sliver (2026-10-14, the simulator). An
+                        // editor's from its top, where its title and tabs are (2026-10-29).
+                        Color.clear.overlay(alignment: GlassShowAllWindows.kind(of: session) == "editor" ? .top : .bottom) {
                             snapshot
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)

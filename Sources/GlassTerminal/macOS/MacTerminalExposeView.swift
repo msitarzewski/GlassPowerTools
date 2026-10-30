@@ -316,11 +316,21 @@ private struct MacTerminalExposeWindowTile: View {
     let selected: Bool
     let hovering: Bool
     let blurred: Bool
+    @State private var picture: Image?
+
+    /// An editor's picture is its whole window, filling the card from the top: title bar, tabs and
+    /// the file list beside the text (the owner, 2026-10-29: "stretch wide to fill the card"). A
+    /// desktop's screen is fitted whole, never cropped.
+    private var fillsCard: Bool { session.map(GlassShowAllWindows.kind(of:)) == "editor" }
 
     var body: some View {
-        let picture = session?.snapshot?()
         ZStack {
-            if let picture {
+            if let picture, fillsCard {
+                Color.clear.overlay(alignment: .top) {
+                    picture.resizable().aspectRatio(contentMode: .fill)
+                        .blur(radius: blurred ? GlassShowAllWindows.previewBlurRadius : 0)
+                }
+            } else if let picture {
                 picture.resizable().aspectRatio(contentMode: .fit)
                     .blur(radius: blurred ? GlassShowAllWindows.previewBlurRadius : 0)
             } else {
@@ -358,6 +368,17 @@ private struct MacTerminalExposeWindowTile: View {
         }
         .shadow(color: .black.opacity(0.35), radius: hovering ? 14 : 8, y: 4)
         .contentShape(.rect(cornerRadius: 10))
+        // Taken again each second, outside the view's update, as a terminal's tile is
+        // (`MacWorkspacePreview`): a desktop's screen moves, and an editor draws its picture just
+        // after it is first asked (`GlassEditorModel.previewImage`, 2026-10-29), so soon again then.
+        .task(id: session?.id) {
+            guard let snapshot = session?.snapshot else { return }
+            while !Task.isCancelled {
+                picture = snapshot()
+                do { try await Task.sleep(for: picture == nil ? .milliseconds(250) : .seconds(1)) }
+                catch { return }
+            }
+        }
     }
 }
 

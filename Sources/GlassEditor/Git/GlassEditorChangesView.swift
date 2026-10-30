@@ -2,17 +2,20 @@
 //  GlassEditorChangesView.swift
 //  Glass Power Tools — GlassEditor
 //
-//  A project's **Changes** tab: every file that differs from the last commit, with its lines, in
-//  one scroll — what `git diff HEAD` says, as Zed's project diff shows it (the owner, 2026-10-23:
-//  "I'd like to be able to see 'this' instead of having to open Zed").
+//  Source Control's **Changes**: every file that differs from the last commit, with its lines, in
+//  one scroll — what `git diff` says, as Zed's project diff shows it (the owner, 2026-10-23: "I'd
+//  like to be able to see 'this' instead of having to open Zed").
 //
 //  Each file's header stays at the top while its lines scroll under it, and folds away. A line
 //  opens its file there; the header's button opens the file. The tab keeps itself current while it
 //  is open, as the terminal beside it changes things.
 //
 //  It commits, too (2026-10-23: "add gutter marks and stage/commit too"): each file's box stages
-//  or unstages it, as Zed's do, and the message above them commits what is staged — or, with
-//  nothing staged, everything listed, as VS Code's smart commit does.
+//  or unstages it, and the message above them commits what is staged — or, with nothing staged,
+//  everything listed, as VS Code's smart commit does. Since 2026-10-28 what is staged is listed
+//  apart from what isn't, as VS Code, Sublime Merge and Fork list it, because each hunk — or the
+//  lines chosen in it — is staged from the one and unstaged from the other; a file a merge stopped
+//  on is listed first, with its conflicts to settle.
 //
 
 import SwiftUI
@@ -26,155 +29,64 @@ import GlassConnectionUI
 struct GlassEditorChangesView: View {
     let workspace: GlassEditorWorkspace
     let projectID: GlassEditorProject.ID
-    /// Files folded away, by path.
+    let repository: GlassEditorGitRepository
+    let ask: (GlassEditorGitRequest) -> Void
+
+    /// Files folded away, by their place in the list ("staged:" or "unstaged:", then the path).
     @State private var folded: Set<String> = []
+    /// The lines chosen in each file's hunks, by the same key.
+    @State private var chosen: [String: [Int: Set<Int>]] = [:]
+    /// Conflicted files being resolved here, by path.
+    @State private var resolving: Set<String> = []
     /// Staged files outside the project's folder that a commit would take too, while it asks.
     @State private var stagedOutside: [String]?
     @FocusState private var messageFocused: Bool
+    @Environment(\.openURL) private var openURL
+    @AppStorage(GlassEditorDiffSettings.layoutKey) private var layout = GlassEditorDiffLayout.unified
+    @AppStorage(GlassEditorDiffSettings.contextKey) private var context = 0
+    @AppStorage(GlassEditorDiffSettings.whitespaceKey) private var ignoresWhitespace = false
+    /// How wide the list is: side by side needs room, and falls back to unified without it.
+    @State private var width: CGFloat = 1000
 
-    private var repository: GlassEditorGitRepository? { workspace.repositories[projectID] }
     private var fontSize: Double { workspace.windowTextConfiguration.fontSize }
+    private var shownLayout: GlassEditorDiffLayout { GlassEditorDiffLayout.fitting(layout, width: width) }
 
     var body: some View {
-        if let repository {
-            VStack(spacing: 0) {
-                summary(repository)
+        VStack(spacing: 0) {
+            if !repository.status.changes.isEmpty || repository.amends {
+                commitBar
                 Divider()
-                if repository.state == .ready, !repository.status.changes.isEmpty {
-                    commitBar(repository)
-                    Divider()
-                }
-                // What a stage, a commit, a push or a pull couldn't do: shown whether or not there
-                // is anything left to commit, as a push comes after the last commit.
-                if let problem = repository.actionProblem {
-                    Label(problem, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, GlassSpatialMetrics.isSpatial ? 20 : 12)
-                        .padding(.vertical, 6)
-                        .accessibilityIdentifier("editor-commit-problem")
-                    Divider()
-                }
-                content(repository)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .alert("Commit Files Outside This Folder Too?", isPresented: Binding(
-                get: { stagedOutside != nil }, set: { if !$0 { stagedOutside = nil } }
-            )) {
-                Button("Commit") {
-                    stagedOutside = nil
-                    Task { await repository.commit(includingOutside: true) }
-                }
-                Button("Cancel", role: .cancel) { stagedOutside = nil }
-            } message: {
-                Text(outsideMessage)
+            if repository.status.changes.isEmpty {
+                ContentUnavailableView("No Changes", systemImage: "checkmark.circle", description: Text(noChanges))
+            } else {
+                changes
             }
-            // Current while it is open: a terminal beside it is where most changes are made. A
-            // folder here is asked often; one on a server, a command away, less.
-            .task(id: projectID) {
-                let interval: Duration = repository.machine == nil ? .seconds(4) : .seconds(20)
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: interval)
-                    guard !Task.isCancelled else { break }
-                    repository.refresh()
-                }
-            }
-        } else {
-            ContentUnavailableView("No Repository", systemImage: "arrow.triangle.branch",
-                                   description: Text("Git isn't available for this project."))
         }
+        .alert("Commit Files Outside This Folder Too?", isPresented: Binding(
+            get: { stagedOutside != nil }, set: { if !$0 { stagedOutside = nil } }
+        )) {
+            Button("Commit") {
+                stagedOutside = nil
+                Task { await repository.commit(includingOutside: true) }
+            }
+            Button("Cancel", role: .cancel) { stagedOutside = nil }
+        } message: {
+            Text(outsideMessage)
+        }
+        .onChange(of: context, initial: true) { _, value in repository.diffContext = GlassEditorDiffSettings.context(value) }
+        .onChange(of: ignoresWhitespace, initial: true) { _, value in repository.ignoresWhitespace = value }
+        // Chosen lines belong to the diff they were chosen in; a new one has other hunks.
+        .onChange(of: repository.unstagedDiffs) { chosen = chosen.filter { !$0.key.hasPrefix("unstaged:") } }
+        .onChange(of: repository.stagedDiffs) { chosen = chosen.filter { !$0.key.hasPrefix("staged:") } }
     }
 
-    // MARK: The line along the top
-
-    private func summary(_ repository: GlassEditorGitRepository) -> some View {
-        let status = repository.status
-        return HStack(spacing: 12) {
-            Label(repository.state == .ready ? status.headName : "Git", systemImage: "arrow.triangle.branch")
-                .font(.headline)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .accessibilityIdentifier("editor-changes-branch")
-            if repository.state == .ready {
-                remote(repository)
-            }
-            Spacer(minLength: 0)
-            if repository.state == .ready, !status.changes.isEmpty {
-                Text(totals(repository))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            if repository.isRefreshing {
-                ProgressView().controlSize(.small)
-            }
-            Button("Refresh", systemImage: "arrow.clockwise") { repository.refresh() }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .help("Ask git again")
-                .accessibilityIdentifier("editor-changes-refresh")
-        }
-        .padding(.horizontal, GlassSpatialMetrics.isSpatial ? 20 : 12)
-        .frame(minHeight: GlassSpatialMetrics.footerHeight)
-        .background(.bar)
-    }
-
-    // MARK: The remote
-
-    /// Pull, Push and Fetch, with how far the branch is behind and ahead of its upstream; Publish for
-    /// a branch the remote doesn't have yet. What is under way says so instead.
-    @ViewBuilder
-    private func remote(_ repository: GlassEditorGitRepository) -> some View {
-        let status = repository.status
-        if let action = repository.networkAction {
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text(action.words).font(.caption).foregroundStyle(.secondary)
-            }
-            .accessibilityIdentifier("editor-remote-working")
-        } else if status.branch != nil {
-            HStack(spacing: 2) {
-                if let upstream = status.upstream {
-                    Button {
-                        Task { await workspace.pull(projectID) }
-                    } label: {
-                        Label(status.behind > 0 ? "Pull \(status.behind)" : "Pull", systemImage: "arrow.down")
-                    }
-                    .disabled(repository.isWorking)
-                    .help(status.behind > 0 ? "Pull \(Self.commits(status.behind)) from \(upstream)" : "Pull from \(upstream)")
-                    .accessibilityLabel(status.behind > 0 ? "Pull \(Self.commits(status.behind))" : "Pull")
-                    .accessibilityIdentifier("editor-pull")
-                    Button {
-                        Task { await repository.push() }
-                    } label: {
-                        Label(status.ahead > 0 ? "Push \(status.ahead)" : "Push", systemImage: "arrow.up")
-                    }
-                    .disabled(repository.isWorking || !repository.canPush)
-                    .help(status.ahead > 0 ? "Push \(Self.commits(status.ahead)) to \(upstream)" : "Nothing to push to \(upstream)")
-                    .accessibilityLabel(status.ahead > 0 ? "Push \(Self.commits(status.ahead))" : "Push")
-                    .accessibilityIdentifier("editor-push")
-                    Button("Fetch", systemImage: "arrow.triangle.2.circlepath") {
-                        Task { await repository.fetch() }
-                    }
-                    .labelStyle(.iconOnly)
-                    .disabled(repository.isWorking)
-                    .help("Ask \(upstream) what's new, without changing anything here")
-                    .accessibilityIdentifier("editor-fetch")
-                } else {
-                    Button("Publish Branch", systemImage: "icloud.and.arrow.up") {
-                        Task { await repository.push() }
-                    }
-                    .disabled(repository.isWorking)
-                    .help("Push \(status.headName) to the remote, and follow it from now on")
-                    .accessibilityIdentifier("editor-publish")
-                }
-            }
-            .buttonStyle(.borderless)
-            .font(.caption.monospacedDigit())
-        }
+    private var noChanges: String {
+        let matches = "Everything matches the last commit on \(repository.status.headName)."
+        guard let commit = repository.lastCommit else { return matches }
+        let name = commit.name.map { " \($0)" } ?? ""
+        let branch = commit.branch.map { " to \($0)" } ?? ""
+        return "Committed\(name)\(branch): \(commit.summary)\n\(matches)"
     }
 
     /// "1 commit", "3 commits".
@@ -182,22 +94,26 @@ struct GlassEditorChangesView: View {
 
     // MARK: Committing
 
-    private func commitBar(_ repository: GlassEditorGitRepository) -> some View {
+    private var commitBar: some View {
         @Bindable var repository = repository
         let staged = repository.status.changes.filter(\.isStaged).count
         let total = repository.status.changes.count
         let message = repository.commitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = repository.amends ? "Amend" : (staged > 0 ? "Commit" : "Commit All")
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 8) {
-                TextField("Message", text: $repository.commitMessage, axis: .vertical)
+                TextField(repository.amends ? "Message (empty keeps the last one)" : "Message",
+                          text: $repository.commitMessage, axis: .vertical)
                     .lineLimit(1...6)
                     .textFieldStyle(.roundedBorder)
                     .focused($messageFocused)
                     .accessibilityIdentifier("editor-commit-message")
-                Button(staged > 0 ? "Commit" : "Commit All") { commit(repository) }
+                Button(title) { commit() }
                     .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(message.isEmpty || repository.isWorking)
-                    .help(staged > 0 ? "Commit the staged files (⌘↩)" : "Stage every change listed and commit it (⌘↩)")
+                    .disabled((message.isEmpty && !repository.amends) || repository.isWorking
+                              || repository.status.changes.contains { $0.kind == .conflicted })
+                    .help(repository.amends ? "Make the last commit again with what is staged (⌘↩)"
+                          : staged > 0 ? "Commit the staged files (⌘↩)" : "Stage every change listed and commit it (⌘↩)")
                     .accessibilityIdentifier("editor-commit")
             }
             HStack(spacing: 8) {
@@ -210,13 +126,16 @@ struct GlassEditorChangesView: View {
                           systemImage: Self.boxSymbol(staged: staged, of: total))
                 }
                 .buttonStyle(.borderless)
-                .disabled(repository.isWorking)
+                .disabled(repository.isWorking || total == 0)
                 .accessibilityIdentifier("editor-stage-all")
                 Text(staged == 0 ? "Nothing staged" : "\(staged) of \(total) staged")
                     .foregroundStyle(.secondary)
-                if repository.isWorking {
-                    ProgressView().controlSize(.small)
-                }
+                Toggle("Amend", isOn: Binding(get: { repository.amends }, set: { amend($0) }))
+                    .toggleStyle(.button)
+                    .buttonStyle(.borderless)
+                    .disabled(repository.status.commit == nil || repository.isWorking)
+                    .help("Replace the last commit instead of adding one: its changes, what is staged now, and this message")
+                    .accessibilityIdentifier("editor-amend")
                 Spacer(minLength: 0)
                 if let commit = repository.lastCommit {
                     Text("Committed\(commit.name.map { " \($0)" } ?? ""): \(commit.summary)")
@@ -224,6 +143,8 @@ struct GlassEditorChangesView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .accessibilityIdentifier("editor-last-commit")
+                } else if repository.hasReadDiffs {
+                    Text(totals).foregroundStyle(.secondary).monospacedDigit()
                 }
             }
             .font(.caption)
@@ -232,7 +153,19 @@ struct GlassEditorChangesView: View {
         .padding(.vertical, 8)
     }
 
-    private func commit(_ repository: GlassEditorGitRepository) {
+    /// Amending begins from the last commit's message, as `git commit --amend` does.
+    private func amend(_ on: Bool) {
+        repository.amends = on
+        guard on, repository.commitMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        Task {
+            if let message = await repository.lastCommitMessage(), repository.amends,
+               repository.commitMessage.isEmpty {
+                repository.commitMessage = message
+            }
+        }
+    }
+
+    private func commit() {
         guard !repository.isWorking else { return }
         Task {
             if case .alsoStagedOutside(let paths) = await repository.commit() {
@@ -256,50 +189,26 @@ struct GlassEditorChangesView: View {
         return staged == total ? "checkmark.square.fill" : "minus.square.fill"
     }
 
-    private func totals(_ repository: GlassEditorGitRepository) -> String {
+    private var totals: String {
         let files = repository.status.changes.count
         let counted = "\(files) file\(files == 1 ? "" : "s")"
-        guard repository.hasReadDiffs else { return counted }
-        let added = repository.diffs.values.reduce(0) { $0 + $1.addedLines }
-        let removed = repository.diffs.values.reduce(0) { $0 + $1.removedLines }
+        let all = Array(repository.stagedDiffs.values) + Array(repository.unstagedDiffs.values)
+        let added = all.reduce(0) { $0 + $1.addedLines }
+        let removed = all.reduce(0) { $0 + $1.removedLines }
         return "\(counted)  +\(added) −\(removed)"
     }
 
-    // MARK: What is under it
+    // MARK: The lists
 
-    @ViewBuilder
-    private func content(_ repository: GlassEditorGitRepository) -> some View {
-        switch repository.state {
-        case .checking:
-            ProgressView("Asking git")
-        case .notARepository:
-            ContentUnavailableView("Not a Git Repository", systemImage: "arrow.triangle.branch",
-                                   description: Text("This folder isn't in a git repository."))
-        case .unavailable(let reason):
-            ContentUnavailableView {
-                Label("Git Can't Answer", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(reason)
-            } actions: {
-                Button("Refresh") { repository.refresh() }
-            }
-        case .ready where repository.status.changes.isEmpty:
-            ContentUnavailableView("No Changes", systemImage: "checkmark.circle",
-                                   description: Text(noChanges(repository)))
-        case .ready:
-            changes(repository)
-        }
+    private enum Group: String {
+        case conflicts, staged, unstaged
     }
 
-    private func noChanges(_ repository: GlassEditorGitRepository) -> String {
-        let matches = "Everything matches the last commit on \(repository.status.headName)."
-        guard let commit = repository.lastCommit else { return matches }
-        let name = commit.name.map { " \($0)" } ?? ""
-        let branch = commit.branch.map { " to \($0)" } ?? ""
-        return "Committed\(name)\(branch): \(commit.summary)\n\(matches)"
-    }
+    private var conflicted: [GlassEditorGitChange] { repository.status.changes.filter { $0.kind == .conflicted } }
+    private var staged: [GlassEditorGitChange] { repository.status.changes.filter { $0.isStaged && $0.kind != .conflicted } }
+    private var unstaged: [GlassEditorGitChange] { repository.status.changes.filter { $0.isUnstaged && $0.kind != .conflicted } }
 
-    private func changes(_ repository: GlassEditorGitRepository) -> some View {
+    private var changes: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 if let problem = repository.diffProblem {
@@ -308,29 +217,93 @@ struct GlassEditorChangesView: View {
                         .foregroundStyle(.secondary)
                         .padding(12)
                 }
-                ForEach(repository.status.changes) { change in
-                    let diff = repository.diffs[change.path]
-                    Section {
-                        if !folded.contains(change.path) {
-                            lines(of: change, diff: diff, in: repository)
+                if !conflicted.isEmpty {
+                    groupTitle("Conflicts", count: conflicted.count, group: .conflicts)
+                    ForEach(conflicted) { change in
+                        Section {
+                            if resolving.contains(change.path) {
+                                GlassEditorConflictView(workspace: workspace, projectID: projectID,
+                                                        repository: repository, path: change.path) {
+                                    resolving.remove(change.path)
+                                }
+                            }
+                        } header: {
+                            conflictHeader(change)
                         }
-                    } header: {
-                        fileHeader(change, diff: diff, in: repository)
+                    }
+                }
+                // Staged changes have a list of their own only once there are some: with nothing
+                // staged, this is the one list it always was.
+                if !staged.isEmpty {
+                    groupTitle("Staged Changes", count: staged.count, group: .staged)
+                    // Identified by list and path: a file staged and changed again is in both lists,
+                    // and one identity for the two left the second without its header (rendered).
+                    ForEach(staged, id: \.stagedKey) { change in
+                        fileSection(change, group: .staged, diff: repository.stagedDiffs[change.path])
+                    }
+                }
+                if !unstaged.isEmpty {
+                    if !staged.isEmpty || !conflicted.isEmpty {
+                        groupTitle("Changes", count: unstaged.count, group: .unstaged)
+                    }
+                    ForEach(unstaged, id: \.unstagedKey) { change in
+                        fileSection(change, group: .unstaged, diff: repository.unstagedDiffs[change.path])
                     }
                 }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .accessibilityIdentifier("editor-changes")
+    }
+
+    private func groupTitle(_ title: String, count: Int, group: Group) -> some View {
+        HStack(spacing: 8) {
+            Text(title).font(.subheadline.weight(.semibold))
+            Text("\(count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            switch group {
+            case .staged:
+                Button("Unstage All", systemImage: "minus.circle") { Task { await repository.unstageAll() } }
+                    .disabled(repository.isWorking)
+            case .unstaged:
+                Button("Discard All…", systemImage: "arrow.uturn.backward.circle") { confirmDiscardAll() }
+                    .disabled(repository.isWorking)
+                Button("Stage All", systemImage: "plus.circle") { Task { await repository.stageAll() } }
+                    .disabled(repository.isWorking)
+            case .conflicts:
+                EmptyView()
+            }
+        }
+        .labelStyle(.titleAndIcon)
+        .buttonStyle(.borderless)
+        .font(.caption)
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder
+    private func fileSection(_ change: GlassEditorGitChange, group: Group, diff: GlassEditorFileDiff?) -> some View {
+        let key = group.rawValue + ":" + change.path
+        Section {
+            if !folded.contains(key) {
+                lines(of: change, diff: diff, group: group, key: key)
+            }
+        } header: {
+            fileHeader(change, group: group, diff: diff, key: key)
+        }
     }
 
     // MARK: A file
 
-    private func fileHeader(_ change: GlassEditorGitChange, diff: GlassEditorFileDiff?,
-                            in repository: GlassEditorGitRepository) -> some View {
+    private func fileHeader(_ change: GlassEditorGitChange, group: Group, diff: GlassEditorFileDiff?,
+                            key: String) -> some View {
         let path = repository.projectRelative(change.path)
         let name = (path as NSString).lastPathComponent
         let folder = (path as NSString).deletingLastPathComponent
-        let isFolded = folded.contains(change.path)
+        let isFolded = folded.contains(key)
         return HStack(spacing: 8) {
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
@@ -338,7 +311,7 @@ struct GlassEditorChangesView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 12)
             if GlassEditorGitRepository.canStage(change) {
-                stageBox(change, name: name, in: repository)
+                stageBox(change, group: group, name: name)
             }
             GlassEditorGitMark(change: change)
             Text(name)
@@ -363,6 +336,13 @@ struct GlassEditorChangesView: View {
                 if diff.addedLines > 0 { Text("+\(diff.addedLines)").foregroundStyle(.green) }
                 if diff.removedLines > 0 { Text("−\(diff.removedLines)").foregroundStyle(.red) }
             }
+            if group == .unstaged, GlassEditorGitRepository.canStage(change) {
+                Button("Discard Changes to \(name)", systemImage: "arrow.uturn.backward") { confirmDiscard(change) }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .disabled(repository.isWorking)
+                    .help(change.kind == .untracked ? "Delete \(name)" : "Discard the changes to \(name) that aren't staged")
+            }
             if change.kind != .deleted {
                 Button("Open \(name)", systemImage: "arrow.up.forward.square") {
                     Task { await workspace.openChangedFile(change.path, in: projectID) }
@@ -380,55 +360,120 @@ struct GlassEditorChangesView: View {
         .overlay(alignment: .bottom) { Divider() }
         .contentShape(Rectangle())
         .onTapGesture {
-            if isFolded { folded.remove(change.path) } else { folded.insert(change.path) }
+            if isFolded { folded.remove(key) } else { folded.insert(key) }
         }
+        .contextMenu { fileMenu(change, group: group) }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(change.description): \(path)")
+        .accessibilityLabel("\(change.description), \(group == .staged ? "staged" : "not staged"): \(path)")
         .accessibilityHint(isFolded ? "Shows its lines" : "Hides its lines")
         .accessibilityAddTraits(.isButton)
         .accessibilityActions {
-            // The box and the button, which the combined row would otherwise hide.
+            // The box and the buttons, which the combined row would otherwise hide.
             if GlassEditorGitRepository.canStage(change) {
-                let whole = change.isStaged && !change.isUnstaged
-                Button(whole ? "Unstage" : "Stage") {
-                    Task {
-                        if whole { await repository.unstage([change]) } else { await repository.stage([change]) }
-                    }
-                }
+                Button(group == .staged ? "Unstage" : "Stage") { toggleStage(change, group: group) }
+            }
+            if group == .unstaged, GlassEditorGitRepository.canStage(change) {
+                Button("Discard Changes") { confirmDiscard(change) }
             }
             if change.kind != .deleted {
                 Button("Open") { Task { await workspace.openChangedFile(change.path, in: projectID) } }
             }
         }
-        .accessibilityIdentifier("editor-changes-file-\(path)")
-    }
-
-    /// Whether the file goes into the next commit: ticked when all of it is staged, a dash when
-    /// part is (staged, then edited again), empty when none is. Pressing it stages the rest, or
-    /// takes a fully staged file back out.
-    private func stageBox(_ change: GlassEditorGitChange, name: String,
-                          in repository: GlassEditorGitRepository) -> some View {
-        let whole = change.isStaged && !change.isUnstaged
-        let symbol = whole ? "checkmark.square.fill" : change.isStaged ? "minus.square.fill" : "square"
-        let label = whole ? "Unstage \(name)" : "Stage \(name)"
-        return Button(label, systemImage: symbol) {
-            Task {
-                if whole { await repository.unstage([change]) } else { await repository.stage([change]) }
-            }
-        }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.borderless)
-        .foregroundStyle(change.isStaged ? Color.accentColor : Color.secondary)
-        .disabled(repository.isWorking)
-        .help(whole ? "Staged: in the next commit. Press to unstage."
-              : change.isStaged ? "Partly staged: changed again since. Press to stage the rest."
-              : "Not staged. Press to stage it for the next commit.")
-        .accessibilityIdentifier("editor-stage-\(repository.projectRelative(change.path))")
+        .accessibilityIdentifier("editor-changes-file-\(group == .staged ? "staged-" : "")\(path)")
     }
 
     @ViewBuilder
-    private func lines(of change: GlassEditorGitChange, diff: GlassEditorFileDiff?,
-                       in repository: GlassEditorGitRepository) -> some View {
+    private func fileMenu(_ change: GlassEditorGitChange, group: Group) -> some View {
+        if GlassEditorGitRepository.canStage(change) {
+            Button(group == .staged ? "Unstage" : "Stage", systemImage: group == .staged ? "minus.circle" : "plus.circle") {
+                toggleStage(change, group: group)
+            }
+        }
+        if group == .unstaged, GlassEditorGitRepository.canStage(change) {
+            Button(change.kind == .untracked ? "Delete File…" : "Discard Changes…", systemImage: "arrow.uturn.backward") {
+                confirmDiscard(change)
+            }
+        }
+        Divider()
+        if change.kind != .deleted {
+            Button("Open", systemImage: "arrow.up.forward.square") {
+                Task { await workspace.openChangedFile(change.path, in: projectID) }
+            }
+        }
+        if let absolute = repository.absolutePath(change.path), change.kind != .untracked, change.kind != .added {
+            Button("Blame", systemImage: "person.text.rectangle") { workspace.showGit(.blame(absolute), of: absolute) }
+            Button("File History", systemImage: "clock.arrow.circlepath") { workspace.showGit(.history(absolute), of: absolute) }
+        }
+        if let remote = repository.webRemote(for: repository.status.branch), change.kind != .untracked, change.kind != .added,
+           let address = remote.webAddress(ofFile: change.originalPath ?? change.path,
+                                           at: repository.status.upstream != nil ? (repository.status.branch ?? "HEAD") : (repository.status.commit ?? "HEAD")) {
+            Button("Open on \(remote.isGitHub ? "GitHub" : "the Web")", systemImage: "safari") { openURL(address) }
+        }
+        Button("Copy Path", systemImage: "doc.on.doc") { GlassEditorPasteboard.copy(repository.projectRelative(change.path)) }
+    }
+
+    /// Whether the file goes into the next commit: ticked in the staged list, empty in the other.
+    /// Pressing it moves the file across.
+    private func stageBox(_ change: GlassEditorGitChange, group: Group, name: String) -> some View {
+        let isStagedList = group == .staged
+        let label = isStagedList ? "Unstage \(name)" : "Stage \(name)"
+        return Button(label, systemImage: isStagedList ? "checkmark.square.fill" : "square") {
+            toggleStage(change, group: group)
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.borderless)
+        .foregroundStyle(isStagedList ? Color.accentColor : Color.secondary)
+        .disabled(repository.isWorking)
+        .help(isStagedList ? "Staged: in the next commit. Press to unstage."
+              : change.isStaged ? "Changed again since it was staged. Press to stage the rest."
+              : "Not staged. Press to stage it for the next commit.")
+        .accessibilityIdentifier("editor-stage-\(isStagedList ? "staged-" : "")\(repository.projectRelative(change.path))")
+    }
+
+    private func toggleStage(_ change: GlassEditorGitChange, group: Group) {
+        Task {
+            if group == .staged { await repository.unstage([change]) } else { await repository.stage([change]) }
+        }
+    }
+
+    // MARK: Discarding
+
+    private func confirmDiscard(_ change: GlassEditorGitChange) {
+        let name = (repository.projectRelative(change.path) as NSString).lastPathComponent
+        let untracked = change.kind == .untracked
+        ask(.confirm(GlassEditorGitConfirmation(
+            title: untracked ? "Delete \(name)?" : "Discard Changes to \(name)?",
+            message: untracked ? "It isn't in git, so it can't be brought back."
+                : change.isStaged ? "Its changes since it was staged are thrown away; what is staged is kept. This can't be undone."
+                : "It goes back to how the last commit has it. This can't be undone.",
+            button: untracked ? "Delete" : "Discard") {
+                await workspace.git(projectID) { repository in
+                    await repository.discard([change])
+                    return true
+                }
+            }))
+    }
+
+    private func confirmDiscardAll() {
+        let files = unstaged.count
+        let new = unstaged.filter { $0.kind == .untracked }.count
+        ask(.confirm(GlassEditorGitConfirmation(
+            title: "Discard All Changes?",
+            message: "The changes to \(files) file\(files == 1 ? "" : "s") that aren't staged are thrown away"
+                + (new > 0 ? ", and \(new) new file\(new == 1 ? " is" : "s are") deleted" : "")
+                + ". What is staged is kept. This can't be undone.",
+            button: "Discard All") {
+                await workspace.git(projectID) { repository in
+                    await repository.discardAll()
+                    return true
+                }
+            }))
+    }
+
+    // MARK: Lines
+
+    @ViewBuilder
+    private func lines(of change: GlassEditorGitChange, diff: GlassEditorFileDiff?, group: Group, key: String) -> some View {
         if let diff {
             if diff.isBinary {
                 note(change.kind == .untracked ? "Binary, or too large to show." : "Binary file: git shows no lines.")
@@ -439,16 +484,19 @@ struct GlassEditorChangesView: View {
                     note("No lines changed.")
                 }
             } else {
-                let width = numberWidth(diff)
-                // One list of rows per file, each with an id of its own across the whole tab: nested
-                // lists identified by position drew blank wherever a later file's positions repeated
-                // an earlier one's (rendered, 2026-10-23).
-                ForEach(DiffRow.rows(of: diff, path: change.path)) { row in
-                    switch row.content {
-                    case .hunk(let hunk): hunkHeader(hunk)
-                    case .line(let line): lineRow(line, change: change, width: width)
-                    }
+                if repository.ignoresWhitespace, GlassEditorGitPatch.canPatch(diff) {
+                    note("Whitespace is ignored, so lines can't be staged one at a time. Show whitespace again to stage them.")
                 }
+                GlassEditorDiffBody(
+                    file: diff, rowID: key, layout: shownLayout, fontSize: fontSize,
+                    wraps: workspace.windowTextConfiguration.wrapsLines,
+                    actions: repository.ignoresWhitespace ? [] : (group == .staged ? [.unstage] : [.stage, .discard]),
+                    perform: { action, hunk, lines in perform(action, file: diff, hunk: hunk, lines: lines, key: key) },
+                    chosen: Binding(get: { chosen[key] ?? [:] }, set: { chosen[key] = $0.isEmpty ? nil : $0 }),
+                    open: change.kind == .deleted ? nil : { line in
+                        Task { await workspace.openChangedFile(change.path, in: projectID, line: line, asPreview: true) }
+                    },
+                    isDisabled: repository.isWorking)
             }
         } else if change.path.hasSuffix("/") {
             note("A folder that is a repository of its own.")
@@ -456,6 +504,29 @@ struct GlassEditorChangesView: View {
             note(change.kind == .untracked ? "Not read: open the file to see it." : "No lines to show.")
         } else {
             note("Reading…")
+        }
+    }
+
+    private func perform(_ action: GlassEditorHunkAction, file: GlassEditorFileDiff, hunk: Int, lines: Set<Int>?, key: String) {
+        switch action {
+        case .stage:
+            chosen[key]?[hunk] = nil
+            Task { await repository.stage(file, hunk: hunk, lines: lines) }
+        case .unstage:
+            chosen[key]?[hunk] = nil
+            Task { await repository.unstage(file, hunk: hunk, lines: lines) }
+        case .discard:
+            let count = lines?.count
+            ask(.confirm(GlassEditorGitConfirmation(
+                title: count.map { $0 == 1 ? "Discard This Line?" : "Discard These \($0) Lines?" } ?? "Discard This Hunk?",
+                message: "The file goes back to how it was there before you changed it. This can't be undone.",
+                button: "Discard") {
+                    chosen[key]?[hunk] = nil
+                    await workspace.git(projectID) { repository in
+                        await repository.discard(file, hunk: hunk, lines: lines)
+                        return true
+                    }
+                }))
         }
     }
 
@@ -467,119 +538,100 @@ struct GlassEditorChangesView: View {
             .padding(.vertical, 8)
     }
 
-    private func hunkHeader(_ hunk: GlassEditorDiffHunk) -> some View {
-        Text(hunk.heading.isEmpty ? hunk.range : "\(hunk.range)  \(hunk.heading)")
-            .font(.system(size: fontSize * 0.9, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.accentColor.opacity(0.08))
-    }
+    // MARK: Conflicts
 
-    private func lineRow(_ line: GlassEditorDiffLine, change: GlassEditorGitChange, width: CGFloat) -> some View {
-        let sign = switch line.kind { case .added: "+"; case .removed: "−"; case .context: " " }
-        let tint: Color = switch line.kind { case .added: .green; case .removed: .red; case .context: .clear }
-        // Where the line is in the file now: a removed line's place is the line after it.
-        let target = line.newNumber ?? line.oldNumber
-        return HStack(alignment: .firstTextBaseline, spacing: 0) {
-            Text(line.oldNumber.map(String.init) ?? "")
-                .frame(width: width, alignment: .trailing)
+    private func conflictHeader(_ change: GlassEditorGitChange) -> some View {
+        let path = repository.projectRelative(change.path)
+        let name = (path as NSString).lastPathComponent
+        let isOpen = resolving.contains(change.path)
+        return HStack(spacing: 8) {
+            GlassEditorGitMark(change: change)
+            Text(name).font(.body.weight(.semibold)).lineLimit(1)
+            Text((path as NSString).deletingLastPathComponent)
+                .font(.callout)
                 .foregroundStyle(.secondary)
-            Text(line.newNumber.map(String.init) ?? "")
-                .frame(width: width, alignment: .trailing)
-                .foregroundStyle(.secondary)
-            Text(sign)
-                .frame(width: fontSize * 1.6)
-                .foregroundStyle(tint == .clear ? Color.secondary : tint)
-            Text(Self.shown(line.text))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-            if line.noNewlineAtEnd {
-                Image(systemName: "arrow.uturn.left")
-                    .foregroundStyle(.secondary)
-                    .help("No newline at the end of the file")
-                    .padding(.trailing, 8)
-            }
-        }
-        .font(.system(size: fontSize, design: .monospaced))
-        .padding(.vertical, 1)
-        .background(tint.opacity(0.16))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            guard change.kind != .deleted else { return }
-            Task { await workspace.openChangedFile(change.path, in: projectID, line: target, asPreview: true) }
-        }
-        .contextMenu {
-            if change.kind != .deleted, let target {
-                Button("Open at Line \(target)", systemImage: "arrow.up.forward.square") {
-                    Task { await workspace.openChangedFile(change.path, in: projectID, line: target) }
+                .lineLimit(1)
+                .truncationMode(.head)
+            Spacer(minLength: 8)
+            Menu("Take") {
+                Button("Take Ours (\(repository.status.headName))") {
+                    Task { await workspace.git(projectID) { await $0.resolve(change.path, taking: .ours) } }
                 }
+                Button("Take Theirs") {
+                    Task { await workspace.git(projectID) { await $0.resolve(change.path, taking: .theirs) } }
+                }
+                Divider()
+                Button("Mark as Resolved") { Task { await repository.stage([change]) } }
             }
-            Button("Copy Line", systemImage: "doc.on.doc") { GlassEditorPasteboard.copy(line.text) }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.spoken(line))
-    }
-
-    /// Wide enough for the file's largest line number.
-    private func numberWidth(_ diff: GlassEditorFileDiff) -> CGFloat {
-        let largest = diff.hunks.map { max($0.oldStart + $0.oldCount, $0.newStart + $0.newCount) }.max() ?? 1
-        return CGFloat(String(largest).count) * fontSize * 0.62 + 10
-    }
-
-    /// A tab as four spaces: Text's own tab is narrow and uneven.
-    private static func shown(_ text: String) -> String {
-        let expanded = text.replacingOccurrences(of: "\t", with: "    ")
-        return expanded.isEmpty ? " " : expanded
-    }
-
-    private static func spoken(_ line: GlassEditorDiffLine) -> String {
-        switch line.kind {
-        case .added: "Added, line \(line.newNumber ?? 0): \(line.text)"
-        case .removed: "Removed, was line \(line.oldNumber ?? 0): \(line.text)"
-        case .context: "Line \(line.newNumber ?? 0): \(line.text)"
-        }
-    }
-}
-
-/// One row of a file's lines in Changes: a hunk's heading, or a line.
-struct DiffRow: Identifiable {
-    enum Content {
-        case hunk(GlassEditorDiffHunk)
-        case line(GlassEditorDiffLine)
-    }
-
-    let id: String
-    let content: Content
-
-    static func rows(of diff: GlassEditorFileDiff, path: String) -> [DiffRow] {
-        var rows: [DiffRow] = []
-        for (h, hunk) in diff.hunks.enumerated() {
-            rows.append(DiffRow(id: "\(path)#\(h)", content: .hunk(hunk)))
-            for (l, line) in hunk.lines.enumerated() {
-                rows.append(DiffRow(id: "\(path)#\(h).\(l)", content: .line(line)))
+            .menuIndicator(.visible)
+            .fixedSize()
+            .help("Settle the whole file as one side has it, or say you've settled it yourself")
+            Button(isOpen ? "Done" : "Resolve…") {
+                if isOpen { resolving.remove(change.path) } else { resolving.insert(change.path) }
             }
+            .accessibilityIdentifier("editor-resolve-\(path)")
+            Button("Open \(name)", systemImage: "arrow.up.forward.square") {
+                Task { await workspace.openChangedFile(change.path, in: projectID) }
+            }
+            .labelStyle(.iconOnly)
+            .help("Open \(name) to resolve it by hand")
         }
-        return rows
+        .buttonStyle(.borderless)
+        .font(.caption)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Conflict: \(path)")
     }
 }
 
 /// A changed file's letter, in its colour: the tree's mark and the Changes tab's.
 struct GlassEditorGitMark: View {
     let change: GlassEditorGitChange
+    /// Whether it is staged, said by the mark: the tree's, where nothing else says it (2026-10-29).
+    /// Changes says it by the list a file is in.
+    var showsStaging = false
+
+    /// Ready to commit: the letter on its colour, as a badge.
+    private var staged: Bool { showsStaging && change.isStaged }
+    /// Staged, then changed again: a commit takes the staged version, not what is on screen.
+    private var changedSinceStaged: Bool { staged && change.isUnstaged }
 
     var body: some View {
-        Text(change.letter)
-            .font(.caption.monospaced().weight(.bold))
-            .foregroundStyle(change.tint)
-            .help(change.description)
-            .accessibilityLabel(change.description)
+        HStack(spacing: 2) {
+            Text(change.letter)
+                .font(.caption.monospaced().weight(.bold))
+                .foregroundStyle(staged ? Color.white : change.tint)
+                .padding(.horizontal, staged ? 3 : 0)
+                .background {
+                    if staged { RoundedRectangle(cornerRadius: 3, style: .continuous).fill(change.tint) }
+                }
+            if changedSinceStaged {
+                Circle()
+                    .fill(change.tint)
+                    .frame(width: 5, height: 5)
+            }
+        }
+        .help(spoken)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+    }
+
+    private var spoken: String {
+        guard showsStaging, change.kind != .untracked, change.kind != .conflicted else { return change.description }
+        if changedSinceStaged { return change.description + ", staged, and changed again since: a commit takes the staged version" }
+        return change.description + (change.isStaged ? ", staged" : ", not staged")
     }
 }
 
 extension GlassEditorGitChange {
+    /// Its identity in each of Changes' lists.
+    var stagedKey: String { "staged:" + path }
+    var unstagedKey: String { "unstaged:" + path }
+
     /// VS Code's and Zed's colours: amber modified, green new, red deleted.
     var tint: Color {
         switch kind {
@@ -610,21 +662,26 @@ struct GlassEditorBranchButton: View {
     let repository: GlassEditorGitRepository
     /// Pulls through the workspace, which reads again the open files the pull changes.
     let pull: () -> Void
-    let action: () -> Void
+    /// Opens Source Control at a part of it.
+    let show: (GlassEditorSourceControlSection) -> Void
 
     private var count: Int { repository.status.changes.count }
     private var isReady: Bool { repository.state == .ready }
 
     /// A click shows Changes, as it always has; held or right-clicked, it pulls, pushes and fetches
-    /// (2026-10-28). A button with a menu rather than a `Menu`: a Mac draws a menu's label as one
-    /// title, which dropped the counts.
+    /// (2026-10-28), and opens the rest of Source Control. A button with a menu rather than a
+    /// `Menu`: a Mac draws a menu's label as one title, which dropped the counts.
     var body: some View {
-        Button(action: action) {
+        Button { show(.changes) } label: {
             label
         }
         .buttonStyle(.borderless)
         .contextMenu {
-            Button("Show Changes", systemImage: "list.bullet.rectangle", action: action)
+            Button("Show Changes", systemImage: "list.bullet.rectangle") { show(.changes) }
+            if isReady {
+                Button("Show History", systemImage: "clock.arrow.circlepath") { show(.history) }
+                Button("Show Branches", systemImage: "arrow.triangle.branch") { show(.branches) }
+            }
             if isReady, repository.status.branch != nil {
                 Divider()
                 if let upstream = repository.status.upstream {
@@ -650,7 +707,8 @@ struct GlassEditorBranchButton: View {
 
     private var label: some View {
             HStack(spacing: 4) {
-                Image(systemName: isReady ? "arrow.triangle.branch" : "exclamationmark.triangle")
+                Image(systemName: !isReady ? "exclamationmark.triangle"
+                      : repository.operation != nil ? "arrow.triangle.merge" : "arrow.triangle.branch")
                 Text(isReady ? repository.status.headName : "Git")
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -688,12 +746,13 @@ struct GlassEditorBranchButton: View {
     }
 
     private var help: String {
+        let operation = repository.operation.map { " — \($0.title.lowercased()), not finished" } ?? ""
         switch repository.state {
         case .ready:
-            (count == 0 ? "Changes: none on \(repository.status.headName)"
-                : "Changes: \(count) file\(count == 1 ? "" : "s") on \(repository.status.headName)") + remoteHelp
-        case .unavailable(let reason): reason
-        case .checking, .notARepository: "Changes"
+            return (count == 0 ? "Changes: none on \(repository.status.headName)"
+                : "Changes: \(count) file\(count == 1 ? "" : "s") on \(repository.status.headName)") + remoteHelp + operation
+        case .unavailable(let reason): return reason
+        case .checking, .notARepository: return "Changes"
         }
     }
 }

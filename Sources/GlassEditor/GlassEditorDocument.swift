@@ -23,6 +23,16 @@ import Observation
 import GlassEditorCore
 import GlassEditorUI
 
+/// What a project's git tab shows.
+public enum GlassEditorGitPage: Hashable, Sendable {
+    /// Changes, History, Branches, Stashes and Tags (`GlassEditorSourceControlSection`).
+    case sourceControl
+    /// Who last changed each line of the file at an absolute path.
+    case blame(String)
+    /// The commits that changed the file at an absolute path.
+    case history(String)
+}
+
 @MainActor @Observable
 public final class GlassEditorDocument: Identifiable {
     public let id = UUID()
@@ -31,8 +41,9 @@ public final class GlassEditorDocument: Identifiable {
     public private(set) var url: URL?
     /// The machine it is on, when that machine is not this one. Nil is the ordinary local case.
     public private(set) var machine: String?
-    /// The name a user gave an unsaved document, so it is not "Untitled" forever.
-    private let untitledName: String
+    /// The name a user gave an unsaved document, so it is not "Untitled" forever; a git tab's
+    /// name, which follows what it shows.
+    var untitledName: String
 
     /// What *this file* says about the text, over whatever its project and the app say
     /// (`GlassEditorTextOverrides`). **Held while the document is open and not stored**: it is the
@@ -53,19 +64,26 @@ public final class GlassEditorDocument: Identifiable {
     /// model is then empty and never dirty, so nothing that saves or searches reaches it.
     public let viewer: GlassEditorViewer?
 
-    /// Set for a project's **Changes** tab (2026-10-23): what git says changed, not a file. Its text
-    /// model is empty and never dirty, as a viewer's is.
-    public let changesOfProject: GlassEditorProject.ID?
+    /// Set for a project's git tabs: its **Changes** tab (2026-10-23), which became Source Control
+    /// (2026-10-28: changes, history, branches, stashes and tags), and a file's Blame and History.
+    /// What git says, not a file: its text model is empty and never dirty, as a viewer's is.
+    public let gitProject: GlassEditorProject.ID?
+    public let gitPage: GlassEditorGitPage?
 
-    /// Whether this is text to edit, find in and save: not a viewer, not Changes.
-    public var isText: Bool { viewer == nil && changesOfProject == nil }
+    /// The project whose Source Control this is.
+    public var changesOfProject: GlassEditorProject.ID? { gitPage == .sourceControl ? gitProject : nil }
+
+    /// Whether this is text to edit, find in and save: not a viewer, not git.
+    public var isText: Bool { viewer == nil && gitProject == nil }
 
     public init(model: GlassEditorModel, url: URL?, untitledName: String = "Untitled",
                 machine: String? = nil, session: RemoteDocumentSession? = nil,
-                viewer: GlassEditorViewer? = nil, changesOfProject: GlassEditorProject.ID? = nil) {
+                viewer: GlassEditorViewer? = nil, gitProject: GlassEditorProject.ID? = nil,
+                gitPage: GlassEditorGitPage? = nil) {
         self.model = model
         self.viewer = viewer
-        self.changesOfProject = changesOfProject
+        self.gitProject = gitProject
+        self.gitPage = gitProject == nil ? nil : (gitPage ?? .sourceControl)
         self.url = url
         self.untitledName = untitledName
         self.machine = machine
@@ -190,14 +208,19 @@ public final class GlassEditorDocument: Identifiable {
         return GlassEditorDocument(model: model, url: nil, untitledName: name)
     }
 
-    /// A project's Changes tab.
+    /// A project's Source Control tab, which opens on Changes.
     static func changes(of project: GlassEditorProject.ID) -> GlassEditorDocument {
+        git(.sourceControl, of: project, named: "Changes")
+    }
+
+    /// A project's git tab of any kind.
+    static func git(_ page: GlassEditorGitPage, of project: GlassEditorProject.ID, named name: String) -> GlassEditorDocument {
         let snapshot = DocumentSnapshot(content: "",
                                         encoding: .utf8(hadBOM: false),
                                         lineEndings: LineEndingStyle.platformDefault,
                                         origin: .ephemeral(id: UUID()))
         return GlassEditorDocument(model: GlassEditorModel(snapshot: snapshot), url: nil,
-                                   untitledName: "Changes", changesOfProject: project)
+                                   untitledName: name, gitProject: project, gitPage: page)
     }
 
     // MARK: Identity
@@ -224,7 +247,7 @@ public final class GlassEditorDocument: Identifiable {
 
     public var isDirty: Bool { model.isDirty }
     /// An untitled document's. Changes is never saved, so it never asks to be.
-    public var hasNeverBeenSaved: Bool { url == nil && changesOfProject == nil }
+    public var hasNeverBeenSaved: Bool { url == nil && gitProject == nil }
 
     /// Changing the language re-parses under the new grammar rather than waiting for the next edit.
     public func setLanguage(_ language: LanguageID) {

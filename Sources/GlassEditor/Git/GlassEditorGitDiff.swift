@@ -149,6 +149,10 @@ public enum GlassEditorGitDiff {
                 endFile()
                 let (old, new) = paths(inHeader: line.dropFirst("diff --git ".count))
                 file = GlassEditorFileDiff(oldPath: old, newPath: new)
+            } else if line.hasPrefix("diff --cc ") || line.hasPrefix("diff --combined ") {
+                // A file a merge stopped on, as a combined diff: shown by the conflict view, not
+                // here, and its `---` lines must not rename the file before it.
+                endFile()
             } else if line.hasPrefix("@@ "), file != nil, let header = hunkHeader(line) {
                 endHunk()
                 hunk = header

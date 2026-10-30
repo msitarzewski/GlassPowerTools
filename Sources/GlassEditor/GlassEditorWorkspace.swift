@@ -9,6 +9,7 @@
 //  be tested without a window. The view above it is thin by design.
 //
 
+import CoreGraphics
 import Foundation
 #if os(iOS)
 import UIKit
@@ -28,6 +29,11 @@ public enum GlassEditorSidebarSelection: Hashable, Sendable {
 
 @MainActor @Observable
 public final class GlassEditorWorkspace {
+    /// The window this workspace is drawn in, as Show All Windows pictures it
+    /// (`GlassEditorWindowPicture.swift`): an `NSWindow` or a `UIWindow`, held weakly.
+    @ObservationIgnored weak var pictureWindow: AnyObject?
+    @ObservationIgnored var rememberedPicture: CGImage?
+    @ObservationIgnored var pictureAsked = false
     /// The open session this workspace was opened from (`GlassOpenSession.id`): a terminal window,
     /// by its folder button. Its orb shows the editor on its ring (D88). Nil when opened otherwise.
     public var openedFrom: String?
@@ -1032,7 +1038,7 @@ public final class GlassEditorWorkspace {
 
     public func closeProject(_ id: GlassEditorProject.ID) {
         // Its Changes tab is about a project that is no longer here.
-        for document in documents where document.changesOfProject == id { close(document.id, force: true) }
+        for document in documents where document.gitProject == id { close(document.id, force: true) }
         repositories[id] = nil
         if let root = projectRoots[id] { forget(root) }
         projects.removeAll { $0.id == id }
@@ -1135,6 +1141,21 @@ public final class GlassEditorWorkspace {
         repository(owning: path)?.folderHasChanges(path) ?? false
     }
 
+    /// Whether a folder has a conflicted file anywhere under it.
+    public func folderHasGitConflicts(_ path: String) -> Bool {
+        repository(owning: path)?.folderHasConflicts(path) ?? false
+    }
+
+    /// What was deleted from a folder: files, and folders whose changes are all deletions.
+    public func gitDeletions(in folder: String) -> (files: [String], folders: [String]) {
+        repository(owning: folder)?.deletions(in: folder) ?? ([], [])
+    }
+
+    /// Whether `.gitignore` leaves a file or folder out.
+    public func isGitIgnored(_ path: String) -> Bool {
+        repository(owning: path)?.isIgnored(path) ?? false
+    }
+
     /// Asks every project's git again: the window came forward, and anything may have changed
     /// while it was behind — a build, a checkout, a commit in a terminal.
     public func refreshRepositories() {
@@ -1192,14 +1213,149 @@ public final class GlassEditorWorkspace {
         return document
     }
 
+    /// Which part of each project's Source Control tab is showing, and a commit its History should
+    /// show when asked from elsewhere (a line's Blame, a tag).
+    public var gitSections: [GlassEditorProject.ID: GlassEditorSourceControlSection] = [:]
+    public var gitShownCommits: [GlassEditorProject.ID: String] = [:]
+    /// A question the Git menu asked for, which the project's Source Control tab puts.
+    public var gitAsks: [GlassEditorProject.ID: GlassEditorGitAsk] = [:]
+
+    /// The project's Source Control tab, at `section`, and at `commit` in History when given.
+    @discardableResult
+    public func showSourceControl(_ section: GlassEditorSourceControlSection, of id: GlassEditorProject.ID? = nil,
+                                  commit: String? = nil) -> GlassEditorDocument? {
+        guard let id = id ?? projects.first?.id else { return nil }
+        gitSections[id] = section
+        if let commit { gitShownCommits[id] = commit }
+        let document = showChanges(of: id)
+        document?.untitledName = section.title
+        return document
+    }
+
+    /// A file's Blame or History tab: opened once per file, chosen again after that.
+    @discardableResult
+    public func showGit(_ page: GlassEditorGitPage, of path: String) -> GlassEditorDocument? {
+        let path = GlassEditorProject.normalized(path)
+        guard let owner = project(owning: path), let repository = repositories[owner.id],
+              repository.state == .ready else { return nil }
+        let normalized: GlassEditorGitPage = switch page {
+        case .blame: .blame(path)
+        case .history: .history(path)
+        case .sourceControl: .sourceControl
+        }
+        if let open = documents.first(where: { $0.gitProject == owner.id && $0.gitPage == normalized }) {
+            selection = open.id
+            return open
+        }
+        let name = (path as NSString).lastPathComponent
+        let title = switch normalized {
+        case .blame: "Blame · \(name)"
+        case .history: "History · \(name)"
+        case .sourceControl: "Changes"
+        }
+        let document = GlassEditorDocument.git(normalized, of: owner.id, named: title)
+        documents.append(document)
+        selection = document.id
+        return document
+    }
+
+    /// Runs something in a project's git that may change its files — a checkout, a merge, a stash,
+    /// a discard, a conflict resolved — then reads again the open files it changed. Whether it worked.
+    @discardableResult
+    public func git(_ id: GlassEditorProject.ID,
+                    _ operation: (GlassEditorGitRepository) async -> Bool) async -> Bool {
+        guard let repository = repositories[id] else { return false }
+        let worked = await operation(repository)
+        await reloadChangedDocuments(in: id)
+        return worked
+    }
+
+    /// Every open file of the project that changed on disk: one with no unsaved edits takes the new
+    /// version at once; one with edits keeps them, and its save asks which to keep — as after a pull.
+    func reloadChangedDocuments(in id: GlassEditorProject.ID) async {
+        var kept: [String] = []
+        for document in documents where document.isText {
+            guard let path = document.path, project(owning: path)?.id == id,
+                  document.machine == machineName(of: id), !writing.contains(document.id), document.session != nil
+            else { continue }
+            let access = access(for: document)
+            guard let now = try? await access.stat(path) else { continue }
+            let check = await document.check(currentStat: now, through: access)
+            switch check.state {
+            case .remoteChangedLocalClean:
+                writing.insert(document.id)
+                do {
+                    try await document.reload(through: access)
+                    seenOnReturn[document.id] = nil
+                } catch {
+                    message = "\(document.displayName) changed and couldn't be read again: \(error.localizedDescription)"
+                }
+                writing.remove(document.id)
+            case .remoteChangedLocalDirty:
+                kept.append(document.displayName)
+            case .noConflict, .indeterminate:
+                break
+            }
+        }
+        updateLineMarkers()
+        if !kept.isEmpty {
+            message = "Git changed \(kept.joined(separator: ", ")) too. Your unsaved edits are kept; saving will ask which version to keep."
+        }
+    }
+
+    /// The machine a path's project is on, nil for this Mac.
+    public func machineName(owning path: String) -> String? {
+        project(owning: GlassEditorProject.normalized(path)).flatMap { machineName(of: $0.id) }
+    }
+
+    /// Whether git can be run where a folder is: this Mac's, or a server's over its project's SSH.
+    public func canRunGit(at path: String) -> Bool {
+        project(owning: GlassEditorProject.normalized(path)).flatMap { projectAccess[$0.id]?.gitRunner } != nil
+    }
+
+    /// Clones a repository into a folder of a project — on this Mac or on a server, with that
+    /// machine's own git and keys (2026-10-28) — and shows it in the tree. The new folder's path, or
+    /// nil with `message` saying why.
+    public func cloneRepository(_ address: String, intoFolder folder: String) async -> String? {
+        let address = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let folderPath = GlassEditorProject.normalized(folder)
+        guard let owner = project(owning: folderPath), let access = projectAccess[owner.id],
+              let runner = access.gitRunner else {
+            message = "Git can't be run where this folder is."
+            return nil
+        }
+        guard let name = GlassEditorGitRepository.cloneName(of: address) else {
+            message = "“\(address)” doesn't look like a repository's address. Copy it from the repository's Clone or Code button."
+            return nil
+        }
+        if let siblings = try? await access.contents(ofDirectory: folderPath), siblings.contains(where: { $0.name == name }) {
+            message = "There's already something named \(name) in \((folderPath as NSString).lastPathComponent). Move it aside, or clone somewhere else."
+            return nil
+        }
+        let cloner = GlassEditorGitRepository(projectPath: folderPath, machine: machineName(of: owner.id), runner: runner,
+                                              access: access)
+        guard await cloner.clone(address, named: name) else {
+            message = cloner.actionProblem ?? "Git couldn't clone \(address)."
+            return nil
+        }
+        refreshFolder(at: folderPath)
+        let path = folderPath == "/" ? "/" + name : folderPath + "/" + name
+        refreshRepository(owning: folderPath)
+        return path
+    }
+
     /// A changed file, opened from Changes — at `line` of it as it is now, when one was chosen. A
     /// line goes to the provisional tab, as a single click in the tree does, so stepping through
     /// the changes leaves one tab behind rather than one per file.
     public func openChangedFile(_ repositoryPath: String, in id: GlassEditorProject.ID, line: Int? = nil,
                                 asPreview: Bool = false) async {
-        guard let path = repositories[id]?.absolutePath(repositoryPath),
-              let document = await open(path: path, asPreview: asPreview), document.isText else { return }
-        guard let line else { return }
+        guard let path = repositories[id]?.absolutePath(repositoryPath) else { return }
+        await open(path: path, line: line, asPreview: asPreview)
+    }
+
+    /// A file of a project, at `line` (from 1) when given: from Blame, and a diff's lines.
+    public func open(path: String, line: Int?, asPreview: Bool = false) async {
+        guard let document = await open(path: path, asPreview: asPreview), document.isText, let line else { return }
         let index = min(max(line - 1, 0), max(0, document.model.lineCount - 1))
         let start = document.model.lineRange(ofLine: index).lowerBound
         document.model.reveal(start..<start)

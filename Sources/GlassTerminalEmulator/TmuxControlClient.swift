@@ -30,6 +30,9 @@ public enum TmuxControlAction: Equatable, Sendable {
     /// tmux ended the client (`%exit`): detached, or the session ended. What follows on the PTY is
     /// the shell's again, if anything.
     case exited(reason: String?)
+    /// Someone renamed the session this client is on (`%session-renamed`): it goes by `name` now,
+    /// and whatever kept the old name must keep this one (2026-10-29).
+    case renamed(String)
     /// The grid for the terminal to show the pane at: tmux's window's while another client has it —
     /// the same session open on another device — so the program's lines break where it broke them,
     /// with the space beyond marked (`own` false); its own again once the window is (2026-10-22).
@@ -178,6 +181,10 @@ public struct TmuxControlClient: Sendable {
             windowSizePending = false
             claimPending = false
             return noteGrid(force: false)
+        case .sessionRenamed(let id, let name):
+            // This client's own session; tmux 3.8 names it by id, the manual's form doesn't.
+            guard !name.isEmpty, id == nil || session == nil || id == session else { return [] }
+            return [.renamed(name)]
         case .sessionWindowChanged:
             return phase == .live || phase == .restoring ? askForPane() : []
         case .windowPaneChanged(let window, let pane):
@@ -527,6 +534,8 @@ enum TmuxControlLine: Equatable {
     case pause(pane: String)
     /// `%session-changed $1 name`: the session attached, by its id.
     case sessionChanged(id: String?)
+    /// `%session-renamed $1 name` (tmux 3.8), or `%session-renamed name` as the manual has it.
+    case sessionRenamed(id: String?, name: String)
     case sessionWindowChanged
     case windowPaneChanged(window: String, pane: String)
     /// `%layout-change @window layout visible-layout flags`: the window's size and its panes'.
@@ -549,6 +558,10 @@ enum TmuxControlLine: Equatable {
             self = .pause(pane: String(words[1]))
         case "%session-changed":
             self = .sessionChanged(id: words.count > 1 ? String(words[1]) : nil)
+        case "%session-renamed" where words.count >= 2:
+            let byID = words.count >= 3 && words[1].hasPrefix("$")
+            self = .sessionRenamed(id: byID ? String(words[1]) : nil,
+                                   name: words.dropFirst(byID ? 2 : 1).joined(separator: " "))
         case "%session-window-changed":
             self = .sessionWindowChanged
         case "%window-pane-changed" where words.count >= 3:

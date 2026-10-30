@@ -466,6 +466,15 @@ class TerminalSession: Identifiable, Hashable {
     /// `tmuxSessionName` was kept from before — W4b: a workgroup's saved session — rather than
     /// chosen in Active to join: the first attach claims it, making it again if it has ended.
     var tmuxClaimsGivenName = false
+    /// `tmuxSessionName` came back with a relaunch (W15): joined if it still runs; ended, the
+    /// terminal is gone, as an `exit` leaves it — never made again (2026-10-29).
+    var tmuxJoinsOnly = false
+    /// The folder a session this terminal's claim makes starts in: a Mac terminal opened over SSH
+    /// on its own Mac (2026-10-29), in the folder it has there. Nil starts it where the claim runs.
+    var tmuxSessionDirectory: String?
+    /// Someone renamed its tmux session (`%session-renamed`): from, to. Its workgroup keeps the new
+    /// name (`SessionManager`), and a Mac pane holding it too.
+    var tmuxSessionRenamed: (@MainActor (_ old: String, _ new: String) -> Void)?
     /// Names a new session never takes, though the host may not be running them — W4b: those
     /// saved workgroups hold.
     var tmuxNamesHeld: (@MainActor () -> Set<String>)?
@@ -1045,6 +1054,14 @@ class TerminalSession: Identifiable, Hashable {
                 if let claimed = tmuxSessionName { tmuxSessionClaimed?(claimed) }
             } else if tmuxClaimsGivenName, let given = tmuxSessionName {
                 guard await claimGivenTmuxSession(given) else { return }
+            } else if tmuxJoinsOnly, let given = tmuxSessionName {
+                tmuxJoinsOnly = false
+                if await tmuxSessionHasEnded(given) {
+                    guard state == .connected, !Task.isCancelled else { return }
+                    Logger.ssh.notice("A terminal's tmux session ended while the app was away: the terminal goes too")
+                    handleCleanRemoteExit()
+                    return
+                }
             }
             guard state == .connected, !Task.isCancelled, let name = tmuxSessionName else { return }
             // As a control-mode client where the host's tmux can have one (D83): tmux hands over every
@@ -1109,6 +1126,14 @@ class TerminalSession: Identifiable, Hashable {
         return true
     }
 
+    /// Whether the host's tmux runs no session called `name`: known only from a list that read.
+    /// tmux missing, or a list that can't be read, is not an ended session — the attach goes on.
+    private func tmuxSessionHasEnded(_ name: String) async -> Bool {
+        guard let listed = try? await listTmuxSessionsRetryingOnce(),
+              case .sessions(let sessions) = TerminalTmux.parse(listed) else { return false }
+        return !sessions.contains { $0.name == name }
+    }
+
     /// Claims a name this terminal kept: made again when it has ended — and only then does the
     /// startup command run — joined when it is still running.
     private func claimGivenTmuxSession(_ name: String) async -> Bool {
@@ -1133,7 +1158,8 @@ class TerminalSession: Identifiable, Hashable {
 
     private func claimTmuxSession(_ candidates: [String]) async -> TerminalTmux.Claim {
         do {
-            let output = try await runTmuxCommand(TerminalTmux.claimCommand(candidates: candidates))
+            let output = try await runTmuxCommand(TerminalTmux.claimCommand(candidates: candidates,
+                                                                             directory: tmuxSessionDirectory))
             let claim = TerminalTmux.parseClaim(output, candidates: candidates)
             if claim == .failed { Logger.ssh.error("tmux would not make a session under any name it was offered") }
             return claim
@@ -1355,6 +1381,12 @@ class TerminalSession: Identifiable, Hashable {
                 // What was drawn so far first: it was drawn for the size before.
                 flushPendingTerminalOutputNow()
                 terminalHostModel.showTmuxGrid(columns: columns, rows: rows, own: own)
+            case .renamed(let name):
+                // Kept by its new name: a reconnect, a relaunch and its workgroup attach to it,
+                // rather than make the old name again and run its startup command (2026-10-29).
+                guard TerminalTmux.isValidSessionName(name), let old = tmuxSessionName, old != name else { break }
+                tmuxSessionName = name
+                tmuxSessionRenamed?(old, name)
             }
         }
     }
@@ -2385,9 +2417,13 @@ struct WorkgroupSSHSubstitution: Codable, Equatable {
     var command: String
 
     var intent: LayoutPreset.SessionIntent {
+        .init(serverID: serverID, label: source.label, startupCommand: Self.startup(command, in: directory))
+    }
+
+    /// `command`, run in `directory` once the shell is there: `cd -- dir && { command; }`.
+    static func startup(_ command: String, in directory: String) -> String {
         let path = directory.trimmingCharacters(in: .whitespacesAndNewlines)
         let script = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        let quotedPath = "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
         // One line: startup commands travel through `TerminalStartupCommandTicket`, which rejects
         // newlines because the PTY receives them as separate commands. A single-line group
         // command keeps the script's exit status without a subshell.
@@ -2398,8 +2434,7 @@ struct WorkgroupSSHSubstitution: Codable, Equatable {
             let body = script.hasSuffix(";") || script.hasSuffix("&") ? script : script + ";"
             group = " && { \(body) }"
         }
-        let startup = path.isEmpty ? script : "cd -- \(quotedPath)" + group
-        return .init(serverID: serverID, label: source.label, startupCommand: startup)
+        return path.isEmpty ? script : "cd -- \(TerminalTmux.shellPath(path))" + group
     }
 }
 
@@ -2467,6 +2502,13 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         /// 2026-10-12: a plain shell by choice, whatever the settings say, so a terminal opened
         /// without tmux opens without it again. Written only when true: older builds read the rest.
         var withoutTmux = false
+        /// 2026-10-29: the Mac a local terminal lives on, as that Mac's Terminal service in the
+        /// library (D86's link, which only that Mac knows), so every other device — another Mac
+        /// too — opens it there over SSH, on its own tmux session, instead of a copy of it (the
+        /// owner: "We haven't even touched 'multiple Macs' in this software yet"). Written by the
+        /// Mac that saves or runs the terminal; nil for an SSH terminal, and for a local one no Mac
+        /// has claimed yet, which opens on whichever Mac opens it, as before.
+        var macServerID: UUID? = nil
 
         init(
             schemaVersion: Int = SessionIntent.currentSchemaVersion,
@@ -2497,7 +2539,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             localShell: String? = nil,
             localDirectory: String? = nil,
             tmuxSession: String? = nil,
-            withoutTmux: Bool = false
+            withoutTmux: Bool = false,
+            macServerID: UUID? = nil
         ) {
             self.schemaVersion = schemaVersion
             self.kind = kind
@@ -2509,6 +2552,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             self.startupCommand = Self.normalizedCommand(startupCommand)
             self.tmuxSession = withoutTmux ? nil : Self.normalizedTmuxSession(tmuxSession)
             self.withoutTmux = withoutTmux
+            self.macServerID = kind == .local ? macServerID : nil
         }
 
         var isSupported: Bool {
@@ -2519,16 +2563,29 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
                 && startupCommand == Self.normalizedCommand(startupCommand)
                 && tmuxSession == Self.normalizedTmuxSession(tmuxSession)
                 && [localShell, localDirectory].allSatisfy { $0 == nil || (!$0!.isEmpty && !$0!.utf8.contains(0)) }
-                && (kind == .local || (localShell == nil && localDirectory == nil))
+                && (kind == .local || (localShell == nil && localDirectory == nil && macServerID == nil))
         }
 
         /// The same terminal, whatever tmux session it was given: a name a pane claimed and wrote
         /// back does not make it a different pane (a device's SSH substitution, an edit's draft).
+        /// Nor does the Mac it was found to be on, written back the same way.
         func sameTerminal(as other: Self) -> Bool {
             var mine = self, theirs = other
             mine.tmuxSession = nil
             theirs.tmuxSession = nil
+            mine.macServerID = nil
+            theirs.macServerID = nil
             return mine == theirs
+        }
+
+        /// The machine whose tmux holds this terminal's session, as its Terminal service in the
+        /// library; nil for this Mac (`thisMac`, D86's link; nil off a Mac). An SSH terminal to
+        /// this Mac's own record, and a local one this Mac claimed or nobody has, are both this
+        /// Mac's: one tmux, one set of names (2026-10-29: the headset gave a workgroup's saved
+        /// `glass-5` to a new session there, since names were kept apart by kind).
+        func machine(thisMac: UUID?) -> UUID? {
+            let id = kind == .ssh ? serverID : macServerID
+            return id == thisMac ? nil : id
         }
 
         var needsMigration: Bool { schemaVersion < Self.currentSchemaVersion }
@@ -2576,6 +2633,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             case localShell, localDirectory
             case tmuxSession
             case withoutTmux
+            case macServerID
         }
 
         init(from decoder: Decoder) throws {
@@ -2596,6 +2654,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             tmuxSession = Self.normalizedTmuxSession(try container.decodeIfPresent(String.self, forKey: .tmuxSession))
             withoutTmux = try container.decodeIfPresent(Bool.self, forKey: .withoutTmux) ?? false
             if withoutTmux { tmuxSession = nil }
+            // Optional for the same reason; an SSH terminal has none.
+            macServerID = kind == .local ? try container.decodeIfPresent(UUID.self, forKey: .macServerID) : nil
         }
 
         func encode(to encoder: Encoder) throws {
@@ -2610,6 +2670,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             try container.encodeIfPresent(localDirectory, forKey: .localDirectory)
             try container.encodeIfPresent(tmuxSession, forKey: .tmuxSession)
             if withoutTmux { try container.encode(true, forKey: .withoutTmux) }
+            try container.encodeIfPresent(macServerID, forKey: .macServerID)
         }
     }
 
@@ -2771,9 +2832,13 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     /// W4b: the tmux sessions saved workgroups hold on one machine — an SSH server, or this Mac
     /// when `serverID` is nil. A new terminal there never takes one, though nothing may be
     /// running it: the workgroup would attach to that terminal's work next time it opens.
-    static func tmuxSessionsHeld(in presets: [LayoutPreset], serverID: UUID?) -> Set<String> {
-        Set(presets.flatMap(\.sessionIntents).filter { intent in
-            serverID == nil ? intent.kind == .local : (intent.kind == .ssh && intent.serverID == serverID)
+    /// The tmux sessions saved workgroups hold on a machine (`SessionIntent.machine`): on an SSH
+    /// server, `serverID`; on this Mac, nil. One machine's names, however its terminals reach it.
+    /// A local terminal no Mac has claimed could be any Mac's, so its names are held everywhere.
+    static func tmuxSessionsHeld(in presets: [LayoutPreset], serverID: UUID?, thisMac: UUID? = nil) -> Set<String> {
+        let machine = serverID == thisMac ? nil : serverID
+        return Set(presets.flatMap(\.sessionIntents).filter { intent in
+            intent.machine(thisMac: thisMac) == machine || (intent.kind == .local && intent.macServerID == nil)
         }.compactMap(\.tmuxSession))
     }
 

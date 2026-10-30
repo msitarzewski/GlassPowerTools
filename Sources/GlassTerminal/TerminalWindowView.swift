@@ -118,6 +118,8 @@ struct TerminalWindowView: View {
     #else
     /// W20, W22: the Mac terminal window this pane is in, whose settings This Window edits.
     @Environment(MacWorkspaceWindowController.self) private var macWindow: MacWorkspaceWindowController?
+    /// Split Right and Split Down, for the tools menu.
+    @Environment(\.macPaneSplit) private var paneSplit
     #endif
     /// W22: the settings of the window this terminal is in, which it draws and behaves with.
     @Environment(\.glassWindowOverrides) private var windowSettings
@@ -200,6 +202,9 @@ struct TerminalWindowView: View {
     }
     
     var body: some View {
+        #if os(visionOS)
+        let _ = TerminalRefreshCounts.shared.note(.panes)
+        #endif
         terminalWindowIdentity
             // The terminal in front, offered on your other devices (D72): Continue opens the same
             // machine's terminal there. Only the focused pane of a window offers itself.
@@ -1858,26 +1863,21 @@ struct TerminalWindowView: View {
         #endif
 
             if showsFooterWorkspaceNavigationActions {
-                #if os(visionOS)
+                #if !os(macOS)
                 // The ⚡, as every other window has it (the owner, 2026-10-22: "switch it to the
-                // lightning bolt and send it to active"): Connections, on Active; held, every
-                // window, in a window or around the person as Settings says.
-                GlassActiveConnectionsButton(action: { terminalRuntime?.showActiveConnections?() })
-                    .accessibilityIdentifier("terminal-active-connections")
-                #else
-                Button {
+                // lightning bolt and send it to active"; 2026-10-29: "the universal Active icon is
+                // the bolt"): Connections, on Active; held, every window. On Vision Pro the button
+                // opens Connections itself. An iPhone or iPad draws it only for a terminal on its
+                // own, which none is today: a workgroup's terminals have the workgroup's ⚡.
+                GlassActiveConnectionsButton(action: {
+                    #if os(iOS)
                     showConnections()
-                } label: {
-                    toolLabel("Connections", image: "server.rack", inMenu: inMenu)
-                }
-                // iPhone and iPad only: on Vision Pro these are toolbar items, and the toolbar
-                // styles its own buttons (W31).
-#if os(iOS)
-                .buttonStyle(.borderless)
-#endif
-                .accessibilityLabel("Connections")
-                .help("Connections")
+                    #endif
+                    terminalRuntime?.showActiveConnections?()
+                })
+                    .accessibilityIdentifier("terminal-active-connections")
                 #endif
+                // The Mac's is the window's ⚡ (`MacWorkspaceView`), not each pane's.
             }
 
             // In Tools on Vision Pro, whose bar had grown to eleven (the owner, 2026-10-21).
@@ -2096,6 +2096,9 @@ struct TerminalWindowView: View {
 
                 Divider()
 
+                #if os(macOS)
+                MacPaneSplitMenuItems(actions: paneSplit)
+                #endif
                 Button {
                     duplicateSession()
                 } label: {
@@ -2208,6 +2211,7 @@ struct TerminalWindowView: View {
     @MainActor private static var barDrawings = (count: 0, since: ContinuousClock.now)
 
     private func noteBarDrawn() {
+        TerminalRefreshCounts.shared.note(.bars)
         Self.barDrawings.count += 1
         let elapsed = ContinuousClock.now - Self.barDrawings.since
         guard elapsed >= .seconds(2) else { return }
@@ -2220,12 +2224,14 @@ struct TerminalWindowView: View {
     private func toolsMenuKey(inMenu: Bool) -> TerminalToolsMenuKey {
         #if os(macOS)
         let (workgroupID, movesTabs): (UUID?, Bool) = (nil, false)
+        let canSplit = paneSplit?.canSplit
         #else
         let movesTabs = tabMoving != nil
+        let canSplit: Bool? = nil
         #endif
         return TerminalToolsMenuKey(inMenu: inMenu, isTerminalActive: isTerminalActive,
                                     canOpenWorkingFolder: canOpenWorkingFolder, opensEditor: openFolderInEditor != nil,
-                                    workgroupID: workgroupID, movesTabs: movesTabs,
+                                    workgroupID: workgroupID, movesTabs: movesTabs, canSplit: canSplit,
                                     hasAssistant: aiAssistant.isAvailable, hasSnippets: !settingsManager.snippets.isEmpty,
                                     state: session.state, isRecording: session.recorder?.isRecording == true,
                                     survivesClose: session.survivesClose)
@@ -2319,6 +2325,8 @@ struct TerminalToolsMenuKey: Equatable {
     var opensEditor: Bool
     var workgroupID: UUID?
     var movesTabs: Bool
+    /// The Mac's Split Right and Split Down: nil where there are none.
+    var canSplit: Bool?
     var hasAssistant: Bool
     var hasSnippets: Bool
     var state: SessionState

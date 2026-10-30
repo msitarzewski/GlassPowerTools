@@ -28,6 +28,23 @@ struct TerminalLinkTargetTests {
         #expect(TerminalLinkTarget(link: "  ") == nil)
     }
 
+    /// What SwiftTerm hands over at the end of a sentence or a shell line, as it does (probed
+    /// 2026-10-29): the punctuation is the line's, not the file's (the owner: "a . or a ; seem to
+    /// prevent display").
+    @Test("a sentence's or a command's punctuation after a path is not the path's")
+    func closingPunctuation() {
+        #expect(TerminalLinkTarget(link: "/private/tmp/build-7/check.log.") == .path("/private/tmp/build-7/check.log"))
+        #expect(TerminalLinkTarget(link: "/private/tmp/build-7/check.log;") == .path("/private/tmp/build-7/check.log"))
+        #expect(TerminalLinkTarget(link: "/tmp/x.log?") == .path("/tmp/x.log"))
+        #expect(TerminalLinkTarget(link: "/tmp/x.log!") == .path("/tmp/x.log"))
+        #expect(TerminalLinkTarget(link: "./run.sh;") == .path("./run.sh"))
+        #expect(TerminalLinkTarget(link: "~/logs/run.output.") == .path("~/logs/run.output"))
+        #expect(TerminalLinkTarget(link: "src/app.ts:12:3.") == .path("src/app.ts"), "and then its line and column")
+        #expect(TerminalLinkTarget(link: "src/../") == .path("src/../"))
+        #expect(TerminalLinkTarget(link: "src/..") == .path("src/.."), "a folder's own .. stays")
+        #expect(TerminalLinkTarget(link: "src/.") == .path("src/."))
+    }
+
     @Test("Apple's detector tells a domain from a relative path, which SwiftTerm's rules cannot")
     func domainOrRelativePath() {
         guard case .url(let url) = TerminalLinkTarget(link: "github.com/owner/repo") else {

@@ -104,7 +104,7 @@ struct WorkgroupTabDraft: Identifiable {
     let id: UUID
     /// Another kind of terminal is another machine: the tmux session stays with the old one.
     var kind: LayoutPreset.SessionIntent.Kind {
-        didSet { if kind != oldValue { tmuxSession = nil } }
+        didSet { if kind != oldValue { tmuxSession = nil; macServerID = nil } }
     }
     /// Another server, the same: a session lives on its host (W4b).
     var serverID: UUID? {
@@ -119,6 +119,8 @@ struct WorkgroupTabDraft: Identifiable {
     var tmuxSession: String? = nil
     /// A plain shell by choice (2026-10-12), kept through an edit for the same reason.
     var withoutTmux = false
+    /// The Mac a local tab lives on (2026-10-29), kept through an edit on any device.
+    var macServerID: UUID? = nil
 
     init(
         id: UUID = UUID(),
@@ -145,6 +147,7 @@ struct WorkgroupTabDraft: Identifiable {
         localDirectory = intent.localDirectory ?? ""
         tmuxSession = intent.tmuxSession
         withoutTmux = intent.withoutTmux
+        macServerID = intent.macServerID
     }
 
     var intent: LayoutPreset.SessionIntent {
@@ -156,7 +159,8 @@ struct WorkgroupTabDraft: Identifiable {
             localShell: kind == .local ? localShell : nil,
             localDirectory: kind == .local ? localDirectory : nil,
             tmuxSession: tmuxSession,
-            withoutTmux: withoutTmux
+            withoutTmux: withoutTmux,
+            macServerID: macServerID
         )
     }
 

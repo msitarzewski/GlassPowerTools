@@ -238,7 +238,8 @@ struct MacTerminalContextMenuTests {
         let view = try terminalView(host)
 
         let menu = try #require(view.menu(for: try rightClick(view)))
-        #expect(Array(titles(menu).prefix(5)) == ["Open in Editor", "Show in Finder", "Watch Log File", "Copy Path", "—"])
+        // A log leads with Watch Log File (2026-10-29: "Should tail the output").
+        #expect(Array(titles(menu).prefix(5)) == ["Watch Log File", "Open in Editor", "Show in Finder", "Copy Path", "—"])
         menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Open in Editor" }))
         menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Show in Finder" }))
         #expect(opened == ["/var/log/glass-test.log"] && revealed == ["/var/log/glass-test.log"])

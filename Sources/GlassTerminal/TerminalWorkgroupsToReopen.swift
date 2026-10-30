@@ -405,7 +405,8 @@ extension TerminalWorkgroupOpening {
                 let session = try sessionManager.createSessionWithoutConnecting(
                     serverID: server.id, settingsManager: settingsManager
                 ) { session in
-                    prepare(session, for: target, workgroupID: workgroupID, settingsManager: settingsManager)
+                    prepare(session, for: target, workgroupID: workgroupID, settingsManager: settingsManager,
+                            joinsOnly: true)
                     session.isWorkgroupSlot = true
                     session.connectsWhenShown = connectsWhenShown
                     if let name = terminal.name { session.rename(to: name) }

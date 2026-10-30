@@ -72,6 +72,30 @@ struct AppKitEngineTests {
     // MARK: - Text system
 
     /// D36: the Mac editor is TextKit 1 with non-contiguous layout, and an edit must not lose it.
+    /// Show All Windows' card (2026-10-29): the text as its window shows it, drawn just after it is
+    /// first asked and never inside the asker's update; nothing while the editor is in no window.
+    @Test("the preview is drawn after it is asked for, at most as wide as asked, and only in a window")
+    func previewIsDrawnAfterItIsAsked() async throws {
+        let engine = makeEngine(String(repeating: "let value = 42 // a line of code\n", count: 40))
+        #expect(engine.model.previewImage(maxPixelWidth: 400) == nil, "first ask: nothing yet")
+        await Task.yield()
+        #expect(engine.model.previewImage(maxPixelWidth: 400) == nil, "in no window, there is nothing to draw")
+
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        engine.containerView.frame = NSRect(x: 0, y: 0, width: 800, height: 500)
+        window.contentView = engine.containerView
+        window.contentView?.layoutSubtreeIfNeeded()
+        _ = engine.model.previewImage(maxPixelWidth: 400)
+        await Task.yield()
+        let picture = try #require(engine.model.previewImage(maxPixelWidth: 400))
+        #expect(picture.width <= 400 && picture.width > 0)
+        #expect(abs(Double(picture.height) / Double(picture.width) - 500.0 / 800.0) < 0.02, "the view's shape")
+        // Ink, not an empty bitmap: some pixel is not fully transparent.
+        let data = try #require(picture.dataProvider?.data as Data?)
+        #expect(data.enumerated().contains { $0.offset % 4 == 3 && $0.element > 0 })
+    }
+
     @Test("the Mac text view is on TextKit 1 with non-contiguous layout, and stays there")
     func textKit1IsTheMacDefault() throws {
         let engine = makeEngine("SELECT 1")
@@ -479,6 +503,28 @@ struct AppKitEngineTests {
         #expect(engine.gutter?.frame.width == EditorMetrics.gutterWidth)
         // The shipped metric: gutter + container inset == 56.
         #expect(EditorMetrics.gutteredLeadingInset == 56)
+    }
+
+    @Test("with line numbers off, a file git marks keeps a gutter just wide enough for the marks")
+    func gutterForChangeMarksAlone() async {
+        var configuration = GlassEditorConfiguration()
+        configuration.showsLineNumbers = false
+        let engine = makeEngine("x\ny\n", configuration: configuration)
+        engine.containerView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        engine.containerView.layoutSubtreeIfNeeded()
+        #expect(engine.gutter?.isHidden == true)
+
+        engine.model.showsChangeMarks = true
+        engine.model.lineChanges = [LineChange(kind: .added, lines: 0..<1, baseLines: 0..<0)]
+        await settle()
+        engine.containerView.layoutSubtreeIfNeeded()
+        #expect(engine.gutter?.isHidden == false)
+        #expect(engine.gutter?.frame.width == EditorMetrics.changeMarkGutterWidth)
+
+        engine.model.showsChangeMarks = false
+        await settle()
+        engine.containerView.layoutSubtreeIfNeeded()
+        #expect(engine.gutter?.isHidden == true && engine.gutter?.frame.width == 0)
     }
 
     // MARK: - Highlighting and surface

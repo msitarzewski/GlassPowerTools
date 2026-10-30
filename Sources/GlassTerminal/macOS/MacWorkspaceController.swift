@@ -332,6 +332,8 @@ final class MacWorkspaceController {
         model.onOpenPath = { [weak self] path in Task { await self?.openPath(path, from: paneID) } }
         model.onRevealPath = { [weak self] path in Task { await self?.revealPath(path, from: paneID) } }
         model.revealPathTitle = local ? "Show in Finder" : "Show in Files"
+        // Open in Preview (2026-10-29), for what Preview opens: the file here, or a copy of the host's.
+        model.onOpenInPreview = { [weak self] path in Task { await self?.openInPreview(path, from: paneID) } }
         // Quick Look over the terminal (2026-10-16): the file here, or a copy from the host.
         model.previewFile = { [weak self] path in await self?.previewFile(path, from: paneID) }
         model.previewContent = GlassTerminalRuntime.current?.filePreview
@@ -366,6 +368,25 @@ final class MacWorkspaceController {
             return nil
         }
         return await TerminalRemotePreview.fetch(found.path, from: session)
+    }
+
+    /// Open in Preview: the file on this Mac, or a copy of the host's, kept so Preview can read it
+    /// after this returns (`TerminalRemotePreview`, in the caches). A beep when it is not there.
+    func openInPreview(_ path: String, from paneID: UUID) async {
+        guard let found = await locatePath(path, from: paneID), !found.isDirectory else {
+            NSSound.beep()
+            return
+        }
+        guard found.serverID != nil else {
+            MacPreviewApp.open(URL(fileURLWithPath: found.path))
+            return
+        }
+        guard let session = sessionsByPaneID[paneID],
+              let copy = await TerminalRemotePreview.fetch(found.path, from: session) else {
+            NSSound.beep()
+            return
+        }
+        MacPreviewApp.open(copy.url)
     }
 
     /// Where a path a pane printed is: absolute, on this Mac or on the pane's host, and whether it
@@ -922,8 +943,26 @@ final class MacWorkspaceController {
                 self?.scrollLocalTmux(paneID, deltaY: deltaY, precise: precise) ?? false
             }
             runtime.model.onFullHistory = { [weak self] in await self?.localTmuxHistory(paneID) }
+            runtime.model.onTmuxSessionRenamed = { [weak self] name in self?.localTmuxSessionRenamed(paneID, to: name) }
         }
         return runtime
+    }
+
+    /// Someone renamed a local pane's tmux session (2026-10-29): the pane, this app's note of what it
+    /// shows and holds, and every workgroup that saved it go by the new name, so a relaunch or the
+    /// workgroup's next open attaches to it rather than making the old one again.
+    private func localTmuxSessionRenamed(_ paneID: UUID, to name: String) {
+        guard !isClosed, TerminalTmux.isValidSessionName(name), let root = state.root,
+              let old = root.pane(id: paneID)?.intent.localTmuxSession, old != name else { return }
+        state.root = root.updatingPane(id: paneID) { $0.intent.localTmuxSession = name }
+        MacLocalTmux.release(old)
+        MacLocalTmux.reserve(name)
+        if localRuntimesByPaneID[paneID] != nil {
+            MacLocalTmux.noteHidden(old)
+            MacLocalTmux.noteShown(name)
+        }
+        if !hasUnsavedState { persist() }
+        GlassTerminalRuntime.current?.settingsManager.renameWorkgroupTmuxSession(from: old, to: name, serverID: nil)
     }
 
     func recorder(for paneID: UUID) -> SessionRecorder? {
@@ -946,6 +985,12 @@ final class MacWorkspaceController {
             // The session a new pane of the workgroup was given goes back to the workgroup (W4b).
             if let name = pane.intent.localTmuxSession {
                 writeBackTmuxSession(name, paneID: pane.id, settingsManager: settingsManager)
+            }
+            // A workgroup's Mac terminal running here is this Mac's: the workgroup says so, once,
+            // and other devices open it here (2026-10-29) — opened now, or back after a relaunch.
+            if let workgroupID, let index = pane.intent.sourceSessionIndex {
+                settingsManager.recordWorkgroupMac(workgroupID: workgroupID, index: index,
+                                                   session: pane.intent.localTmuxSession)
             }
             guard let runtime = localRuntime(for: pane.id), !runtime.hasEngine,
                   let recorder = recorder(for: pane.id) else { continue }
@@ -1080,7 +1125,8 @@ final class MacWorkspaceController {
                     allocate: {
                         // Never a name a saved workgroup holds for this Mac (W4b).
                         if held == nil {
-                            held = LayoutPreset.tmuxSessionsHeld(in: SettingsManager.savedLayoutPresets(in: defaults), serverID: nil)
+                            held = LayoutPreset.tmuxSessionsHeld(in: SettingsManager.savedLayoutPresets(in: defaults), serverID: nil,
+                                                                 thisMac: GlassTerminalRuntime.current?.thisMacServerID?())
                         }
                         return MacLocalTmux.allocateName(tmux: tmux, launch: localTmuxLaunch(for: pane), avoiding: held ?? [])
                     }
@@ -1299,6 +1345,8 @@ final class MacWorkspaceController {
                         session.tmuxSessionName = tmuxSession
                         session.tmuxClaimsGivenName = true
                     }
+                    // Another Mac's terminal: a session made for it starts in its folder there.
+                    session.tmuxSessionDirectory = pane.intent.sshDirectory
                     self?.keepClaimedSSHTmuxSession(of: session, paneID: pane.id, settingsManager: settingsManager)
                     // Before it connects, so its first read is the one its attach asks for.
                     self?.watch(session, for: pane.id)
@@ -1376,6 +1424,13 @@ final class MacWorkspaceController {
             guard let self, !isClosed, sessionsByPaneID[paneID] == nil || sessionsByPaneID[paneID] === session else { return }
             if setSSHTmuxSession(name, for: paneID), !hasUnsavedState { persist() }
             if let settingsManager { writeBackTmuxSession(name, paneID: paneID, settingsManager: settingsManager) }
+        }
+        // Renamed on its host: the tab keeps the new name too, after the workgroups do (2026-10-29).
+        let renamed = session.tmuxSessionRenamed
+        session.tmuxSessionRenamed = { [weak self] old, new in
+            renamed?(old, new)
+            guard let self, !isClosed, sessionsByPaneID[paneID] == nil || sessionsByPaneID[paneID] === session else { return }
+            if setSSHTmuxSession(new, for: paneID), !hasUnsavedState { persist() }
         }
     }
 

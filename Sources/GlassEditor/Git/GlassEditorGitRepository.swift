@@ -3,8 +3,10 @@
 //  Glass Power Tools — GlassEditor
 //
 //  One open project's git: its branch, what changed, and — while the Changes tab is open — every
-//  changed file's lines. Refreshed when the project opens, when its window comes forward, after a
-//  save from the editor, from the footer's Refresh, and every few seconds while Changes is shown.
+//  changed file's lines, staged and not. Refreshed when the project opens, when its window comes
+//  forward, after a save from the editor, from the footer's Refresh, and every few seconds while
+//  Changes is shown. What it can do besides staging and committing — hunks and lines, branches,
+//  tags, stashes, history, blame, merges and rebases — is in `GlassEditorGitOperations.swift`.
 //
 
 import Foundation
@@ -33,23 +35,50 @@ public final class GlassEditorGitRepository {
 
     public private(set) var state: State = .checking
     public private(set) var status = GlassEditorGitStatus()
-    /// Each changed file's diff, by its path from the repository's root — read while
-    /// `showsDiffs`, and kept between refreshes.
-    public private(set) var diffs: [String: GlassEditorFileDiff] = [:]
+    /// Each file's staged changes (the index against the last commit), and its changes not staged
+    /// (the working tree against the index, new files whole), by its path from the repository's
+    /// root — read while `showsDiffs`, and kept between refreshes. Two diffs rather than one against
+    /// the last commit, because a hunk is staged from the one and unstaged from the other.
+    public private(set) var stagedDiffs: [String: GlassEditorFileDiff] = [:]
+    public private(set) var unstagedDiffs: [String: GlassEditorFileDiff] = [:]
     /// Why the lines could not be read, when the list could.
     public private(set) var diffProblem: String?
     /// The lines have been read at least once since Changes opened.
     public private(set) var hasReadDiffs = false
     public private(set) var isRefreshing = false
 
-    /// Whether the Changes tab wants the lines, which cost a second command and the reads of new
+    /// Whether the Changes tab wants the lines, which cost two more commands and the reads of new
     /// files; the tree needs only the list.
     public var showsDiffs = false {
         didSet {
             guard showsDiffs != oldValue else { return }
-            if showsDiffs { refresh() } else { hasReadDiffs = false; diffs = [:] }
+            if showsDiffs { refresh() } else { hasReadDiffs = false; stagedDiffs = [:]; unstagedDiffs = [:] }
         }
     }
+
+    /// Lines of context around each change: git's 3 when nil, the whole file at `wholeFile`.
+    public var diffContext: Int? {
+        didSet { if diffContext != oldValue, showsDiffs { refresh() } }
+    }
+    public static let wholeFile = 1_000_000
+    /// Changes only in spaces and tabs left out. Hunks read that way can't be staged on their own:
+    /// they no longer match the file.
+    public var ignoresWhitespace = false {
+        didSet { if ignoresWhitespace != oldValue, showsDiffs { refresh() } }
+    }
+
+    /// A merge, a rebase, a cherry-pick or a revert that stopped part way, and what it is doing.
+    public internal(set) var operation: GlassEditorGitOperation?
+    public internal(set) var operationDetail: String?
+    /// The branches, tags, stashes and remotes, read by `loadReferences()`.
+    public internal(set) var branches: [GlassEditorGitBranch] = []
+    public internal(set) var tags: [GlassEditorGitTag] = []
+    public internal(set) var stashes: [GlassEditorGitStash] = []
+    public internal(set) var remotes: [GlassEditorGitRemote] = []
+    /// The next commit replaces the last one instead (`git commit --amend`).
+    public var amends = false
+    /// The repository's own folder, where a merge or a rebase keeps its state; asked once.
+    @ObservationIgnored var gitDirectory: String?
 
     /// The project's folder, absolute, on its machine.
     public let projectPath: String
@@ -60,9 +89,19 @@ public final class GlassEditorGitRepository {
     public private(set) var changesByPath: [String: GlassEditorGitChange] = [:]
     /// Every folder in the project with a changed file somewhere under it.
     public private(set) var changedFolders: Set<String> = []
+    /// Every folder with a conflicted file somewhere under it: the tree marks it red, since a
+    /// conflict stops a commit (2026-10-29).
+    public private(set) var conflictedFolders: Set<String> = []
+    /// Every folder whose changes are all deletions: gone from the disk, and drawn by the tree only
+    /// so a deletion can be seen among the changed files.
+    public private(set) var deletedFolders: Set<String> = []
+    /// Deleted files, by the folder they were in.
+    public private(set) var deletionsByFolder: [String: [String]] = [:]
+    /// What `.gitignore` leaves out, absolute: folders once, and files matching a pattern.
+    public private(set) var ignoredPaths: Set<String> = []
 
-    @ObservationIgnored private let runner: any GlassEditorGitRunner
-    @ObservationIgnored private let access: any GlassEditorFileAccess
+    @ObservationIgnored let runner: any GlassEditorGitRunner
+    @ObservationIgnored let access: any GlassEditorFileAccess
     /// The project's folder inside the repository: "" at its root, "Sources/App/" below it. Asked
     /// once; the folder does not move inside its repository while it is open.
     @ObservationIgnored private(set) var prefix: String?
@@ -130,6 +169,7 @@ public final class GlassEditorGitRepository {
             }
             take(GlassEditorGitStatus.parse(answer.standardOutput))
             if state != .ready { state = .ready }
+            await readOperation()
             if showsDiffs { await readDiffs() }
         } catch GlassEditorGitError.notInstalled {
             // Said only where there is a repository to read: a Mac without git would otherwise
@@ -152,11 +192,13 @@ public final class GlassEditorGitRepository {
             state = .unavailable("Git won't read this folder because another account owns it. Run git config --global --add safe.directory \(GlassEditorRemoteGit.shellWord(projectPath)) on \(machine ?? "this Mac"), then refresh.")
         } else if answer.exitStatus == 128 {
             prefix = nil
+            gitDirectory = nil
             take(GlassEditorGitStatus())
-            diffs = [:]
+            stagedDiffs = [:]
+            unstagedDiffs = [:]
             state = .notARepository
         } else if said.localizedCaseInsensitiveContains("unknown option") {
-            state = .unavailable("Git on \(machine ?? "this Mac") is too old for the editor, which needs Git 2.15 or later. Update it there, then refresh.")
+            state = .unavailable("Git on \(machine ?? "this Mac") is too old for the editor, which needs Git 2.16 or later. Update it there, then refresh.")
         } else {
             state = .unavailable("Git couldn't read the changes: \(answer.complaint ?? "it stopped with status \(answer.exitStatus.map(String.init) ?? "unknown").")")
         }
@@ -168,17 +210,41 @@ public final class GlassEditorGitRepository {
         if new != status { status = new }
         var byPath: [String: GlassEditorGitChange] = [:]
         var folders: Set<String> = []
+        var conflicted: Set<String> = []
+        var standing: Set<String> = []
+        var deletions: [String: [String]] = [:]
         for change in new.changes {
             guard let path = absolutePath(change.path) else { continue }
             byPath[path] = change
-            var folder = (path as NSString).deletingLastPathComponent
-            while folder.count >= projectPath.count, folder.hasPrefix(projectPath) {
-                guard folders.insert(folder).inserted else { break }
-                folder = (folder as NSString).deletingLastPathComponent
+            let parent = (path as NSString).deletingLastPathComponent
+            mark(&folders, from: parent)
+            if change.kind == .conflicted { mark(&conflicted, from: parent) }
+            if change.kind == .deleted {
+                deletions[parent, default: []].append(path)
+            } else {
+                mark(&standing, from: parent)
             }
         }
+        let ignored = Set(new.ignored.compactMap { entry in
+            absolutePath(entry.hasSuffix("/") ? String(entry.dropLast()) : entry)
+        })
         if byPath != changesByPath { changesByPath = byPath }
         if folders != changedFolders { changedFolders = folders }
+        if conflicted != conflictedFolders { conflictedFolders = conflicted }
+        let gone = folders.subtracting(standing)
+        if gone != deletedFolders { deletedFolders = gone }
+        if deletions != deletionsByFolder { deletionsByFolder = deletions }
+        if ignored != ignoredPaths { ignoredPaths = ignored }
+    }
+
+    /// `folder` and every folder above it in the project, into `folders`; one already there has
+    /// its own above it already.
+    private func mark(_ folders: inout Set<String>, from folder: String) {
+        var folder = folder
+        while folder.count >= projectPath.count, folder.hasPrefix(projectPath) {
+            guard folders.insert(folder).inserted else { break }
+            folder = (folder as NSString).deletingLastPathComponent
+        }
     }
 
     // MARK: The lines
@@ -191,7 +257,7 @@ public final class GlassEditorGitRepository {
         do {
             let base: String
             if status.commit == nil {
-                // No commit yet: everything is new against the empty tree.
+                // No commit yet: everything staged is new against the empty tree.
                 let tree = try await runner.git(GlassEditorGitCommand.emptyTree, in: projectPath)
                 guard tree.succeeded else {
                     diffProblem = "Git couldn't read the changes: \(tree.complaint ?? "no empty tree")"
@@ -201,13 +267,20 @@ public final class GlassEditorGitRepository {
             } else {
                 base = "HEAD"
             }
-            let answer = try await runner.git(GlassEditorGitCommand.diff(against: base), in: projectPath)
-            guard answer.succeeded else {
+            let staged = try await runner.git(GlassEditorGitCommand.stagedDiff(against: base, context: diffContext,
+                                                                                ignoringWhitespace: ignoresWhitespace),
+                                              in: projectPath)
+            let unstaged = try await runner.git(GlassEditorGitCommand.unstagedDiff(context: diffContext,
+                                                                                    ignoringWhitespace: ignoresWhitespace),
+                                                in: projectPath)
+            for answer in [staged, unstaged] where !answer.succeeded {
                 diffProblem = "Git couldn't read the changes: \(answer.complaint ?? "it stopped with status \(answer.exitStatus.map(String.init) ?? "unknown").")"
                 return
             }
+            var readStaged: [String: GlassEditorFileDiff] = [:]
+            for file in GlassEditorGitDiff.parse(staged.standardOutput) { readStaged[file.id] = file }
             var read: [String: GlassEditorFileDiff] = [:]
-            for file in GlassEditorGitDiff.parse(answer.standardOutput) { read[file.id] = file }
+            for file in GlassEditorGitDiff.parse(unstaged.standardOutput) { read[file.id] = file }
             // `git diff` leaves out files git does not know yet; they are read as they are, as
             // wholly new. A folder is a repository of its own, and has no lines to show.
             var budget = Self.untrackedFilesRead
@@ -215,14 +288,16 @@ public final class GlassEditorGitRepository {
                 guard budget > 0 else { break }
                 guard let path = absolutePath(change.path) else { continue }
                 budget -= 1
-                if let kept = diffs[change.path], kept.newPath == change.path, !kept.hunks.isEmpty || kept.isBinary,
+                if let kept = unstagedDiffs[change.path], kept.oldPath == nil, kept.newPath == change.path,
+                   !kept.hunks.isEmpty || kept.isBinary,
                    let stamp = try? await access.stat(path), stamp == untrackedStamps[change.path] {
                     read[change.path] = kept
                     continue
                 }
                 read[change.path] = await untracked(change.path, at: path)
             }
-            if read != diffs { diffs = read }
+            if readStaged != stagedDiffs { stagedDiffs = readStaged }
+            if read != unstagedDiffs { unstagedDiffs = read }
             diffProblem = nil
             hasReadDiffs = true
         } catch let error as GlassEditorGitError {
@@ -230,6 +305,50 @@ public final class GlassEditorGitRepository {
         } catch {
             diffProblem = "Git couldn't read the changes: \(error.localizedDescription)"
         }
+    }
+
+    /// Which operation stopped part way, from the files git keeps while one is under way.
+    private func readOperation() async {
+        if gitDirectory == nil,
+           let answer = try? await runner.git(GlassEditorGitCommand.gitDirectory, in: projectPath), answer.succeeded {
+            let folder = String(decoding: answer.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            gitDirectory = folder.isEmpty ? nil : folder
+        }
+        guard let gitDirectory else { return }
+        var found: GlassEditorGitOperation?
+        for (marker, kind) in GlassEditorGitOperation.markers {
+            if (try? await access.stat(gitDirectory + "/" + marker)) != nil {
+                found = kind
+                break
+            }
+        }
+        var detail: String?
+        switch found {
+        case .rebase:
+            // "feature: 2 of 5", from what the rebase keeps.
+            for folder in ["rebase-merge", "rebase-apply"] {
+                let base = gitDirectory + "/" + folder + "/"
+                guard let step = await smallFile(base + (folder == "rebase-merge" ? "msgnum" : "next")),
+                      let last = await smallFile(base + (folder == "rebase-merge" ? "end" : "last")) else { continue }
+                let branch = await smallFile(base + "head-name").map { $0.hasPrefix("refs/heads/") ? String($0.dropFirst(11)) : $0 }
+                detail = (branch.map { $0 + ": " } ?? "") + "\(step) of \(last)"
+                break
+            }
+        case .merge, .revert, .cherryPick:
+            // What git wrote for the commit: "Merge branch 'feature'".
+            detail = await smallFile(gitDirectory + "/MERGE_MSG")?.split(whereSeparator: \.isNewline).first.map(String.init)
+        case nil:
+            break
+        }
+        if operation != found { operation = found }
+        if operationDetail != detail { operationDetail = detail }
+    }
+
+    /// A file of git's own, trimmed; nil when it isn't there.
+    private func smallFile(_ path: String) async -> String? {
+        guard let data = try? await access.read(path), data.count < 64 * 1024 else { return nil }
+        let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
     }
 
     /// What each new file looked like when it was last read, so a refresh does not read it again.
@@ -341,12 +460,18 @@ public final class GlassEditorGitRepository {
 
     /// Commits `commitMessage`. With nothing staged, everything under the project's folder is
     /// staged first ("Commit All", VS Code's smart commit). `includingOutside` is the answer to
-    /// `.alsoStagedOutside`.
+    /// `.alsoStagedOutside`. With `amends`, the last commit is made again with what is staged and
+    /// the message (its own, when the message is empty), and nothing is staged for it.
     @discardableResult
     public func commit(includingOutside: Bool = false) async -> CommitOutcome {
         let message = commitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty else {
+        let amending = amends
+        guard !message.isEmpty || amending else {
             actionProblem = "Write a message for the commit first."
+            return .notCommitted
+        }
+        guard !amending || status.commit != nil else {
+            actionProblem = "There's no commit to amend yet."
             return .notCommitted
         }
         guard !isWorking else { return .notCommitted }
@@ -363,7 +488,7 @@ public final class GlassEditorGitRepository {
                     if !outside.isEmpty { return .alsoStagedOutside(outside) }
                 }
             }
-            if !hasStagedChanges {
+            if !hasStagedChanges, !amending {
                 let answer = try await runner.git(GlassEditorGitCommand.stageAll(except: nestedRepositories),
                                                   in: projectPath)
                 guard answer.succeeded else {
@@ -372,7 +497,10 @@ public final class GlassEditorGitRepository {
                     return .notCommitted
                 }
             }
-            let answer = try await runner.git(GlassEditorGitCommand.commit(message: commitMessage), in: projectPath)
+            let arguments = amending
+                ? GlassEditorGitCommand.amend(message: message.isEmpty ? nil : commitMessage)
+                : GlassEditorGitCommand.commit(message: commitMessage)
+            let answer = try await runner.git(arguments, in: projectPath)
             guard answer.succeeded else {
                 actionProblem = problem(answer, doing: "commit")
                 await refreshed()
@@ -380,8 +508,13 @@ public final class GlassEditorGitRepository {
             }
             actionProblem = nil
             commitMessage = ""
+            amends = false
             await refreshed()
-            let summary = message.split(whereSeparator: \.isNewline).first.map(String.init) ?? message
+            var summary = message.split(whereSeparator: \.isNewline).first.map(String.init) ?? message
+            if summary.isEmpty, let subject = try? await runner.git(GlassEditorGitCommand.log(limit: 1, skip: 0, allBranches: false),
+                                                                    in: projectPath) {
+                summary = GlassEditorGitCommit.parse(subject.standardOutput).first?.subject ?? ""
+            }
             lastCommit = GlassEditorCommitNote(name: status.commit.map { String($0.prefix(7)) },
                                                branch: status.branch, summary: summary)
             return .committed
@@ -395,23 +528,43 @@ public final class GlassEditorGitRepository {
     }
 
     /// Runs one stage or unstage, one at a time, then asks git what changed.
-    private func perform(_ arguments: [String], failing verb: String) async {
-        guard !isWorking else { return }
+    func perform(_ arguments: [String], failing verb: String) async {
+        await run(arguments, doing: verb)
+    }
+
+    /// Runs one command that changes something — with `input` on its standard input, and the
+    /// network's time limit when it goes to a remote — one at a time, then asks git what changed.
+    /// Whether it worked; when it didn't, `actionProblem` says why.
+    @discardableResult
+    func run(_ arguments: [String], input: Data? = nil, network: Bool = false, doing verb: String) async -> Bool {
+        guard !isWorking else { return false }
         isWorking = true
         defer { isWorking = false }
         await settled()
+        var worked = false
         do {
-            let answer = try await runner.git(arguments, in: projectPath)
-            actionProblem = answer.succeeded ? nil : problem(answer, doing: verb)
+            let answer: GlassEditorCommandOutput
+            if let input {
+                answer = try await runner.git(arguments, in: projectPath, input: input)
+            } else if network {
+                answer = try await runner.git(arguments, in: projectPath, timeLimit: GlassEditorGitCommand.networkTimeLimit)
+            } else {
+                answer = try await runner.git(arguments, in: projectPath)
+            }
+            worked = answer.succeeded
+            actionProblem = worked ? nil : (network ? networkProblem(answer, doing: verb) : problem(answer, doing: verb))
+        } catch GlassEditorGitError.tookTooLong where network {
+            actionProblem = "The remote didn't finish within ten minutes, so the \(verb) was stopped. Check the connection, then try again."
         } catch let error as GlassEditorGitError {
             actionProblem = error.explanation(on: machine)
         } catch {
             actionProblem = "Git couldn't be asked to \(verb) on \(machine ?? "this Mac"): \(error.localizedDescription)"
         }
         await refreshed()
+        return worked
     }
 
-    private func refreshed() async {
+    func refreshed() async {
         refresh()
         await settled()
     }
@@ -485,29 +638,11 @@ public final class GlassEditorGitRepository {
 
     /// One push, pull or fetch, one action at a time; then asks git what changed. Whether it worked.
     @discardableResult
-    private func network(_ action: NetworkAction, _ arguments: [String], doing verb: String) async -> Bool {
+    func network(_ action: NetworkAction, _ arguments: [String], doing verb: String) async -> Bool {
         guard !isWorking else { return false }
-        isWorking = true
         networkAction = action
-        defer {
-            isWorking = false
-            networkAction = nil
-        }
-        await settled()
-        var worked = false
-        do {
-            let answer = try await runner.git(arguments, in: projectPath, timeLimit: GlassEditorGitCommand.networkTimeLimit)
-            worked = answer.succeeded
-            actionProblem = worked ? nil : networkProblem(answer, doing: verb)
-        } catch GlassEditorGitError.tookTooLong {
-            actionProblem = "The remote didn't finish within ten minutes, so the \(verb) was stopped. Check the connection, then try again."
-        } catch let error as GlassEditorGitError {
-            actionProblem = error.explanation(on: machine)
-        } catch {
-            actionProblem = "Git couldn't be asked to \(verb) on \(machine ?? "this Mac"): \(error.localizedDescription)"
-        }
-        await refreshed()
-        return worked
+        defer { networkAction = nil }
+        return await run(arguments, network: true, doing: verb)
     }
 
     /// Why a push, a pull or a fetch failed, in words that say what to do; else as any refusal.
@@ -539,6 +674,13 @@ public final class GlassEditorGitRepository {
         }
         if says("untracked working tree files would be overwritten") {
             return "Pulling would overwrite files that aren't in git yet. Move them aside or commit them first."
+        }
+        if says("Repository not found", "does not appear to be a git repository", "repository not found")
+            || (said.contains("repository '") && said.contains("' does not exist")) {
+            return "There's no repository at that address, or \(place) isn't allowed to see it. Check the address, and that \(place)'s key or account can reach it."
+        }
+        if says("already exists and is not an empty directory") {
+            return "A folder with that name is already there. Choose another place, or move it aside."
         }
         if says("There is no tracking information", "has no upstream branch") {
             return "This branch doesn't follow a branch on the remote. Push it first, which publishes it."
@@ -574,6 +716,31 @@ public final class GlassEditorGitRepository {
             return "Another git command is using this repository. Wait for it to finish and try again; if nothing is running, delete .git/index.lock first."
         }
         let output = String(decoding: answer.standardOutput, as: UTF8.self)
+        let both = said + "\n" + output
+        if both.contains("CONFLICT") || both.contains("could not apply") || both.contains("after resolving the conflicts")
+            || both.contains("fix conflicts") || both.contains("Merge conflict in") {
+            return verb == "apply the stash" || verb == "pop the stash"
+                ? "The stash's changes conflict with yours. Resolve the conflicts in Changes; the stash is kept until you drop it."
+                : "Git stopped to let you resolve conflicts. Choose a side for each in Changes, then Continue."
+        }
+        if said.contains("would be overwritten by") || said.contains("Your local changes to the following files") {
+            return "Your uncommitted changes to some files would be overwritten. Commit or stash them first, then try again."
+        }
+        if said.contains("untracked working tree files would be") {
+            return "Files that aren't in git yet would be overwritten. Move them aside or commit them first."
+        }
+        if said.contains("already exists") {
+            return "Git couldn't \(verb): \(answer.complaint ?? "that name is taken.")"
+        }
+        if said.contains("is already checked out at") || said.contains("is already used by worktree") {
+            return "That branch is checked out in another working tree. Switch there, or choose another branch."
+        }
+        if said.contains("You have not concluded your merge") || said.contains("MERGE_HEAD exists") {
+            return "A merge is under way. Finish it (Continue) or give it up (Abort) first."
+        }
+        if said.contains("rebase-merge") && said.contains("already") || said.contains("It seems that there is already a rebase") {
+            return "A rebase is under way. Finish it (Continue) or give it up (Abort) first."
+        }
         if verb == "commit", answer.exitStatus == 1,
            [said, output].contains(where: { $0.contains("nothing to commit") || $0.contains("no changes added to commit") }) {
             return "There's nothing to commit: no changes are staged."
@@ -616,5 +783,30 @@ public final class GlassEditorGitRepository {
 
     public func folderHasChanges(_ path: String) -> Bool {
         changedFolders.contains(GlassEditorProject.normalized(path))
+    }
+
+    public func folderHasConflicts(_ path: String) -> Bool {
+        conflictedFolders.contains(GlassEditorProject.normalized(path))
+    }
+
+    /// Deleted files that were in `folder`, and folders in it whose changes are all deletions.
+    public func deletions(in folder: String) -> (files: [String], folders: [String]) {
+        let folder = GlassEditorProject.normalized(folder)
+        let files = (deletionsByFolder[folder] ?? []).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        let folders = deletedFolders
+            .filter { ($0 as NSString).deletingLastPathComponent == folder }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return (files, folders)
+    }
+
+    /// Whether `.gitignore` leaves this out: the path itself, or a folder it is in.
+    public func isIgnored(_ path: String) -> Bool {
+        guard !ignoredPaths.isEmpty else { return false }
+        var path = GlassEditorProject.normalized(path)
+        while path.count > projectPath.count, path.hasPrefix(projectPath) {
+            if ignoredPaths.contains(path) { return true }
+            path = (path as NSString).deletingLastPathComponent
+        }
+        return false
     }
 }

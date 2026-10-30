@@ -44,7 +44,7 @@ public enum TerminalLinkTarget: Equatable, Sendable {
             return
         }
         guard text.contains("/") else { return nil }
-        self = .path(Self.withoutLocation(text))
+        self = .path(Self.withoutLocation(Self.withoutClosingPunctuation(text)))
     }
 
     /// The address Apple's link detector finds in `line` at `column` (a cell of an ASCII line is
@@ -80,6 +80,20 @@ public enum TerminalLinkTarget: Equatable, Sendable {
         guard let first = scheme.first, first.isASCII, first.isLetter,
               scheme.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "+-.".contains($0)) }) else { return false }
         return text[colon...].hasPrefix("://") || ["mailto", "tel", "news", "file"].contains(scheme.lowercased())
+    }
+
+    /// `run.log.` → `run.log`, `run.sh;` → `run.sh`, `app.ts:12:3.` → `app.ts:12:3`: the sentence or
+    /// the shell line a path ends, not the path. SwiftTerm's rule takes `.`, `;`, `?` and `!` as a
+    /// path's own characters, which they can be, so the end of a sentence came with it, no file had
+    /// that name, and nothing was shown (the owner, 2026-10-29: "a . or a ; seem to prevent
+    /// display"). A folder's own `.` and `..` stay.
+    static func withoutClosingPunctuation(_ path: String) -> String {
+        var rest = Substring(path)
+        while let last = rest.last, ".,;:!?".contains(last), rest.count > 1 {
+            if rest == ".." || rest.hasSuffix("/.") || rest.hasSuffix("/..") { break }
+            rest = rest.dropLast()
+        }
+        return String(rest)
     }
 
     /// `app.log:12:3` → `app.log`: a compiler's or a log's place in the file is not the file's name.

@@ -220,7 +220,8 @@ struct WorkgroupTmuxSessionsTests {
                 .init(serverID: beta.id, tmuxSession: "glass-2"),
                 .init(kind: .local, tmuxSession: "glass-4")
             ]))
-            #expect(settings.tmuxSessionsHeld(forServer: alpha.id) == ["glass-1", "glass-3"], "this server's, not another machine's")
+            // A Mac terminal no Mac has claimed yet could be on any machine (2026-10-29): its name too.
+            #expect(settings.tmuxSessionsHeld(forServer: alpha.id) == ["glass-1", "glass-3", "glass-4"], "this server's, not another machine's")
 
             let servers = ServerManager(loadImmediately: false, defaults: defaults,
                                         passwordStore: ServerPasswordStore(retrieve: { _ in "unused" }, save: { _, _ in }, delete: { _ in }))
@@ -232,7 +233,7 @@ struct WorkgroupTmuxSessionsTests {
             terminal.tmuxCommandRunner = { host.answer($0) }
             terminal.state = .connected
             await terminal.waitForTmuxAttach()
-            #expect(Array(host.claims.first?.prefix(2) ?? []) == ["glass-2", "glass-4"], "glass-1 and glass-3 are the workgroup's")
+            #expect(Array(host.claims.first?.prefix(2) ?? []) == ["glass-2", "glass-5"], "glass-1, glass-3 and glass-4 are the workgroups'")
             #expect(terminal.tmuxSessionName == "glass-2")
         }
     }

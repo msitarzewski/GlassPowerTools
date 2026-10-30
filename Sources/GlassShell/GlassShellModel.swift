@@ -512,8 +512,12 @@ public final class GlassShellModel: GlassServiceStore {
     private func listenForRemoteChanges() async {
         guard remoteChangeTask == nil else { return }
         remoteChangeTask = Task { [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: Self.remoteChangeNotification) {
+            for await notice in NotificationCenter.default.notifications(named: Self.remoteChangeNotification) {
                 guard let self, !Task.isCancelled else { return }
+                // The push is for every library (no object); one addressed to another model isn't
+                // this one's. A test's notice for its own model made another test's sync run, and
+                // that test read "Syncing" in place of the failure it was checking (2026-10-30).
+                guard notice.object == nil || (notice.object as AnyObject?) === self else { continue }
                 await synchronizeCatalog()
                 // A pull that changed nothing still leaves the view correct; one that did needs the
                 // projection rebuilt, and `synchronizeCatalog` has already done that.

@@ -18,6 +18,9 @@
 import Foundation
 import CryptoKit
 import OSLog
+#if os(visionOS)
+import GlassTerminalEmulator
+#endif
 
 nonisolated enum TerminalSchemeFiles {
     static let folderName = "Terminal Themes"
@@ -85,9 +88,14 @@ final class TerminalSchemeLibrary {
     @ObservationIgnored private var query: NSMetadataQuery?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     /// What each file said, by name, with the date it was read at: read again when it changes.
-    @ObservationIgnored private var read: [String: (modified: Date?, profile: TerminalProfile?, problem: String?)] = [:]
+    @ObservationIgnored private var read: [String: (modified: Date?, theme: TerminalTheme?, problem: String?)] = [:]
     @ObservationIgnored private var reading: Set<String> = []
     @ObservationIgnored private var asked: Set<String> = []
+    /// The listing waiting or under way, and whether another was asked for meanwhile (`refreshSoon`).
+    @ObservationIgnored private var listing: Task<Void, Never>?
+    @ObservationIgnored private var listsAgain = false
+    /// How many listings have been taken in, for tests.
+    @ObservationIgnored private(set) var listingsTaken = 0
     nonisolated private static let log = Logger(subsystem: "com.glasspowertools", category: "TerminalSchemes")
 
     /// Folders given here instead of iCloud's and the device's, for tests.
@@ -114,9 +122,10 @@ final class TerminalSchemeLibrary {
             #if DEBUG
             await TerminalDemoSchemes.addIfAsked(to: self)
             #endif
-            refresh()
+            refreshSoon()
             if cloud != nil { watchCloud() }
         }
+        // This device's own folder, at once; iCloud's once it is found.
         refresh()
     }
 
@@ -145,36 +154,90 @@ final class TerminalSchemeLibrary {
 
     // MARK: - Listing
 
-    /// Lists the folders again, reading what is new or changed off the main thread.
-    func refresh() {
-        var found: [String: TerminalScheme] = [:]
-        // The device's first, so iCloud's copy of a name wins.
-        for folder in [deviceFolder, cloudFolder].compactMap({ $0 }) {
+    /// A scheme's file as a listing found it.
+    nonisolated struct Listed: Sendable {
+        let fileName: String
+        let file: URL
+        let isDownloaded: Bool
+        let modified: Date?
+    }
+
+    private var folders: [URL] { [deviceFolder, cloudFolder].compactMap { $0 } }
+
+    /// The folders' schemes in name order, the device's first so iCloud's copy of a name wins.
+    /// Whether each is here, and when it changed, is a question to iCloud per file, so a folder in
+    /// iCloud is listed off the main thread (`refreshSoon`): on the main thread, 148 questions a
+    /// time stalled a Vision Pro's typing and menus (2026-10-29).
+    nonisolated static func list(_ folders: [URL]) -> [Listed] {
+        var found: [String: Listed] = [:]
+        for folder in folders {
             let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
             for listed in names {
                 guard let entry = TerminalSchemeFiles.entry(named: listed) else { continue }
                 let file = folder.appendingPathComponent(entry.fileName)
                 var downloaded = entry.isDownloaded
-                if downloaded, let status = try? file.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-                    .ubiquitousItemDownloadingStatus {
-                    downloaded = status == .current || status == .downloaded
+                var modified: Date?
+                if downloaded, let values = try? file.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey,
+                                                                                .contentModificationDateKey]) {
+                    if let status = values.ubiquitousItemDownloadingStatus {
+                        downloaded = status == .current || status == .downloaded
+                    }
+                    modified = values.contentModificationDate
                 }
-                found[entry.fileName] = TerminalScheme(id: TerminalSchemeFiles.id(forFileNamed: entry.fileName),
-                                                       fileName: entry.fileName, file: file, isDownloaded: downloaded)
+                found[entry.fileName] = Listed(fileName: entry.fileName, file: file, isDownloaded: downloaded,
+                                               modified: downloaded ? modified : nil)
             }
         }
+        func name(_ listed: Listed) -> String { (listed.fileName as NSString).deletingPathExtension }
+        return found.values.sorted { name($0).localizedStandardCompare(name($1)) == .orderedAscending }
+    }
+
+    /// Lists the folders again now, on the main thread: this device's own folder, and tests'.
+    func refresh() {
+        take(Self.list(folders))
+    }
+
+    /// Lists the folders again shortly, off the main thread: for iCloud's news, each scheme read,
+    /// and anything else that comes many at a time. Asked again while one waits or lists, it lists
+    /// once more after: a folder of 148 arriving is listed a few times, not 148 times over.
+    func refreshSoon() {
+        guard listing == nil else {
+            listsAgain = true
+            return
+        }
+        listing = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard let folders = self?.folders else { return }
+            let started = ContinuousClock.now
+            let listed = await Task.detached(priority: .utility) { Self.list(folders) }.value
+            guard let self else { return }
+            self.take(listed)
+            #if os(visionOS)
+            let took = Int((ContinuousClock.now - started) / .milliseconds(1))
+            TerminalSelectionDiagnostics.record?("schemes listed \(listed.count) in \(took) ms, off the main thread")
+            #endif
+            self.listing = nil
+            if self.listsAgain {
+                self.listsAgain = false
+                self.refreshSoon()
+            }
+        }
+    }
+
+    /// The schemes a listing found, each in the colors read from it, reading what is new or changed
+    /// off the main thread and fetching what isn't here yet.
+    private func take(_ listed: [Listed]) {
+        listingsTaken += 1
         var next: [TerminalScheme] = []
-        for var scheme in found.values {
+        for entry in listed {
+            var scheme = TerminalScheme(id: TerminalSchemeFiles.id(forFileNamed: entry.fileName),
+                                        fileName: entry.fileName, file: entry.file, isDownloaded: entry.isDownloaded)
             if scheme.isDownloaded {
-                let modified = (try? scheme.file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-                if let known = read[scheme.fileName], known.modified == modified {
-                    scheme.theme = known.profile.map {
-                        TerminalTheme(profile: $0, fallback: .default, id: scheme.id, withFont: false)
-                            .reidentified(id: scheme.id, name: scheme.name)
-                    }
+                if let known = read[scheme.fileName], known.modified == entry.modified {
+                    scheme.theme = known.theme
                     scheme.problem = known.problem
                 } else {
-                    readLater(scheme, modified: modified)
+                    readLater(scheme, modified: entry.modified)
                 }
             } else {
                 // A scheme is a few kilobytes: every one is fetched, so each is there when chosen.
@@ -182,14 +245,14 @@ final class TerminalSchemeLibrary {
             }
             next.append(scheme)
         }
-        next.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         if next != schemes { schemes = next }
-        read = read.filter { found[$0.key] != nil }
+        let names = Set(listed.map(\.fileName))
+        read = read.filter { names.contains($0.key) }
     }
 
     private func readLater(_ scheme: TerminalScheme, modified: Date?) {
         guard reading.insert(scheme.fileName).inserted else { return }
-        let file = scheme.file, name = scheme.fileName
+        let file = scheme.file, name = scheme.fileName, id = scheme.id, title = scheme.name
         Task {
             let outcome = await Task.detached(priority: .utility) { () -> (TerminalProfile?, String?) in
                 var result: (TerminalProfile?, String?) = (nil, nil)
@@ -201,9 +264,13 @@ final class TerminalSchemeLibrary {
                 return result
             }.value
             reading.remove(name)
-            read[name] = (modified, outcome.0, outcome.1)
+            // Its colors made once, here, not at every listing.
+            let theme = outcome.0.map {
+                TerminalTheme(profile: $0, fallback: .default, id: id, withFont: false).reidentified(id: id, name: title)
+            }
+            read[name] = (modified, theme, outcome.1)
             if let problem = outcome.1 { Self.log.error("Terminal scheme \(name, privacy: .public) can't be read: \(problem, privacy: .public)") }
-            refresh()
+            refreshSoon()
         }
     }
 
@@ -228,7 +295,8 @@ final class TerminalSchemeLibrary {
         }
         let outcome = await Task.detached(priority: .userInitiated) { Self.copy(urls, into: folder) }.value
         for name in outcome.added { read[name] = nil }
-        refresh()
+        let folders = folders
+        take(await Task.detached(priority: .userInitiated) { Self.list(folders) }.value)
         return outcome
     }
 
@@ -241,7 +309,8 @@ final class TerminalSchemeLibrary {
         }
         if let failure { Self.log.error("Deleting a terminal scheme failed: \(failure.localizedDescription, privacy: .public)") }
         read[scheme.fileName] = nil
-        refresh()
+        if failure == nil { schemes.removeAll { $0.fileName == scheme.fileName } }
+        refreshSoon()
     }
 
     /// At most this many profiles from one import: a folder of a thousand is a mistake, not a set.
@@ -330,7 +399,7 @@ final class TerminalSchemeLibrary {
         query.predicate = NSPredicate(format: "%K LIKE '*.terminal'", NSMetadataItemFSNameKey)
         for name in [Notification.Name.NSMetadataQueryDidFinishGathering, .NSMetadataQueryDidUpdate] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: query, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.refresh() }
+                MainActor.assumeIsolated { self?.refreshSoon() }
             })
         }
         query.start()

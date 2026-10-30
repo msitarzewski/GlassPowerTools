@@ -364,8 +364,8 @@ enum TerminalTmux {
     }
 
     /// The claim for a host, through `sh -c` like every exec-channel command.
-    static func claimCommand(candidates: [String]) -> String {
-        "sh -c \(quoted(searchPath + claimScript(candidates: candidates, tmux: "tmux")))"
+    static func claimCommand(candidates: [String], directory: String? = nil) -> String {
+        "sh -c \(quoted(searchPath + claimScript(candidates: candidates, directory: directory, tmux: "tmux")))"
     }
 
     /// Makes a session under the first of `candidates` that nothing holds, as an `sh` script.
@@ -380,7 +380,7 @@ enum TerminalTmux {
     nonisolated static func claimScript(candidates: [String], directory: String? = nil, command: [String] = [],
                                         tmux: String, serverArguments: [String] = []) -> String {
         let run = ([tmux, "-u"] + serverArguments.map(quoted)).joined(separator: " ")
-        let creates = (directory.map { ["-c", quoted($0)] } ?? []) + command.map(quoted)
+        let creates = (directory.map { ["-c", shellPath($0)] } ?? []) + command.map(quoted)
         let onTaken = candidates.count == 1 ? #"echo "exists $c"; exit 0"# : "continue"
         return "command -v \(tmux) >/dev/null 2>&1 || { echo \(missingMarker); exit 0; }; "
             + "for c in \(candidates.prefix(claimLimit).map(quoted).joined(separator: " ")); do "
@@ -493,6 +493,14 @@ enum TerminalTmux {
     /// POSIX single quoting. `'\''` also reads correctly in fish, where `\'` outside quotes is a quote.
     nonisolated static func quoted(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// A folder as a shell word, quoted, but with a leading `~` as the home of whoever runs it: a
+    /// Mac terminal's folder may be written `~/project`, and in quotes the shell would not expand it.
+    nonisolated static func shellPath(_ path: String) -> String {
+        if path == "~" { return "\"$HOME\"" }
+        if path.hasPrefix("~/") { return "\"$HOME\"/" + quoted(String(path.dropFirst(2))) }
+        return quoted(path)
     }
 }
 

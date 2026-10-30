@@ -30,6 +30,31 @@ struct GlassEditorQuickPreviewTests {
         #expect(!document.model.configuration.isEditable, "looked at, not changed")
     }
 
+    /// A log is read from its end and followed (2026-10-29: "Should tail the output"); asked not
+    /// to, the same file is text from its start, as before.
+    @Test("a log, when asked to tail: its end, from the start of a line, and its size")
+    func logIsTailed() async throws {
+        let lines = (1...4000).map { "line \($0) of the run, something happened here\n" }.joined()
+        let url = try file("run.log", Data(lines.utf8))
+        guard case .tail = await GlassEditorQuickPreview.decide(url, tails: true) else {
+            Issue.record("not tailed")
+            return
+        }
+        guard case .code = await GlassEditorQuickPreview.decide(url) else {
+            Issue.record("not text when not tailed")
+            return
+        }
+        let end = try #require(await GlassEditorLogTail.end(of: url))
+        #expect(end.size == UInt64(lines.utf8.count))
+        #expect(end.text.utf8.count <= GlassEditorLogTail.tailLimit)
+        #expect(end.text.hasPrefix("line "), "from a line's start")
+        #expect(end.text.hasSuffix("line 4000 of the run, something happened here\n"), "to the end")
+        let binary = try file("crash.log", Data([0x00, 0x01, 0x02, 0xFF, 0xFE, 0x00, 0x00, 0x10] + Array(repeating: 0, count: 64)))
+        if case .tail = await GlassEditorQuickPreview.decide(binary, tails: true) {
+            Issue.record("binary bytes are not a log to read")
+        }
+    }
+
     @Test("Swift is Swift: the editor's view, with its language, so it's highlighted")
     func swiftIsHighlighted() async throws {
         let url = try file("main.swift", Data("let greeting = \"hello\"\n".utf8))

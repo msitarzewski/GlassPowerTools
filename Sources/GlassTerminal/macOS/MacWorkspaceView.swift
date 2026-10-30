@@ -683,20 +683,17 @@ struct MacWorkspaceView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                Button("New Local Pane", systemImage: "rectangle.split.2x1") {
-                    // In the focused local terminal's folder (W37).
-                    Task { await selected.addLocalPane(axis: .horizontal) }
-                }
-                .disabled(!selected.canAddPane)
-                .accessibilityIdentifier("mac-workspace-new-local-pane")
+                // Split Right is in the pane's gear menu now, beside Split Down (`MacPaneSplitActions`).
 
-                // The library is where a machine is chosen, everywhere in the app. This used to
-                // open a picker of its own, which meant two different answers to "which host?" —
-                // one of them without the library's search, scopes, favourites or services.
-                Button("Connections", systemImage: "network") {
-                    openWindow(id: "main")
+                // The ⚡, as every other window has it: Connections, on Active (the owner,
+                // 2026-10-29, of this window's globe and its pane's server rack: "these do the same
+                // thing, yes? And shouldn't they be the lightning bolt?!"). One, the window's; the
+                // panes' bars have none. The library is where a machine is chosen, everywhere in the
+                // app. An open Connections window comes forward: asking for "main" makes another.
+                GlassActiveConnectionsButton {
+                    if !GlassLibraryWindows.bringForward() { openWindow.openConnections() }
+                    terminalRuntime?.showActiveConnections?()
                 }
-                .accessibilityIdentifier("mac-workspace-connect-host")
 
                 Button(
                     "Secure Keyboard Entry",
@@ -1004,6 +1001,8 @@ private struct MacWorkspaceTabContent: View {
         workspaceContent
             .frame(minHeight: 460)
             .focusedSceneValue(\.macWorkspaceActions, focusedActions)
+            // Split Right and Split Down, for the gear menu of the pane in front.
+            .environment(\.macPaneSplit, MacPaneSplitActions(canSplit: controller.canAddPane, split: focusedActions.addLocalPane))
             // Edit ▸ Find, Find Next and Find Previous belong to the shell (`GlassShellFindCommands`);
             // here they go to the focused pane's find bar.
             .focusedSceneValue(\.glassFindItem, GlassFindItemAction(

@@ -58,7 +58,18 @@ public struct GlassEditorWorkspaceView: View {
     /// bar comes back when another document is chosen, and must not take the keyboard then.
     @FocusState private var findFieldIsFocused: Bool
     @State private var answeredFindFocusRequest = 0
+    #if os(macOS)
+    /// The file list has the keyboard when the window opens. Nothing did, so AppKit gave it to the
+    /// first control, the sidebar button, and drew its focus ring there (the owner, 2026-10-29,
+    /// with keyboard navigation on: "why is this outlined :D").
+    @FocusState private var filesHaveFocus: Bool
+    #endif
     @State private var filter = ""
+    /// The tree shows only the files git says have changed, and the folders that hold them (the
+    /// owner, 2026-10-29: "there's no view … to show only changed files in the file sidebar").
+    @State private var showsChangedOnly = false
+    /// Folders closed while the tree shows changed files only, by path; every other one is open.
+    @State private var closedWhileChangedOnly: Set<String> = []
     @State private var settingsProject: GlassEditorProject?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openWindow) private var openWindow
@@ -131,6 +142,11 @@ public struct GlassEditorWorkspaceView: View {
         // Waits in the dock with its project's machine (D88).
         .glassSessionOrb(GlassSessionOrbFace(title: detailTitle, symbolName: "doc.text",
                                              dockID: GlassEditorRuntime.sessionID(windowID: windowID)) { nil })
+        #else
+        // The window, for its picture in Show All Windows (`GlassEditorWindowPicture.swift`). Not on
+        // the headset, where the window shrinks into its own orb: its picture would be the orb's.
+        // There the file in front is the picture.
+        .background { GlassEditorPictureWindowReader(workspace: workspace) }
         #endif
         // **The text follows the system's appearance.** `GlassEditorModel` defaults to the dark
         // theme and nothing ever changed it, so in Light mode the window's chrome went light and the
@@ -240,7 +256,34 @@ public struct GlassEditorWorkspaceView: View {
             resetFontSize: { workspace.resetFontSize() },
             goToLine: { goToLineText = ""; isGoingToLine = true },
             showChanges: workspace.projects.first.flatMap { workspace.repositories[$0.id] }?.isRepository == true
-                ? { workspace.showChanges() } : nil)
+                ? { workspace.showChanges() } : nil,
+            git: gitMenuActions)
+    }
+
+    /// The Git menu's actions for this window's project, when its repository is ready.
+    private var gitMenuActions: GlassEditorGitMenuActions? {
+        guard let project = workspace.projects.first, let repository = workspace.repositories[project.id],
+              repository.state == .ready else { return nil }
+        let id = project.id
+        let status = repository.status
+        let idle = !repository.isWorking
+        let file = workspace.selectedDocument.flatMap { document -> String? in
+            guard document.isText, let path = document.path, workspace.repository(owning: path) === repository,
+                  workspace.gitChange(at: path)?.kind != .untracked else { return nil }
+            return path
+        }
+        return GlassEditorGitMenuActions(
+            show: { workspace.showSourceControl($0, of: id) },
+            ask: { ask in
+                workspace.gitAsks[id] = ask
+                workspace.showSourceControl(ask == .stash ? .stashes : .branches, of: id)
+            },
+            hasChanges: !status.changes.isEmpty,
+            pull: idle && status.upstream != nil ? { Task { await workspace.pull(id) } } : nil,
+            push: idle && status.branch != nil && repository.canPush ? { Task { await repository.push() } } : nil,
+            fetch: idle && status.upstream != nil ? { Task { await repository.fetch() } } : nil,
+            blame: file.map { path in { workspace.showGit(.blame(path), of: path) } },
+            fileHistory: file.map { path in { workspace.showGit(.history(path), of: path) } })
     }
 
     /// Edit ▸ Find in this window (`GlassShellFindCommands`): ⌘F, ⌘G and ⇧⌘G. The editor never
@@ -278,6 +321,15 @@ public struct GlassEditorWorkspaceView: View {
         // toolbar elsewhere, and a button on the empty document view — none of which is in the
         // sidebar.
         .toolbar(removing: workspace.projects.isEmpty ? .sidebarToggle : nil)
+        #if os(macOS)
+        .defaultFocus($filesHaveFocus, true)
+        // And back to it whenever no file is open: with keyboard navigation on, the overview's
+        // Recently Edited button was found holding the keyboard, its ring drawn (the owner,
+        // 2026-10-29: "so weird. why is this highlighted?!").
+        .onChange(of: workspace.selectedDocument == nil) { _, nothingOpen in
+            if nothingOpen { filesHaveFocus = true }
+        }
+        #endif
     }
     #endif
 
@@ -375,6 +427,7 @@ public struct GlassEditorWorkspaceView: View {
 
     private func compactFolder(_ node: GlassEditorProjectNode) -> some View {
         GlassEditorFolderList(workspace: workspace, folder: node, filter: filter,
+                              changedOnly: changedOnly,
                               open: { openFromFolderList($0, asPreview: false) },
                               preview: { openFromFolderList($0, asPreview: true) })
             // The shared header, the same one the Files browser shows: this folder's name, and
@@ -432,14 +485,25 @@ public struct GlassEditorWorkspaceView: View {
             ForEach(workspace.projects) { project in
                 Section {
                     if let root = workspace.projectRoots[project.id] {
-                        GlassEditorTreeRows(workspace: workspace, nodes: root.children ?? [],
-                                            filter: filter, open: activate, preview: preview)
+                        GlassEditorTreeRows(workspace: workspace, nodes: root.children ?? [], folderPath: root.path,
+                                            isRead: root.children != nil, filter: filter, changedOnly: changedOnly,
+                                            closedWhileChangedOnly: $closedWhileChangedOnly,
+                                            open: activate, preview: preview)
                     }
                 }
                 // No header. The project's name and where it is are in the **title bar** now, and
                 // repeating them over the file list said the same two facts twice in one window
                 // (2026-09-17). The machine badge lives in Project Settings, which is the place
                 // that can also change it.
+            }
+        }
+        #if os(macOS)
+        .focused($filesHaveFocus)
+        #endif
+        .overlay {
+            if changedOnly, !workspace.projects.contains(where: { hasChanges($0) }) {
+                ContentUnavailableView("No Changed Files", systemImage: "checkmark.circle",
+                                       description: Text("Every file is as the last commit has it."))
             }
         }
         // Bare rows in the headset's own sidebar column, as the system's sidebar drew them (W33).
@@ -502,9 +566,19 @@ public struct GlassEditorWorkspaceView: View {
                     // away (2026-10-23). Only in a repository, where there is a branch to name.
                     if let repository = workspace.repositories[project.id], repository.isRepository {
                         GlassEditorBranchButton(repository: repository,
-                                                pull: { Task { await workspace.pull(project.id) } }) {
-                            workspace.showChanges(of: project.id)
+                                                pull: { Task { await workspace.pull(project.id) } }) { section in
+                            workspace.showSourceControl(section, of: project.id)
                         }
+                        // Beside the branch, as Xcode keeps "only files with source control status"
+                        // at the foot of its navigator. The Filter field still applies inside it.
+                        Button(showsChangedOnly ? "Show All Files" : "Show Only Changed Files",
+                               systemImage: showsChangedOnly
+                                   ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle") {
+                            showsChangedOnly.toggle()
+                            closedWhileChangedOnly = []
+                        }
+                        .help(showsChangedOnly ? "Show All Files" : "Show Only Changed Files")
+                        .accessibilityIdentifier("editor-files-changed-only")
                     }
                     Spacer(minLength: 0)
                     Button("Refresh", systemImage: "arrow.clockwise") {
@@ -542,6 +616,16 @@ public struct GlassEditorWorkspaceView: View {
     /// `GlassPathLocation` and both ask it.
     private func abbreviated(_ path: String) -> String {
         GlassPathLocation.abbreviatingHome(path)
+    }
+
+    /// Changed files only, while there is a repository to ask.
+    private var changedOnly: Bool {
+        showsChangedOnly && workspace.projects.contains { workspace.repositories[$0.id]?.isRepository == true }
+    }
+
+    /// A change the tree can show: a deleted file has no row to show it in.
+    private func hasChanges(_ project: GlassEditorProject) -> Bool {
+        workspace.repositories[project.id]?.changesByPath.values.contains { $0.kind != .deleted } == true
     }
 
     /// Case-insensitive, per level — the way the schema browser filters databases and the tables
@@ -601,8 +685,8 @@ public struct GlassEditorWorkspaceView: View {
                             GlassWorkspaceTabItem(id: document.id,
                                                   title: document.isDirty ? "\(document.displayName) •" : document.displayName,
                                                   symbolName: document.viewer?.kind.symbolName
-                                                      ?? (document.changesOfProject != nil ? "arrow.triangle.branch"
-                                                          : symbolName(for: document.model.language)),
+                                                      ?? document.gitPage.map(Self.gitSymbol)
+                                                      ?? symbolName(for: document.model.language),
                                                   isProvisional: workspace.isPreview(document.id),
                                                   help: document.locationDescription ?? document.displayName)
                         },
@@ -623,10 +707,19 @@ public struct GlassEditorWorkspaceView: View {
                 // it keeps rendering the first document opened. Seen in the running app with three
                 // files open and the first one still showing. One identity per document, so
                 // switching documents builds the engine that belongs to it.
-                if let project = document.changesOfProject {
-                    // What git says changed since the last commit (2026-10-23).
-                    GlassEditorChangesView(workspace: workspace, projectID: project)
-                        .id(document.id)
+                if let project = document.gitProject, let page = document.gitPage {
+                    // What git says (2026-10-23: changed since the last commit; 2026-10-28: all of it).
+                    Group {
+                        switch page {
+                        case .sourceControl:
+                            GlassEditorSourceControlView(workspace: workspace, projectID: project, document: document)
+                        case .blame(let path):
+                            GlassEditorBlameView(workspace: workspace, projectID: project, path: path)
+                        case .history(let path):
+                            GlassEditorFileHistoryView(workspace: workspace, projectID: project, path: path)
+                        }
+                    }
+                    .id(document.id)
                 } else if let viewer = document.viewer {
                     // Not text: the file as what it is (`GlassEditorViewerView`).
                     GlassEditorViewerView(viewer: viewer) {
@@ -1059,6 +1152,15 @@ public struct GlassEditorWorkspaceView: View {
         case .xml: "XML"
         case .html: "HTML"
         case .plaintext: "Plain Text"
+        }
+    }
+
+    /// A git tab's symbol: the branch for Source Control, a person for Blame, a clock for History.
+    static func gitSymbol(_ page: GlassEditorGitPage) -> String {
+        switch page {
+        case .sourceControl: "arrow.triangle.branch"
+        case .blame: "person.text.rectangle"
+        case .history: "clock.arrow.circlepath"
         }
     }
 
@@ -1600,6 +1702,8 @@ struct GlassEditorFolderList: View {
     let workspace: GlassEditorWorkspace
     let folder: GlassEditorProjectNode
     let filter: String
+    /// Only what git says has changed, and the folders that hold it, as the tree shows them.
+    var changedOnly = false
     /// A double tap: the file is kept.
     let open: (GlassEditorProjectNode) -> Void
     /// A single tap: the file is shown in the provisional tab.
@@ -1609,9 +1713,11 @@ struct GlassEditorFolderList: View {
 
     /// Case-insensitive, this level only — the same rule the tree filters each level by.
     private var visible: [GlassEditorProjectNode] {
-        let children = folder.children ?? []
-        guard !query.isEmpty else { return children }
-        return children.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        (folder.children ?? []).filter { node in
+            (query.isEmpty || node.name.localizedCaseInsensitiveContains(query))
+                && (!changedOnly || (node.isDirectory ? workspace.folderHasGitChanges(node.path)
+                                                       : workspace.gitChange(at: node.path) != nil))
+        }
     }
 
     var body: some View {
@@ -1630,9 +1736,33 @@ struct GlassEditorFolderList: View {
                         .simultaneousGesture(TapGesture(count: 2).onEnded { open(node) })
                 }
             }
+            ForEach(deleted, id: \.path) { file in
+                GlassEditorDeletedRow(workspace: workspace, path: file.path, isFolder: false, shownName: file.name)
+            }
         }
         .scrollContentBackground(.hidden)
-        .overlay { if visible.isEmpty { emptyState } }
+        .overlay { if visible.isEmpty, deleted.isEmpty { emptyState } }
+    }
+
+    /// While only changes show, what was deleted here: files in this folder, and the files of a
+    /// deleted folder in it under the folder's name — a folder that is gone has no screen to push.
+    private var deleted: [(path: String, name: String)] {
+        guard changedOnly, folder.children != nil else { return [] }
+        let found = workspace.gitDeletions(in: folder.path)
+        let standing = Set((folder.children ?? []).map(\.path))
+        var files = found.files.map { (path: $0, name: ($0 as NSString).lastPathComponent) }
+        let base = folder.path + "/"
+        for gone in found.folders where !standing.contains(gone) {
+            var inside: [String] = []
+            var pending = [gone]
+            while let next = pending.popLast() {
+                let more = workspace.gitDeletions(in: next)
+                inside += more.files
+                pending += more.folders
+            }
+            files += inside.sorted().map { (path: $0, name: String($0.dropFirst(base.count))) }
+        }
+        return files.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }
     }
 
     /// An empty list is four different facts, and a blank screen says none of them.
@@ -1644,6 +1774,9 @@ struct GlassEditorFolderList: View {
             ContentUnavailableView("Cannot Read \(folder.name)",
                                    systemImage: "exclamationmark.triangle",
                                    description: Text(loadError))
+        } else if changedOnly, query.isEmpty {
+            ContentUnavailableView("No Changed Files", systemImage: "checkmark.circle",
+                                   description: Text("Every file in \(folder.name) is as the last commit has it."))
         } else if query.isEmpty {
             ContentUnavailableView("Empty Folder", systemImage: "folder",
                                    description: Text("There is nothing in \(folder.name)."))
@@ -1664,28 +1797,78 @@ struct GlassEditorFolderList: View {
 private struct GlassEditorTreeRows: View {
     let workspace: GlassEditorWorkspace
     let nodes: [GlassEditorProjectNode]
+    /// The folder these are in, and whether it has been read: a deletion is drawn beside what is
+    /// still there only once what is there is known.
+    let folderPath: String
+    let isRead: Bool
     let filter: String
+    /// Only what git says has changed, and the folders that hold it, every one of them open
+    /// unless closed here — so a change deep in the tree is in view without opening each folder.
+    /// Deleted files and folders are drawn too, struck through, so a deletion is not missed.
+    var changedOnly = false
+    /// By path: a deleted folder has no node.
+    var closedWhileChangedOnly: Binding<Set<String>> = .constant([])
     /// Opening it for good — a double click.
     let open: (GlassEditorProjectNode) -> Void
     /// Showing it provisionally — one click.
     let preview: (GlassEditorProjectNode) -> Void
 
+    private var query: String { filter.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private func shows(_ name: String) -> Bool {
+        query.isEmpty || name.localizedCaseInsensitiveContains(query)
+    }
+
     private var visible: [GlassEditorProjectNode] {
-        let query = filter.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return nodes }
-        return nodes.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        nodes.filter { node in shows(node.name) && (!changedOnly || isChanged(node)) }
+    }
+
+    private func isChanged(_ node: GlassEditorProjectNode) -> Bool {
+        node.isDirectory ? workspace.folderHasGitChanges(node.path) : workspace.gitChange(at: node.path) != nil
+    }
+
+    /// What was deleted here, while only changes show.
+    private var deleted: (files: [String], folders: [String]) {
+        guard changedOnly, isRead else { return ([], []) }
+        let found = workspace.gitDeletions(in: folderPath)
+        let standing = Set(nodes.map(\.path))
+        return (found.files.filter { shows(GlassEditorDeletedRow.name($0)) },
+                found.folders.filter {
+                    !standing.contains($0) && shows(GlassEditorDeletedRow.name($0))
+                        && !GlassEditorProject.skippedNames.contains(GlassEditorDeletedRow.name($0))
+                })
+    }
+
+    private func expansion(of node: GlassEditorProjectNode) -> Binding<Bool> {
+        guard changedOnly else {
+            return Binding(get: { workspace.isExpanded(node.id) },
+                           set: { workspace.setExpanded($0, for: node.id) })
+        }
+        return expansion(of: node.path)
+    }
+
+    private func expansion(of path: String) -> Binding<Bool> {
+        Binding(get: { !closedWhileChangedOnly.wrappedValue.contains(path) },
+                set: { open in
+                    if open { closedWhileChangedOnly.wrappedValue.remove(path) }
+                    else { closedWhileChangedOnly.wrappedValue.insert(path) }
+                })
     }
 
     var body: some View {
         ForEach(visible) { node in
             if node.isDirectory {
-                DisclosureGroup(isExpanded: Binding(
-                    get: { workspace.isExpanded(node.id) },
-                    set: { workspace.setExpanded($0, for: node.id) })) {
-                    GlassEditorTreeRows(workspace: workspace, nodes: node.children ?? [],
-                                        filter: filter, open: open, preview: preview)
+                DisclosureGroup(isExpanded: expansion(of: node)) {
+                    GlassEditorTreeRows(workspace: workspace, nodes: node.children ?? [], folderPath: node.path,
+                                        isRead: node.children != nil, filter: filter, changedOnly: changedOnly,
+                                        closedWhileChangedOnly: closedWhileChangedOnly,
+                                        open: open, preview: preview)
                 } label: {
                     row(node, symbol: "folder")
+                }
+                // Shown open, so read: a folder is read the first time it opens (`setExpanded`).
+                .task(id: changedOnly) {
+                    if changedOnly { await node.loadChildrenIfNeeded(using: workspace.access(for: node)) }
                 }
                 .tag(GlassEditorSidebarSelection.node(node.id))
                 // The sidebar's row spacing in the headset's own column (W33); nothing elsewhere.
@@ -1695,6 +1878,21 @@ private struct GlassEditorTreeRows: View {
                     .tag(GlassEditorSidebarSelection.node(node.id))
                     .glassSpatialListRow()
             }
+        }
+        let deleted = deleted
+        ForEach(deleted.folders, id: \.self) { folder in
+            DisclosureGroup(isExpanded: expansion(of: folder)) {
+                GlassEditorTreeRows(workspace: workspace, nodes: [], folderPath: folder, isRead: true, filter: filter,
+                                    changedOnly: true, closedWhileChangedOnly: closedWhileChangedOnly,
+                                    open: open, preview: preview)
+            } label: {
+                GlassEditorDeletedRow(workspace: workspace, path: folder, isFolder: true)
+            }
+            .glassSpatialListRow()
+        }
+        ForEach(deleted.files, id: \.self) { file in
+            GlassEditorDeletedRow(workspace: workspace, path: file, isFolder: false)
+                .glassSpatialListRow()
         }
     }
 
@@ -1727,6 +1925,46 @@ private struct GlassEditorTreeRows: View {
     }
 }
 
+/// A deleted file or folder among the changed files: struck through, with git's D. It has no
+/// file to open; a press shows Changes, where its last committed lines are.
+struct GlassEditorDeletedRow: View {
+    let workspace: GlassEditorWorkspace
+    let path: String
+    let isFolder: Bool
+    /// From the folder the list is in, on a phone, where a deleted folder has no screen of its own.
+    var shownName: String?
+
+    static func name(_ path: String) -> String { (path as NSString).lastPathComponent }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label {
+                Text(shownName ?? Self.name(path)).strikethrough()
+            } icon: {
+                Image(systemName: isFolder ? "folder" : "doc")
+            }
+            .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if !isFolder, let change = workspace.gitChange(at: path) {
+                GlassEditorGitMark(change: change, showsStaging: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { showChanges() }
+        .help("Deleted. Its last committed version is in Changes.")
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(shownName ?? Self.name(path)), deleted")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Shows Changes")
+    }
+
+    private func showChanges() {
+        guard let project = workspace.project(owning: path) else { return }
+        workspace.showSourceControl(.changes, of: project.id)
+    }
+}
+
 /// What a file or folder looks like in a list — in the tree, and on a phone's folder screen.
 ///
 /// The two lists navigate differently (a tree selects and expands in place; a phone pushes), so
@@ -1738,6 +1976,10 @@ private struct GlassEditorFileRow: View {
     let open: (GlassEditorProjectNode) -> Void
     @State private var isNamingNewFile = false
     @State private var newFileName = ""
+    @State private var isCloning = false
+    @State private var cloneAddress = ""
+
+    private var isIgnored: Bool { workspace.isGitIgnored(node.path) }
 
     /// The folder a new file goes in: this one, or the one this file is in.
     private var newFileFolder: String {
@@ -1756,6 +1998,8 @@ private struct GlassEditorFileRow: View {
             // The list's own font, as the schema browser's table rows use — `rowSubtitleFont` is
             // `.caption` on a Mac, which made a file tree read like a footnote.
             Label(node.name, systemImage: symbol)
+                // Left out by `.gitignore`: there, but not the project's own (2026-10-29).
+                .opacity(isIgnored ? 0.5 : 1)
             Spacer(minLength: 0)
             // Trailing, where a fact about a row goes. A folder on this device is read before the
             // frame draws and neither of these is ever seen; a folder on another machine is a
@@ -1765,8 +2009,16 @@ private struct GlassEditorFileRow: View {
                     .controlSize(.small)
                     .accessibilityLabel("Reading \(node.name)")
             } else if !node.isDirectory, let change = workspace.gitChange(at: node.path) {
-                // How it differs from the last commit, as Zed and VS Code mark it (2026-10-23).
-                GlassEditorGitMark(change: change)
+                // How it differs from the last commit, as Zed and VS Code mark it (2026-10-23), and
+                // whether it is staged (2026-10-29).
+                GlassEditorGitMark(change: change, showsStaging: true)
+            } else if node.isDirectory, workspace.folderHasGitConflicts(node.path) {
+                // Red over orange: a conflict stops a commit (2026-10-29).
+                Circle()
+                    .fill(.red)
+                    .frame(width: 6, height: 6)
+                    .help("Has conflicts")
+                    .accessibilityLabel("Has conflicts")
             } else if node.isDirectory, workspace.folderHasGitChanges(node.path) {
                 Circle()
                     .fill(.orange)
@@ -1785,6 +2037,21 @@ private struct GlassEditorFileRow: View {
         .glassSpatialListRow()
         .contextMenu {
             Button(node.isDirectory ? "Open Folder" : "Open") { open(node) }
+            // Who changed each line, and the commits that changed it (2026-10-28).
+            if !node.isDirectory, workspace.repository(owning: node.path)?.state == .ready,
+               workspace.gitChange(at: node.path)?.kind != .untracked {
+                Button("Blame", systemImage: "person.text.rectangle") { workspace.showGit(.blame(node.path), of: node.path) }
+                Button("File History", systemImage: "clock.arrow.circlepath") {
+                    workspace.showGit(.history(node.path), of: node.path)
+                }
+            }
+            if workspace.gitChange(at: node.path) != nil, let owner = workspace.repository(owning: node.path) {
+                Button("Show Changes", systemImage: "list.bullet.rectangle") {
+                    if let project = workspace.projects.first(where: { workspace.repositories[$0.id] === owner }) {
+                        workspace.showSourceControl(.changes, of: project.id)
+                    }
+                }
+            }
             // Local or on a server, through the project's own access (2026-09-26: the editor had
             // no way to start a new file on a server).
             Button("New File…", systemImage: "doc.badge.plus") {
@@ -1792,8 +2059,29 @@ private struct GlassEditorFileRow: View {
                 isNamingNewFile = true
             }
             if node.isDirectory {
+                // Here or on a server, with that machine's own git and keys (2026-10-28).
+                if workspace.canRunGit(at: node.path) {
+                    Button("Clone Repository Here…", systemImage: "square.and.arrow.down.on.square") {
+                        cloneAddress = ""
+                        isCloning = true
+                    }
+                }
                 Button("Refresh") { refresh() }
             }
+        }
+        .alert("Clone Repository", isPresented: $isCloning) {
+            TextField("Address", text: $cloneAddress)
+            Button("Clone") {
+                let address = cloneAddress, folder = node.path, id = node.id
+                Task {
+                    if await workspace.cloneRepository(address, intoFolder: folder) != nil {
+                        workspace.setExpanded(true, for: id)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Into a new folder in \(node.name), with \(workspace.machineName(owning: node.path) ?? "this Mac")'s git and keys. For example, git@github.com:owner/repo.git or https://github.com/owner/repo.")
         }
         .alert("New File", isPresented: $isNamingNewFile) {
             TextField("File name", text: $newFileName)

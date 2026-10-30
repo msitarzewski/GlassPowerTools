@@ -26,14 +26,21 @@ public enum SwiftTermRendererPreference: Equatable, Sendable {
 
     public static var platformDefault: Self {
         #if os(visionOS)
-        // SwiftTerm's Metal view can report itself active on Vision Pro while
-        // never presenting a drawable. Keep the proven UIKit renderer as the
-        // device default until Metal presentation is validated independently.
-        .coreGraphics
+        // Core Graphics: tried with Metal on the headset (2026-10-29, 0.4.552), the owner: "The
+        // text is far less legible and the refreshes more obvious! Its like a jpg vs png". SwiftTerm
+        // 1.20 presents with Metal there (it counts the frames, and falls back by itself when they
+        // stop), so Settings ▸ Terminal ▸ Diagnostics ▸ Draw with Metal stays, off, for comparing.
+        let drawsWithMetal = UserDefaults.standard.object(forKey: visionMetalKey) as? Bool ?? false
+        return drawsWithMetal ? .metal : .coreGraphics
         #else
         .metal
         #endif
     }
+
+    /// Vision Pro's switch for Metal (`platformDefault`).
+    public static let visionMetalKey = "terminal.drawsWithMetal"
+    /// Posted when that switch changes: terminals on screen draw the new way at once.
+    public static let changedNotification = Notification.Name("GlassTerminal.rendererPreferenceChanged")
 }
 
 public struct SwiftTermRendererDiagnostics: Equatable, Sendable {
@@ -448,6 +455,9 @@ public final class SwiftTermHostModel: ObservableObject {
     /// host cannot. `revealPathTitle` names it.
     public var onRevealPath: (@MainActor (String) -> Void)?
     public var revealPathTitle = "Show in Files"
+    /// Open in Preview on a path to a file the Mac's Preview opens (`MacPreviewApp`, 2026-10-29):
+    /// the file here, or a copy of the host's. Nil off the Mac.
+    public var onOpenInPreview: (@MainActor (String) -> Void)?
     /// The file a printed path names, ready to show on this Mac — the file, or a copy fetched from
     /// the terminal's machine — for Quick Look over the terminal (`TerminalPreviewFile`); nil when
     /// there is none to show. Set by the window for each of its panes, on the Mac and Vision Pro.
@@ -475,6 +485,9 @@ public final class SwiftTermHostModel: ObservableObject {
     /// every query the program sends, so the terminal's own answers are dropped. Set by the session,
     /// or the local pane, while it is one.
     public var isTmuxControlClient = false
+    /// A local pane's tmux session was renamed (`%session-renamed`, 2026-10-29), to this name: the
+    /// pane and its workgroup keep it, so neither makes the old one again.
+    public var onTmuxSessionRenamed: (@MainActor (String) -> Void)?
     /// The history is the terminal's own though it runs in tmux: Find, Select All and scrolling use it
     /// rather than tmux's.
     public var keepsHistoryUnderTmux: Bool { isTmuxControlClient }
@@ -869,6 +882,9 @@ public final class SwiftTermHostModel: ObservableObject {
         // cards; Blur previews softens it like every other).
         guard let view = terminalEngine?.hostView, view.window != nil,
               view.bounds.width > 0, view.bounds.height > 0 else { return rememberedPreview }
+        #if os(visionOS)
+        TerminalRefreshCounts.shared.note(.pictures)
+        #endif
         let scale = min(1, CGFloat(max(1, min(maxPixelWidth, 1024))) / view.bounds.width,
                         640 / view.bounds.height)
         let format = UIGraphicsImageRendererFormat()
@@ -1046,6 +1062,9 @@ public final class SwiftTermHostModel: ObservableObject {
         guard nonce != lastNonce else { return }
         lastNonce = nonce
         noteOutputActivity()
+        #if os(visionOS)
+        TerminalRefreshCounts.shared.noteOutput(from: ObjectIdentifier(self), bytes: data.count)
+        #endif
         guard let terminalEngine,
               pendingFlushTask == nil,
               pendingChunks.isEmpty,
@@ -2256,6 +2275,82 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     /// The keyboard's accessory while it is withheld (`SwiftTermHostModel.setKeyboardAccessoryWithheld`).
     var withheldAccessory: UIView?
 
+    #if os(visionOS)
+    /// The rows SwiftTerm reported changed just before it asks for its repaint (`rangeChanged`).
+    var changedRows: (start: Int, end: Int)?
+    /// What each screen row showed when last repainted, so only rows that really changed are
+    /// repainted (`TerminalRowFingerprints`).
+    private var fingerprints = TerminalRowFingerprints()
+    /// The width and cell height the fingerprints were taken at: at another, every row draws anew.
+    private var fingerprintedGeometry = CGSize.zero
+    /// A selection changed: its highlight is no row's fingerprint, so its repaint is whole.
+    private var repaintsWhole = false
+
+    /// SwiftTerm 1.20 repaints the whole terminal for every update on iOS and visionOS
+    /// (`updateDisplay`: `setNeedsDisplay(bounds)`, a "TODO iOS"); the Mac repaints the rows that
+    /// changed. On Vision Pro every typed key showed as the screen refreshing (the owner,
+    /// 2026-10-29). The rows reported just before are repainted instead (`TerminalRepaintBand`); a
+    /// repaint with none reported — a selection, a resize, a theme — or while scrolled back stays
+    /// whole. SwiftTerm's main still repaints whole there (`TerminalRenderOwner.prepareFrame`): for
+    /// upstream.
+    ///
+    /// Of the rows named, only those that really changed: SwiftTerm names every row when a
+    /// synchronized update ends, and Claude Code sends each frame, a typed letter's too, as one
+    /// (`TerminalRowFingerprints`; the owner, 2026-10-29: "Every letter affects the screen"). Where
+    /// none changed, nothing is repainted.
+    override func setNeedsDisplay(_ rect: CGRect) {
+        let rows = changedRows
+        changedRows = nil
+        guard rect == bounds else { return super.setNeedsDisplay(rect) }
+        let terminal = getTerminal()
+        let screen = 0...max(0, terminal.rows - 1)
+        let fingerprint: (Int) -> Int = { TerminalRowFingerprint.of(terminal.getLine(row: $0), columns: terminal.cols) }
+        let geometry = CGSize(width: bounds.width, height: cellSize?.height ?? 0)
+        if geometry != fingerprintedGeometry {
+            fingerprintedGeometry = geometry
+            fingerprints.forget()
+        }
+        let atBottom = cellSize.map { bounds.maxY >= contentSize.height - $0.height / 2 } ?? false
+        let wantsWhole = repaintsWhole
+        repaintsWhole = false
+        guard let rows, !wantsWhole, TerminalRepaintBand.isOn, let cell = cellSize else {
+            TerminalRefreshCounts.shared.note(.wholeRepaints)
+            if atBottom { fingerprints.record(screen, fingerprint: fingerprint) } else { fingerprints.forget() }
+            return super.setNeedsDisplay(rect)
+        }
+        #if DEBUG
+        Self.repaintLog.debug("repaint rows \(rows.start)-\(rows.end) of \(terminal.rows) bounds \(self.bounds.debugDescription, privacy: .public) content \(self.contentSize.height) cell \(cell.height) atBottom \(atBottom)")
+        #endif
+        guard atBottom else {
+            TerminalRefreshCounts.shared.note(.wholeScrolledBack)
+            fingerprints.forget()
+            return super.setNeedsDisplay(rect)
+        }
+        // `updateFullScreen` — a theme, reverse colours — names a row past the last: all of it,
+        // whatever the cells hold, as their colours' values are not in a fingerprint.
+        guard rows.start >= 0, rows.start <= rows.end, rows.end < terminal.rows else {
+            TerminalRefreshCounts.shared.note(.wholeAllRows)
+            fingerprints.record(screen, fingerprint: fingerprint)
+            return super.setNeedsDisplay(rect)
+        }
+        guard let changed = fingerprints.changed(in: rows.start...rows.end, fingerprint: fingerprint) else {
+            TerminalRefreshCounts.shared.note(.unchangedRows)
+            return
+        }
+        guard let band = TerminalRepaintBand.rect(rows: (changed.lowerBound, changed.upperBound), screenRows: terminal.rows,
+                                                  cellHeight: cell.height, bounds: bounds), band != bounds else {
+            TerminalRefreshCounts.shared.note(.wholeAllRows)
+            return super.setNeedsDisplay(rect)
+        }
+        TerminalRefreshCounts.shared.note(.rowRepaints)
+        super.setNeedsDisplay(band)
+    }
+
+    #if DEBUG
+    private static let repaintLog = Logger(subsystem: "com.glasspowertools", category: "TerminalRepaint")
+    #endif
+    #endif
+
     /// The accessory, shown or withheld.
     var terminalAccessory: MinimalTerminalAccessoryView? {
         (inputAccessoryView ?? withheldAccessory) as? MinimalTerminalAccessoryView
@@ -2327,6 +2422,7 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         super.selectionChanged(source: source)
         allowMouseReporting = !selection.active
         #if os(visionOS)
+        repaintsWhole = true
         // Output takes the selection away and `SwiftTermSelectionKeeper` gives it back: only what
         // happens outside that is worth a line.
         if !isFeeding, selection.active != noted {
@@ -3300,7 +3396,8 @@ private final class SwiftTermEngine: TerminalEngine {
     private let onRendererDiagnostics: (SwiftTermRendererDiagnostics) -> Void
     private let onOSC52Decision: (SwiftTermOSC52Decision) -> Void
     private let performanceClock = ContinuousClock()
-    private let rendererPreference = SwiftTermRendererPreference.platformDefault
+    /// Read again at each activation: Vision Pro's can be switched (`platformDefault`).
+    private var rendererPreference: SwiftTermRendererPreference { .platformDefault }
     private var metalActivationAttempted = false
     /// Metal could not be started here; Core Graphics draws from then on.
     private var metalUnavailable = false
@@ -3334,7 +3431,13 @@ private final class SwiftTermEngine: TerminalEngine {
         terminalView.notifyUpdateChanges = true
         terminalView.isOpaque = false
         terminalView.backgroundColor = .clear
+        #if os(visionOS)
+        // A repaint of some rows (`TerminalRepaintBand`) starts from clear: what was there is drawn
+        // over by the theme's background only where it is opaque.
+        terminalView.clearsContextBeforeDrawing = true
+        #else
         terminalView.clearsContextBeforeDrawing = false
+        #endif
         terminalView.layer.cornerRadius = SwiftTermHostView.terminalViewCornerRadius
         terminalView.layer.masksToBounds = true
         terminalView.isAccessibilityElement = true
@@ -3364,9 +3467,46 @@ private final class SwiftTermEngine: TerminalEngine {
             self.onOSC52Decision(SwiftTermOSC52Policy.evaluate(request))
         }
         scrollWatcher = UIKitAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
+        #if os(visionOS)
+        rendererObservers = [
+            NotificationCenter.default.addObserver(forName: SwiftTermRendererPreference.changedNotification,
+                                                   object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.rendererPreferenceChanged() }
+            },
+            NotificationCenter.default.addObserver(forName: .terminalViewMetalRendererStatusDidChange,
+                                                   object: terminalView, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.metalStatusChanged() }
+            },
+        ]
+        #endif
     }
 
     private var scrollWatcher: UIKitAlternateScreenScrollWatcher?
+
+    #if os(visionOS)
+    private var rendererObservers: [NSObjectProtocol] = []
+    private var lastMetalStatus: MetalRendererStatus?
+
+    /// Settings' switch: Metal tried again, or Core Graphics, now.
+    private func rendererPreferenceChanged() {
+        metalActivationAttempted = false
+        metalUnavailable = false
+        activateRendererIfAttached()
+    }
+
+    /// Each frame Metal presents, counted; its state, when it changes, written down: whether Metal
+    /// really draws on the headset is what this proves.
+    private func metalStatusChanged() {
+        let status = terminalView.metalRendererStatus
+        defer { lastMetalStatus = status }
+        if status.presentedFrameCount != lastMetalStatus?.presentedFrameCount ?? 0 {
+            TerminalRefreshCounts.shared.note(.metalFrames)
+        }
+        if status.state != lastMetalStatus?.state {
+            TerminalSelectionDiagnostics.record?("renderer metal \(status.state) after \(status.presentedFrameCount) frames")
+        }
+    }
+    #endif
 
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
     var hostView: UIView { containerView }
@@ -3643,6 +3783,11 @@ private final class SwiftTermEngine: TerminalEngine {
             rendererBackingIsClear: rendererBackingIsClear,
             failureDescription: failureDescription
         )
+        #if os(visionOS)
+        if diagnostics.backend != rendererDiagnostics.backend {
+            TerminalSelectionDiagnostics.record?("renderer \(diagnostics.backend.rawValue)" + (failureDescription.map { " (\($0))" } ?? ""))
+        }
+        #endif
         rendererDiagnostics = diagnostics
         onRendererDiagnostics(diagnostics)
     }
@@ -4040,6 +4185,9 @@ public struct SwiftTermHostView: UIViewRepresentable {
             // An answer to the program's query: tmux has answered it already (control mode, D83).
             if let model, model.isTmuxControlClient, model.retainedRenderer()?.isFeedingOutput == true { return }
             model?.retainedRenderer()?.recordInput(byteCount: data.count)
+            #if os(visionOS)
+            if let model { TerminalRefreshCounts.shared.noteKeySent(to: ObjectIdentifier(model)) }
+            #endif
             onSendData(Data(data))
         }
 
@@ -4074,6 +4222,13 @@ public struct SwiftTermHostView: UIViewRepresentable {
             }
         }
         public func rangeChanged(source: TerminalView, startY: Int, endY: Int) {
+            #if os(visionOS)
+            // Only an update's own report, its range not yet cleared, comes before a repaint; a
+            // cursor's move alone reports with no range.
+            if let view = source as? ReviewingTerminalView, source.getTerminal().getUpdateRange() != nil {
+                view.changedRows = (startY, endY)
+            }
+            #endif
             Task { @MainActor [weak model] in
                 model?.recordDisplayRange(startY: startY, endY: endY)
             }
@@ -4719,6 +4874,9 @@ public struct SwiftTermHostView: NSViewRepresentable {
             // An answer to the program's query: tmux has answered it already (control mode, D83).
             if let model, model.isTmuxControlClient, model.retainedRenderer()?.isFeedingOutput == true { return }
             model?.retainedRenderer()?.recordInput(byteCount: data.count)
+            #if os(visionOS)
+            if let model { TerminalRefreshCounts.shared.noteKeySent(to: ObjectIdentifier(model)) }
+            #endif
             onSendData(Data(data))
         }
 
@@ -5069,7 +5227,7 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
                 onProcessOutput?(ArraySlice(bytes), start.duration(to: clock.now))
             case .transport(let bytes):
                 writeToTmux(bytes)
-            case .live, .exited, .showGrid:
+            case .live, .exited, .showGrid, .renamed:
                 onTmuxControlEvent?(action)
             }
         }
@@ -5512,6 +5670,8 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
                 }
             case .showGrid(let columns, let rows, let own):
                 self?.showTmuxGrid(columns: columns, rows: rows, own: own)
+            case .renamed(let name):
+                self?.delegateProxy.hostModel?.onTmuxSessionRenamed?(name)
             default:
                 break
             }

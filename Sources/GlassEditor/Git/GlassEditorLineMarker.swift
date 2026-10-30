@@ -49,6 +49,8 @@ final class GlassEditorLineMarker {
     }
 
     func start() {
+        // Room for the marks even with line numbers off (2026-10-28).
+        if document?.model.showsChangeMarks == false { document?.model.showsChangeMarks = true }
         watchRepository()
         watchText()
         baseMayHaveChanged()
@@ -59,6 +61,7 @@ final class GlassEditorLineMarker {
         reading?.cancel()
         comparing?.cancel()
         if document?.model.lineChanges.isEmpty == false { document?.model.lineChanges = [] }
+        if document?.model.showsChangeMarks == true { document?.model.showsChangeMarks = false }
     }
 
     /// Waits for the marks in flight (tests).

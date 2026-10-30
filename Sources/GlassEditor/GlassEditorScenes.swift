@@ -21,6 +21,7 @@ import AppKit
 import GlassShell
 import GlassLayers
 import GlassEditorCore
+import GlassEditorUI
 
 /// Owns the editor for the process. One per app, created in the composition root — the same shape
 /// as every other capability's runtime.
@@ -246,6 +247,10 @@ public final class GlassEditorRuntime {
                     hostID: workspace.projects.first?.hostID ?? GlassLocalHost.id,
                     activate: { [weak self] in self?.present(id) },
                     close: { [weak self] in self?.closeWorkspace(id) },
+                    // The window as it is, file list and all (2026-10-29; `GlassEditorWindowPicture`).
+                    snapshot: { [weak workspace] in
+                        workspace?.previewImage().map { Image(decorative: $0, scale: 1) }
+                    },
                     unsavedChanges: { [weak workspace] in workspace.flatMap(Self.unsavedChanges(in:)) },
                     openedFrom: workspace.openedFrom
                 )
@@ -832,6 +837,11 @@ struct GlassEditorCommands: Commands {
             // at selection time"*). A folder chosen here is a project in a window of its own.
             Button("Open…") { show(GlassEditorOpenPanel.run(runtime: runtime)) }
                 .keyboardShortcut("o", modifiers: .command)
+            // A repository from GitHub or anywhere, cloned into a folder on this Mac and opened as a
+            // project (2026-10-28). A folder on a server clones from its tree: Clone Repository Here….
+            Button("Clone Repository…") {
+                Task { show(await GlassEditorClonePanel.run(runtime: runtime)) }
+            }
             // **Open Recent belongs here**, not in the sidebar. The sidebar is a project's tree;
             // recents are the app's memory of what you have been in lately, which is a File-menu
             // fact on this platform and has been since long before this app (2026-09-17). Folders
@@ -872,12 +882,45 @@ struct GlassEditorCommands: Commands {
                 .keyboardShortcut("l", modifiers: [.command, .option])
                 .disabled(actions == nil)
 
-            Divider()
-
+        }
+        // The project's git (2026-10-28): its Source Control tab's parts, the remote, and the file in
+        // front's Blame and History. No new keys: ⌃⇧G, VS Code's for Changes, is the one it had.
+        CommandMenu("Git") {
             // What changed since the last commit (2026-10-23), on VS Code's key for it.
             Button("Show Changes") { actions?.showChanges?() }
                 .keyboardShortcut("g", modifiers: [.control, .shift])
                 .disabled(actions?.showChanges == nil)
+            Button("Show History") { actions?.git?.show(.history) }
+                .disabled(actions?.git == nil)
+            Button("Show Branches") { actions?.git?.show(.branches) }
+                .disabled(actions?.git == nil)
+            Button("Show Stashes") { actions?.git?.show(.stashes) }
+                .disabled(actions?.git == nil)
+            Button("Show Tags") { actions?.git?.show(.tags) }
+                .disabled(actions?.git == nil)
+
+            Divider()
+
+            Button("Pull") { actions?.git?.pull?() }
+                .disabled(actions?.git?.pull == nil)
+            Button("Push") { actions?.git?.push?() }
+                .disabled(actions?.git?.push == nil)
+            Button("Fetch") { actions?.git?.fetch?() }
+                .disabled(actions?.git?.fetch == nil)
+
+            Divider()
+
+            Button("New Branch…") { actions?.git?.ask(.newBranch) }
+                .disabled(actions?.git == nil)
+            Button("Stash Changes…") { actions?.git?.ask(.stash) }
+                .disabled(actions?.git?.hasChanges != true)
+
+            Divider()
+
+            Button("Blame") { actions?.git?.blame?() }
+                .disabled(actions?.git?.blame == nil)
+            Button("File History") { actions?.git?.fileHistory?() }
+                .disabled(actions?.git?.fileHistory == nil)
         }
     }
 }
@@ -910,6 +953,73 @@ enum GlassEditorOpenPanel {
     }
 }
 
+/// File ▸ Clone Repository…: the address, then where, then a window on the clone. A clone can take a
+/// while; a small panel says it is under way, and a failure says why in words that say what to do.
+@MainActor
+enum GlassEditorClonePanel {
+    static func run(runtime: GlassEditorRuntime) async -> [UUID] {
+        let ask = NSAlert()
+        ask.messageText = "Clone Repository"
+        ask.informativeText = "The repository's address, as its Clone or Code button gives it: git@github.com:owner/repo.git or https://github.com/owner/repo."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
+        field.placeholderString = "Address"
+        if let copied = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           GlassEditorGitRepository.cloneName(of: copied) != nil, copied.contains("git") || copied.hasPrefix("https://") {
+            field.stringValue = copied
+        }
+        ask.accessoryView = field
+        ask.addButton(withTitle: "Next…")
+        ask.addButton(withTitle: "Cancel")
+        ask.window.initialFirstResponder = field
+        guard ask.runModal() == .alertFirstButtonReturn else { return [] }
+        let address = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let name = GlassEditorGitRepository.cloneName(of: address) else {
+            tell("That Isn't a Repository's Address", "Copy it from the repository's Clone or Code button, then try again.")
+            return []
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Clone Here"
+        panel.message = "Choose the folder to clone \(name) into."
+        guard panel.runModal() == .OK, let parent = panel.url else { return [] }
+        let destination = parent.appendingPathComponent(name, isDirectory: true)
+        guard !FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) else {
+            tell("\(name) Is Already There", "Choose another folder, or move the one that's there aside.")
+            return []
+        }
+
+        let progress = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 320, height: 64), styleMask: [.titled],
+                               backing: .buffered, defer: false)
+        progress.title = "Cloning \(name)…"
+        let spinner = NSProgressIndicator(frame: NSRect(x: 144, y: 16, width: 32, height: 32))
+        spinner.style = .spinning
+        spinner.startAnimation(nil)
+        progress.contentView?.addSubview(spinner)
+        progress.center()
+        progress.orderFront(nil)
+        defer { progress.orderOut(nil) }
+
+        let cloner = GlassEditorGitRepository(projectPath: parent.path(percentEncoded: false), machine: nil,
+                                              runner: GlassEditorLocalGit.shared, access: GlassEditorLocalFileAccess())
+        guard await cloner.clone(address, named: name) else {
+            progress.orderOut(nil)
+            tell("Couldn't Clone \(name)", cloner.actionProblem ?? "Git couldn't clone \(address).")
+            return []
+        }
+        return runtime.open(urls: [destination])
+    }
+
+    private static func tell(_ title: String, _ message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.runModal()
+    }
+}
+
 /// What the focused editor window can do, published so the menu bar can ask without holding a view.
 /// Open… is not here: the menu runs its own panel, so it works with no editor window at all.
 @MainActor
@@ -920,18 +1030,36 @@ public struct GlassEditorActions {
     public let goToLine: () -> Void
     /// The project's Changes tab; nil when the window's project is in no repository.
     public let showChanges: (() -> Void)?
+    /// The rest of the Git menu; nil when the window's project has no repository ready.
+    public let git: GlassEditorGitMenuActions?
 
     public init(increaseFontSize: @escaping () -> Void,
                 decreaseFontSize: @escaping () -> Void,
                 resetFontSize: @escaping () -> Void,
                 goToLine: @escaping () -> Void,
-                showChanges: (() -> Void)? = nil) {
+                showChanges: (() -> Void)? = nil,
+                git: GlassEditorGitMenuActions? = nil) {
         self.increaseFontSize = increaseFontSize
         self.decreaseFontSize = decreaseFontSize
         self.resetFontSize = resetFontSize
         self.goToLine = goToLine
         self.showChanges = showChanges
+        self.git = git
     }
+}
+
+/// What the Git menu can do in the focused editor window; nil where there's nothing to do it to.
+@MainActor
+public struct GlassEditorGitMenuActions {
+    let show: (GlassEditorSourceControlSection) -> Void
+    let ask: (GlassEditorGitAsk) -> Void
+    let hasChanges: Bool
+    let pull: (() -> Void)?
+    let push: (() -> Void)?
+    let fetch: (() -> Void)?
+    /// For the file in front, when it is in the repository.
+    let blame: (() -> Void)?
+    let fileHistory: (() -> Void)?
 }
 
 private struct GlassEditorActionsKey: FocusedValueKey {

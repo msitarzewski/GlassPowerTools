@@ -104,7 +104,8 @@ public enum GutterLineNumbers {
                 configuration: model.configuration
             ),
         ]
-        for label in visible {
+        // With numbers off, the gutter is only wide enough for the change marks.
+        for label in visible where model.configuration.showsLineNumbers {
             let text = "\(label.number)" as NSString
             let size = text.size(withAttributes: attributes)
             // Right-aligned against the gutter's trailing edge, and top-aligned

@@ -18,6 +18,8 @@
 //    Mac; the editor's own viewers on Vision Pro (2026-10-22), where Quick Look only takes over the
 //    whole window.
 //  - A 3D model: RealityKit, turned with the pointer (`GlassModelView`, D78).
+//  - A log, as the terminal names one: its end, kept up with as it grows (the owner, 2026-10-29:
+//    "Should tail the output :)"). From a server it is the end as fetched.
 //  - Anything else: what it is, and its size; Open in Editor is beside it.
 //
 
@@ -34,12 +36,15 @@ import AVKit
 
 public struct GlassEditorQuickPreview: View {
     let url: URL
+    /// A log: shown from its end and followed (`GlassEditorLogTail`), when its bytes are text.
+    let tails: Bool
 
     @State private var shown: Shown?
     @Environment(\.colorScheme) private var colorScheme
 
-    public init(url: URL) {
+    public init(url: URL, tails: Bool = false) {
         self.url = url
+        self.tails = tails
     }
 
     /// How much of a text file is shown: a long log's first pages, said to be its first.
@@ -50,6 +55,8 @@ public struct GlassEditorQuickPreview: View {
         /// Text in the editor's view, highlighted for its language, not to be changed here.
         case code(GlassEditorDocument)
         case text(String, size: UInt64)
+        /// A log's end, followed.
+        case tail
         #if os(macOS)
         /// A picture whose name doesn't say so: Quick Look would go by the name.
         case image(NSImage)
@@ -72,6 +79,8 @@ public struct GlassEditorQuickPreview: View {
                     .onChange(of: colorScheme) { _, scheme in document.model.theme = Self.theme(for: scheme) }
             case .text(let text, let size):
                 textView(text, size: size)
+            case .tail:
+                GlassEditorLogTail(url: url)
             #if os(macOS)
             case .image(let image):
                 Image(nsImage: image)
@@ -101,7 +110,7 @@ public struct GlassEditorQuickPreview: View {
                 ProgressView()
             }
         }
-        .task(id: url) { shown = await Self.decide(url) }
+        .task(id: url) { shown = await Self.decide(url, tails: tails) }
     }
 
     private func textView(_ text: String, size: UInt64) -> some View {
@@ -131,7 +140,7 @@ public struct GlassEditorQuickPreview: View {
     }
 
     /// What `url` is, read from its first bytes, and how to show it.
-    static func decide(_ url: URL) async -> Shown {
+    static func decide(_ url: URL, tails: Bool = false) async -> Shown {
         let name = url.lastPathComponent
         guard let head = try? await GlassEditorLocalFileAccess.head(atPath: url.path, length: textLimit) else {
             #if os(macOS)
@@ -142,6 +151,8 @@ public struct GlassEditorQuickPreview: View {
         }
         let kind = GlassEditorFileKind.classify(name: name, prefix: head.head.prefix(GlassEditorFileKind.sniffLength))
         switch kind {
+        case .text where tails:
+            return .tail
         case .text:
             if let document = try? await GlassEditorDocument.open(path: url.path, through: GlassEditorLocalFileAccess(),
                                                                   asText: true) {
@@ -175,6 +186,66 @@ public struct GlassEditorQuickPreview: View {
         case .binary:
             return .nothing(.binary, size: head.size)
         }
+    }
+}
+#endif
+
+#if os(macOS) || os(visionOS)
+/// A log's end, read again each second while it is shown, so the lines a program is writing arrive
+/// as it writes them; held at the bottom, where they come.
+struct GlassEditorLogTail: View {
+    let url: URL
+
+    /// How much of the end is shown: pages of a log, never the whole of a large one.
+    nonisolated static let tailLimit = 64 * 1024
+
+    @State private var text = ""
+    @State private var size: UInt64 = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView([.vertical, .horizontal]) {
+                Text(verbatim: text)
+                    .font(.system(.callout, design: .monospaced))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
+                    .padding(10)
+            }
+            .defaultScrollAnchor(.bottomLeading)
+            Divider()
+            Label(size > UInt64(Self.tailLimit)
+                  ? "The end of \(ByteCountFormatter.string(fromByteCount: Int64(clamping: size), countStyle: .file)), as it grows"
+                  : "As it grows",
+                  systemImage: "arrow.down.to.line")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+        }
+        .task(id: url) {
+            while !Task.isCancelled {
+                if let end = await Self.end(of: url), end.size != size || text.isEmpty {
+                    size = end.size
+                    text = end.text
+                }
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+            }
+        }
+    }
+
+    /// The file's last `tailLimit` bytes from the start of a line, and its size; off the main actor.
+    static func end(of url: URL) async -> (text: String, size: UInt64)? {
+        await Task.detached(priority: .utility) {
+            guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+            defer { try? handle.close() }
+            guard let size = try? handle.seekToEnd() else { return nil }
+            let start = size > UInt64(tailLimit) ? size - UInt64(tailLimit) : 0
+            guard (try? handle.seek(toOffset: start)) != nil, var bytes = try? handle.readToEnd() else { return nil }
+            // From a line's start, so a character cut in half doesn't open it.
+            if start > 0, let newline = bytes.firstIndex(of: 0x0A) { bytes = bytes[bytes.index(after: newline)...] }
+            return (String(decoding: bytes, as: UTF8.self), size)
+        }.value
     }
 }
 #endif

@@ -343,6 +343,11 @@ struct GlassPowerToolsApp: App {
         terminal.isThisMacServer = { [weak model] serverID in
             model?.host(owningEndpoint: EndpointID(rawValue: serverID))?.isThisMac == true
         }
+        // The same link the other way: the saved Terminal service other devices reach this Mac by.
+        terminal.thisMacServerID = { [weak model] in
+            guard let host = model?.hosts.first(where: \.isThisMac) else { return nil }
+            return host.services.first { $0.kind == .ssh && !host.isBuiltIn($0.endpointID) }?.endpointID.rawValue
+        }
         // The SQL, unrun, in a new query tab; connected first as the library's Connect does, from a
         // Connections window, where the database asks for a password and says what failed.
         terminal.openSQL = { [weak model] sql, connection in
@@ -469,7 +474,10 @@ struct GlassPowerToolsApp: App {
         #if os(macOS) || os(visionOS)
         // A path a terminal printed, previewed over it as the editor previews files (2026-10-16; the
         // headset 2026-10-22).
-        terminal.filePreview = { url in AnyView(GlassEditorQuickPreview(url: url)) }
+        // A log, as the terminal names one, from its end and followed (2026-10-29).
+        terminal.filePreview = { url in
+            AnyView(GlassEditorQuickPreview(url: url, tails: GlassTerminalRuntime.namesLog(url.lastPathComponent)))
+        }
         #endif
         // A Mermaid diagram a terminal shows as text, drawn from the mark beside it (2026-10-21).
         terminal.diagramView = { source in AnyView(GlassEditorDiagramView(source: source)) }
@@ -789,8 +797,8 @@ struct GlassPowerToolsApp: App {
 
     var body: some Scene {
         mainScene
-        // The Files window carries the editor's presenter: Open in Editor there has to show a
-        // window when Connections, the other place that can, is closed.
+        // Terminal and Files windows carry the editor's presenter: Open in Editor there has to show
+        // a window when Connections, the other place that can, is closed.
         GlassTerminalScenes(runtime: terminal) { [editor] in
             AnyView(Color.clear.accessibilityHidden(true).glassEditorWindowPresenter(editor))
         }

@@ -38,6 +38,7 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         coordinator.textView = textView
 
         installViews()
+        model.previewDrawer = { [weak self] width in self?.drawPreview(maxPixelWidth: width) }
         applyThemeToCanvas()
         loadInitialContent()
         textView.assertUsingTextKit2()
@@ -68,17 +69,32 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         }
     }
 
-    /// `GlassEditorModel.lineChanges`: the gutter's change marks, redrawn when they change.
+    /// `GlassEditorModel.lineChanges`: the gutter's change marks, redrawn when they change — and
+    /// the gutter kept wide enough for them when line numbers are off.
     private func observeLineChanges() {
         withObservationTracking { [weak self] in
             _ = self?.model.lineChanges
+            _ = self?.model.showsChangeMarks
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                if self.gutterWidthConstraint?.constant != self.gutterWidth { self.applyGutterWidth() }
                 self.gutter?.refresh()
                 self.observeLineChanges()
             }
         }
+    }
+
+    /// The gutter's width for what it shows now: numbers, change marks alone, or nothing.
+    private var gutterWidth: CGFloat {
+        EditorMetrics.gutterWidth(showsLineNumbers: model.configuration.showsLineNumbers,
+                                  showsChangeMarks: model.showsChangeMarks)
+    }
+
+    private func applyGutterWidth() {
+        gutterWidthConstraint?.constant = gutterWidth
+        gutter?.isHidden = gutterWidth == 0
+        containerView.setNeedsLayout()
     }
 
     /// Scrolls to the range's own rectangle. `scrollRangeToVisible` did nothing for text TextKit 2
@@ -207,6 +223,26 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         }
     }
 
+    /// The gutter and the text as they are on screen, at most `maxPixelWidth` wide: the model's
+    /// `previewImage`, for All Windows. Draws a copy; the scroll position and selection stay.
+    private func drawPreview(maxPixelWidth: Int) -> CGImage? {
+        let view = containerView
+        guard view.window != nil, view.bounds.width > 0, view.bounds.height > 0 else { return nil }
+        let scale = min(view.traitCollection.displayScale, CGFloat(max(1, maxPixelWidth)) / view.bounds.width)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let size = CGSize(width: view.bounds.width * scale, height: view.bounds.height * scale)
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            // What is on screen as it is composited; the layer where a snapshot cannot be had.
+            if !view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: false) {
+                context.cgContext.scaleBy(x: scale, y: scale)
+                view.layer.render(in: context.cgContext)
+            }
+        }
+        return image.cgImage
+    }
+
     private func installViews() {
         let gutterView = GlassLineNumberGutterIOS(textView: textView, model: model)
         gutterView.translatesAutoresizingMaskIntoConstraints = false
@@ -215,11 +251,9 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         containerView.addSubview(gutterView)
         containerView.addSubview(textView)
 
-        let width = gutterView.widthAnchor.constraint(
-            equalToConstant: model.configuration.showsLineNumbers ? EditorMetrics.gutterWidth : 0
-        )
+        let width = gutterView.widthAnchor.constraint(equalToConstant: gutterWidth)
         gutterWidthConstraint = width
-        gutterView.isHidden = !model.configuration.showsLineNumbers
+        gutterView.isHidden = gutterWidth == 0
 
         NSLayoutConstraint.activate([
             gutterView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
@@ -301,10 +335,7 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
             textView.wrapsLines = current.wrapsLines
         }
         if previous.showsLineNumbers != current.showsLineNumbers {
-            gutterWidthConstraint?.constant =
-                current.showsLineNumbers ? EditorMetrics.gutterWidth : 0
-            gutter?.isHidden = !current.showsLineNumbers
-            containerView.setNeedsLayout()
+            applyGutterWidth()
         }
         coordinator.configurationDidChange(on: textView)
         // See the AppKit note: family and contrast floor change the ink without

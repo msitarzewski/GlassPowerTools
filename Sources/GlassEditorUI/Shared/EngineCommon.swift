@@ -45,6 +45,13 @@ public enum EditorMetrics {
     /// the gap after the numbers, where VS Code and Zed put theirs.
     public static let changeMarkWidth: CGFloat = 3
     public static let changeMarkTrailingInset: CGFloat = 3
+    /// The gutter with line numbers off while a file's changes are marked: room for the bar alone.
+    public static let changeMarkGutterWidth: CGFloat = 8
+
+    /// How wide the gutter is for what it shows: numbers (and marks), marks alone, or nothing.
+    public static func gutterWidth(showsLineNumbers: Bool, showsChangeMarks: Bool) -> CGFloat {
+        showsLineNumbers ? gutterWidth : (showsChangeMarks ? changeMarkGutterWidth : 0)
+    }
 }
 
 // MARK: - Color bridging

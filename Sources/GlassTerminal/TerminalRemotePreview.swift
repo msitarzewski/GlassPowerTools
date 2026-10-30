@@ -18,6 +18,8 @@ import GlassTerminalEmulator
 enum TerminalRemotePreview {
     /// A preview fetches no more than this: a large picture or PDF, not a disk image.
     static let byteLimit: UInt64 = 32 * 1024 * 1024
+    /// Of a log, only its end, whatever its size: the preview shows a log's last lines (2026-10-29).
+    static let logTailBytes: UInt64 = 256 * 1024
 
     /// The file at `path` — absolute, on `session`'s host — copied here, or nil when it can't be
     /// read, isn't a regular file, or is larger than `byteLimit`.
@@ -43,10 +45,12 @@ enum TerminalRemotePreview {
             Logger.pathPreview.error("event=fetch result=stat-failed error=\(error.localizedDescription, privacy: .public)")
             return nil
         }
-        guard let size, size <= byteLimit else {
+        let isLog = TerminalLogFile.isLog(path)
+        guard let size, isLog || size <= byteLimit else {
             Logger.pathPreview.notice("event=fetch result=too-large size=\(size ?? 0, privacy: .public)")
             return nil
         }
+        if isLog { return await readEnd(of: path, size: size, through: client) }
         do {
             let file = try await client.openFile(filePath: path, flags: .read)
             let buffer = try? await file.readAll()
@@ -58,6 +62,26 @@ enum TerminalRemotePreview {
             return Data(buffer: buffer)
         } catch {
             Logger.pathPreview.error("event=fetch result=open-failed error=\(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    /// A log's last `logTailBytes`, read in turn until the end: a server may answer a read with less.
+    private static func readEnd(of path: String, size: UInt64, through client: SFTPClient) async -> Data? {
+        do {
+            let file = try await client.openFile(filePath: path, flags: .read)
+            var offset = size > logTailBytes ? size - logTailBytes : 0
+            var data = Data()
+            while offset < size {
+                let chunk = try await file.read(from: offset, length: UInt32(min(size - offset, 64 * 1024)))
+                guard chunk.readableBytes > 0 else { break }
+                data.append(Data(buffer: chunk))
+                offset += UInt64(chunk.readableBytes)
+            }
+            try? await file.close()
+            return data
+        } catch {
+            Logger.pathPreview.error("event=fetch result=tail-failed error=\(error.localizedDescription, privacy: .public)")
             return nil
         }
     }

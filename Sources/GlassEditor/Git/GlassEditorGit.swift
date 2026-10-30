@@ -58,10 +58,18 @@ public protocol GlassEditorGitRunner {
     /// The same, given `timeLimit` seconds instead of a minute: a push, a pull or a fetch, which
     /// wait on the network.
     func git(_ arguments: [String], in directory: String, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput
+    /// The same, with `input` on git's standard input: a patch for `git apply -`, which stages,
+    /// unstages or discards one hunk or chosen lines (2026-10-28).
+    func git(_ arguments: [String], in directory: String, input: Data) async throws -> GlassEditorCommandOutput
 }
 
 public extension GlassEditorGitRunner {
     func git(_ arguments: [String], in directory: String, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput {
+        try await git(arguments, in: directory)
+    }
+
+    /// A runner that keeps no input (a test's script) answers as without it.
+    func git(_ arguments: [String], in directory: String, input: Data) async throws -> GlassEditorCommandOutput {
         try await git(arguments, in: directory)
     }
 }
@@ -105,8 +113,11 @@ enum GlassEditorGitCommand {
     /// The project's folder inside its repository: "" at the root, "Sources/App/" below it.
     static let prefix = global + ["rev-parse", "--show-prefix"]
 
-    /// Every change under the project's folder, with the branch, in the format git keeps stable.
-    static let status = global + ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all", "--", "."]
+    /// Every change under the project's folder, with the branch, in the format git keeps stable;
+    /// and what `.gitignore` leaves out, for the tree to dim (2026-10-29). `matching` names an
+    /// ignored folder once, as `.build/`, never the files in it (Git 2.16 or later).
+    static let status = global + ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all",
+                                  "--ignored=matching", "--", "."]
 
     /// The working tree against `base`: everything since the last commit, staged or not.
     static func diff(against base: String) -> [String] {
@@ -181,6 +192,199 @@ enum GlassEditorGitCommand {
     static func changed(from old: String, to new: String) -> [String] {
         global + ["diff", "--name-only", "--no-relative", "-z", old, new]
     }
+
+    // MARK: Everything else (2026-10-28: "build git now, end to end, first class (diff viewer, all of it!)")
+
+    /// The diff options every diff here shares, as `diff(against:)` has them; `context` lines around
+    /// each change (git's 3 when nil), whitespace ignored when asked.
+    static func diffOptions(context: Int? = nil, ignoringWhitespace: Bool = false) -> [String] {
+        ["--no-color", "--no-ext-diff", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/", "-M"]
+            + (context.map { ["-U\($0)"] } ?? []) + (ignoringWhitespace ? ["-w"] : [])
+    }
+
+    /// The working tree against the index: what is not staged yet.
+    static func unstagedDiff(context: Int? = nil, ignoringWhitespace: Bool = false) -> [String] {
+        global + ["diff"] + diffOptions(context: context, ignoringWhitespace: ignoringWhitespace) + ["--", "."]
+    }
+
+    /// The index against `base`: what the next commit would hold.
+    static func stagedDiff(against base: String, context: Int? = nil, ignoringWhitespace: Bool = false) -> [String] {
+        global + ["diff", "--cached"] + diffOptions(context: context, ignoringWhitespace: ignoringWhitespace) + [base, "--", "."]
+    }
+
+    /// A patch on standard input applied to the index (`cached`), the working tree, or backwards.
+    static func apply(toIndex cached: Bool, reverse: Bool) -> [String] {
+        global + ["apply"] + (cached ? ["--cached"] : []) + (reverse ? ["--reverse"] : []) + ["--whitespace=nowarn", "-"]
+    }
+
+    /// The repository's own folder, absolute: where git keeps the state of a merge or a rebase.
+    static let gitDirectory = global + ["rev-parse", "--absolute-git-dir"]
+
+    /// Files back as the index has them: their unstaged changes thrown away.
+    static func restoreFromIndex(_ repositoryPaths: [String]) -> [String] {
+        global + ["checkout", "-q", "--"] + repositoryPaths.map(exactly)
+    }
+
+    /// Files back as the last commit has them, in the index and the working tree.
+    static func restoreFromHead(_ repositoryPaths: [String]) -> [String] {
+        global + ["checkout", "-q", "HEAD", "--"] + repositoryPaths.map(exactly)
+    }
+
+    /// Files git doesn't know yet, deleted.
+    static func removeUntracked(_ repositoryPaths: [String]) -> [String] {
+        global + ["clean", "-f", "-q", "--"] + repositoryPaths.map(exactly)
+    }
+
+    /// Files added since the last commit, out of the index and off the disk.
+    static func removeAdded(_ repositoryPaths: [String]) -> [String] {
+        global + ["rm", "-q", "-f", "--"] + repositoryPaths.map(exactly)
+    }
+
+    /// The last commit made again with what is staged now, and `message` (its own when nil).
+    static func amend(message: String?) -> [String] {
+        global + ["commit", "--quiet", "--amend"] + (message.map { ["-m", $0] } ?? ["--no-edit"])
+    }
+
+    // MARK: Branches and tags
+
+    /// Every local and remote branch: name, commit, upstream, how far ahead and behind it, when its
+    /// commit was made, its first line, whether it is checked out. NUL between fields, one a line.
+    static let branches = global + ["for-each-ref",
+        "--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(committerdate:unix)%00%(subject)%00%(HEAD)",
+        "refs/heads", "refs/remotes"]
+
+    /// Every tag: name, its commit, the tag object's own (an annotated tag's), when, its first line.
+    static let tags = global + ["for-each-ref", "--sort=-creatordate",
+        "--format=%(refname:short)%00%(objectname)%00%(*objectname)%00%(creatordate:unix)%00%(subject)", "refs/tags"]
+
+    static func checkout(_ branch: String) -> [String] { global + ["checkout", "-q", branch] }
+
+    /// A remote branch, checked out as a local branch of the same name that follows it.
+    static func checkoutTracking(_ remoteBranch: String, as local: String) -> [String] {
+        global + ["checkout", "-q", "-b", local, "--track", remoteBranch]
+    }
+
+    /// A commit on its own, no branch (a detached HEAD).
+    static func checkoutDetached(_ commit: String) -> [String] { global + ["checkout", "-q", "--detach", commit] }
+
+    /// A new branch at `start` (HEAD when nil), checked out or not.
+    static func createBranch(_ name: String, at start: String?, checkingOut: Bool) -> [String] {
+        global + (checkingOut ? ["checkout", "-q", "-b", name] : ["branch", name]) + (start.map { [$0] } ?? [])
+    }
+
+    static func renameBranch(_ old: String, to new: String) -> [String] { global + ["branch", "-m", old, new] }
+
+    /// `force` deletes a branch whose commits are on no other branch.
+    static func deleteBranch(_ name: String, force: Bool) -> [String] { global + ["branch", force ? "-D" : "-d", name] }
+
+    static func deleteRemoteBranch(_ name: String, on remote: String) -> [String] {
+        global + ["push", "--quiet", remote, "--delete", name]
+    }
+
+    static func setUpstream(of branch: String, to upstream: String) -> [String] {
+        global + ["branch", "--set-upstream-to=" + upstream, branch]
+    }
+
+    /// A tag at `commit`: annotated when it has a message.
+    static func createTag(_ name: String, at commit: String, message: String?) -> [String] {
+        global + ["tag"] + (message.map { ["-a", "-m", $0] } ?? []) + [name, commit]
+    }
+
+    static func deleteTag(_ name: String) -> [String] { global + ["tag", "-d", name] }
+
+    static func pushTag(_ name: String, to remote: String) -> [String] {
+        global + ["push", "--quiet", remote, "refs/tags/" + name]
+    }
+
+    static func deleteRemoteTag(_ name: String, on remote: String) -> [String] {
+        global + ["push", "--quiet", remote, "--delete", "refs/tags/" + name]
+    }
+
+    /// The remotes with their addresses: "origin\tgit@github.com:a/b.git (fetch)".
+    static let remotesWithAddresses = global + ["remote", "-v"]
+
+    // MARK: Combining work
+
+    /// No editor ever opens: there is no terminal for one. A merge, a rebase, a cherry-pick or a
+    /// revert that would ask for a message takes the one git wrote.
+    static let noEditor = ["-c", "core.editor=true"]
+
+    static func merge(_ ref: String) -> [String] { global + noEditor + ["merge", "--no-edit", ref] }
+    static func rebase(onto ref: String) -> [String] { global + noEditor + ["rebase", ref] }
+    static func cherryPick(_ commit: String) -> [String] { global + noEditor + ["cherry-pick", commit] }
+    static func revert(_ commit: String) -> [String] { global + noEditor + ["revert", "--no-edit", commit] }
+
+    /// A pull that merges or rebases when the branch and its upstream have both moved on.
+    static func pull(rebasing: Bool) -> [String] {
+        global + noEditor + ["pull", rebasing ? "--rebase" : "--no-rebase", "--no-edit", "--quiet"]
+    }
+
+    /// Going on with, or giving up, the operation under way (`GlassEditorGitOperation`).
+    static func operation(_ verb: String, _ step: String) -> [String] { global + noEditor + [verb, "--" + step] }
+
+    /// A merge's conflicts resolved and staged: its commit, with the message git prepared.
+    static let concludeMerge = global + noEditor + ["commit", "--no-edit", "--quiet"]
+
+    enum ResetMode: String, Sendable { case soft, mixed, hard }
+    static func reset(to commit: String, mode: ResetMode) -> [String] { global + ["reset", "--" + mode.rawValue, "-q", commit] }
+
+    // MARK: History
+
+    /// Commits, newest first, fields NUL-separated and each commit ended by a record separator:
+    /// hash, parents, author, email, when (Unix), the refs at it, first line, the rest.
+    static func log(limit: Int, skip: Int, allBranches: Bool, path: String? = nil) -> [String] {
+        global + ["log", "--date-order", "-n", String(limit), "--skip=\(skip)",
+                  "--format=%H%x00%P%x00%an%x00%ae%x00%at%x00%D%x00%s%x00%b%x1e"]
+            // Every branch, remote branch and tag, and HEAD: `--all` would bring in the stash's
+            // own commits too (rendered, 2026-10-28).
+            + (allBranches && path == nil ? ["--branches", "--remotes", "--tags", "HEAD"] : [])
+            + (path.map { ["--follow", "--", $0] } ?? [])
+    }
+
+    /// One commit's changes: against its first parent, as a merge's are usually read; a first
+    /// commit against nothing.
+    static func commitDiff(_ commit: String, parent: String?, context: Int? = nil, ignoringWhitespace: Bool = false) -> [String] {
+        if let parent {
+            return global + ["diff"] + diffOptions(context: context, ignoringWhitespace: ignoringWhitespace) + [parent, commit]
+        }
+        return global + ["show", "--format=", "--root"] + diffOptions(context: context, ignoringWhitespace: ignoringWhitespace) + [commit]
+    }
+
+    /// Who last changed each line of a file, read as git's porcelain format.
+    static func blame(_ projectRelativePath: String) -> [String] {
+        global + ["blame", "--porcelain", "-M", "--", projectRelativePath]
+    }
+
+    // MARK: Stashes
+
+    /// Each stash: its name (`stash@{0}`), commit, when, and what it says.
+    static let stashes = global + ["stash", "list", "--format=%gd%x00%H%x00%at%x00%gs"]
+
+    static func stash(message: String?, includingUntracked: Bool) -> [String] {
+        global + ["stash", "push", "--quiet"] + (includingUntracked ? ["--include-untracked"] : [])
+            + (message.map { ["-m", $0] } ?? [])
+    }
+
+    /// `apply`, `pop` or `drop` one stash; applying puts staged changes back staged when it can.
+    static func stashAction(_ verb: String, _ stash: String) -> [String] {
+        global + ["stash", verb] + (verb == "drop" ? ["--quiet"] : ["--index", "--quiet"]) + [stash]
+    }
+
+    /// A stash's changes against the commit it was made on.
+    static func stashDiff(_ stash: String) -> [String] {
+        global + ["stash", "show", "-p"] + diffOptions() + [stash]
+    }
+
+    /// A stash's new files, kept in its third parent when it was made with them.
+    static func stashUntrackedDiff(_ stashCommit: String) -> [String] {
+        global + ["show", "--format=", "--root"] + diffOptions() + [stashCommit + "^3"]
+    }
+
+    // MARK: Cloning
+
+    static func clone(_ address: String, into folder: String) -> [String] {
+        global + ["clone", "--quiet", "--", address, folder]
+    }
 }
 
 // MARK: This Mac
@@ -199,13 +403,23 @@ public struct GlassEditorLocalGit: GlassEditorGitRunner {
     }
 
     public func git(_ arguments: [String], in directory: String, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput {
+        try await git(arguments, in: directory, input: nil, timeLimit: timeLimit)
+    }
+
+    public func git(_ arguments: [String], in directory: String, input: Data) async throws -> GlassEditorCommandOutput {
+        try await git(arguments, in: directory, input: input, timeLimit: Self.timeLimit)
+    }
+
+    private func git(_ arguments: [String], in directory: String, input: Data?, timeLimit: TimeInterval) async throws -> GlassEditorCommandOutput {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let executable = Self.executable else {
                     continuation.resume(throwing: GlassEditorGitError.notInstalled)
                     return
                 }
-                continuation.resume(with: Result { try Self.run(executable, arguments, in: directory, timeLimit: timeLimit) })
+                continuation.resume(with: Result {
+                    try Self.run(executable, arguments, in: directory, input: input, timeLimit: timeLimit)
+                })
             }
         }
     }
@@ -242,21 +456,31 @@ public struct GlassEditorLocalGit: GlassEditorGitRunner {
 
     /// Runs it and reads both streams at once: a diff larger than a pipe's buffer stops git until
     /// it is read, and reading one stream to its end first would wait for ever on the other.
-    nonisolated static func run(_ executable: String, _ arguments: [String],
-                                in directory: String, timeLimit: TimeInterval = GlassEditorLocalGit.timeLimit) throws -> GlassEditorCommandOutput {
+    nonisolated static func run(_ executable: String, _ arguments: [String], in directory: String, input: Data? = nil,
+                                timeLimit: TimeInterval = GlassEditorLocalGit.timeLimit) throws -> GlassEditorCommandOutput {
         let process = Process()
         process.executableURL = URL(filePath: executable)
         process.arguments = arguments
         process.currentDirectoryURL = URL(filePath: directory, directoryHint: .isDirectory)
         var environment = ProcessInfo.processInfo.environment
-        // Never ask for a password: there is no terminal to ask in.
+        // Never ask for a password, or open an editor: there is no terminal for either. A merge, a
+        // rebase or a revert takes the message git wrote (`GlassEditorGitCommand.noEditor`).
         environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment["GIT_EDITOR"] = "true"
         process.environment = environment
         let standardOutput = Pipe(), standardError = Pipe()
         process.standardOutput = standardOutput
         process.standardError = standardError
-        process.standardInput = FileHandle.nullDevice
+        let standardInput = input.map { _ in Pipe() }
+        process.standardInput = standardInput ?? FileHandle.nullDevice
         try process.run()
+        if let input, let standardInput {
+            // Written from its own thread: a patch larger than the pipe holds waits on git reading it.
+            DispatchQueue.global().async {
+                try? standardInput.fileHandleForWriting.write(contentsOf: input)
+                try? standardInput.fileHandleForWriting.close()
+            }
+        }
 
         let state = RunState()
         let timer = DispatchWorkItem { [process] in
@@ -336,9 +560,39 @@ public struct GlassEditorRemoteGit: GlassEditorGitRunner {
         return output
     }
 
-    /// `git -C <directory> <arguments>`, each word quoted when it needs to be.
+    /// The input goes in the command line, as the format of `/usr/bin/printf` (POSIX's, whichever
+    /// shell the account has — fish's own `printf` is not quite it), piped into git: an exec channel
+    /// here has no standard input to write to.
+    public func git(_ arguments: [String], in directory: String, input: Data) async throws -> GlassEditorCommandOutput {
+        guard input.count <= Self.inputCeiling else { throw GlassEditorGitError.tooMuchOutput }
+        let line = "/usr/bin/printf " + Self.printfFormat(input) + " | " + Self.commandLine(arguments, in: directory)
+        let output = try await command(line, .seconds(60))
+        if output.exitStatus == 127 { throw GlassEditorGitError.notInstalled }
+        return output
+    }
+
+    /// The most input sent in a command line: a hunk's patch is a few kilobytes.
+    nonisolated static let inputCeiling = 192 * 1024
+
+    /// `input` as a single-quoted `printf` format that writes it back byte for byte: letters, digits
+    /// and ordinary punctuation as they are, everything else — `%`, `\`, a quote, a newline, any
+    /// byte outside ASCII — as `\ooo`.
+    nonisolated static func printfFormat(_ input: Data) -> String {
+        var format = "'"
+        for byte in input {
+            let plain = (0x20...0x7E).contains(byte) && byte != UInt8(ascii: "%") && byte != UInt8(ascii: "\\")
+                && byte != UInt8(ascii: "'")
+            if plain { format.append(Character(UnicodeScalar(byte))) } else { format += String(format: "\\%03o", byte) }
+        }
+        return format + "'"
+    }
+
+    /// `git -C <directory> <arguments>`, each word quoted when it needs to be. A command that must
+    /// never open an editor sets `GIT_EDITOR` too, which a shell's profile could set and which
+    /// outranks `core.editor`.
     nonisolated static func commandLine(_ arguments: [String], in directory: String) -> String {
-        (["git", "-C", directory] + arguments).map(shellWord).joined(separator: " ")
+        let words = (["git", "-C", directory] + arguments).map(shellWord).joined(separator: " ")
+        return arguments.contains("core.editor=true") ? "env GIT_EDITOR=true " + words : words
     }
 
     /// A word as the shell should read it: bare when it is only characters no shell treats

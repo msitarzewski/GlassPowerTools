@@ -547,7 +547,11 @@ struct TerminalConnectFlow: ViewModifier {
             showOpenWorkgroup(preset.id)
             return
         }
-        if substitutions == nil && preset.sessionIntents.contains(where: { $0.kind == .local }) {
+        // Stand-ins only for Mac terminals whose Mac this device can't reach: the others open on
+        // their Mac, on their own sessions (2026-10-29).
+        if substitutions == nil && preset.sessionIntents.contains(where: {
+            $0.kind == .local && LayoutRestorationPlan.mac(of: $0, in: serverManager.servers) == nil
+        }) {
             substitutionReviewPreset = preset
             return
         }

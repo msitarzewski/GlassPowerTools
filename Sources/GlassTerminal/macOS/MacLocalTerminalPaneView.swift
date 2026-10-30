@@ -37,6 +37,8 @@ struct MacLocalTerminalPaneView: View {
     @Environment(MacWorkspaceWindowController.self) private var terminalWindow: MacWorkspaceWindowController?
     /// That window's settings, which this pane draws and behaves with.
     @Environment(\.glassWindowOverrides) private var windowSettings
+    /// Split Right and Split Down, for the gear menu.
+    @Environment(\.macPaneSplit) private var paneSplit
     @ObservedObject var hostModel: SwiftTermHostModel
     @ObservedObject var processState: SwiftTermLocalProcessState
     @State private var aiAssistant = AIAssistant()
@@ -193,12 +195,7 @@ struct MacLocalTerminalPaneView: View {
         .toolbar {
             if isFocused {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    Button("Connections", systemImage: "server.rack") {
-                        openWindow(id: "main")
-                    }
-                    .labelStyle(.iconOnly)
-                    .help("Connections")
-
+                    // Connections is the window's ⚡ (`MacWorkspaceView`).
                     if aiAssistant.isAvailable {
                         Button("AI Assistant", systemImage: "sparkles") {
                             presentAIAssistant()
@@ -412,8 +409,9 @@ struct MacLocalTerminalPaneView: View {
 
     private var localToolsMenu: some View {
         // What the toolbar doesn't already have (2026-10-20, the owner: "remove the duplicate items
-        // in the menu that exist in the toolbar too"): Connections, AI Assistant, Open Folder Here,
-        // Focus Mode and Scale Text are buttons beside it. In an SSH terminal's menu's order.
+        // in the menu that exist in the toolbar too"): AI Assistant, Open Folder Here, Focus Mode and
+        // Scale Text are buttons beside it, Connections the window's ⚡. In an SSH terminal's menu's
+        // order.
         Menu {
             Button("Search", systemImage: "magnifyingglass") { presentSearch() }
             Button("Clear", systemImage: "trash") {
@@ -456,6 +454,7 @@ struct MacLocalTerminalPaneView: View {
 
             Divider()
 
+            MacPaneSplitMenuItems(actions: paneSplit)
             Button("New Local Terminal Window", systemImage: "macwindow.badge.plus") {
                 openWindowInThisFolder()
             }

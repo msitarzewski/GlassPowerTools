@@ -330,6 +330,8 @@ struct VisionTerminalWorkgroupView: View {
     /// The sidebar's height and its rows', so the space below the rows reaches its foot.
     @State private var sidebarHeight: CGFloat = 0
     @State private var sidebarRowsHeight: CGFloat = 0
+    /// What is drawn each second, over the window (Settings ▸ Terminal ▸ Show Refresh Counts).
+    @AppStorage(TerminalRefreshCountsView.shownKey) private var showsRefreshCounts = false
     /// A sidebar row's corners, where it is tinted and highlighted.
     private static var sidebarRowCornerRadius: CGFloat { 16 }
 
@@ -350,6 +352,9 @@ struct VisionTerminalWorkgroupView: View {
     #endif
 
     var body: some View {
+        #if os(visionOS)
+        let _ = TerminalRefreshCounts.shared.note(.windows)
+        #endif
         Group {
             if let workgroup = sessionManager.workgroup(for: workgroupID) {
                 let sessions = liveSessions(in: workgroup)
@@ -377,6 +382,12 @@ struct VisionTerminalWorkgroupView: View {
         } message: {
             Text("Leave it blank to use the automatic name. In tmux, every device shows the name.")
         }
+        #if os(visionOS)
+        .ornament(visibility: showsRefreshCounts ? .visible : .hidden, attachmentAnchor: .scene(.top),
+                  contentAlignment: .bottom) {
+            if showsRefreshCounts { TerminalRefreshCountsView() }
+        }
+        #endif
         .onAppear {
             sessionManager.serverManager.loadServersIfNeeded()
             synchronizeSelection()

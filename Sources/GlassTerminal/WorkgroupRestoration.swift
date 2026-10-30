@@ -16,6 +16,8 @@ struct LayoutRestorationTarget {
     /// back to the right pane. Nil for a device's stand-in for a Mac terminal, which is not the
     /// workgroup's and keeps nothing.
     var sourceIndex: Int? = nil
+    /// The folder a session made for it starts in: a Mac terminal's own, opened on its Mac.
+    var folder: String? = nil
 
     var displayName: String {
         intent.label ?? server?.name ?? "Local Terminal"
@@ -28,6 +30,7 @@ struct LayoutRestorationPlan {
 
     /// - Parameter substitutions: a device's SSH stand-ins for the workgroup's Mac terminals, by
     ///   index, once reviewed; Mac terminals left without one are skipped. Nil before review.
+    ///   A Mac terminal whose Mac is in the library needs none: it opens there (`onItsMac`).
     init(preset: LayoutPreset, availableServers: [ServerConfiguration],
          substitutions: [Int: LayoutPreset.SessionIntent]? = nil) {
         let serversByID = Dictionary(
@@ -41,7 +44,12 @@ struct LayoutRestorationPlan {
             let sessionNumber = index + 1
             var intent = saved
             var sourceIndex: Int? = index
-            if let substitutions, saved.kind == .local {
+            var folder: String?
+            if let mac = Self.mac(of: saved, in: availableServers) {
+                let joining = Self.onItsMac(saved, mac: mac)
+                intent = joining.intent
+                folder = joining.folder
+            } else if let substitutions, saved.kind == .local {
                 guard let substitute = substitutions[index] else { continue }
                 intent = substitute
                 sourceIndex = nil
@@ -63,12 +71,35 @@ struct LayoutRestorationPlan {
                     failures.append("\(server.name): legacy algorithms require a direct security review.")
                     continue
                 }
-                targets.append(LayoutRestorationTarget(intent: intent, server: server, sourceIndex: sourceIndex))
+                targets.append(LayoutRestorationTarget(intent: intent, server: server, sourceIndex: sourceIndex,
+                                                       folder: folder))
             }
         }
 
         self.targets = targets
         self.failures = failures
+    }
+
+    /// The Mac a local terminal lives on, when this device can reach it: its Terminal service, in
+    /// the library here (2026-10-29). Nil for an SSH terminal, one no Mac has claimed, and one
+    /// whose Mac this device has no record of — which still needs a stand-in.
+    static func mac(of intent: LayoutPreset.SessionIntent, in servers: [ServerConfiguration]) -> UUID? {
+        guard intent.kind == .local, let mac = intent.macServerID, servers.contains(where: { $0.id == mac }) else { return nil }
+        return mac
+    }
+
+    /// A Mac terminal opened on its own Mac from elsewhere: over SSH, joining the session it runs
+    /// in there — the same one the Mac's tab shows — and nothing typed into it. Only a session made
+    /// for it, because it has ended, runs its startup command, in its folder (the owner, of the
+    /// stand-ins that ran a Mac's startup scripts in `~` beside the real ones: "Maybe that's part of
+    /// the problem too?"). A plain shell has no session to join: it starts in its folder.
+    static func onItsMac(_ saved: LayoutPreset.SessionIntent, mac: UUID) -> (intent: LayoutPreset.SessionIntent, folder: String?) {
+        if saved.withoutTmux {
+            let command = WorkgroupSSHSubstitution.startup(saved.startupCommand ?? "", in: saved.localDirectory ?? "")
+            return (.init(serverID: mac, label: saved.label, startupCommand: command, withoutTmux: true), nil)
+        }
+        return (.init(serverID: mac, label: saved.label, startupCommand: saved.startupCommand,
+                      tmuxSession: saved.tmuxSession), saved.localDirectory)
     }
 }
 
@@ -79,15 +110,20 @@ struct LayoutRestorationPlan {
 @MainActor
 enum TerminalWorkgroupOpening {
     /// Readies a terminal for its pane, before it connects.
+    /// - Parameter joinsOnly: a relaunch's terminal (W15): its session is joined if it still runs,
+    ///   and if it has ended the terminal is gone, as an `exit` leaves it — never made again
+    ///   (2026-10-29, the owner: "how about they're just gone").
     static func prepare(_ session: TerminalSession, for target: LayoutRestorationTarget,
-                        workgroupID: UUID, settingsManager: SettingsManager) {
+                        workgroupID: UUID, settingsManager: SettingsManager, joinsOnly: Bool = false) {
         session.workgroupLabel = target.intent.label
         // A plain shell by choice: no session, and none claimed to keep.
         session.withoutTmux = target.intent.withoutTmux
         guard !target.intent.withoutTmux else { return }
+        session.tmuxSessionDirectory = target.folder
         if let name = target.intent.tmuxSession {
             session.tmuxSessionName = name
-            session.tmuxClaimsGivenName = true
+            session.tmuxClaimsGivenName = !joinsOnly
+            session.tmuxJoinsOnly = joinsOnly
         }
         guard let index = target.sourceIndex, target.intent.tmuxSession == nil else { return }
         let opened = target.intent
@@ -200,6 +236,7 @@ struct WorkgroupSSHSubstitutionReview: View {
         self.onOpen = onOpen
         let valid = saved.filter { index, value in
             preset.sessionIntents.indices.contains(index) && preset.sessionIntents[index].sameTerminal(as: value.source)
+                && LayoutRestorationPlan.mac(of: preset.sessionIntents[index], in: servers) == nil
                 && servers.contains { $0.id == value.serverID && !$0.legacyAlgorithmsEnabled }
         }
         _replacements = State(initialValue: valid)
@@ -207,8 +244,15 @@ struct WorkgroupSSHSubstitutionReview: View {
     }
 
     private var availableServers: [ServerConfiguration] { servers.filter { !$0.legacyAlgorithmsEnabled } }
+    /// The Mac terminals this device has to stand in for: those whose Mac it can't reach open there.
+    private var needingStandIns: [(offset: Int, element: LayoutPreset.SessionIntent)] {
+        Array(preset.sessionIntents.enumerated()).filter {
+            $0.element.kind == .local && LayoutRestorationPlan.mac(of: $0.element, in: servers) == nil
+        }
+    }
     private var canOpen: Bool {
-        (!replacements.isEmpty || preset.sessionIntents.contains { $0.kind == .ssh })
+        (!replacements.isEmpty
+            || preset.sessionIntents.contains { $0.kind == .ssh || LayoutRestorationPlan.mac(of: $0, in: servers) != nil })
             && replacements.values.allSatisfy { replacement in
                 !replacement.directory.utf8.contains(0) && !replacement.command.utf8.contains(0)
                     && availableServers.contains { server in server.id == replacement.serverID }
@@ -220,11 +264,14 @@ struct WorkgroupSSHSubstitutionReview: View {
             Form {
                 Section {
                     Text("This device cannot run local terminals. Choose SSH replacements below, or leave entries skipped. Your original workgroup and its Mac terminals stay unchanged.")
+                    if needingStandIns.count < preset.sessionIntents.filter({ $0.kind == .local }).count {
+                        Text("Mac terminals whose Mac is in Connections open on that Mac, in their own sessions. These are the ones whose Mac isn't.")
+                    }
                     if availableServers.isEmpty {
                         Text("Add an SSH connection in Connections first. Connections requiring legacy security review must be opened directly.")
                     }
                 }
-                ForEach(Array(preset.sessionIntents.enumerated()).filter { $0.element.kind == .local }, id: \.offset) { index, source in
+                ForEach(needingStandIns, id: \.offset) { index, source in
                     Section {
                         Label(source.label ?? "Local Terminal \(index + 1)", systemImage: "apple.terminal")
                             .foregroundStyle(.secondary).opacity(0.55)
@@ -235,8 +282,10 @@ struct WorkgroupSSHSubstitutionReview: View {
                             get: { replacements[index]?.serverID },
                             set: { id in
                                 if let id {
+                                    // Its Mac folder to start with: a blank one ran the Mac's
+                                    // startup scripts in the server's home (2026-10-29).
                                     replacements[index] = WorkgroupSSHSubstitution(source: source, serverID: id,
-                                        directory: replacements[index]?.directory ?? "",
+                                        directory: replacements[index]?.directory ?? source.localDirectory ?? "",
                                         command: replacements[index]?.command ?? source.startupCommand ?? "")
                                 } else { replacements.removeValue(forKey: index) }
                             })) {

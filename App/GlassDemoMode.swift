@@ -161,6 +161,16 @@ enum GlassDemoMode {
                 terminal.requestDemoReplay(name: "alpha", output: Data(agentTranscript.utf8), windowSettings: demoLook,
                                            ticks: ticks, titles: spinner.map { "\($0) \(task)" }, every: .milliseconds(100))
             }
+        case "terminal-typing":
+            // Keys typed at a prompt, five a second, each echoed in place as a shell echoes it (the
+            // owner on the headset, 2026-10-29: "every keypress causes a refresh"), and the line
+            // cleared after twenty: what a Vision Pro terminal repaints for one key.
+            let typed = Array("ssh deploy@alpha tail -f /var/log/app.log ")
+            let ticks = typed.indices.map { index in
+                Data((index % 20 == 0 ? "\r\u{1B}[K$ " : "") .appending(String(typed[index])).utf8)
+            }
+            terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8), windowSettings: demoLook,
+                                       ticks: ticks, every: .milliseconds(200))
         case "terminal-diagram":
             // A Mermaid diagram a coding agent printed as text, with its mark (2026-10-21).
             terminal.requestDemoReplay(name: "alpha", output: Data(diagramTranscript.utf8), windowSettings: demoLook)

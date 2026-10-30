@@ -193,6 +193,7 @@ nonisolated struct LiveTmuxControlTests {
                 case .live: live = true
                 case .exited: exited = true
                 case .showGrid(let columns, let rows, _): terminal.resize(cols: columns, rows: rows)
+                case .renamed: break
                 }
             }
         }

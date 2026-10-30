@@ -29,8 +29,8 @@ enum TerminalLinkLookup {
     }
 
     /// The actions on a link, by name, as the Mac's menu offers them: Open Link and Copy Link on an
-    /// address; Open in Editor, Show in Files, Watch Log File and Copy Path on a path, each only
-    /// where the model's host can do it.
+    /// address; Open in Editor, Open in Preview, Show in Files, Watch Log File and Copy Path on a
+    /// path, each only where the model's host can do it. A log leads with Watch Log File.
     struct Action {
         let title: String
         let symbol: String
@@ -51,15 +51,27 @@ enum TerminalLinkLookup {
             return actions
         case .path(let path):
             var actions: [Action] = []
+            var watching: Action?
+            if let watch = model?.onWatchFile, !path.hasSuffix("/") {
+                watching = Action(title: "Watch Log File", symbol: "doc.text.magnifyingglass") { watch(path) }
+            }
+            // A log is followed, not edited (2026-10-29: "Should tail the output").
+            if let first = watching, TerminalLogFile.isLog(path) {
+                actions.append(first)
+                watching = nil
+            }
             if let open = model?.onOpenPath {
                 actions.append(Action(title: "Open in Editor", symbol: "pencil.and.list.clipboard") { open(path) })
             }
+            #if !canImport(UIKit) && canImport(AppKit)
+            if let preview = model?.onOpenInPreview, MacPreviewApp.opens(path) {
+                actions.append(Action(title: "Open in Preview", symbol: "photo") { preview(path) })
+            }
+            #endif
             if let reveal = model?.onRevealPath, let title = model?.revealPathTitle {
                 actions.append(Action(title: title, symbol: "folder") { reveal(path) })
             }
-            if let watch = model?.onWatchFile, !path.hasSuffix("/") {
-                actions.append(Action(title: "Watch Log File", symbol: "doc.text.magnifyingglass") { watch(path) })
-            }
+            if let watching { actions.append(watching) }
             actions.append(Action(title: "Copy Path", symbol: "doc.on.doc") { copy(path) })
             return actions
         }

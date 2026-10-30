@@ -1928,3 +1928,34 @@ user request." Then "Highlight colors, etc. I don't think we have highlight/text
 - To change a scheme's colours, Copy to Your Themes makes it an ordinary theme for the Themes editor.
 - **Not done:** a bold text colour (SwiftTerm has none to set); bundling the 148 in the app (their origins and
   licences are unchecked: iTerm2-Color-Schemes is MIT, each scheme's author varies).
+
+## D91 — A workgroup's Mac terminals belong to their Mac — Approved 2026-10-29, implemented 2026-10-30 (0.4.567)
+**Owner, 2026-10-29:** on six empty tmux sessions on his Mac, "how about they're just gone"; then "Is there a defined
+workgroup that was trying to launch a remote session with 'this computer' and failing to realize it was [his Mac]?";
+then "a Workgroup can have SSH sessions too... and a Workgroup can be defined on any device, right?" and "We haven't
+even touched 'multiple Macs' in this software yet." On the recommendations: "end the six empty sessions, Build 1 to 6
+and check the rest of the app for others".
+
+**Why:** a workgroup's local terminal said only "local". On the headset, a stand-in for one ("Use SSH Instead of
+Local", reaching his Mac over SSH) dropped its tmux name and left its folder blank, so each opening made new sessions
+in the home folder and ran the Mac terminals' startup scripts there, beside the real ones; it once took names another
+workgroup kept on the Mac, since names were held per kind, not per machine. A second Mac would run another Mac's
+terminals on itself; an SSH terminal to the Mac's own record, opened on that Mac, went over SSH to itself. D86 knew
+which library machine the Mac is, but listed workgroups as not done.
+
+**Decision:**
+1. `SessionIntent.macServerID`: the Mac a local terminal lives on, as that Mac's Terminal service in the library
+   (D86's link, which only that Mac knows; the ID syncs). Written by the Mac that saves the workgroup or runs the
+   terminal (at a tab's start, and when the library has loaded); nil until then, opening as before.
+2. Each terminal opens on its machine (`SessionIntent.machine`): on that Mac, a local tab — an SSH terminal to its own
+   record too; anywhere else (iPhone, iPad, Vision Pro, another Mac), over SSH to it, joining its tmux session with
+   nothing typed; ended, made again in its folder (`tmux new-session -c`) with its startup command once.
+3. The stand-in sheet lists only Mac terminals whose Mac this device can't reach; its folder starts as the Mac's.
+4. One machine, one set of tmux names, however its terminals reach it; an unclaimed local terminal's names are held
+   everywhere. The Mac's already-open check matches by machine too.
+5. A renamed session (`%session-renamed`, which tmux 3.8 writes with the session's id) keeps its tabs and workgroups.
+6. A relaunch on iPhone, iPad and Vision Pro (W15) joins a session that runs; one that ended takes its terminal with
+   it, never made again. `exit` already closed and forgot the terminal there. Opening a workgroup yourself still makes
+   its ended sessions. The Mac's own window restoration is unchanged (a reboot brings its tabs back on new sessions).
+
+Task note `tasks/2026-10/2026-10-30_workgroup-machines.md`.

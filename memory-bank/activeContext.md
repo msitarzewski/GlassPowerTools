@@ -31,7 +31,153 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-10-27 — RESUME HERE: the orb dock's ninth to thirteenth rounds, the terminal redraw storm, and living rooms committed and pushed (0.4.535–0.4.541)
+## 2026-10-28/29 — RESUME HERE: git first class (0.4.549) and the headset's stalls (0.4.550), uncommitted
+- **Git, end to end, in the editor** (his "build git now, end to end, first class (doff viewer, all of it!)"): built,
+  tested, installed as 0.4.549 on all three; nothing committed or pushed. `tasks/2026-10/2026-10-28_git-first-class.md`.
+  Not yet seen: his look on the Mac, a server project, the iPhone and headset layouts.
+- **Then on the headset (0.4.549), his "the settings menu is moving again, I can't choose Settings … about a .5
+  second delay for every keypress":** the bar redraws as often as on 0.4.544, when Settings last worked (about twice a
+  second), so not the 0.4.539 storm; a launch check that takes 45 ms took 13.7 s. Instruments, sysdiagnose and
+  screenshots all fail over the network. Suspect: the Terminal Themes library (new in 0.4.546) listed iCloud's folder
+  of 148 on the main thread, two iCloud questions a file, once per scheme read and per iCloud notice. 0.4.550 lists it
+  off the main thread and in batches, and writes main-thread stalls to the diagnostics file. Next: his try, then the
+  file copied off the headset. `tasks/2026-10/2026-10-29_headset-stalls.md`.
+- **Mac terminal toolbar (0.4.555), his "these do the same thing, yes? And shouldn't they be the lightning bolt?!
+  Move split pane into the gear menu":** the window's globe and each pane's server rack both opened Connections. Now
+  one ⚡ in the window's toolbar (Connections forward, else opened, then Active); the panes' bars have none. The split
+  button left the toolbar; Split Right and Split Down are in each pane's gear menu, local and SSH
+  (`MacPaneSplitActions`, `MacWorkspaceCommands.swift`), worded as the Terminal menu's, with no key equivalents.
+  Then his "the universal Active icon is the bolt": the terminal bar's last server-rack Connections (iPhone/iPad, drawn
+  only for a terminal standing alone, which none is: workgroups pass `ownsSessionLifecycle: false` and carry the ⚡)
+  is the ⚡ too. I had told him iPhone/iPad still showed the server rack; they did not.
+  Built for all three; Mac and iPhone run 0.4.555 (read back, no new Mac crash report). Headset held on 0.4.554 for
+  his typing test; install 0.4.555 there after the diagnostics file is pulled.
+- **Then "Open folder in editor fails on mac right now" (0.4.556):** only terminal windows were open. A folder in a
+  saved editor project (and every remote folder) opens through `GlassEditorRuntime.present`, a request that a
+  presenter must answer; the Connections window, editor windows and the Files window carry one, terminal windows did
+  not, so the editor window was made and never shown. `GlassTerminalScenes`' accessory (`windowAccessory`, was
+  `filesWindowAccessory`) now goes on the Mac's terminal windows and the headset's too. His try is the check.
+  **He confirmed it: "That worked."**
+- **Then (0.4.557) his "wrap long lines setting doesn't seem to apply to the diff views", "no view … to show only
+  changed files in the file sidebar", and a focus ring on the editor's sidebar button ("why is this outlined"):**
+  - His GlassPowerTools editor window keeps Wrap Long Lines off (This Window); diffs always wrapped. `GlassEditorDiffBody`
+    takes `wraps` (the window's text configuration) from Changes, History and stashes; off, each hunk's lines are one
+    line apiece in a sideways scroll under its bar (`GlassEditorSidewaysScroll`; side by side as two columns). Test
+    `unwrappedLinesAreGroupedUnderTheirOwnHunk`. The conflict view still always wraps.
+  - Show Only Changed Files: a button beside the branch at the tree's foot (repositories only). The tree keeps changed
+    files and the folders holding them, all open unless closed in that mode (read as they show); inside a folder git
+    calls untracked as a whole, everything shows; the Filter field still applies; "No Changed Files" when none. The
+    phone's folder screens filter the same way.
+  - The ring: his Mac has keyboard navigation on (`AppleKeyboardUIMode` 2) and nothing in an editor window took focus,
+    so AppKit gave it to the sidebar button. The file list now takes default focus on the Mac.
+  Built for all three; `swift test --filter GlassEditorGitReadingTests` 20 of 20, and the new test bit (grouping broken:
+  3 failures; file restored byte for byte). Mac and iPhone run 0.4.557 (read back, no new Mac crash report); headset
+  still 0.4.554 for the typing test. None of the three seen on a screen yet: his look on the Mac is the check.
+- **Then (0.4.558) his "you should! Yes!" to four more states in the tree:** (1) Show Only Changed Files draws deleted
+  files and wholly deleted folders, struck through with D; a press shows Changes (phone: a deleted folder's files
+  under its name); (2) a folder holding a conflict gets a red dot; (3) the tree's mark says staging: a filled badge
+  when staged, plus a dot when changed again since (Changes keeps the plain letter); (4) `.gitignore`d files and
+  folders dim to half, from `git status --ignored=matching` (folders once; nothing measurable on this repo; Git 2.16
+  now the stated minimum). Renamed and copied files say where from. The untracked-whole-folder special case was
+  wrong (status uses `--untracked-files=all`) and is gone. 64 git tests pass; the two new ones bit (8 failures when
+  broken, files restored byte for byte).
+  Built for all three; Mac and iPhone run 0.4.558 (read back, no new Mac crash report). Headset still 0.4.554 for
+  the typing test (0.4.558 ready for it). Not yet seen on a screen: his look is the check.
+- **Then the ring again (0.4.559, Mac only), on the overview's first Recently Edited button:** how it got focus is not
+  known (the app's focus was in a terminal by the time it was asked). The file list now takes focus again whenever no
+  file is open (`onChange` of `selectedDocument == nil`), as well as when the window opens. If the sidebar is hidden
+  the overview's buttons are all there is to hold it. Mac runs 0.4.559; iPhone 0.4.558; headset 0.4.554. If he sees
+  it again, ask what he did just before.
+- **Then (0.4.560) his "Let's give the editor a proper preview in expose mode":** an editor window's card is the file in
+  front as the window draws it (gutter, canvas, scroll position): `GlassEditorModel.previewImage` gives the last picture
+  and draws the next just after (the terminal's pattern after the headset's AttributeGraph aborts); each engine sets
+  `previewDrawer` (AppKit `displayIgnoringOpacity`, UIKit `drawHierarchy`). No file open: symbol and name as before.
+  The Mac overview's window tiles now re-read pictures each second in a task (desktops move live). The orb dock and
+  switcher read the same picture, so editor orbs show text on the headset. Test "the preview is drawn after it is
+  asked for…" bit (no ink when the draw was removed); AppKit backend 32/32. Mac and iPhone run 0.4.560.
+- **His question, "I wonder if the grid and carousel modes are as useful … given that expose mode is so good?":** my
+  recommendation, awaiting his word: drop the Mac's Terminal Overview (toolbar button, ⌥⌘G grid, ⌥⇧⌘G carousel —
+  Show All Windows is a superset and drags tabs between windows); drop the headset's carousel; keep the headset's grid
+  until the sidebar or All Windows can reorder tabs by dragging (the grid's cards are the only drag-to-reorder there).
+- **Then (0.4.561) his "stretch wide to fill the card, and show the sidebar too if open!"** (his screenshot showed the
+  0.4.560 picture working; the one before was taken before it drew): the card is the whole editor window — its frame
+  view on the Mac (the content view alone left a blank band under the toolbar; probe pictures in
+  `~/Software/glass/tmp/probe-560`), `drawHierarchy` of the window on iPad and iPhone — filling the card from the top
+  (`GlassEditorWindowPicture.swift`, `GlassEditorPictureWindowReader`). The headset keeps the file's own picture: its
+  window shrinks into an orb, so a window picture would be the orb. Desktops still fit whole. Test
+  `theWholeWindowIsDrawnJustAfterItIsAsked` bit. He asked what Terminal Overview is: the 2×2 toolbar button (grid or
+  carousel of one window's tabs); the cut is still his to approve.
+  Built for all three; Mac and iPhone run 0.4.561 (read back, no new Mac crash report); headset 0.4.554.
+- **Then his side-by-side (0.4.562, Mac only): the card's file list was empty.** macOS 26 holds a sidebar inside an
+  `NSGlassEffectView`; `cacheDisplay` of the window, of the glass's content view, and `CALayer.render` all leave its
+  rows out (probes in `~/Software/glass/tmp/probe-560`), while the `NSTableView` drawn by itself draws them. The
+  picture is the window, then every list inside glass drawn in at its visible rect. Test
+  `theSidebarsRowsAreInThePicture` (checks alpha: glass is not drawn, so empty is clear) bit when the lists were left out.
+  Mac runs 0.4.562 (read back, no new crash report); iPhone 0.4.561; headset 0.4.554.
+- **Then "The search bar is bright, but the preview works now!" (0.4.563, Mac only):** the sidebar's Filter field
+  draws its glass as solid white in a bitmap (measured: opaque white, alone or in the window). The picture clears its
+  place, paints a faint capsule (white 10% on dark, black 6% on light) and draws the field's magnifier and placeholder,
+  which draw themselves. Test `theFilterFieldIsNotASolidWhiteBar` bit; checked by eye over dark grey.
+  Mac runs 0.4.563 (read back, no new crash report); iPhone 0.4.561; headset 0.4.554.
+- **Then (0.4.564) his "Let's improve the data detectors" — a `.log` "Should tail the output", which other dev
+  extensions aren't handled, ".ts too?", "Open in Preview" for what Preview opens, and the focus ring on the
+  preview popover's folder button:**
+  - `TerminalLogFile` (GlassTerminalEmulator): log, out, err, stdout, stderr, output, trace, and rotated `x.log.1` /
+    `x.log.2026-10-29`. A log's link menu leads with Watch Log File; its hover preview shows its last 64 KB, held at
+    the bottom and re-read each second (`GlassEditorLogTail`, via `GlassTerminalRuntime.namesLog` → the editor's
+    `GlassEditorQuickPreview(tails:)`); from a server only its last 256 KB is fetched, whatever its size; the popover
+    bar has Watch Log File for a log (Mac and headset).
+  - Open in Preview (Mac): menu and popover, when Launch Services says Preview opens the extension (`MacPreviewApp`);
+    a host's file is copied to the caches first and kept.
+  - The popover's bar buttons are `.focusable(false)` on the Mac: any key closes the popover, so they could never be
+    reached by keyboard, and the first took focus with keyboard navigation on.
+  - His `.log` hovers: path resolved; the app's log showed popovers opening, so it showed the file from its top.
+  - `.ts` was already detected and previewed (JavaScript grammar; bytes beat the MPEG-TS type).
+  - Tests: link menu order, Open in Preview, log names, the log's end; each bit when broken.
+  - Built for all three; Mac and iPhone run 0.4.564 (read back, no new Mac crash report); headset 0.4.554.
+  - Offered, not done: map `.env/.envrc`→bash, `.ini/.cfg/.conf`→TOML, `.jsonl`→JSON, C++/Obj-C→C, Dockerfile/
+    Makefile→bash on existing grammars; real grammars (CSS/SCSS, Ruby, Java/Kotlin, TypeScript, diff) as a larger job.
+- **Then "a . or a ; seem to prevent display" (0.4.565):** probed SwiftTerm's implicit links: a path's trailing `.`
+  `;` `?` `!` came with it (`mac-check.log.`, `run.sh;`, `app.ts:12:3.`), so no file had that name. Quotes, brackets
+  and commas were already left out. `TerminalLinkTarget.withoutClosingPunctuation` strips `.,;:!?` from a path's end
+  (keeping a folder's own `.` and `..`) before its line and column go. Test bit. SwiftTerm's hover underline still
+  covers the punctuation (its own drawing).
+  Built for all three; Mac, iPhone and headset run 0.4.565 (read back; the headset at his "vision pro is up").
+- **His "Any reason we don't ship this now?" (2026-10-29 afternoon):** every package suite run (19 targets): all pass
+  after one expectation updated to the log-first menu (`MacTerminalContextMenuTests`; GlassTerminalTests 1062 pass);
+  GlassEditorUIKitTests have no macOS cases. tmux changed during the run: seven `glass-N` sessions made at 14:27 by
+  SSH logins (the headset reattaching), not by tests, which use their own sockets. Two private test fixtures made
+  neutral (a machine's name and a path of his replaced with made-up ones); the picture tests' windows
+  moved off screen. Not done, awaiting his "ship it": release notes for 0.4.550–0.4.565, commit, dry run, notarize,
+  push, GitHub release, site. Headset/TestFlight held: the stall is open and the Diagnostics switches are in Settings.
+- **Then "it still happens. Every letter affects the screen" (headset 0.4.565; 0.4.566 for it):** the diagnostics file
+  (`~/Software/glass/tmp/headset-diag/screen-sharing-1431.log`) gave the reason: every key a whole repaint, "every
+  line", ~one per key (e.g. keys 26 → 130 whole repaints in 5 s). Cause, read in SwiftTerm 1.20: `endSynchronizedOutput`
+  calls `refresh(startRow: 0, endRow: rows - 1)`, and Claude Code wraps each frame (each typed letter's) in a
+  synchronized update (DEC 2026); SwiftTerm keeps only a start/end range, so the true rows are lost. Fix in our view:
+  `TerminalRowFingerprints` + `TerminalRowFingerprint` (each cell's character, width, attribute, payload) — of the rows
+  named, only those whose fingerprint changed are repainted; none changed, none repainted ("skipped (unchanged)" in the
+  counts). Whole as before: no rows named, a selection change (flag), scrolled back, `updateFullScreen` (end = rows: a
+  theme), a new width or cell height. Test reproduces it in SwiftTerm (a 2026 frame adding one letter: rows 0–7
+  named, row 2 changed); the band and fingerprint tests bit. Upstream: SwiftTerm should keep the batch's own range
+  at the end of a synchronized update — a PR to offer, at his word.
+  He still sees a painting flicker on the headset; two A/B tries asked of him (Scale Text off; Glass 0), unanswered.
+- **Then the "Not in a window" sessions and workgroups across machines (D91, 0.4.567), his "end the six empty
+  sessions, Build 1 to 6 and check the rest of the app for others":** the six ended (all idle zsh in `~`). A Mac
+  terminal now records its Mac; every other device (another Mac too) opens it there on its own session; one set of
+  tmux names per machine; renames followed; a relaunch off the Mac never makes a session. Tests bit; full suites run.
+  `tasks/2026-10/2026-10-30_workgroup-machines.md`. An agent is sweeping the rest of the app for single-Mac
+  assumptions (read-only); its findings go to him, nothing built from them yet. Next: install 0.4.567, his try on the
+  headset (open a Mac workgroup: it should join the Mac's sessions, no sheet).
+  0.4.567 is on all three (the Mac at his word); the Mac recorded itself on its four open workgroups at once.
+- **Then "fix the SSH key one first" (0.4.568):** a key change wrote the device's whole key list to the Keychain
+  and deleted every record not in it — and the list is read once per launch, so a key imported on another device
+  since lost its record. Now each change writes and deletes only its own records. Same task note. The sweep's other
+  findings (local-folder projects with no machine, SQLite paths, loopback addresses, …) wait for his choice.
+  0.4.568 (with a test-isolation fix to the library's remote-change listener) is on all three, read back; no new
+  crash reports. Nothing committed.
+
+## 2026-10-27 — the orb dock's ninth to thirteenth rounds, the terminal redraw storm, and living rooms committed and pushed (0.4.535–0.4.541)
 - **Pushed 2026-10-27 at his word ("push it"):** eight commits, `dcad5dcb`…`61a3bd0f` (0.4.495–0.4.541), each scanned for
   private names and addresses first. Then, at his word, the tests' private-range example addresses (`10.x`) became
   documentation-range ones (`198.51.100.x`, which no test there used), except where a test needs an address on the
@@ -72,10 +218,13 @@ use the disposable test VM only).
   choice:** a nudge pad and slide by hand for fine positioning in Focus Mode (same environments note). Open: his "the
   vision pro didn't connect when the app restarted" after 0.4.543's install; the headset's log shows ten terminals
   coming back at 06:25 and 06:30 UTC and nothing about connecting; he moved on ("GREAT!") before saying what didn't.
+- **Parked (2026-10-28): the family's icons in one style** — mockups only, nothing changed in any project
+  (`tasks/2026-10/2026-10-28_icon-suite-exploration.md`). Resume with his choice of direction.
 - **Then (2026-10-28) the Mac's third release, 0.4.548** (his "build and deploy the Mac version"; 0.4.547 built,
   committed and pushed, then withdrawn unpublished for the Files window's empty-folder gap, his "option 2"):
-  `tasks/2026-10/2026-10-28_release-0.4.548.md`. The GitHub release and the site deploy are his to run (auto mode's
-  classifier refuses a public release); TestFlight's external testing is drafted and waits on his details and word.
+  `tasks/2026-10/2026-10-28_release-0.4.548.md`. **Released** (0dd4983d): GitHub v0.4.548 (Latest, downloads match
+  their checksums) and the site live (94 files match; the feed offers 548). TestFlight's external testing is drafted
+  and waits on his details and word.
 - **Then (2026-10-28) Terminal color schemes, 0.4.546 (Mac read back; headset and iPhone installing as they wake), not committed (D90):**
   a user's 148 Terminal profiles "first class": iCloud Drive ▸ Terminal Themes, Choose Theme (Settings ▸ Terminal ▸
   Theme ▸ Choose…), This Window, Open With. `tasks/2026-10/2026-10-28_terminal-schemes.md`. His "highlight/text

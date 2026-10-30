@@ -211,9 +211,10 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   and images, and see-through glass on Mac and Vision Pro.
 - **Editor:** files on this device or on a server, projects with a file tree, syntax highlighting
   for fifteen languages, and previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV;
-  images, PDFs, video, audio and 3D models open as themselves. Git: changes, marks beside the lines,
-  staging, committing, pull, push and fetch, here or on a server. On the Mac it can be your default
-  text editor.
+  images, PDFs, video, audio and 3D models open as themselves. Git, here or on a server: a diff
+  viewer (unified or side by side, changed words highlighted), staging a file, a hunk or single lines,
+  commit and amend, pull and push, the history with its graph, branches, stashes, tags, merges and
+  rebases with a conflict resolver, blame, and cloning. On the Mac it can be your default text editor.
 - **Everywhere you are:** the library, favorites, workgroups and projects sync through iCloud, and
   credentials through iCloud Keychain; keys made in the Secure Enclave stay on their device. Your
   Library shows the time you spend on each machine, added up across your devices, and a Mac knows its
@@ -242,6 +243,7 @@ The [help](https://glasspowertools.com/help/) is written from the app's own code
   [on Vision Pro](https://glasspowertools.com/help/desktop-vision-pro.html)
 - **Editor:** [opening files](https://glasspowertools.com/help/editor-opening.html),
   [projects](https://glasspowertools.com/help/editor-projects.html),
+  [git](https://glasspowertools.com/help/editor-git.html),
   [previews and viewers](https://glasspowertools.com/help/editor-preview-and-viewers.html)
 
 ## How it's made

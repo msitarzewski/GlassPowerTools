@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 import GlassEditorCore
@@ -105,6 +106,9 @@ public final class GlassEditorModel {
     /// The lines that differ from the file's last commit, marked beside them in the gutter. Set by
     /// whoever knows the file's history — the editor, from git — and empty otherwise.
     public var lineChanges: [LineChange] = []
+    /// Whether the gutter keeps room for those marks when line numbers are off: set while something
+    /// marks this file (2026-10-28: the marks went with the numbers before).
+    public var showsChangeMarks = false
 
     /// The remote conflict decision, surfaced and never auto-resolved
     /// (projectRules.md, Data Safety). `indeterminate` stays `indeterminate`.
@@ -137,6 +141,31 @@ public final class GlassEditorModel {
     /// lives as long as the model; `nil` when the consumer opted out (LSP /
     /// manual `setHighlights`) or the grammar failed to load.
     @ObservationIgnored private var highlightDriver: SyntaxHighlightDriver?
+
+    // MARK: - Preview
+
+    /// Draws the text as its window shows it — gutter, canvas and the lines scrolled to — at most
+    /// this many pixels wide. Set by the engine showing this document; nil while none does.
+    @ObservationIgnored public var previewDrawer: (@MainActor (_ maxPixelWidth: Int) -> CGImage?)?
+    @ObservationIgnored private var rememberedPreview: CGImage?
+    @ObservationIgnored private var previewAsked = false
+
+    /// The document as its window shows it, for Show All Windows' cards (the owner, 2026-10-29:
+    /// "give the editor a proper preview in expose mode"). Asked from SwiftUI bodies, so it gives
+    /// the picture drawn last and draws the next just after, outside the update, as a terminal's
+    /// does (`SwiftTermHostModel.previewImage`): a view drawn inside SwiftUI's update can lay its
+    /// window out there, which aborted the app on the headset.
+    public func previewImage(maxPixelWidth: Int = 800) -> CGImage? {
+        if !previewAsked, previewDrawer != nil {
+            previewAsked = true
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                previewAsked = false
+                if let image = previewDrawer?(maxPixelWidth) { rememberedPreview = image }
+            }
+        }
+        return rememberedPreview
+    }
 
     // MARK: - Init
 

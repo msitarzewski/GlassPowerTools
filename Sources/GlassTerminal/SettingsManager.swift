@@ -524,20 +524,35 @@ class SettingsManager {
     /// same to a user about to conclude their keys are gone, and only one of them is safe to act on.
     struct SSHKeyCatalogStore {
         let load: () throws -> [StoredSSHKey]?
-        let save: ([StoredSSHKey]) throws -> Void
+        /// One change: `all` is the list with it made, as this device knows it; `changed` the records
+        /// added or edited; `removed` those deleted.
+        let save: (_ all: [StoredSSHKey], _ changed: [StoredSSHKey], _ removed: Set<UUID>) throws -> Void
+        /// `save` writes `all` as the whole catalog: a store this device alone writes. One whose records
+        /// sync writes only what changed, and is checked only for that.
+        let writesWholeList: Bool
 
         /// D26: records beside their material, routed to the same store the material went to.
         @MainActor
         static var keychain: SSHKeyCatalogStore {
+            records(all: { try KeychainManager.allSSHKeyRecords() },
+                    write: { try KeychainManager.saveSSHKeyRecord($0) },
+                    delete: { try KeychainManager.deleteSSHKeyRecord(for: $0) })
+        }
+
+        /// A store of records, one per key, that other devices write too: each change writes and deletes
+        /// only its own records (2026-10-30). Records sync through iCloud Keychain, and this device reads
+        /// its list once per launch; saving the list whole deleted every record it didn't know about, so a
+        /// key imported on another device since lost its record at this one's next change.
+        static func records(all: @escaping () throws -> [StoredSSHKey],
+                            write: @escaping (StoredSSHKey) throws -> Void,
+                            delete: @escaping (UUID) throws -> Void) -> SSHKeyCatalogStore {
             SSHKeyCatalogStore(
-                load: { try KeychainManager.allSSHKeyRecords() },
-                save: { keys in
-                    let wanted = Set(keys.map(\.id))
-                    for existing in try KeychainManager.allSSHKeyRecords() where !wanted.contains(existing.id) {
-                        try KeychainManager.deleteSSHKeyRecord(for: existing.id)
-                    }
-                    for key in keys { try KeychainManager.saveSSHKeyRecord(key) }
-                }
+                load: all,
+                save: { _, changed, removed in
+                    for id in removed { try delete(id) }
+                    for key in changed { try write(key) }
+                },
+                writesWholeList: false
             )
         }
 
@@ -556,11 +571,12 @@ class SettingsManager {
                     guard data.count <= maximumBytes else { throw SettingsPersistenceError.invalidSSHKeyCatalog }
                     return try JSONDecoder().decode([StoredSSHKey].self, from: data)
                 },
-                save: { keys in
+                save: { keys, _, _ in
                     let data = try JSONEncoder().encode(keys)
                     guard data.count <= maximumBytes else { throw SettingsPersistenceError.readbackMismatch }
                     if let writer { writer(data) } else { defaults.set(data, forKey: UserDefaultsKeys.sshKeys) }
-                }
+                },
+                writesWholeList: true
             )
         }
     }
@@ -584,16 +600,28 @@ class SettingsManager {
         }
     }
 
-    private func persistSSHKeysAndVerify(_ candidateKeys: [StoredSSHKey]) throws {
+    /// Writes one change to the key records and reads it back; returns the catalog as it now stands,
+    /// with any keys other devices added since this one last read it.
+    /// - Parameters:
+    ///   - candidateKeys: the list with the change made, as this device knows it.
+    ///   - changed: the records added or edited.
+    ///   - removed: the records deleted.
+    private func persistSSHKeysAndVerify(_ candidateKeys: [StoredSSHKey], changed: [StoredSSHKey] = [],
+                                         removed: Set<UUID> = []) throws -> [StoredSSHKey] {
         try ensureSSHKeyCatalogAvailable()
-        try sshKeyCatalogStore.save(candidateKeys)
+        try sshKeyCatalogStore.save(candidateKeys, changed, removed)
         // Compared by identity rather than as an ordered list: the Keychain keys records by id and
-        // returns them oldest first, so "the same keys" is the question, not "the same order".
-        guard let persisted = try? sshKeyCatalogStore.load(),
-              Dictionary(persisted.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-                == Dictionary(candidateKeys.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) else {
+        // returns them oldest first, so "the same keys" is the question, not "the same order". A store
+        // whose records sync is checked only for what changed: other devices' keys are theirs.
+        guard let persisted = try? sshKeyCatalogStore.load() else { throw SettingsPersistenceError.readbackMismatch }
+        let byID = Dictionary(persisted.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let whole = sshKeyCatalogStore.writesWholeList
+        guard (whole ? candidateKeys : changed).allSatisfy({ byID[$0.id] == $0 }),
+              removed.allSatisfy({ byID[$0] == nil }),
+              !whole || byID.count == Set(candidateKeys.map(\.id)).count else {
             throw SettingsPersistenceError.readbackMismatch
         }
+        return persisted
     }
 
     private func verifiedPersistedSSHKeyCatalog() throws -> [StoredSSHKey] {
@@ -730,8 +758,7 @@ class SettingsManager {
                     // Persisted metadata is the commit marker. If either side still refers to
                     // the key, the deletion never committed and its live secret must survive.
                     if !catalogContainsKey {
-                        sshKeys.append(entry.key)
-                        try persistSSHKeysAndVerify(sshKeys)
+                        sshKeys = try persistSSHKeysAndVerify(sshKeys + [entry.key], changed: [entry.key])
                     }
                     guard try sshKeyLifecycleStore.retrieve(entry.key.id) != nil else {
                         entry.phase = .recoveryRequired
@@ -791,8 +818,7 @@ class SettingsManager {
                   Self.sshKeyMaterialMatches(readback, material) else {
                 throw SettingsPersistenceError.readbackMismatch
             }
-            sshKeys = originalKeys + [key]
-            try persistSSHKeysAndVerify(sshKeys)
+            sshKeys = try persistSSHKeysAndVerify(originalKeys + [key], changed: [key])
 
             journal.entries.removeAll { $0.key.id == key.id }
             if journal.entries.isEmpty {
@@ -804,7 +830,7 @@ class SettingsManager {
             var rollbackSucceeded = true
             sshKeys = originalKeys
             do {
-                try persistSSHKeysAndVerify(originalKeys)
+                sshKeys = try persistSSHKeysAndVerify(originalKeys, removed: [key.id])
             } catch {
                 rollbackSucceeded = false
             }
@@ -933,10 +959,15 @@ class SettingsManager {
         }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SSHKeyNameError.empty }
+        // Deleted on another device since this one read its list: renaming it would bring its record back.
+        if !sshKeyCatalogStore.writesWholeList, let current = try? sshKeyCatalogStore.load(),
+           !current.contains(where: { $0.id == keyID }) {
+            sshKeys = current
+            throw SecretStoreError.notFound
+        }
         var candidateKeys = sshKeys
         candidateKeys[index].name = trimmed
-        try persistSSHKeysAndVerify(candidateKeys)
-        sshKeys = candidateKeys
+        sshKeys = try persistSSHKeysAndVerify(candidateKeys, changed: [candidateKeys[index]])
     }
 
     func openSSHPublicKey(for keyID: UUID) throws -> String {
@@ -995,7 +1026,7 @@ class SettingsManager {
         }
 
         do {
-            try persistSSHKeysAndVerify(sshKeys)
+            sshKeys = try persistSSHKeysAndVerify(sshKeys, removed: [keyID])
             try await serverManager?.persistServersOrThrow()
             if let index = journal.entries.firstIndex(where: { $0.key.id == keyID }) {
                 journal.entries[index].phase = .metadataRemoved
@@ -1007,7 +1038,7 @@ class SettingsManager {
                 serverManager.servers = originalServers
             }
             do {
-                try persistSSHKeysAndVerify(originalKeys)
+                sshKeys = try persistSSHKeysAndVerify(originalKeys, changed: [keyMetadata])
                 try await serverManager?.persistServersOrThrow()
             } catch {
                 sshKeyDeletionRecoveryError = SettingsPersistenceError.rollbackFailed.localizedDescription
@@ -1044,7 +1075,7 @@ class SettingsManager {
                 serverManager.servers = originalServers
             }
             do {
-                try persistSSHKeysAndVerify(originalKeys)
+                sshKeys = try persistSSHKeysAndVerify(originalKeys, changed: [keyMetadata])
                 try await serverManager?.persistServersOrThrow()
             } catch {
                 rollbackSucceeded = false
@@ -1787,6 +1818,15 @@ class SettingsManager {
 
     func upsertLayoutPreset(_ preset: LayoutPreset) {
         var normalized = preset.migratedToCurrentSchema()
+        #if os(macOS)
+        // A workgroup this Mac saves: its local terminals no Mac has claimed are this Mac's.
+        if let thisMac = thisMacServerID?() {
+            for index in normalized.sessionIntents.indices
+            where normalized.sessionIntents[index].kind == .local && normalized.sessionIntents[index].macServerID == nil {
+                normalized.sessionIntents[index].macServerID = thisMac
+            }
+        }
+        #endif
         guard normalized.isValidForPersistence else {
             Logger.settings.error("Refusing to persist an invalid workgroup preset")
             return
@@ -1898,9 +1938,15 @@ class SettingsManager {
 
     // MARK: Workgroups keep their tmux sessions (W4b, 2026-10-08)
 
-    /// The tmux sessions saved workgroups hold on an SSH server: a new terminal there skips them.
+    /// This Mac's own Terminal service in the library (D86), set by the composition root; nil off
+    /// a Mac, and on a Mac the library does not know as itself. Workgroups record it on the local
+    /// terminals this Mac saves or runs (`SessionIntent.macServerID`).
+    var thisMacServerID: (@MainActor () -> UUID?)?
+
+    /// The tmux sessions saved workgroups hold on an SSH server — its SSH terminals' and, when the
+    /// server is a Mac, that Mac's local terminals' — so a new terminal there skips them.
     func tmuxSessionsHeld(forServer serverID: UUID) -> Set<String> {
-        LayoutPreset.tmuxSessionsHeld(in: layoutPresets, serverID: serverID)
+        LayoutPreset.tmuxSessionsHeld(in: layoutPresets, serverID: serverID, thisMac: thisMacServerID?())
     }
 
     /// The workgroups saved in `defaults`, read without a settings manager: the Mac's window
@@ -1924,10 +1970,57 @@ class SettingsManager {
               layoutPresets[position].sessionIntents.indices.contains(index) else { return false }
         var preset = layoutPresets[position]
         let saved = preset.sessionIntents[index]
-        guard saved.tmuxSession == nil, saved.kind == opened.kind, saved.serverID == opened.serverID else { return false }
+        // The same machine, however it was reached: a Mac terminal opened over SSH on its Mac from
+        // another device, or an SSH terminal to this Mac opened here as a local one (2026-10-29).
+        let thisMac = thisMacServerID?()
+        guard saved.tmuxSession == nil,
+              saved.kind == opened.kind ? saved.serverID == opened.serverID
+                                        : saved.machine(thisMac: thisMac) == opened.machine(thisMac: thisMac)
+        else { return false }
         preset.sessionIntents[index].tmuxSession = name
         upsertLayoutPreset(preset)
         return true
+    }
+
+    /// A Mac's local terminal from a workgroup runs here: the workgroup records this Mac as its
+    /// Mac, once, so other devices open it here rather than copies (2026-10-29). Only a local
+    /// terminal no Mac has claimed, and only while the pane at `index` is still it (`session`, the
+    /// tmux session the pane runs in, when the workgroup has one saved).
+    @discardableResult
+    func recordWorkgroupMac(workgroupID: UUID, index: Int, session: String?) -> Bool {
+        guard let thisMac = thisMacServerID?(),
+              let position = layoutPresets.firstIndex(where: { $0.id == workgroupID }),
+              layoutPresets[position].sessionIntents.indices.contains(index) else { return false }
+        let saved = layoutPresets[position].sessionIntents[index]
+        guard saved.kind == .local, saved.macServerID == nil,
+              saved.tmuxSession == nil || saved.tmuxSession == session else { return false }
+        upsertLayoutPreset(layoutPresets[position])
+        return layoutPresets[position].sessionIntents[index].macServerID == thisMac
+    }
+
+    /// A tmux session someone renamed (`%session-renamed`, 2026-10-29): every workgroup that saved
+    /// it on that machine (`serverID`, nil for this Mac) keeps it by its new name. Otherwise the
+    /// next open would make a new session under the old name and run its startup command again.
+    @discardableResult
+    func renameWorkgroupTmuxSession(from old: String, to new: String, serverID: UUID?) -> Bool {
+        guard old != new, TerminalTmux.isValidSessionName(new) else { return false }
+        let thisMac = thisMacServerID?()
+        let machine = serverID == thisMac ? nil : serverID
+        var renamed = false
+        for var preset in layoutPresets {
+            var changed = false
+            for index in preset.sessionIntents.indices
+            where preset.sessionIntents[index].tmuxSession == old
+                && preset.sessionIntents[index].machine(thisMac: thisMac) == machine {
+                preset.sessionIntents[index].tmuxSession = new
+                changed = true
+            }
+            if changed {
+                upsertLayoutPreset(preset)
+                renamed = true
+            }
+        }
+        return renamed
     }
 
     func updateLayoutPresetLastUsed(_ presetID: UUID) {

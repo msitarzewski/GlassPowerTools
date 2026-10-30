@@ -72,8 +72,12 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - Files on this device or on a server, projects with a file tree, syntax highlighting, and previews
   for Markdown (with Mermaid diagrams), HTML, SVG and CSV. Images, PDFs, video, audio and 3D models
   open as themselves. On the Mac it can be your default text editor.
-- Git: a project's branch and changes, change marks beside the lines, staging and committing, and
-  pull, push and fetch, on this Mac or on a server over the project's SSH connection.
+- Git, on this Mac or on a server over the project's SSH connection: Source Control with a diff
+  viewer (unified or side by side, changed words highlighted, 3 or 10 lines of context or the whole
+  file, whitespace ignored), staging a file, a hunk or chosen lines, discarding, commit and amend,
+  pull, push and fetch, the history with its graph, branches, stashes and tags, merges, rebases,
+  cherry-picks, reverts and resets, a conflict resolver, Blame and a file's history, Clone, and change
+  marks beside the lines.
 
 ### Across the system
 - Widgets (Machines, Machine, Active), Siri and Shortcuts, Spotlight, Controls, Handoff and
@@ -91,6 +95,32 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.549 (28 October 2026, not released yet)
+- **Git, end to end.** The Changes tab became **Source Control**: Changes, History, Branches, Stashes
+  and Tags, on a Mac and, for a project on a server, on iPhone, iPad and Vision Pro too.
+  - **A diff viewer.** Unified or side by side (unified when the window is narrow), the words that
+    changed inside a line highlighted, 3 or 10 lines around each change or the whole file, and
+    whitespace ignored when you ask.
+  - **Stage a hunk, or single lines.** Each hunk has Stage, Unstage and Discard; choose line numbers
+    to act on those lines only. What is staged is listed apart from what isn't. Discard a file's
+    changes, or all of them (each asks first), and Amend the last commit.
+  - **History** with the lines of its branches and merges, the branches and tags at each commit, and
+    each commit's message and changes; from a commit, a branch or tag, check out, cherry-pick,
+    revert, reset (soft, mixed or hard), copy, or open it on GitHub.
+  - **Branches**, here and on each remote: switch, track a remote's branch, merge, rebase, make,
+    rename, push, delete (asking again for one whose commits would be lost), open on GitHub, and begin
+    a pull request. **Stashes** with their changes (apply, pop, drop), and **Tags** (make, push,
+    delete).
+  - **Merges and rebases that stop.** A bar says what is under way, with Continue, Skip and Abort, and
+    a resolver puts each conflict's two sides beside each other: ours, theirs, or both.
+  - **Blame** and a file's **History**, from the file list or the Mac's new Git menu, which also has
+    each part of Source Control, Pull, Push, Fetch, New Branch… and Stash Changes….
+  - **Clone**: File ▸ Clone Repository… on a Mac, or Clone Repository Here… on any folder in a
+    project, on this Mac or on a server.
+  - Open files a checkout, a merge, a stash or a discard changed are read again; one with unsaved
+    edits keeps them, and saving it asks which version to keep.
+  - Change marks beside the lines stay, in a narrow strip, with line numbers turned off.
 
 ### 0.4.495 – 0.4.548 (21 – 28 October 2026)
 - **0.4.548 is the Mac's third release**, through Sparkle.

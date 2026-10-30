@@ -945,6 +945,10 @@ class SessionManager {
         session.tmuxNamesHeld = { [weak settingsManager] in
             settingsManager?.tmuxSessionsHeld(forServer: serverID) ?? []
         }
+        // A session renamed on its host keeps its workgroups (2026-10-29).
+        session.tmuxSessionRenamed = { [weak settingsManager] old, new in
+            settingsManager?.renameWorkgroupTmuxSession(from: old, to: new, serverID: serverID)
+        }
     }
 
     /// Recording a connection is best-effort metadata — `updateLastConnected` logs its own

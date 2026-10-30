@@ -170,6 +170,21 @@ final class MacWorkspacePreviewRegistry {
             .filter { $0.workgroupID == workgroupID && !$0.isClosed }
     }
 
+    /// Saved workgroups' Mac terminals open in this Mac's windows now are this Mac's: each workgroup
+    /// records it (2026-10-29), once the library can say which of its machines this Mac is. Windows
+    /// back after a relaunch start their tabs before the library has loaded, which say so then.
+    func recordThisMacOnOpenWorkgroups(settingsManager: SettingsManager) {
+        for preset in settingsManager.layoutPresets
+        where preset.sessionIntents.contains(where: { $0.kind == .local && $0.macServerID == nil }) {
+            for tab in tabs(for: preset.id) {
+                for pane in tab.state.root?.panes ?? [] where pane.intent.kind == .local {
+                    guard let index = pane.intent.sourceSessionIndex else { continue }
+                    settingsManager.recordWorkgroupMac(workgroupID: preset.id, index: index, session: pane.intent.localTmuxSession)
+                }
+            }
+        }
+    }
+
     /// The window, tab and pane holding a live session — Active's way to a terminal that is in
     /// no workgroup.
     private func locate(sessionID: UUID) -> (window: NSWindow, controller: MacWorkspaceWindowController,
@@ -198,14 +213,18 @@ final class MacWorkspacePreviewRegistry {
     }
 
     /// The window and tab `reveal(workgroup:)` brings forward, if any.
-    func locate(workgroup preset: LayoutPreset) -> (window: NSWindow, controller: MacWorkspaceWindowController,
+    func locate(workgroup preset: LayoutPreset,
+                thisMac: UUID? = GlassTerminalRuntime.current?.thisMacServerID?()) -> (window: NSWindow, controller: MacWorkspaceWindowController,
                                                     tab: MacWorkspaceController)? {
+        // By machine (`SessionIntent.machine`): a local tab and an SSH pane to this Mac's own record
+        // show one session, as do a Mac terminal and an SSH pane to its Mac (2026-10-29).
         let saved = Set(preset.sessionIntents.compactMap { intent in
-            intent.tmuxSession.map { TerminalWorkgroupSession(serverID: intent.kind == .local ? nil : intent.serverID, name: $0) }
+            intent.tmuxSession.map { TerminalWorkgroupSession(serverID: intent.machine(thisMac: thisMac), name: $0) }
         })
         func holdsSaved(_ tab: MacWorkspaceController) -> Bool {
             (tab.state.root?.panes ?? []).contains { pane in
-                pane.intent.tmuxSession.map { saved.contains(TerminalWorkgroupSession(serverID: pane.intent.serverID, name: $0)) } == true
+                let machine = pane.intent.serverID == thisMac ? nil : pane.intent.serverID
+                return pane.intent.tmuxSession.map { saved.contains(TerminalWorkgroupSession(serverID: machine, name: $0)) } == true
             }
         }
         let shown = entries.keys.sorted { $0.uuidString < $1.uuidString }.compactMap { id -> (NSWindow, MacWorkspaceWindowController)? in
