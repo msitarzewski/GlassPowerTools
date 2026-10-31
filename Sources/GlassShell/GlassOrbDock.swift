@@ -243,6 +243,17 @@ public final class GlassOrbDockModel {
         lastSide = side
     }
 
+    #if DEBUG
+    /// Screenshots (`--demo-dock-below`): the dock opens under the Connections window, low and in front,
+    /// with the window brought back above it, as the owner keeps his ("the terminal above with tabs open
+    /// and the full dock below", 2026-10-31); in the simulator visionOS put it high on the right, and
+    /// nothing there can move a window.
+    public static var demoOpensBelowConnections = false
+
+    /// Screenshots: the next window opens above the dock, as one brought back from it does.
+    public func demoNextWindowByDock() { returning(nil) }
+    #endif
+
     /// Where a window opens: by the dock when the dock asked for it, else wherever visionOS puts it.
     func placement(_ context: WindowPlacementContext) -> WindowPlacement {
         returning.removeAll { $0.until <= .now }
@@ -263,9 +274,14 @@ public extension Scene {
     /// The dock opens at the size the person gave it, wherever visionOS puts it; at its first
     /// otherwise, and fits its orbs (`GlassOrbDockView`).
     func glassOrbDockOpensAtItsSize() -> some Scene {
-        defaultWindowPlacement { _, _ in
-            WindowPlacement(size: GlassConnectionsWindowSize.stored(
-                GlassUITestRun.settingsDefaults.string(forKey: GlassOrbDock.sizeKey) ?? ""))
+        defaultWindowPlacement { _, context in
+            let size = GlassConnectionsWindowSize.stored(GlassUITestRun.settingsDefaults.string(forKey: GlassOrbDock.sizeKey) ?? "")
+            #if DEBUG
+            if GlassOrbDockModel.demoOpensBelowConnections, let main = context.windows.first(where: { $0.id == "main" }) {
+                return WindowPlacement(.below(main), size: size)
+            }
+            #endif
+            return WindowPlacement(size: size)
         }
     }
 

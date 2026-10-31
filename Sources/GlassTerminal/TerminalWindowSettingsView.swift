@@ -15,6 +15,7 @@
 
 import SwiftUI
 import GlassLayers
+import GlassShell
 import GlassConnectionUI
 import GlassTerminalEmulator
 
@@ -29,6 +30,11 @@ struct TerminalOverridesSettingsView: View {
     /// The window's name as typed, kept on Return or on leaving the field.
     @State private var nameDraft = ""
     @FocusState private var nameFocused: Bool
+    #if os(visionOS)
+    /// The Debugging section, once shown from Settings ▸ About (`GlassDebugging`).
+    @AppStorage(GlassDebugging.revealedKey, store: GlassUITestRun.settingsDefaults) private var showsDebugging = false
+    @AppStorage(TerminalRefreshCountsView.shownKey) private var showsRefreshCounts = false
+    #endif
     #endif
 
     /// Where each kind of setting lives for every window, as This Window names it.
@@ -311,6 +317,17 @@ struct TerminalOverridesSettingsView: View {
                 Text("Focus Mode")
             } footer: {
                 Text("What surrounds you when this window enters Focus Mode. To add your own, go to All Terminals ▸ Focus Mode.")
+            }
+
+            if showsDebugging {
+                Section {
+                    Toggle("Show Refresh Counts", isOn: $showsRefreshCounts)
+                        .accessibilityIdentifier("terminal-window-refresh-counts")
+                } header: {
+                    Text("Debugging")
+                } footer: {
+                    Text("Over every terminal window: how often windows, terminals and their bars are drawn each second, how much output arrives, and how soon a typed key's answer comes back. The rest is in All Terminals ▸ Diagnostics.")
+                }
             }
             #endif
 

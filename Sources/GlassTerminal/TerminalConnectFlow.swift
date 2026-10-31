@@ -350,15 +350,21 @@ struct TerminalConnectFlow: ViewModifier {
             sessionManager.registerSession(session)
             session.state = .connected
             presentTerminalWindow(for: session, windowSettings: windowSettings)
-        case .demoTabs(let names, let output, let grid, let windowSettings, let ticks, let titles, let every):
-            // The same connectionless sessions, as the tabs of one window.
-            let sessions = names.map { name in
+        case .demoTabs(let names, let output, let grid, let windowSettings, let ticks, let titles, let every, let firstDraw):
+            // The same connectionless sessions, as the tabs of one window; the first drawing
+            // `firstDraw`'s screen for its size when there is one.
+            let sessions = names.enumerated().map { index, name in
+                let draw = index == 0 ? firstDraw : nil
+                let program = DemoWheelAnswer()
                 let session = TerminalSession(server: ServerConfiguration(name: name, host: "192.0.2.10", username: "ann"),
                                               terminalWriteSink: { _ in },
-                                              terminalResizeSink: { _, _ in })
+                                              terminalResizeSink: { rows, columns in
+                                                  if let draw { program.session?.feedTerminalData(draw(rows, columns)) }
+                                              })
+                program.session = session
                 sessionManager.registerSession(session)
                 session.state = .connected
-                session.feedTerminalData(output)
+                if draw == nil { session.feedTerminalData(output) }
                 return session
             }
             // Each writing as `demoReplay`'s does, a little apart, as agents at work in one window.

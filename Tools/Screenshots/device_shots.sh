@@ -66,7 +66,11 @@ shot vision-workgroups "${VISION_APP:-}" "$VISION" workgroups 25 "$GLASS"
 # 2026-10-30: Git in the editor (a taller window, so Changes shows more than its first file), and the orb dock
 # (D88) by itself, then closer, one tab's name showing as a look shows it.
 shot vision-editor-git "${VISION_APP:-}" "$VISION" editor-git 32 "$GLASS --demo-close-connections --demo-editor-size 1150,1050"
-shot vision-dock "${VISION_APP:-}" "$VISION" dock 40 "$GLASS --demo-close-connections --demo-dock-alone"
+# The dock as the owner keeps his (2026-10-31: "the terminal above with tabs open and the full dock below"): the
+# dock opens under a short Connections window, low enough for the simulator's fixed view, and a terminal with its
+# tabs comes back above it. The close-up keeps the dock alone: in this layout a dot's name is drawn under the
+# terminal's toolbar.
+shot vision-dock "${VISION_APP:-}" "$VISION" dock 45 "$GLASS --demo-close-connections --demo-dock-below --demo-library-size 1000x200"
 shot vision-dock-name "${VISION_APP:-}" "$VISION" dock 40 "$GLASS --demo-close-connections --demo-dock-alone" \
   "✳ Storefront checkout redesign"
 # Focus Mode in rooms of one's own (D89; the owner, 2026-10-30, "screen shots for the site"): the loft, Midtown out of

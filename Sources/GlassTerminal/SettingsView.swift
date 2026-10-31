@@ -403,6 +403,10 @@ struct TerminalSettingsView: View {
     @Environment(SettingsManager.self) private var settingsManager
     @State private var showingThemeEditor = false
     @State private var showingThemeChooser = false
+    #if os(visionOS)
+    /// Diagnostics only once shown from Settings ▸ About (`GlassDebugging`).
+    @AppStorage(GlassDebugging.revealedKey, store: GlassUITestRun.settingsDefaults) private var showsDebugging = false
+    #endif
     
     var body: some View {
         @Bindable var settings = settingsManager
@@ -626,7 +630,7 @@ struct TerminalSettingsView: View {
                 .onChange(of: settings.focusEnvironmentSound) { _, _ in
                     settings.saveSettings()
                 }
-            TerminalRefreshCountsSection()
+            if showsDebugging { TerminalRefreshCountsSection() }
             #endif
 
             #if os(macOS)

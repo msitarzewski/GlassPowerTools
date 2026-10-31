@@ -205,6 +205,12 @@ use the disposable test VM only).
   "commit the rest": all of the 10-30/31 work committed (not pushed, not deployed). **Next:** D92's step 1 (play
   Apple's components) when he says; his open choices: Reality Composer Pro 3 here, the plugin's licence, a Feedback
   report.
+- **Then (2026-10-31, after pushing `2fcad522`):** the site's dock picture retaken as he uses it ("the terminal above
+  with tabs open and the full dock below"; DEBUG `--demo-dock-below`, a tabbed demo terminal whose first tab draws
+  btop); the site rebuilt and staged on the server, **his provision command still to run**. Then the diagnostics
+  hidden until shown (hold the version in Settings ▸ About; a Debugging section in a terminal window's settings):
+  **0.4.569** built and installed on the Mac, headset and iPhone, each read back 0.4.569; no new Mac crash reports.
+  Not committed: the dock picture and 0.4.569's changes, awaiting his word.
 
 ## 2026-10-27 — the orb dock's ninth to thirteenth rounds, the terminal redraw storm, and living rooms committed and pushed (0.4.535–0.4.541)
 - **Pushed 2026-10-27 at his word ("push it"):** eight commits, `dcad5dcb`…`61a3bd0f` (0.4.495–0.4.541), each scanned for

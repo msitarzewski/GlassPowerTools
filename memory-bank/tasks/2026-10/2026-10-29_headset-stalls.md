@@ -120,3 +120,15 @@ of the host's `TerminalEngine` protocol, on SwiftTerm's headless `Terminal` core
 Unicode widths and our tmux control mode are where the correctness lives). Switchable per window. Costs: selection,
 keyboard/IME input, VoiceOver, links, search highlights, images, hold-to-select and diagram marks move to the new
 view; days to a couple of weeks. Waiting on his word.
+
+## 0.4.569: the diagnostics kept, out of the way (2026-10-31)
+The owner: "make the debug panel toggleable so we can keep it but it's available when we need it"; asked which, "both
+but put the toggle in a debugging section in window's settings."
+- **Hidden until shown** (`GlassDebugging.revealedKey`, this device only, never synced): holding the version line in
+  Settings ▸ About for 2 seconds shows them, holding it again hides them (also an accessibility action, Show/Hide
+  Debugging); About then says where they are. Vision Pro only, as the diagnostics are.
+- **Settings ▸ Terminal ▸ Diagnostics** (Show Refresh Counts, Draw with Metal, Repaint Changed Lines Only) appears
+  only once shown.
+- **This Window ▸ Debugging**, once shown: **Show Refresh Counts** (the same switch, for every terminal window, as
+  its footer says).
+- Undocumented in the help on purpose: it's for diagnosing, not a feature.

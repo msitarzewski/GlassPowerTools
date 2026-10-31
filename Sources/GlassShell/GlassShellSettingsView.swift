@@ -421,6 +421,10 @@ public struct GlassShellSettingsView: View {
 struct GlassShellAboutView: View {
     private static let sponsor = URL(string: "https://github.com/sponsors/msitarzewski")!
     @State private var showsAcknowledgements = false
+    #if os(visionOS)
+    /// Diagnostics shown on this device (`GlassDebugging`): holding the version line shows or hides them.
+    @AppStorage(GlassDebugging.revealedKey, store: GlassUITestRun.settingsDefaults) private var showsDebugging = false
+    #endif
 
     var body: some View {
         VStack(spacing: 10) {
@@ -434,6 +438,19 @@ struct GlassShellAboutView: View {
             Text("Version \(GlassShellSettingsView.versionString)")
                 .font(.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("settings-about-version")
+                #if os(visionOS)
+                .onLongPressGesture(minimumDuration: 2) { showsDebugging.toggle() }
+                .accessibilityAction(named: showsDebugging ? "Hide Debugging" : "Show Debugging") { showsDebugging.toggle() }
+                #endif
+            #if os(visionOS)
+            if showsDebugging {
+                Text("Debugging is shown: Settings ▸ Terminal ▸ Diagnostics, and Debugging in a terminal window's settings. Hold the version again to hide it.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 380)
+                    .accessibilityIdentifier("settings-about-debugging")
+            }
+            #endif
             Text("Terminals, databases, remote desktops and an editor for every machine you own — on Mac, iPad, iPhone and Vision Pro.")
                 .font(.callout).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

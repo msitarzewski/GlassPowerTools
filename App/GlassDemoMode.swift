@@ -296,6 +296,7 @@ enum GlassDemoMode {
             // opens, then the shop's monitor open beside it. `--demo-orb-name <title>` shows one name.
             #if os(visionOS)
             GlassUITestRun.settingsDefaults.set(true, forKey: GlassOrbDock.settingKey)
+            GlassOrbDockModel.demoOpensBelowConnections = arguments.contains("--demo-dock-below")
             GlassSessionOrbDemo.shrinksNext = true
             let ticks = (1...6).map { Data("\r\n\u{1B}[2m  ⎿  reading line \($0)\u{1B}[0m".utf8) }
             terminal.requestDemoTabs(names: ["✳ Storefront checkout redesign", "✳ Fix the flaky login tests",
@@ -310,9 +311,13 @@ enum GlassDemoMode {
             await openEditor(editor, preview: false)
             try? await Task.sleep(for: .seconds(12))
             GlassSessionOrbDemo.shrinksNext = false
-            // `--demo-dock-alone`: the dock by itself.
+            // `--demo-dock-alone`: the dock by itself. Otherwise a terminal with its tabs, back above the
+            // dock as a window from the dock comes (the owner, 2026-10-31: "the terminal above with tabs
+            // open and the full dock below").
             guard !arguments.contains("--demo-dock-alone") else { return }
-            terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:), windowSettings: demoLook)
+            GlassOrbDockModel.shared.demoNextWindowByDock()
+            terminal.requestDemoTabs(names: ["shop", "jobs", "release", "backups"], output: Data(terminalTranscript.utf8),
+                                     grid: false, windowSettings: demoLook, firstDraw: GlassDemoBtop.screen(rows:columns:))
             #endif
         case "orb", "orb-looked-at":
             // Connections shrunk into its orb by the real idle path (W29): two terminals open, so
