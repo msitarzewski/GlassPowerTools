@@ -16,7 +16,8 @@
 # site, and is no bigger than what is in it. `looks` are still cut out by the window's outline, for the gallery's
 # small pictures. `workspace` is four windows at once: a terminal running a btop-style monitor, a database, a
 # desktop and the editor. `editor-git` is the editor's Changes on the made-up shop's repository
-# (App/GlassDemoGit.swift, made with the VM's git); `sql` is SQL from a terminal, two windows at once.
+# (App/GlassDemoGit.swift, made with the VM's git); `sql` is SQL from a terminal, two windows at once;
+# `all-windows` is Show All Windows over a terminal's tabs, a database, a desktop and the editor.
 # Look at every picture before publishing it: nothing personal belongs in them.
 set -euo pipefail
 ROOT=${0:A:h:h:h}
@@ -203,6 +204,28 @@ sql() {  # dark | light
   sleep 3
   screen "sql-$1"
 }
+# `all-windows`: Show All Windows over what the `all-windows` surface opens (a terminal window of three tabs, the
+# first running the btop-style monitor; the shop's database; a desktop; the editor), opened as a person opens it,
+# from the terminal window's toolbar. It covers the whole screen, so the windows' frames under it don't matter. The
+# desktop's not-ready notice (`BEFORE`) is dismissed first, or its picture would carry it. A tab has a picture once
+# it has been shown, so each is shown (⌘2, ⌘3, then ⌘1 back to the monitor) before it opens.
+all_windows() {  # dark | light
+  SETTLE=24 launch all-windows
+  connections_away
+  timeout 60 $VM tool press "$APP" "Dismiss" >/dev/null 2>&1 || true
+  sleep 1
+  # Its accessibility name is the tab's and where it is connected ("alpha – ann@192.0.2.10:22"), so not `raise`.
+  events "tell process \"$APP\" to set frontmost to true"
+  events "tell process \"$APP\" to perform action \"AXRaise\" of (first window whose name starts with \"alpha\")"
+  sleep 1
+  for tab in 2 3 1; do
+    events "keystroke \"$tab\" using command down"
+    sleep 2
+  done
+  timeout 60 $VM tool press "$APP" "Show All Windows" alpha >/dev/null
+  sleep 3
+  screen "all-windows-$1"
+}
 dock() {  # hide | show: in the GUI session (from SSH alone the Dock stayed, 2026-10-30)
   gui "defaults write com.apple.dock autohide -bool $([[ $1 == hide ]] && echo true || echo false); killall Dock" >/dev/null 2>&1 || true
   sleep 3
@@ -250,16 +273,22 @@ names=("$@")
 # `workgroups` and `workspace` are there to name, not in the default set: the Mac's workgroup detail cuts its
 # table off at this size, so the site shows the Vision Pro one; and the four windows at once repeated the home
 # page's four service pictures, so the owner kept those (2026-10-18).
-(( $# )) || names=(library terminal database diagram desktop editor editor-git sql active)
+(( $# )) || names=(library terminal database diagram desktop editor editor-git sql active all-windows)
 prepare
-[[ -n ${(M)names:#database} || -n ${(M)names:#diagram} || -n ${(M)names:#workspace} || -n ${(M)names:#sql} ]] && shop
+[[ -n ${(M)names:#database} || -n ${(M)names:#diagram} || -n ${(M)names:#workspace} || -n ${(M)names:#sql}
+   || -n ${(M)names:#all-windows} ]] && shop
 for name in $names; do
   [[ $name == looks ]] && { looks; continue; }
-  [[ -n ${SURFACE[$name]:-} || $name == workspace || $name == sql ]] || { echo "unknown shot: $name"; exit 2; }
+  [[ -n ${SURFACE[$name]:-} || $name == workspace || $name == sql || $name == all-windows ]] \
+    || { echo "unknown shot: $name"; exit 2; }
   for look in dark light; do
     appearance $look
     if [[ $name == sql ]]; then
       sql $look
+      continue
+    fi
+    if [[ $name == all-windows ]]; then
+      all_windows $look
       continue
     fi
     if [[ $name == workspace ]]; then

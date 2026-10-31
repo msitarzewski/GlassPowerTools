@@ -319,6 +319,26 @@ now name their bars with annotations instead
 ([task note](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md)). Chart layout on this machine can
 be measured headless with an `ImageRenderer` probe — `Tools/ChartProbe` is the shape of it.
 
+## Xcode 27.2 released (27B52), the only Xcode — 2026-10-31
+
+The owner removed Xcode 27.1 and the 27.2 beta; `/Applications/Xcode.app` is 27.2 (27B52) and selected.
+- **Metal Toolchain again.** The first archive failed with `missing Metal Toolchain`, as on 2026-09-19: each new
+  Xcode needs `xcodebuild -downloadComponent MetalToolchain` (now in `Documentation/BUILDING.md`).
+- **Runtimes kept:** iOS 27.2 (24B8117); iOS 27.2 for the iPhone Duo (24B91016s, identifier
+  `iOS-27-2-iPhone19-4`: the Duo has a runtime of its own, which the plain one doesn't run); visionOS 27.2
+  (24N120); and iOS and visionOS 26.5 (23F77, 23O470) to try the oldest supported release (the floor is 26.0).
+  Removed: iOS 27.0 and 27.1, the 27.2 betas, visionOS 27.0, and every tvOS and watchOS runtime.
+- **`simctl runtime delete` the first time only unregistered** a runtime: it printed "Run 'xcrun simctl runtime
+  scan-and-mount' to re-register the runtime, then delete it again" and left the files in
+  `/System/Library/AssetsV2/com_apple_MobileAsset_*SimulatorRuntime`. After `scan-and-mount`, a second delete removed
+  them (37 GB of runtimes left, from 145).
+- **Simulators** on removed runtimes were deleted, except three with something on them, moved with `simctl upgrade`
+  (which keeps their data): the Duo probe (its library) and two of other projects'. The screenshot scripts'
+  `simulator()` takes the newest runtime's simulator with that exact name, so a 26.5 one never stands in; an
+  "iPhone 17 Pro Max" was made on iOS 27.2, whose own set starts at the iPhone 18.
+- **Device support** folders were all for builds no device runs now (iPhone 27.2 is 24B119, Vision Pro 24N120) and
+  were removed, with derived data written by the older Xcodes.
+
 ## Editor and grid engines, 2026-09-25
 
 - **Mac editor text system: TextKit 1** with non-contiguous layout (D36) — `GlassTextView.makeTextKit1()`,

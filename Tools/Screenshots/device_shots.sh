@@ -23,8 +23,12 @@ GLASS="--demo-glass 0.78,0.5,thin"
 . Tools/Screenshots/demo-hosts.sh
 mkdir -p "$RAW" "$OUT"
 
-simulator() {  # the first available simulator with this exact name
-  xcrun simctl list devices available | grep -F "    $1 (" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'
+simulator() {  # the available simulator named exactly this, on the newest runtime that has one: the list runs
+  # oldest first, and an older runtime kept for the oldest supported release (26.5) must not stand in (2026-10-31)
+  xcrun simctl list devices available | awk -v prefix="    $1 (" '
+    index($0, prefix) == 1 { rest = substr($0, length(prefix) + 1)
+      if (substr(rest, 37, 1) == ")" && substr(rest, 1, 36) !~ /[^0-9A-F-]/) id = substr(rest, 1, 36) }
+    END { print id }'
 }
 ready() {  # udid [ios]
   xcrun simctl boot "$1" 2>/dev/null || true

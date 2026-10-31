@@ -5,6 +5,9 @@
 - A Mac with Apple silicon. The app is built for `arm64` only.
 - Xcode 27 or later (the project is developed with Xcode 27.2 and Swift 6.4). The package manifest
   needs Swift tools 6.2.
+- Xcode's Metal Toolchain, which a new Xcode doesn't include: the terminal's renderer has Metal
+  shaders, so without it every build fails with "missing Metal Toolchain". Install it once per Xcode
+  with `xcodebuild -downloadComponent MetalToolchain`, or from Xcode ▸ Settings ▸ Components.
 - Deployment floor: macOS 26, iOS and iPadOS 26, visionOS 26.
 - Python 3 and `curl`, used by the build's pre-action (below). `npm` only when Mermaid moves to a
   new version.

@@ -137,7 +137,13 @@ public final class GlassDesktopCapability: GlassCapability {
 
     /// Every desktop on screen, one row each, on the machine its service belongs to.
     public func openSessions() -> [GlassOpenSession] {
-        runtime.app.liveSessions.map { session in
+        var sessions = runtime.app.liveSessions
+        #if DEBUG
+        // The screenshots' made-up desktops (`requestDemoDesktop`) keep storage of their own, so
+        // they join here, or Show All Windows left them out (2026-10-31).
+        sessions += runtime.demoSessions.values.sorted { $0.connection.name < $1.connection.name }
+        #endif
+        return sessions.map { session in
             let connection = session.connection
             let protocolName = connection.protocol == .rdp ? "RDP" : "VNC"
             return GlassOpenSession(

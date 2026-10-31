@@ -408,8 +408,14 @@ struct TerminalConnectFlow: ViewModifier {
             sessionManager.selectSession(first.id, inWorkgroup: workgroupID)
             iOSRouter.showTerminal(workgroupID: workgroupID)
             #else
+            // One window with a tab per session, each claiming its own (2026-10-31: only the first
+            // had a window, and Show All Windows listed the others as Files browsers).
             _ = grid
-            presentTerminalWindow(for: first, windowSettings: windowSettings)
+            var request = MacWorkspaceLaunchRequest(tabs: sessions.map {
+                MacLiveSessionWorkspaceRouter.launchRequest(for: $0, sessionManager: sessionManager).tabs[0]
+            })
+            request.windowSettings = windowSettings
+            openWindow(id: "workspace", value: request)
             #endif
         case .demoFiles(let name, let path):
             // The same connectionless session: the browser cannot open SFTP over it and says so,

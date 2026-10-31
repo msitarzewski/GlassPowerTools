@@ -391,10 +391,16 @@ enum GlassDemoMode {
                 windowSettings: windowSettings,
                 opensSettings: surface == "desktop-settings")
         case "all-windows":
-            // All Windows (2026-10-14): a window of three terminals as tabs, a desktop and an
-            // editor, then All Windows over them, laid out as the Mac's, a card per tab.
-            terminal.requestDemoTabs(names: ["alpha", "bravo", "charlie"],
-                                     output: Data(terminalTranscript.utf8), grid: false, windowSettings: demoLook)
+            // All Windows (2026-10-14): a window of three terminals as tabs, the first running
+            // the btop-style monitor, the shop's database, a desktop and an editor, then All Windows
+            // over them, a card per tab. On the Mac, Tools/Screenshots/site_shots.sh presses Show
+            // All Windows itself (2026-10-31, the owner: the Mac's was on the site nowhere).
+            terminal.requestDemoTabs(names: ["alpha", "build", "nas"],
+                                     output: Data(terminalTranscript.utf8), grid: false, windowSettings: demoLook,
+                                     firstDraw: GlassDemoBtop.screen(rows:columns:))
+            try? await Task.sleep(for: .seconds(2))
+            database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop", showsDiagram: false)
+            try? await Task.sleep(for: .seconds(2))
             let renderer = ImageRenderer(content: DemoRemoteScreen())
             renderer.scale = 1
             if let picture = renderer.cgImage {

@@ -123,6 +123,17 @@ The same app, with a local shell, menus and windows that are as see-through as y
     <td><sub><strong>Remote desktops.</strong> RDP and VNC, with the remote resolution following your window.</sub></td>
     <td><sub><strong>Editor.</strong> Files on this device or on a server, with highlighting, previews, Git, and viewers for pictures, PDFs and 3D models.</sub></td>
   </tr>
+  <tr>
+    <td colspan="2">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-all-windows-dark.webp">
+        <img src="site/static/shots/mac-all-windows-light.webp" alt="Show All Windows on a Mac: a terminal window's three tabs, a database, a remote desktop and the editor, as live pictures in groups.">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2"><sub><strong>Show All Windows.</strong> Every terminal tab and every other window at once, as live pictures, a group for each. Type to find one, choose it to go there, or drag a tab into another window. Press ⇧⌘\ or pinch in on a terminal.</sub></td>
+  </tr>
 </table>
 
 ## A terminal worth looking at
@@ -209,9 +220,12 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   be picked up on another device, and with tmux 3.2 or later the terminal keeps every line itself, so
   you scroll and select through the whole history. Windows scale as well as resize, and each can have
   a look of its own. Color schemes come from macOS Terminal profiles, any number of them, kept in
-  iCloud Drive for every device. A file whose path a terminal prints previews over it (on the Mac and
-  Vision Pro), with a log file's end (followed as it grows on the Mac), and a Mermaid diagram it prints
-  draws with one choice. On the Mac, SQL it prints opens in the query editor on that machine's database, and the
+  iCloud Drive for every device. Links and paths a terminal prints are recognised, with actions of
+  their own (right-click on the Mac, pinch and hold on Vision Pro): open the link, open the file in the
+  Editor, show it in the Finder or Files, or follow a log in a new tab with Watch Log File. The file a
+  path names previews over the terminal (on the Mac and Vision Pro), a log file's end included, kept
+  up to date as it grows when the log is on the Mac, and a Mermaid diagram a terminal prints draws
+  with one choice. On the Mac, SQL a terminal prints opens in the query editor on that machine's database, and the
   folder button opens the shell's folder in the Finder, Files or the Editor; on iPhone, iPad and Vision
   Pro, a picture or file pasted into a terminal is uploaded and its path typed. A workgroup's
   terminals on a Mac open from your other devices over SSH to that Mac. On Vision Pro, orbs gather in
@@ -250,6 +264,8 @@ The [help](https://glasspowertools.com/help/) is written from the app's own code
   [connect](https://glasspowertools.com/help/library-connect.html),
   [sync](https://glasspowertools.com/help/library-sync.html)
 - **Terminal:** [connect](https://glasspowertools.com/help/terminal-connect.html),
+  [work in a terminal](https://glasspowertools.com/help/terminal-sessions.html) (links, paths and
+  file previews included),
   [keys and trust](https://glasspowertools.com/help/terminal-keys-and-trust.html),
   [tmux](https://glasspowertools.com/help/terminal-tmux.html),
   [workgroups](https://glasspowertools.com/help/terminal-workgroups.html),

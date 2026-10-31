@@ -31,7 +31,19 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-10-28/29 — RESUME HERE: git first class (0.4.549) and the headset's stalls (0.4.550), uncommitted
+## 2026-10-31 — RESUME HERE: the first external TestFlight, Xcode 27.2, Show All Windows on the site
+- **TestFlight (his "spin up the first actual test flight"):** 0.4.569 (569) uploaded for iPhone, iPad and Vision Pro
+  with the released Xcode 27.2; What to Test on both builds; both in the external Testers group (public link, 100);
+  review contact set; **both submitted for Beta App Review** (`WAITING_FOR_BETA_REVIEW`). App Privacy "Data Not
+  Collected", published by him. `tasks/2026-10/2026-10-31_external-testflight.md`.
+- **Xcode 27.2 (27B52) is the only Xcode:** old runtimes, simulators, device support and derived data removed; the
+  screenshot scripts take the newest runtime's simulator (techContext, "Xcode 27.2 released").
+- **The Mac's Show All Windows** pictured on the home and terminal pages and in the README (`site_shots.sh
+  all-windows`); links, paths and log previews added to the home page, README, App Store description and What to
+  Test. Committed and pushed at his word, with the site's deployment asked for in the same breath.
+- **Next:** Beta App Review's answer; then the Duo's fold on Xcode 27.2's Device Hub, unchecked.
+
+## 2026-10-28/29 — git first class (0.4.549) and the headset's stalls (0.4.550), uncommitted
 - **Git, end to end, in the editor** (his "build git now, end to end, first class (doff viewer, all of it!)"): built,
   tested, installed as 0.4.549 on all three; nothing committed or pushed. `tasks/2026-10/2026-10-28_git-first-class.md`.
   Not yet seen: his look on the Mac, a server project, the iPhone and headset layouts.
