@@ -64,7 +64,7 @@ Sessions running on your machines can be chosen several at a time and opened tog
 
 Every session has **Active Connections** (⚡) at the right end of its top toolbar, and the library has one too.
 
-- **On Vision Pro, Mac and iPad:** ⚡ brings the library window forward and opens **Active**. **On Vision Pro** there is only ever one library window, and a desktop's ⚡ is last in its control bar.
+- **On Vision Pro, Mac and iPad:** ⚡ brings the library window forward and opens **Active**. **On Vision Pro** there is only ever one library window, a desktop's ⚡ is last in its control bar, and a terminal's is in the bar below its window.
 - **On iPhone:** ⚡ leaves the session screen and opens **Active** in the library.
 - **On iPhone, iPad and Vision Pro:** touch and hold ⚡ (pinch and hold on Vision Pro) for **All Windows**. **On Mac**, **Show All Windows** is beside ⚡. See [See everything open with Show All Windows](#see-everything-open-with-show-all-windows).
 
@@ -138,7 +138,7 @@ When you leave the library window alone, it gets out of the way. After two minut
 
 - Look at the orb: it grows a little and shows **Connections** beneath it.
 - Tap it (look and pinch) to bring the library window back where it was, at the size it was, showing what it showed before.
-- ⚡ in a session, or **Connections** in a terminal window, also brings the library window back, and the orb goes.
+- ⚡ in a session also brings the library window back, and the orb goes.
 
 The library window keeps its size while it is the only window open, while a sheet, alert or menu is open over it, while you are typing in it, and while a connection you started from it is still connecting. To wait longer, or never shrink, change **Settings** ▸ **General** ▸ **Shrink Connections when idle**; see [Settings](library-settings.md#general). When orbs gather in a dock, the library window goes into the dock instead; see [Gather orbs in a dock on Vision Pro](#gather-orbs-in-a-dock-on-vision-pro).
 

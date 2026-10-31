@@ -189,7 +189,7 @@ A path is read on the machine that printed it: from the shell's current folder w
 - 3D models (USDZ, USD and Reality files): in 3D, turned with the pointer.
 - A log file, named as in [Links and paths](#links-and-paths), that holds text: its end, the last 64 KB, with the newest lines at the bottom. For a log on this Mac, the preview reads it again each second, so new lines appear as they are written. From a server, the preview shows the end as it was when the preview opened; to follow it, choose **Watch Log File**.
 
-A bar across the top names the file and has **Show in Finder**, or **Show in Files** for a file on a server; **Watch Log File** for a log; **on Mac**, **Open in Preview** for a file Preview opens; and **Open in Editor**, to change it. A file on a server is copied to this device for the preview, up to 32 MB; of a log, only its last 256 KB is copied, however large it is. The copy is removed when the preview closes. A folder has no preview.
+A bar across the top names the file and has **Show in Finder**, or **Show in Files** for a file on a server; **Watch Log File** for a log; **on Mac**, **Open in Preview** for a file Preview opens; and **Open in Editor**, to change it. A file on a server is copied to this device for the preview, up to 32 MB; of a log, only its last 256 KB is copied, however large it is. The copy is removed when the preview closes; one opened with **Open in Preview** stays in the app's caches folder. A folder has no preview.
 
 - Choose **Quick Look** from a path's right-click menu, or **on Vision Pro** pinch and hold the path and choose **Quick Look**.
 - Or set **Show previews** in **Settings** ▸ **Terminal**:

@@ -41,7 +41,13 @@ use the disposable test VM only).
 - **The Mac's Show All Windows** pictured on the home and terminal pages and in the README (`site_shots.sh
   all-windows`); links, paths and log previews added to the home page, README, App Store description and What to
   Test. Committed and pushed at his word, with the site's deployment asked for in the same breath.
-- **Next:** Beta App Review's answer; then the Duo's fold on Xcode 27.2's Device Hub, unchecked.
+- **The iPhone Duo (D93, approved: "go with your recommendations"):** a deck below the fold for every tool, and two
+  services side by side held like a book; plan in `tasks/2026-10/2026-10-31_duo-deck-plan.md`, nothing built.
+- **The Mac's 0.4.569 release (his word, "Release 0.4.569"):** the docs audit found the site and help describing
+  0.4.549–0.4.569 while the Mac download was 0.4.548. Release notes brought to 0.4.569; site, README, help, privacy
+  date, App Store description and building guide corrected from an independent audit.
+- **Next:** Beta App Review's answer; the devices' versions read back once unlocked; then D93's step 0 (the Duo's
+  poses on Xcode 27.2's Device Hub).
 
 ## 2026-10-28/29 — git first class (0.4.549) and the headset's stalls (0.4.550), uncommitted
 - **Git, end to end, in the editor** (his "build git now, end to end, first class (doff viewer, all of it!)"): built,

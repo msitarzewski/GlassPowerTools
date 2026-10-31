@@ -77,7 +77,7 @@ Under **Library**, **Show service availability** (off by default) puts a dot bes
 
 ## About
 
-**About** shows the app's version, a **Sponsor** link and **Acknowledgements**.
+**About** shows the app's version, a **Sponsor** link and **Acknowledgements**. **On Vision Pro**, holding the version line for two seconds shows the diagnostics, on this device only: **Settings** ▸ **Terminal** ▸ **Diagnostics**, and a **Debugging** section in a terminal window's settings. Holding it again hides them.
 
 **On Mac**, a build that updates itself also has **Check for updates automatically**, **Check Now** and when it last checked, and the app menu has **Check for Updates…**. Any other build says **This build does not update itself.**
 

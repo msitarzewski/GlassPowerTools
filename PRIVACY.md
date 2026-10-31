@@ -4,7 +4,7 @@ Glass Power Tools collects nothing about you. It has no account, no analytics, n
 tracking, and no server of ours sits between you and your machines. This page lists what the app
 keeps and where, and everything it sends and to whom.
 
-Last changed 18 October 2026. Every change to this page is recorded in the public repository's history.
+Last changed 31 October 2026. Every change to this page is recorded in the public repository's history.
 
 ## What the app keeps, and where
 

@@ -1986,3 +1986,30 @@ a plain USDZ.
 
 **Status:** direction approved; steps and evidence in `tasks/2026-10/2026-10-31_room-format.md`. Open with the owner:
 installing Reality Composer Pro 3 here, the plugin's licence, a Feedback report for the USDZ crash.
+
+## D93 — The iPhone Duo: a deck below the fold, and two services side by side — Approved 2026-10-31 (nothing built)
+**Owner, 2026-10-31:** "I'd like for the folded (in half) versions of our tools to leverage the two screens to
+perfection … the top screen a remote desktop, then the bottom a keyboard and a toggleable trackpad", then "we should
+allow two of any of our services in fold like a book mode. A terminal the left, a database on the right (or
+whatever)", then, on the written plan, "go with your recommendations".
+
+**Why:** only the terminal reads the fold today (2026-10-21's laptop bar); the desktop, database and editor draw
+across it. Apple: content above the fold, controls below, no pose-only features, layout from reserved regions. UTM
+already ships a keyboard-or-touchpad lower half for its virtual machines.
+
+**Decision:**
+1. **Half open like a laptop,** every tool puts its work above the fold and one shared deck below it (in
+   `GlassConnectionUI`): a strip under the fold with the tool's keys and a keyboard-or-panel switch, then the system
+   keyboard or the tool's panel. The keyboard comes up on a fresh fold only; unfolding restores what was there.
+2. **The remote desktop** follows the top half's size (Fit stays a window setting); on a fresh fold its trackpad comes
+   up, not the keyboard. The terminal, editor and query bring up the keyboard.
+3. **Panels:** the desktop's trackpad (`TrackpadPointerController`); the terminal's tabs as cards by default, a second
+   tab live one tap away; the editor's preview or Git diff; the database's selected row.
+4. **Two services side by side,** held like a book or open flat on its side: two pages inside one window (one library,
+   one ⚡), not the system's Split View, which keeps working beside it. The 2026-10-13 rule that a phone presents
+   sessions in place stands. Each tool hands its session view to the shell by id.
+5. **Pictures:** Apple's half-open product image if its design resources have one, else a Blender render with our
+   captures; the App Store's Duo screenshots.
+
+**Status:** approved; plan and steps in `tasks/2026-10/2026-10-31_duo-deck-plan.md` (steps 0–8). Open: whether a
+physical iPhone Duo is available to test on.

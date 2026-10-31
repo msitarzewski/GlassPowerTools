@@ -6,6 +6,26 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.569</title>
+      <pubDate>Sat, 31 Oct 2026 23:06:14 GMT</pubDate>
+      <sparkle:version>569</sparkle:version>
+      <sparkle:shortVersionString>0.4.569</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.569</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.569</h2>
+<ul>
+  <li><b>Git, end to end, in the editor.</b> History with its graph, branches, stashes and tags, merges and rebases with a conflict resolver, blame, and cloning. Diffs follow Wrap Long Lines, Show Only Changed Files narrows the tree, and the tree marks deleted, conflicted, staged and ignored files and says where a rename came from. It needs Git 2.16 or later.</li>
+  <li><b>Follow a log.</b> Right-click a log file's path in a terminal and Watch Log File comes first: it follows the log in a new tab. Its preview keeps up as it grows when the log is on this Mac. Open in Preview opens a picture or a PDF a terminal names, and a path's closing punctuation is left off.</li>
+  <li><b>Workgroups across Macs.</b> A workgroup's local terminals belong to their Mac; your other devices, another Mac too, open them there over SSH, on their own tmux sessions.</li>
+  <li><b>One ⚡ on every terminal toolbar</b> for Active. Split Right and Split Down are in each pane's gear menu, and Open Folder in Editor works from a terminal window.</li>
+  <li><b>Faster terminals:</b> only the rows that changed are drawn again.</li>
+  <li>Editor windows show as pictures in Show All Windows and the switcher.</li>
+  <li>Changing an SSH key on one device no longer removes the key records another device made. The library's iCloud line says what to do: "Sign in to iCloud to sync", or "Check iCloud to sync".</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.569/GlassPowerTools-0.4.569.zip" length="28357380" type="application/octet-stream" sparkle:edSignature="ErfEvueNGhw1NL490107KiX4/j5SdVlLeFsr9lJ4D0sB4ASiY5dbx2fdR32qeM7RNQersb2Y7MU22V/hH/elBw=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.548</title>
       <pubDate>Wed, 28 Oct 2026 21:51:38 GMT</pubDate>
       <sparkle:version>548</sparkle:version>

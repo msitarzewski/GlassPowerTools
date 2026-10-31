@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.548 (28 October 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.569 (31 October 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to TestFlight for internal testing; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.548)
+## What it holds (0.4.569)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -44,9 +44,12 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - Terminals that scale as well as resize: Scale Text keeps the rows and columns and scales the text,
   and ⌘+, ⌘− and ⌘0 size the window. Text up to
   28 points; on iPhone, iPad and Vision Pro it can follow the system's text size.
-- On the Mac, a file whose path a terminal prints previews over the terminal; files dropped on a
-  terminal have their paths typed, and on a server they are uploaded first. AI coding agents are
+- On the Mac and Vision Pro, a file whose path a terminal prints previews over the terminal, a log's
+  end included, and Watch Log File follows a log in a new tab; files dropped on a terminal have their
+  paths typed, and on a server they are uploaded first. AI coding agents are
   recognised on tabs and cards.
+- A workgroup's terminals on a Mac belong to that Mac: every other device, another Mac too, opens
+  them there over SSH, on their own tmux sessions.
 - Color schemes from macOS Terminal profiles, any number, kept in iCloud Drive for every device and
   chosen with a preview of each, for every terminal or one window.
 - On Vision Pro, Focus Mode surrounds you with a built-in environment or your own 3D room or 360°
@@ -96,7 +99,9 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
-### 0.4.549 (28 October 2026, not released yet)
+### 0.4.549 – 0.4.569 (28 – 31 October 2026)
+- **0.4.569 is the Mac's fourth release**, through Sparkle. Build 569 is also the first TestFlight build
+  for testers outside the team, waiting for Apple's Beta App Review.
 - **Git, end to end.** The Changes tab became **Source Control**: Changes, History, Branches, Stashes
   and Tags, on a Mac and, for a project on a server, on iPhone, iPad and Vision Pro too.
   - **A diff viewer.** Unified or side by side (unified when the window is narrow), the words that
@@ -121,6 +126,27 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   - Open files a checkout, a merge, a stash or a discard changed are read again; one with unsaved
     edits keeps them, and saving it asks which version to keep.
   - Change marks beside the lines stay, in a narrow strip, with line numbers turned off.
+  - Diffs follow Wrap Long Lines, and Show Only Changed Files narrows a project's files. The file tree
+    strikes through deleted files and marks conflicted, staged and ignored ones, and says where a
+    renamed file came from. Git 2.16 or later is needed.
+- **Workgroups across Macs (0.4.567).** A workgroup's local terminals record their Mac. Every other
+  device, another Mac too, opens them there over SSH on their own tmux sessions, made again in their
+  folder only if they ended. An SSH terminal to a Mac's own record opens on that Mac as a local tab.
+- **Logs and paths.** A log file's path leads its menu with **Watch Log File**, which follows it in a
+  new tab. A log on the Mac previews its end and keeps up as it grows. **Open in Preview** on the Mac
+  opens a picture or a PDF a terminal names, and a path's closing punctuation is left off.
+- **The Mac's terminal toolbar (0.4.555).** One ⚡ for Active takes the place of the globe and the
+  panes' server racks; Split Right and Split Down are in each pane's gear menu. Open Folder in Editor
+  works from a terminal window.
+- **Faster terminals.** Only the rows that changed are drawn again, and the Terminal Themes folder is
+  read away from the main thread (0.4.550): on Vision Pro, keystrokes had been waiting half a second.
+- **Editor windows as pictures** in Show All Windows and the switcher, sidebar and all.
+- **SSH key records kept across devices (0.4.568).** A change to the keys on one device writes and
+  deletes only its own records; it had been removing records another device made.
+- **iCloud's footer says what to do:** "Sign in to iCloud to sync" or "Check iCloud to sync", in grey;
+  red only for a sync that failed.
+- **Vision Pro's diagnostics (0.4.569)** are hidden until you hold the version line in Settings ▸
+  About; holding it again hides them.
 
 ### 0.4.495 – 0.4.548 (21 – 28 October 2026)
 - **0.4.548 is the Mac's third release**, through Sparkle.

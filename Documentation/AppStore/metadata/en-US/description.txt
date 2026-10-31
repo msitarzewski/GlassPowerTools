@@ -31,6 +31,7 @@ EDITOR
 • Syntax highlighting for fifteen languages
 • Previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV
 • Pictures, PDFs, video, audio and 3D models open as themselves
+• Git for a project on a server: changes, staging, commits, history, branches, pull and push
 
 EVERYWHERE YOU ARE
 • Your library, favorites, workgroups and projects sync through iCloud, and passwords and keys through iCloud Keychain. Keys made in the Secure Enclave never leave their device.
@@ -38,7 +39,7 @@ EVERYWHERE YOU ARE
 • Widgets, Siri and Shortcuts, Spotlight and Handoff, and Controls on iPhone and iPad
 
 PRIVATE BY DESIGN
-No account, no analytics, no tracking. The app connects to the machines you add and to iCloud, and to Tailscale only if you connect a Tailscale account to find your devices. No server of ours sits between you and your machines.
+No account, no analytics, no tracking. The app connects to the machines you add and to iCloud, to Tailscale only if you connect a Tailscale account to find your devices, and to a 3D model's link a terminal printed only when you choose to open it. No server of ours sits between you and your machines.
 
 FREE AND OPEN SOURCE
 Glass Power Tools is free, and its source is public under the GPLv3 at github.com/msitarzewski/GlassPowerTools. Made by Michael Sitarzewski.
