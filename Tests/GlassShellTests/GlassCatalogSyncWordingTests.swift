@@ -36,9 +36,25 @@ struct GlassCatalogSyncWordingTests {
     @Test("signed out of iCloud is iCloud unavailable, with what to do, not CloudKit's words")
     func signedOut() async throws {
         let (status, words) = try await status(after: CKError(.notAuthenticated))
-        guard case .unavailable = status else { Issue.record("\(status)"); return }
+        guard case .unavailable(_, let short) = status else { Issue.record("\(status)"); return }
         #expect(words.hasPrefix("Not signed in to iCloud. Sign in with your Apple Account in System Settings"))
         #expect(!words.contains("authenticated account"))
+        // The footer's line says what to do, not that something is wrong (2026-10-30).
+        #expect(short == "Sign in to iCloud to sync")
+    }
+
+    @Test("a build without iCloud says the library stays on this device, not that it failed")
+    func noICloudInThisBuild() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("SyncWording-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
+                                    sharedContainerURL: nil, resolveSharedContainer: false,
+                                    accessGroup: "TEST.sh.glas.shared", layers: GlassLayerStore.forTest())
+        await model.load()
+        #expect(model.catalogSyncStatus == .idle)
+        #expect(!model.isCatalogSyncAttached)
+        #expect(model.catalogSyncStatusDescription.hasPrefix("This build doesn't use iCloud, so the library stays on this device."))
     }
 
     @Test("a restricted account is unavailable too")

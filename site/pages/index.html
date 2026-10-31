@@ -32,7 +32,7 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
     </div>
     <div>
       <p>The Mac, iPad and iPhone apps are the same app, adapted to each device. The Mac adds a local shell and menus. The iPhone gives each session the whole screen.</p>
-      <p>An honest note on testing. The current build is used every day on a Mac, an iPhone and a Vision Pro: on 2026-10-28 the Mac had 0.4.548, and the iPhone and the headset 0.4.545. Not every newer change has been checked on every device yet.</p>
+      <p>An honest note on testing. The current build is used every day on a Mac, an iPhone and a Vision Pro: on 2026-10-30 all three had 0.4.568, newer than the Mac's release. Not every newer change has been checked on every device yet.</p>
     </div>
   </div>
   <div class="gallery">
@@ -53,6 +53,37 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 </section>
 
 <section class="band">
+  <h2>The orb dock</h2>
+  <p class="intro">Set <strong>Settings ▸ Appearance ▸ Orbs ▸ Shrink to Orb</strong> to <strong>Into the Dock</strong>, and a window you shrink closes into an orb in one dock, with Connections first. A terminal window's tabs sit on a ring around its orb. A machine's databases, desktops and editors gather on that machine's orb. Pinch an orb, and its window comes back above the dock at the size it had. Resize the dock, and the orbs wrap to its shape.</p>
+  <div class="gallery">
+    <figure>
+      <img class="room" src="static/shots/vision-dock.webp" width="2400" height="1350" loading="lazy" alt="The orb dock on Vision Pro, high in the simulator's living room: the Connections orb with its Active count of four, a window of three coding agents with its tabs on a ring, a btop monitor on build, and two machine orbs, one holding the shop database and one the editor.">
+      <figcaption><strong>Every window, one row.</strong> Connections, three coding agents in one window, a monitor on build, and the machines holding a database and the editor.</figcaption>
+    </figure>
+    <figure>
+      <img class="room" src="static/shots/vision-dock-name.webp" width="2400" height="1350" loading="lazy" alt="Closer on the dock: the Connections orb, then the coding agents' orb with its tabs ringed around it, the name of one tab, Storefront checkout redesign, showing above it, and the btop monitor's orb beside it.">
+      <figcaption><strong>Look, and it says.</strong> A tab's name shows while you look at its dot. The agents' marks stay in colour.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="band">
+  <h2>Focus Mode: a room of your own</h2>
+  <p class="intro">Focus Mode on Vision Pro sets a terminal in a place you choose: a night sky, dusk, a grid or a studio, or a 3D room or 360° photo of your own, kept in iCloud Drive. A room can be alive. Its own animation plays, a clock on its wall keeps your time, its sounds play around you at the level you set, and now and then something passes the window. Pinch the floor to walk there, and swing a pinch on a wall to turn.</p>
+  <div class="gallery">
+    <figure>
+      <img class="room" src="static/shots/vision-focus-loft.webp" width="2400" height="1350" loading="lazy" alt="Focus Mode on Vision Pro in a loft high over Midtown at night: a terminal running btop in front of tall windows full of the city's lit towers, the time and date on the wall above the windows.">
+      <figcaption><strong>A loft over the city.</strong> The time on the wall, the city's lights outside, and its sounds around you.</figcaption>
+    </figure>
+    <figure>
+      <img class="room" src="static/shots/vision-focus-ridge.webp" width="2400" height="1350" loading="lazy" alt="Focus Mode on Vision Pro in a studio with glass walls: a terminal running btop where the room meets its glass, a timber ceiling, armchairs and a desk to the left, and through the glass a deck rail, pines and golden hills under a pale sky.">
+      <figcaption><strong>A studio over a meadow.</strong> Glass walls, timber and the hills beyond.</figcaption>
+    </figure>
+  </div>
+  <p>These two rooms are the author's own files, added from iCloud Drive; they don't come with the app. <a href="help/terminal-sessions.html#focus-mode-on-vision-pro">Focus Mode on Vision Pro</a></p>
+</section>
+
+<section class="band">
   <h2>Pick up where you left off</h2>
   <p class="intro">Turn on <strong>Keep Sessions Running with tmux</strong> for a machine, and each terminal you open there runs in its own tmux session on the machine. A dropped connection, a closed window or a quit app leaves the work running. The machine needs tmux.</p>
   <div class="gallery">
@@ -62,7 +93,7 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
     </figure>
     <figure>
       <img class="room" src="static/shots/vision-workgroups.webp" width="2400" height="1350" loading="lazy" alt="Workgroups on Vision Pro: the Shop workgroup's startup plan, four terminals on three machines: web and jobs on alpha, release on build and backups on nas, each with its address and startup command.">
-      <figcaption><strong>Workgroups that come back.</strong> A saved set of terminals, each keeping its own tmux session. After a quit, a crash or an update, the windows come back on the same sessions with everything still running, and a startup command never runs into a session that is still going.</figcaption>
+      <figcaption><strong>Workgroups that come back.</strong> A saved set of terminals, each keeping its own tmux session. After a quit, a crash or an update, the windows come back on the same sessions with everything still running, and a startup command never runs into a session that is still going. A workgroup's terminals on a Mac open from your other devices over SSH to that Mac, on the same sessions.</figcaption>
     </figure>
   </div>
   <p><a href="help/terminal-tmux.html">Keep terminals running with tmux</a> · <a href="help/terminal-workgroups.html">Workgroups</a></p>
@@ -72,31 +103,31 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
   <h2>On the Mac</h2>
   <div class="gallery">
     <figure>
-      <img class="window only-dark" src="static/shots/mac-terminal-dark.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac with its sidebar open, listing the terminal on alpha, which is running btop: the CPU's graph and cores, memory, the network and the shop's processes.">
-      <img class="window only-light" src="static/shots/mac-terminal-light.webp" width="2480" height="1560" loading="lazy" alt="The same window in the light appearance.">
+      <img class="screen only-dark" src="static/shots/mac-terminal-dark.webp" width="3008" height="1880" loading="lazy" alt="A terminal window on a Mac on its desktop, connected to alpha and running btop: the CPU's graph and sixteen cores, memory, disks, the network and the shop's processes with their commands.">
+      <img class="screen only-light" src="static/shots/mac-terminal-light.webp" width="3008" height="1880" loading="lazy" alt="The same window in the light appearance.">
       <figcaption><strong>Terminal.</strong> SSH with host keys you confirm, tabs in a sidebar, tmux sessions you pick up on any device, and the server’s files a click away.</figcaption>
     </figure>
     <figure>
-      <img class="window only-dark" src="static/shots/mac-database-dark.webp" width="2480" height="1560" loading="lazy" alt="A database window on a Mac: the shop database's twelve tables in the sidebar with orders selected, its SELECT statement, and a grid of orders with their customer, date, status and total.">
-      <img class="window only-light" src="static/shots/mac-database-light.webp" width="2480" height="1560" loading="lazy" alt="The same window in the light appearance.">
+      <img class="screen only-dark" src="static/shots/mac-database-dark.webp" width="3008" height="1880" loading="lazy" alt="A database window on a Mac: the shop database's twelve tables in the sidebar with orders selected, its SELECT statement, and a grid of orders with their customer, date, status and total.">
+      <img class="screen only-light" src="static/shots/mac-database-light.webp" width="3008" height="1880" loading="lazy" alt="The same window in the light appearance.">
       <figcaption><strong>Databases.</strong> MySQL, PostgreSQL and SQLite: browse, filter and edit rows, follow foreign keys, write and explain queries.</figcaption>
     </figure>
     <figure>
-      <img class="window only-dark" src="static/shots/mac-desktop-dark.webp" width="2412" height="1548" loading="lazy" alt="A remote desktop window on a Mac, connected to bravo at 1920 × 1080: a made-up remote screen with a monitoring window charting CPU over the last hour and a window listing the files in ~/shop.">
-      <img class="window only-light" src="static/shots/mac-desktop-light.webp" width="2412" height="1548" loading="lazy" alt="The same window in the light appearance.">
+      <img class="screen only-dark" src="static/shots/mac-desktop-dark.webp" width="3008" height="1880" loading="lazy" alt="A remote desktop window on a Mac, connected to bravo at 1920 × 1080: a made-up remote screen with a monitoring window charting CPU over the last hour and a window listing the files in ~/shop.">
+      <img class="screen only-light" src="static/shots/mac-desktop-light.webp" width="3008" height="1880" loading="lazy" alt="The same window in the light appearance.">
       <figcaption><strong>Remote desktops.</strong> RDP and VNC, with the remote resolution following your window.</figcaption>
     </figure>
     <figure>
-      <img class="window only-dark" src="static/shots/mac-editor-dark.webp" width="2480" height="1560" loading="lazy" alt="The editor on a Mac: the shop project's files in the sidebar, three tabs (compose.yaml, README.md and ShippingAddress.swift), and ShippingAddress.swift open with its Swift highlighted.">
-      <img class="window only-light" src="static/shots/mac-editor-light.webp" width="2480" height="1560" loading="lazy" alt="The same window in the light appearance.">
-      <figcaption><strong>Editor.</strong> Files on this device or on a server, with highlighting, previews, and viewers for pictures, PDFs and 3D models.</figcaption>
+      <img class="screen only-dark" src="static/shots/mac-editor-dark.webp" width="3008" height="1880" loading="lazy" alt="The editor on a Mac: the shop project's files in the sidebar, three tabs (compose.yaml, README.md and ShippingAddress.swift), and ShippingAddress.swift open with its Swift highlighted.">
+      <img class="screen only-light" src="static/shots/mac-editor-light.webp" width="3008" height="1880" loading="lazy" alt="The same window in the light appearance.">
+      <figcaption><strong>Editor.</strong> Files on this device or on a server, with highlighting, previews, Git, and viewers for pictures, PDFs and 3D models.</figcaption>
     </figure>
   </div>
 </section>
 
 <section class="band">
   <h2>A terminal worth looking at</h2>
-  <p class="intro">You look at terminals all day, so each window can have a look of its own: a picture behind the text, Digital Rain that quickens while the terminal prints, a Synthwave horizon, green or amber phosphor, a glow. The text comes first: bright patches are held down so it stays readable, and the motion stops under Reduce Motion and Low Power Mode. On the Mac, iPad and Vision Pro.</p>
+  <p class="intro">You look at terminals all day, so each window can have a look of its own: a picture behind the text, Digital Rain that quickens while the terminal prints, a Synthwave horizon, an aurora, a starfield, a Blueprint sheet, a Coding Agent backdrop, green or amber phosphor, a glow. The text comes first: bright patches are held down so it stays readable, and the motion stops under Reduce Motion and Low Power Mode. On the Mac, iPad and Vision Pro.</p>
   <div class="gallery">
     <figure>
       <img class="window" src="static/shots/mac-look-synthwave.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Synthwave look: btop on alpha over a dark purple sky, a low sun and a glowing grid running to the horizon, its text in pinks, greens and blues.">
@@ -132,12 +163,17 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
     <a class="card" href="editor.html">
       <span class="glyph" aria-hidden="true">✎</span>
       <h3>Editor</h3>
-      <p>Files on this device or on a server. Projects with a file tree, highlighting for fifteen languages, previews for Markdown, HTML, SVG and CSV, and viewers for pictures, PDFs, video, audio and 3D models.</p>
+      <p>Files on this device or on a server. Projects with a file tree, highlighting for fifteen languages, Git, previews for Markdown, HTML, SVG and CSV, and viewers for pictures, PDFs, video, audio and 3D models.</p>
     </a>
     <a class="card" href="help/library-browse.html">
       <span class="glyph" aria-hidden="true">☰</span>
       <h3>The library</h3>
       <p>One list of hosts, with favorites, collections and search. It syncs through iCloud. Credentials sync through iCloud Keychain. Your Library shows the time you spend on each machine, across your devices. Widgets show your machines and what's open, and Show All Windows shows every open session as a live picture.</p>
+    </a>
+    <a class="card" href="help/library-siri-and-system.html">
+      <span class="glyph" aria-hidden="true">⌘</span>
+      <h3>Around the system</h3>
+      <p>Siri and Shortcuts, Spotlight, Controls, Handoff and <code>ssh://</code> links. Send files to a machine from Shortcuts, or on the Mac from Share ▸ Send to a Machine. On the Mac, a Finder toolbar button, Services and a Quick Action open a terminal in a folder.</p>
     </a>
   </div>
 </section>
@@ -146,9 +182,9 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
   <h2>Why one app</h2>
   <p>A machine usually offers several ways in. The common setup is one app per protocol. Each app keeps its own list of the same machines and its own settings. Glass Power Tools keeps one list instead. Whether that fits how you work is for you to judge.</p>
   <figure class="window-shot">
-    <img class="only-dark" src="static/shots/mac-library-dark.webp" width="2880" height="1800" loading="lazy" alt="The library on a Mac, in Dark Mode. All Connections lists six machines (This Mac, alpha, bravo, build, nas and win) with an icon for each service. Beside it, Your Library counts 6 machines and 8 services, a bar chart shows 181 connections over the last 30 days on 3 devices, and Most used lists alpha, bravo and build.">
-    <img class="only-light" src="static/shots/mac-library-light.webp" width="2880" height="1800" loading="lazy" alt="The same window in the light appearance.">
-    <figcaption>The one list, on a Mac, with a month of connections from three devices.</figcaption>
+    <img class="screen only-dark" src="static/shots/mac-library-dark.webp" width="3008" height="1880" loading="lazy" alt="The library on a Mac, in Dark Mode, on the desktop under the app's menu bar. The sidebar lists Favorites, Recent and Active, four collections (Home, Office, Production and Staging), SSH Keys, Workgroups and Projects. All Connections lists nine machines (This Mac, alpha, bravo, build, db, nas, pi, staging and win) with an icon for each service, and alpha, build and db starred. Beside it, Your Library counts 9 machines, 13 services, 3 favorites and 4 collections; a bar chart shows 218 hours in use over the last 30 days on 3 devices, and Most used lists alpha, bravo, build, db and staging.">
+    <img class="screen only-light" src="static/shots/mac-library-light.webp" width="3008" height="1880" loading="lazy" alt="The same window in the light appearance.">
+    <figcaption>The one list, on a Mac, with a month of use from three devices.</figcaption>
   </figure>
   <p><a href="why.html">The reasoning, and what the app is not →</a></p>
 </section>
@@ -158,8 +194,8 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
   <p class="intro">The same library and the same machines. The iPhone gives each session the whole screen.</p>
   <div class="devices pair">
     <figure class="tablet">
-      <img src="static/shots/ipad-library.webp" width="1200" height="1600" loading="lazy" alt="An iPad in Dark Mode showing the library: the machines on the left; on the right, Your Library's counts, a month of connections as a bar chart (189 on 3 devices) and the machines used most.">
-      <figcaption><strong>iPad.</strong> The library, with a month of connections.</figcaption>
+      <img src="static/shots/ipad-landscape.webp" width="1600" height="1200" loading="lazy" alt="An iPad in landscape, in Dark Mode, showing the library in three columns: the sidebar with Favorites, Recent, Active, four collections, SSH Keys, Workgroups and Projects; the machines, from This iPad to win; and Your Library's counts, a month of time in use as a bar chart (218 hours on 3 devices) and the machines used most.">
+      <figcaption><strong>iPad.</strong> The library, with a month of use.</figcaption>
     </figure>
     <figure class="phone">
       <img src="static/shots/iphone-terminal.webp" width="780" height="1695" loading="lazy" alt="An iPhone showing the terminal on alpha across the whole screen, running btop: the CPU's graph and cores, memory and the shop's processes.">
@@ -170,11 +206,13 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 
 <section class="band">
   <h2>What leaves your devices</h2>
-  <p class="intro">The app connects to three kinds of place, and no others. The Mac app also checks its update feed on this site, and asks on its second launch whether to do that automatically.</p>
+  <p class="intro">The app connects to these places, and no others. The Mac app also checks its update feed on this site, and asks on its second launch whether to do that automatically.</p>
   <ul class="list">
     <li><strong>The servers you add.</strong> Only when you connect to them.</li>
     <li><strong>iCloud.</strong> Your host library syncs through your private iCloud database. Passwords, keys and host-key pins sync through iCloud Keychain, except a password you protect with Face ID or Touch ID, which stays on its device. Keys made in the Secure Enclave never leave the device they were made on.</li>
     <li><strong>Tailscale's API</strong>, only if you connect a Tailscale account to find your devices.</li>
+    <li><strong>A 3D model's address</strong>, only when you choose to open a model's link that a terminal printed.</li>
+    <li><strong>A repository's remote</strong>, on the Mac, when you pull, push, fetch or clone in the editor: the Mac's own git reaches it, with your git settings and keys.</li>
   </ul>
   <p>There are no analytics and no telemetry. Secrets live in the Keychain, apart from your settings. The database assistant runs on your device through Apple Intelligence, and the help lists exactly what it is given.</p>
   <p><a href="security.html">How credentials and connections are protected, and what is not →</a></p>

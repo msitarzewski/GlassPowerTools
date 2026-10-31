@@ -769,7 +769,7 @@ public struct GlassEditorScenes: Scene {
         .glassComesBackByOrbDock()
         #endif
         #if !os(iOS)
-        .defaultSize(width: 1100, height: 720)
+        .defaultSize(width: GlassEditorWindowSize.width, height: GlassEditorWindowSize.height)
         // Not on launch: the library is the app's front door, and an editor with nothing open is
         // not a useful first thing to see.
         .defaultLaunchBehavior(.suppressed)
@@ -1073,3 +1073,24 @@ public extension FocusedValues {
     }
 }
 #endif
+
+/// An editor window's first size. Screenshots only (2026-10-30): `--demo-editor-size <width>,<height>`
+/// in a `--ui-testing` run opens it at that size, as a person could resize it, so Changes shows more
+/// than its first file.
+enum GlassEditorWindowSize {
+    static var width: CGFloat { demo?.width ?? 1100 }
+    static var height: CGFloat { demo?.height ?? 720 }
+
+    private static let demo: CGSize? = {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"), let flag = arguments.firstIndex(of: "--demo-editor-size"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        let values = arguments[flag + 1].split(separator: ",").compactMap { Double($0) }
+        guard values.count == 2, values.allSatisfy({ (400...3000).contains($0) }) else { return nil }
+        return CGSize(width: values[0], height: values[1])
+        #else
+        return nil
+        #endif
+    }()
+}

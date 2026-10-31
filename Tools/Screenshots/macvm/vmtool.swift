@@ -8,10 +8,12 @@
 //   vmtool windows [owner]            on-screen windows (id, owner, pid, layer, bounds, title), for screencapture -l
 //   vmtool wallpaper get              each screen's desktop picture (NSWorkspace.desktopImageURL(for:))
 //   vmtool wallpaper set <file>       set it on every screen (setDesktopImageURL), then read it back
-//   vmtool press <bundle-id|name|pid> <title>  press the first button, menu item, radio button or checkbox
-//                                     with that title or description: in the windows, then the menu bar
+//   vmtool press <bundle-id|name|pid> <title> [window]  press the first button, menu item, radio button or
+//                                     checkbox with that title or description: in the windows, then the menu bar;
+//                                     or only in the window with that title
 //   vmtool place <app> x y w h [title]  move and size the app's front window, or its window with that title (points)
 //   vmtool display [set WIDTHxHEIGHT]  list the main display's modes, or pick one by size in points (HiDPI if any)
+//   vmtool drag x1 y1 x2 y2 / click x y  the left button pressed at one point and let go at the other (points)
 //   vmtool ax <bundle-id|name|pid> [depth]
 //                                     accessibility tree of the app's windows (role, title, description = the
 //                                     VoiceOver label, identifier, value) and controls with no label at all
@@ -162,8 +164,9 @@ func audit(_ query: String, maxDepth: Int) {
     for item in unlabelled { print("  UNLABELLED \(item)") }
 }
 
-/// Depth-first search of the app's windows for a button whose title or description is `name`; presses it.
-func press(_ query: String, _ name: String) {
+/// Depth-first search of the app's windows for a button whose title or description is `name`; presses it. With
+/// `window`, only that window's: two windows can have the same button (each one's Hide Sidebar).
+func press(_ query: String, _ name: String, window: String? = nil) {
     guard AXIsProcessTrusted() else { fail("not trusted for Accessibility", 3) }
     guard let app = findApp(query) else { fail("not running: \(query)", 4) }
     let root = AXUIElementCreateApplication(app.processIdentifier)
@@ -183,7 +186,13 @@ func press(_ query: String, _ name: String) {
     }
     // The app's windows first, then its menu bar (menu items, submenus included, press without opening).
     var places = attribute(root, kAXWindowsAttribute) as? [AXUIElement] ?? []
-    if let menuBar = attribute(root, kAXMenuBarAttribute) { places.append(menuBar as! AXUIElement) }
+    if let window {
+        // A window with a subtitle is titled "alpha – ann@192.0.2.10:22" here, "alpha" in the window list.
+        places = places.filter { text($0, kAXTitleAttribute).map { $0 == window || $0.hasPrefix(window + " – ") } ?? false }
+        guard !places.isEmpty else { fail("no window titled \"\(window)\"", 4) }
+    } else if let menuBar = attribute(root, kAXMenuBarAttribute) {
+        places.append(menuBar as! AXUIElement)
+    }
     guard let button = places.lazy.compactMap({ search($0, 0) }).first else { fail("no button \"\(name)\"", 4) }
     let result = AXUIElementPerformAction(button, kAXPressAction as CFString)
     print(result == .success ? "pressed \"\(name)\"" : "press failed: \(result.rawValue)")
@@ -212,6 +221,31 @@ func place(_ query: String, _ frame: [Double], title: String? = nil) {
     AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, AXValueCreate(.cgPoint, &origin)!)
     AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, AXValueCreate(.cgSize, &size)!)
     print("placed \(query)'s window at \(Int(frame[0])),\(Int(frame[1])) \(Int(frame[2]))x\(Int(frame[3]))")
+}
+
+// MARK: mouse
+
+// `drag x1 y1 x2 y2` presses the left button at one point and lets go at the other, moving through ten steps on the
+// way, as a hand drags a divider; `click x y` is the same without moving. Points, top-left origin, as `windows`
+// reports frames. Posting events needs the same Accessibility trust as `press`.
+func drag(from start: CGPoint, to end: CGPoint) {
+    guard AXIsProcessTrusted() else { fail("not trusted for Accessibility", 3) }
+    func post(_ type: CGEventType, _ point: CGPoint) {
+        CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?
+            .post(tap: .cghidEventTap)
+        usleep(30_000)
+    }
+    post(.mouseMoved, start)
+    post(.leftMouseDown, start)
+    if start != end {
+        for step in 1...10 {
+            let t = CGFloat(step) / 10
+            post(.leftMouseDragged, CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t))
+        }
+    }
+    post(.leftMouseUp, end)
+    print(start == end ? "clicked \(Int(start.x)),\(Int(start.y))"
+        : "dragged \(Int(start.x)),\(Int(start.y)) to \(Int(end.x)),\(Int(end.y))")
 }
 
 // MARK: display
@@ -251,11 +285,19 @@ case ("wallpaper", "get"): wallpaperGet()
 case ("wallpaper", "set") where args.count == 3: wallpaperSet(args[2])
 case ("ax", let query?): audit(query, maxDepth: args.count > 2 ? Int(args[2]) ?? 6 : 6)
 case ("press", let query?) where args.count == 3: press(query, args[2])
+case ("press", let query?) where args.count == 4: press(query, args[2], window: args[3])
 case ("place", let query?) where args.count == 6: place(query, args.dropFirst(2).compactMap(Double.init))
 case ("place", let query?) where args.count == 7: place(query, args[2...5].compactMap(Double.init), title: args[6])
 case ("display", nil): displayModes(set: nil)
 case ("display", "set") where args.count == 3: displayModes(set: args[2])
+case ("drag", _) where args.count == 5 && args.dropFirst().allSatisfy({ Double($0) != nil }):
+    let v = args.dropFirst().compactMap(Double.init)
+    drag(from: CGPoint(x: v[0], y: v[1]), to: CGPoint(x: v[2], y: v[3]))
+case ("click", _) where args.count == 3 && args.dropFirst().allSatisfy({ Double($0) != nil }):
+    let v = args.dropFirst().compactMap(Double.init)
+    drag(from: CGPoint(x: v[0], y: v[1]), to: CGPoint(x: v[0], y: v[1]))
 default:
     fail("usage: vmtool windows [owner] | wallpaper get | wallpaper set <file> | ax <bundle-id|name|pid> [depth] | "
-        + "press <bundle-id|name|pid> <button title> | place <app> x y w h [title] | display [set WIDTHxHEIGHT]", 2)
+        + "press <bundle-id|name|pid> <button title> [window title] | place <app> x y w h [title] | display [set WIDTHxHEIGHT] | "
+        + "drag x1 y1 x2 y2 | click x y", 2)
 }

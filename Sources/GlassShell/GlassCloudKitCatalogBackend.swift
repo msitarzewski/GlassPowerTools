@@ -170,6 +170,20 @@ public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
 }
 
 extension GlassCatalogSyncStatus {
+    /// Signed out of iCloud: what to do, in the words of the device's own Settings.
+    static var signedOut: GlassCatalogSyncStatus {
+        .unavailable("Not signed in to iCloud. Sign in with your Apple Account in \(settingsName) to sync your library with your other devices.",
+                     short: "Sign in to iCloud to sync")
+    }
+
+    private static var settingsName: String {
+        #if os(macOS)
+        "System Settings"
+        #else
+        "Settings"
+        #endif
+    }
+
     /// A sync that threw, in words a person can act on (2026-10-20). A Mac signed out of iCloud
     /// said "iCloud sync failed" and, opened, CloudKit's own "This request requires an
     /// authenticated account" (found running the first release on a Mac with no Apple Account).
@@ -177,18 +191,16 @@ extension GlassCatalogSyncStatus {
     /// what to do. Anything else keeps its own words, as before.
     static func after(_ error: any Error) -> GlassCatalogSyncStatus {
         guard let code = (error as? CKError)?.code else { return .failed(error.localizedDescription) }
-        #if os(macOS)
-        let settings = "System Settings"
-        #else
-        let settings = "Settings"
-        #endif
+        let settings = settingsName
         switch code {
         case .notAuthenticated:
-            return .unavailable("Not signed in to iCloud. Sign in with your Apple Account in \(settings) to sync your library with your other devices.")
+            return .signedOut
         case .accountTemporarilyUnavailable:
-            return .unavailable("iCloud needs your attention. Check your Apple Account in \(settings); your library syncs once it can.")
+            return .unavailable("iCloud needs your attention. Check your Apple Account in \(settings); your library syncs once it can.",
+                                short: "Check iCloud to sync")
         case .managedAccountRestricted:
-            return .unavailable("iCloud is restricted on this device, so your library stays on it.")
+            return .unavailable("iCloud is restricted on this device, so your library stays on it.",
+                                short: "iCloud is restricted here")
         default:
             return .failed(error.localizedDescription)
         }

@@ -1,6 +1,6 @@
 # Settings and window appearance
 
-Settings for the whole app are in one place. This page covers opening Settings, the **General**, **Appearance**, **Privacy** and **About** pages, and how to make windows more or less transparent. The pages after **About** (**Connections**, **Terminal**, **Snippets**, **Databases**, **Desktops** and **Editor**) are described in the help for those features.
+Settings for the whole app are in one place. This page covers opening Settings, the **General**, **Appearance**, **Privacy** and **About** pages, how to make windows more or less transparent, and where orbs go on Vision Pro. The pages after **About** (**Connections**, **Terminal**, **Snippets**, **Databases**, **Desktops** and **Editor**) are described in the help for those features.
 
 ## Open Settings
 
@@ -43,13 +43,27 @@ Each follows **Appearance** until you change it there, and only that window chan
 
 **On Mac**, **Appearance** ends with **Show All Windows** ▸ **Blur previews**, which softens the pictures in Show All Windows so a screenshot of it can be shared; see [AI agents and private pictures](library-connect.md#ai-agents-and-private-pictures).
 
+**On Vision Pro**, **Appearance** has **Show All Windows** ▸ **Opens**: **In a Window** (the starting setting) or **Around You**, for where pinching and holding ⚡ opens Show All Windows; see [Around you on Vision Pro](library-connect.md#around-you-on-vision-pro). After it comes **Orbs**.
+
+## Orbs on Vision Pro
+
+**Settings** ▸ **Appearance** ▸ **Orbs** decides where a window goes when you choose **Shrink to Orb**:
+
+- **Shrink to Orb**: **Where the Window Is** (the starting setting), and the window becomes an orb where it stands; or **Into the Dock**, and orbs, with Connections, gather in a dock. See [Gather orbs in a dock on Vision Pro](library-connect.md#gather-orbs-in-a-dock-on-vision-pro).
+- **Windows From a Tall Dock**, with **Into the Dock**: **On Its Left** or **On Its Right** (the starting setting), the side a window comes back on when the dock is taller than it is wide. In Focus Mode a window comes back on the side away from where you turned to look at the dock instead.
+- **Fit Dock to Its Orbs**, once you have resized the dock: the dock fits its orbs in a row again.
+
+With **Into the Dock**, a **Dock** section follows, with the dock's own **Opacity** and **Glass**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**. Set both to 0% for a clear dock.
+
+These settings are kept on this device.
+
 ## General
 
 Under **This Device**, give this device a name. **Your Library**'s overview uses it on all your devices when it counts time in use and connections by device (see [The library at a glance](library-browse.md#the-library-at-a-glance)). Left empty, the name is what the system calls the device: on a Mac its computer name; on iPhone, iPad and Vision Pro, the kind of device ("iPhone"), so two of the same kind are best named here.
 
 Under **Library**, **Show service availability** (off by default) puts a dot beside each service in a host's details, and on each kind of service in the host's row, for the least responsive service of that kind: green when it answers, orange when it answers slowly, red when it does not. While the library is on screen, this device opens a connection to each service's port about once a minute and closes it at once; it never signs in. A Screen Sharing (VNC) service is checked every ten minutes instead, because each connection makes a Mac start its screen sharing for a while. A service you're connected to isn't checked: it always shows a green dot, with this setting on or off, and is checked again on its usual schedule after you disconnect. A SQLite file, a database reached through its machine's SSH connection, and this Mac's own terminal have no dot.
 
-**On Vision Pro:** **Shrink Connections when idle** sets how long the library window waits, with no tap, scroll or typing in it, before it shrinks into a small orb while other windows are open: **Never**, **1 Minute**, **2 Minutes** (the starting setting), **5 Minutes** or **10 Minutes**. Tap the orb to bring the window back. See [Bring the library back on Vision Pro](library-connect.md#bring-the-library-back-on-vision-pro).
+**On Vision Pro:** **Shrink Connections when idle** sets how long the library window waits, with no tap, scroll or typing in it, before it shrinks into a small orb while other windows are open: **Never**, **1 Minute**, **2 Minutes** (the starting setting), **5 Minutes** or **10 Minutes**. Tap the orb to bring the window back. With **Shrink to Orb** set to **Into the Dock**, it goes into the dock instead (see [Orbs on Vision Pro](#orbs-on-vision-pro)). See [Bring the library back on Vision Pro](library-connect.md#bring-the-library-back-on-vision-pro).
 
 **General** also shows the state of your host library on this device under **Host Library**: how many **Hosts** it has and whether **This device** is kept on this device only. If the file that holds favorites and recent hosts cannot be read, an orange message here explains why, and favorites and **Recent** cannot be changed until it can.
 
@@ -57,7 +71,7 @@ Under **Library**, **Show service availability** (off by default) puts a dot bes
 
 **Credentials** shows where passwords and keys are kept and their **Default mobility**. With **iCloud Keychain**, a credential you save is available on your other devices. Nothing on this page shows or reads a secret.
 
-**On your other devices** shows the **Host library** sync status and explains which secrets travel with you. See "Your library on all your devices".
+**On your other devices** shows the **Host library** sync status and explains which secrets travel with you. See [Check the sync status](library-sync.md#check-the-sync-status).
 
 **Show Machines in Search**, off by default, puts your machines' and Workgroups' names in Spotlight and Siri on this device, to open them from there. Names only: addresses and credentials are never indexed. See [Find your machines in Spotlight](library-siri-and-system.md#find-your-machines-in-spotlight).
 

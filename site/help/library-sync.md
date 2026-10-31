@@ -14,7 +14,10 @@ When you are signed in to iCloud, the hosts you add on one device appear on your
 | The host for this device (**This Mac**, **This iPad**, **This iPhone** or **This Apple Vision Pro**) and its services | This device only |
 | Favorites | Your other devices: hosts, and the services, projects, workgroups and folders in **Favorites**. The exception is the star on the device's own host (**This Mac** and the others), which stays on the device. |
 | Terminal Workgroups | Your other devices, while **Sync terminal settings** is on (see [Workgroups](terminal-workgroups.md)) |
-| Terminal themes and terminal preferences | Your other devices, while **Sync terminal settings** is on (see [Terminal settings](terminal-settings.md#edit-a-theme)) |
+| Terminal themes and terminal preferences, including which theme or color scheme every terminal uses | Your other devices, while **Sync terminal settings** is on (see [Terminal settings](terminal-settings.md#edit-a-theme)) |
+| Color schemes in **Terminal Themes** (`.terminal` files) | Your other devices, through **iCloud Drive ▸ Glass Power Tools ▸ Terminal Themes**, whether or not **Sync terminal settings** is on. Without iCloud Drive, this device only (see [Choose a theme or a color scheme](terminal-settings.md#choose-a-theme-or-a-color-scheme)) |
+| Your own Focus Mode environments (3D rooms and 360° photos), and each room's fit and starting place | Your other devices, through **iCloud Drive ▸ Glass Power Tools ▸ Environments**; only Vision Pro shows them. Without iCloud Drive, this device only (see [Focus Mode on Vision Pro](terminal-sessions.md#focus-mode-on-vision-pro)) |
+| The editor's **Projects** list: each project's machine and folder, its name and its text settings, never its files | Your other devices, through iCloud (see [How the list syncs](editor-projects.md#how-the-list-syncs)) |
 | How many connections the device made, and how many minutes it was in use, each day of the last 30, per machine and kind of service, and the device's name (for **Your Library**'s overview) | Your other devices, through iCloud |
 | The connection history itself (times of day), **Recent**, and which service **Connect opens** | This device only |
 | Which machine in your library is this Mac (see [When a machine in your library is this Mac](library-browse.md#when-a-machine-in-your-library-is-this-mac)) | This Mac only |
@@ -34,17 +37,30 @@ If you are not signed in to iCloud, or iCloud is unavailable, the library on thi
 
 ## Check the sync status
 
-The foot of the library's sidebar shows the iCloud status, for example **Synced with iCloud** and a time. Choose it (**on Vision Pro**, the cloud) for the details: when the last sync finished, how many records are in iCloud and how many were received and sent, and **Sync Now**.
+The foot of the library's sidebar shows the iCloud status in a few words:
 
-Settings shows the same status:
+- **Synced with iCloud** and a time, or **Syncing with iCloud…** while a sync runs.
+- **Waiting to sync**: no sync has finished since the app opened.
+- **Sign in to iCloud to sync**: this device isn't signed in to iCloud.
+- **Check iCloud to sync**: your Apple Account needs your attention.
+- **iCloud is restricted here**: iCloud is restricted on this device, so the library stays on it.
+- **iCloud sync failed**: the last attempt failed. Only this one is shown in red.
+- **On this device only**: this build doesn't use iCloud, for example one built from the source code. The App Store and TestFlight builds sync.
+
+Choose it (**on Vision Pro**, the cloud) for the details: the status in more words, with what to do when there is something to do; how many records are in iCloud and how many were received and sent; and **Sync Now**.
+
+Settings shows the same status in more words:
 
 1. Open **Settings** and choose **Privacy**.
 2. Under **On your other devices**, read **Host library**:
    - **Synced** followed by a time: the last sync finished then.
    - **Syncing…**: a sync is running.
    - **Waiting to sync**: no sync has finished since the app opened.
-   - **Not signed in to iCloud**: sign in with your Apple Account in **Settings** (**System Settings** on Mac), and the library syncs. The library's footer says **iCloud unavailable**. A restricted account, or one that needs your attention, says so the same way.
+   - **Not signed in to iCloud**: sign in with your Apple Account in **Settings** (**System Settings** on Mac), and the library syncs.
+   - **iCloud needs your attention**: check your Apple Account in **Settings** (**System Settings** on Mac); the library syncs once it can.
+   - **iCloud is restricted on this device**: the library stays on this device.
    - **Not synced —** followed by a reason: the last attempt failed. The library on this device is unchanged.
+   - **This build doesn't use iCloud**: the library stays on this device.
 
 ## When two devices disagree
 

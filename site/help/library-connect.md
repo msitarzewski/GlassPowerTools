@@ -1,6 +1,6 @@
 # Connect and switch between sessions
 
-You start a session from a host in the library, and you return to any open session from **Active** or **Show All Windows**. This page covers the Connect controls, which service a host opens, the Mac's Command Palette, how to switch to or close open sessions, and shrinking windows into orbs on Vision Pro.
+You start a session from a host in the library, and you return to any open session from **Active** or **Show All Windows**. This page covers the Connect controls, which service a host opens, the Mac's Command Palette, how to switch to or close open sessions, and shrinking windows into orbs on Vision Pro, where they stand or together in a dock.
 
 ## Connect from the host list
 
@@ -140,7 +140,7 @@ When you leave the library window alone, it gets out of the way. After two minut
 - Tap it (look and pinch) to bring the library window back where it was, at the size it was, showing what it showed before.
 - ⚡ in a session, or **Connections** in a terminal window, also brings the library window back, and the orb goes.
 
-The library window keeps its size while it is the only window open, while a sheet, alert or menu is open over it, while you are typing in it, and while a connection you started from it is still connecting. To wait longer, or never shrink, change **Settings** ▸ **General** ▸ **Shrink Connections when idle**; see [Settings](library-settings.md#general).
+The library window keeps its size while it is the only window open, while a sheet, alert or menu is open over it, while you are typing in it, and while a connection you started from it is still connecting. To wait longer, or never shrink, change **Settings** ▸ **General** ▸ **Shrink Connections when idle**; see [Settings](library-settings.md#general). When orbs gather in a dock, the library window goes into the dock instead; see [Gather orbs in a dock on Vision Pro](#gather-orbs-in-a-dock-on-vision-pro).
 
 > [!NOTE]
 > Vision Pro does not tell apps where you are looking, so looking at the orb shows its name and a tap brings the window back. With **Dwell Control** on (**Settings** ▸ **Accessibility** ▸ **Interaction** ▸ **Dwell Control**), holding your gaze on the orb taps it.
@@ -149,7 +149,7 @@ If you close the library window while nothing else is open, the orb takes its pl
 
 ## Shrink a session window to an orb on Vision Pro
 
-A terminal, remote desktop, database or editor window can shrink into a small glass orb where it stands, and grow back when you want it, the way the library window does. Its session keeps running while it is an orb: terminals stay connected, and so does a desktop.
+A terminal, remote desktop, database or editor window can shrink into a small glass orb where it stands, and grow back when you want it, the way the library window does. Its session keeps running while it is an orb: terminals stay connected, and so does a desktop. To gather orbs in one place instead, see [Gather orbs in a dock on Vision Pro](#gather-orbs-in-a-dock-on-vision-pro).
 
 - Choose **Shrink to Orb**, first in the window's bottom bar. A terminal window with two or more terminals has the **Terminal View** button instead: pinch it.
 - The orb is a glass sphere with the session's live picture in it: the terminal in front, or the desktop's screen. A database or editor window shows itself as it looked when it shrank.
@@ -159,3 +159,50 @@ A terminal, remote desktop, database or editor window can shrink into a small gl
 A terminal window's terminals sit around its orb as glass dots, up to 12, each showing what its row in the sidebar shows: the coding agent running in it, in the agent's colour, or a terminal, pulsing while it prints. Look at a dot to see that terminal's picture in the orb and its name beside the dot; you can look across to the name to read it. Pinch the dot, or the name, to bring the window back with that terminal in front.
 
 When the window has **Auto-focus on activity** on, the orb pulses while a terminal in it prints, and shows the terminal that printed last. See [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings).
+
+A terminal window standing as its orb when the app quits stands as its orb again after a relaunch.
+
+## Gather orbs in a dock on Vision Pro
+
+Orbs can gather in one place instead of standing where their windows were: a dock, a window of its own that you move by its bar like any other. To turn it on, set **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Shrink to Orb** to **Into the Dock**; see [Orbs on Vision Pro](library-settings.md#orbs-on-vision-pro).
+
+With it on:
+
+- **Shrink to Orb** closes the window into the dock: it gathers into a drop that lands there as its orb. Its session keeps running: terminals stay connected, and so do databases and desktops.
+- The library window, left alone, goes into the dock too, instead of shrinking where it is.
+- **Connections** is first in the dock, a little larger than the rest. Each terminal window has an orb of its own, with its terminals as dots around it. Databases, remote desktops and editors are gathered by machine: one orb for each machine with any of them open, docked or not, with a dot for each. An editor opened from a terminal in the dock is a dot on that terminal's orb.
+- Look at a dot to see its name beside it.
+
+The dock closes by itself when no window is in it and Connections is open.
+
+### Bring a window back from the dock
+
+- Pinch an orb to bring its window back, at the size it had. On a terminal's orb, pinch a dot to bring the window back with that terminal in front. On a machine's orb, pinch a dot to bring back that one window, or the orb to bring back all of them.
+- Pinch **Connections** to bring the library window back.
+- **Active**, **Show All Windows** and the library bring a docked window back too.
+
+A window comes back above the dock. When the dock is taller than it is wide, the window comes back beside it instead: in Focus Mode, on the side away from where you turned to look at the dock; elsewhere, on the side set in **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Windows From a Tall Dock**. visionOS doesn't let an app put a window back where it stood.
+
+### Connect from the dock
+
+Pinch and hold **Connections** in the dock for a menu:
+
+- **Favorites**: your favorite machines.
+- **Recent**: the five machines you connected to most recently, other than your favorites.
+- **Dock Settings**: opens **Settings** on **Appearance**.
+
+Choose a machine to connect to it. A machine with several services lists them, for example **Terminal on alpha**. The window that opens comes out by the dock.
+
+### Arrange the dock
+
+- **Move an orb:** pinch and hold it until it lifts, then move your hand. Let go over another orb to put it in that orb's place; over **Connections**, it goes first; past the last orb, last. Each orb keeps its place on this device, so a window that leaves the dock comes back to the same place.
+- **Scroll:** pinch and move at once, without holding.
+- **Resize:** drag the dock's corner. The orbs wrap into rows to fit its shape, or stand in a column when it is taller than it is wide, and once you let go the dock snaps around them. The size is kept on this device. Until you resize it, the dock fits its orbs in a row, wrapping onto up to three rows. **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Fit Dock to Its Orbs** goes back to that.
+
+When there is more in the dock than it shows, an arrow at its top or bottom says so; pinch the arrow to scroll a row. A window docked into a row the dock doesn't show makes the dock taller, up to three rows; past that, the dock scrolls to it.
+
+### After a relaunch
+
+A terminal window in the dock when the app quits is in the dock again after a relaunch. Its orb shows the picture the window had as it docked until the terminal draws again. The picture is kept on this device, and deleted when the window leaves the dock or its session ends.
+
+Connections, left in the dock, goes back into it once the terminals that came back have connected or given up, unless it is asking you something then, such as a password.

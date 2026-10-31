@@ -475,6 +475,8 @@ public final class GlassShellModel: GlassServiceStore {
     /// The remote half of the library. Nil until `enableCatalogSync` supplies one, so a build or a
     /// test that has no business talking to CloudKit does not.
     private var catalogBackend: (any GlassCatalogSyncBackend)?
+    /// Whether this build syncs the library at all.
+    public var isCatalogSyncAttached: Bool { catalogBackend != nil }
     private var remoteChangeTask: Task<Void, Never>?
     public private(set) var catalogSyncStatus: GlassCatalogSyncStatus = .idle
     /// What the last completed sync moved, for the iCloud status: how many records the account
@@ -787,15 +789,18 @@ public final class GlassShellModel: GlassServiceStore {
 
     /// The library's sync state, in words a person can act on.
     ///
-    /// "Not set up" rather than an error when no backend is attached: a build without CloudKit, or
-    /// a UI test, is not broken — it simply has no other devices to talk to.
+    /// Not an error when no backend is attached: a build without CloudKit (one built from source, a
+    /// UI test) is not broken, it simply has no other devices to talk to, and says so.
     public var catalogSyncStatusDescription: String {
         switch catalogSyncStatus {
-        case .idle: return catalogBackend == nil ? "Not synced on this build" : "Waiting to sync"
+        case .idle:
+            return catalogBackend == nil
+                ? "This build doesn't use iCloud, so the library stays on this device. The App Store and TestFlight builds sync."
+                : "Waiting to sync"
         case .syncing: return "Syncing…"
         case .synced(let date):
             return "Synced \(date.formatted(date: .omitted, time: .shortened))"
-        case .unavailable(let reason): return reason
+        case .unavailable(let reason, _): return reason
         case .failed(let message): return "Not synced — \(message)"
         }
     }
@@ -2093,14 +2098,47 @@ extension Logger {
 #if DEBUG
 extension GlassShellModel {
     /// Screenshots only (`--demo-open library-history`): connections as if made over the last
-    /// weeks, so the overview's chart and Most used have something to show. Each is a host's name,
-    /// how many days ago, and the kind of service.
+    /// weeks, so the overview's chart and Most used have something to show, and each machine's
+    /// last connection as a real one leaves it, for Recent. Each is a host's name, how many days
+    /// ago, and the kind of service.
     public func demoRecordConnections(_ connections: [(host: String, daysAgo: Int, kind: HostServiceKind)]) {
         let now = Date()
         for connection in connections {
             guard let host = hosts.first(where: { $0.displayName == connection.host }) else { continue }
             let date = now.addingTimeInterval(-Double(connection.daysAgo) * 24 * 60 * 60)
             preferences.recordConnection(.init(date: date, hostID: host.id, kind: connection.kind))
+            if date > (preferences[host: host.id].lastConnected ?? .distantPast) {
+                preferences[host: host.id].lastConnected = date
+            }
+        }
+        try? persistPreferences()
+    }
+
+    /// Screenshots only: minutes in use as the usage clock counts them, for the overview's Time in
+    /// Use, which it opens on. Each is a host's name, how many days ago, the kind, and the minutes.
+    public func demoRecordMinutes(_ uses: [(host: String, daysAgo: Int, kind: HostServiceKind, minutes: Int)]) {
+        let calendar = Calendar.current
+        var minutes = preferences.usageMinutes ?? [:]
+        for use in uses {
+            guard let host = hosts.first(where: { $0.displayName == use.host }),
+                  let date = calendar.date(byAdding: .day, value: -use.daysAgo, to: Date()) else { continue }
+            minutes[GlassUsagePayload.dayKey(date, calendar: calendar), default: [:]][
+                "\(host.id.rawValue.uuidString)|\(use.kind.rawValue)", default: 0] += use.minutes
+        }
+        preferences.usageMinutes = minutes
+        try? persistPreferences()
+    }
+
+    /// Screenshots only: the footer as the app shows it on a device signed out of iCloud, which the
+    /// screenshot VM is (it has no Apple Account); its build has no iCloud to ask.
+    public func demoSignedOutOfICloud() {
+        catalogSyncStatus = .signedOut
+    }
+
+    /// Screenshots only: these machines marked favourites, on this device alone.
+    public func demoMarkFavorites(_ names: [String]) {
+        for host in hosts where names.contains(host.displayName) {
+            preferences[host: canonicalID(for: host.id)].isFavorite = true
         }
         try? persistPreferences()
     }
@@ -2115,21 +2153,27 @@ extension GlassShellModel {
     }
 
     /// Screenshots only: other devices' counts, as iCloud would bring them (D81) — each a name and,
-    /// per machine and kind, how many connections it made on each of the last 30 days but every third.
-    public func demoOtherDevices(_ devices: [(name: String, use: [(host: String, kind: HostServiceKind, perDay: Int)])]) {
+    /// per machine and kind, how many connections it made and how many minutes it was in use on
+    /// each of the last 30 days but every third.
+    public func demoOtherDevices(_ devices: [(name: String, use: [(host: String, kind: HostServiceKind, perDay: Int,
+                                                                   minutesPerDay: Int)])]) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         var payload = GlassUsagePayload()
         for device in devices {
             var history: [GlassShellPreferences.ConnectionEvent] = []
+            var minutes: [String: [String: Int]] = [:]
             for day in 0..<GlassUsagePayload.days where day % 3 != 2 {
                 let date = calendar.date(byAdding: .hour, value: 12, to: calendar.date(byAdding: .day, value: -day, to: today) ?? today) ?? today
                 for use in device.use {
                     guard let host = hosts.first(where: { $0.displayName == use.host }) else { continue }
                     history += Array(repeating: .init(date: date, hostID: host.id, kind: use.kind), count: use.perDay)
+                    minutes[GlassUsagePayload.dayKey(date, calendar: calendar), default: [:]][
+                        "\(host.id.rawValue.uuidString)|\(use.kind.rawValue)", default: 0] += use.minutesPerDay
                 }
             }
-            payload.devices[UUID().uuidString] = GlassUsagePayload.Device(name: device.name, history: history)
+            payload.devices[UUID().uuidString] = GlassUsagePayload.Device(name: device.name, history: history,
+                                                                          minutes: minutes)
         }
         applyUsage(payload)
     }

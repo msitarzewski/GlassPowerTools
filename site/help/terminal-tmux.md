@@ -24,9 +24,9 @@ The switch can only be turned on once a connection has found tmux on the machine
 - In **Active**, a terminal in tmux says **in tmux** under its name, and swiping it offers **Detach** rather than **Close**. Its tools menu says **Detach** rather than **Disconnect**. Afterwards **Active** lists it under the machine as **Detached**.
 - **Open Folder Here** and the **AI Assistant** ask tmux which folder the shell is in, so they follow your `cd` inside tmux too.
 - With tmux older than 3.2, detaching from tmux yourself (its prefix key, then **d**) closes the terminal and leaves the session running. From 3.2 on, close the tab or choose **Detach** instead (see [The terminal keeps the whole session](#the-terminal-keeps-the-whole-session)).
-- A Workgroup remembers each terminal's session and opens on it again. Its startup command runs only when the session is new, never into one still running. See [Save and open terminal Workgroups](terminal-workgroups.md).
+- A Workgroup remembers each terminal's session and opens on it again. Its startup command runs only when the session is new, never into one still running. A Workgroup's Mac terminals open on their Mac's own sessions from your other devices too. See [Save and open terminal Workgroups](terminal-workgroups.md) and [Mac terminals open on their Mac](terminal-workgroups.md#mac-terminals-open-on-their-mac).
 - A new terminal never takes a session a saved Workgroup keeps on that machine.
-- **On Vision Pro, iPad and iPhone**, after the app quits, crashes or is updated, the terminal windows and sets holding terminals in tmux come back, each terminal on its own session (see [Work in a terminal](terminal-sessions.md#windows-and-tabs)).
+- **On Vision Pro, iPad and iPhone**, after the app quits, crashes or is updated, the terminal windows and sets holding terminals in tmux come back, each terminal on its own session (see [Work in a terminal](terminal-sessions.md#windows-and-tabs)). A session that ended while the app was away isn't made again: its terminal closes when it finds the session gone, as it would after `exit`. Opening a Workgroup yourself still makes its ended sessions again.
 
 If the machine doesn't have tmux, the terminal says so and opens an ordinary shell instead.
 

@@ -93,10 +93,10 @@ public struct GlassICloudStatusFooter: View {
     /// One line that fits a sidebar; the popover has the rest.
     private var shortStatus: String {
         switch model.catalogSyncStatus {
-        case .idle: model.catalogSyncStatusDescription
+        case .idle: model.isCatalogSyncAttached ? "Waiting to sync" : "On this device only"
         case .syncing: "Syncing with iCloud…"
         case .synced(let date): "Synced with iCloud \(date.formatted(date: .omitted, time: .shortened))"
-        case .unavailable: "iCloud unavailable"
+        case .unavailable(_, let short): short
         case .failed: "iCloud sync failed"
         }
     }
@@ -105,11 +105,9 @@ public struct GlassICloudStatusFooter: View {
         if case .syncing = model.catalogSyncStatus { true } else { false }
     }
 
+    /// Only a failure is red: signed out or restricted is a state to act on, not an error.
     private var isProblem: Bool {
-        switch model.catalogSyncStatus {
-        case .failed, .unavailable: true
-        default: false
-        }
+        if case .failed = model.catalogSyncStatus { true } else { false }
     }
 
     /// The SF Symbols Apple's apps use for the same four states.
@@ -158,10 +156,8 @@ struct GlassICloudStatusDetails: View {
         if case .syncing = model.catalogSyncStatus { true } else { false }
     }
 
+    /// Only a failure is red: signed out or restricted is a state to act on, not an error.
     private var isProblem: Bool {
-        switch model.catalogSyncStatus {
-        case .failed, .unavailable: true
-        default: false
-        }
+        if case .failed = model.catalogSyncStatus { true } else { false }
     }
 }

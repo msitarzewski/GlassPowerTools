@@ -17,8 +17,9 @@
 #   macvm.sh gui '<command>'                      run a bash command as admin in the logged-in GUI (Aqua) session
 #   macvm.sh tool <args…>                         vmtool in the GUI session: windows [owner] | wallpaper get |
 #                                                 wallpaper set <file-in-vm> | ax <bundle-id|name|pid> [depth] |
-#                                                 press <bundle-id|name|pid> <button title> |
-#                                                 place <app> x y w h [title] | display [set WxH]
+#                                                 press <bundle-id|name|pid> <button title> [window] |
+#                                                 place <app> x y w h [title] | display [set WxH] |
+#                                                 drag x1 y1 x2 y2 | click x y
 #   macvm.sh shot <name>                          whole VM screen → .scratch/shots/macvm/<name>.png
 #   macvm.sh winshot <owner> <name>               one window of <owner> ("Glass Power Tools") → …/<name>.png
 #   macvm.sh install-app [App.app]                copy the app (default: build-app's) to /Applications
@@ -58,7 +59,8 @@ SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLeve
 mkdir -p "$SCRATCH" "$SHOTS"
 
 die() { echo "macvm: $*" >&2; exit 1; }
-exists() { tart list --quiet 2>/dev/null | grep -qx "$1"; }
+# grep reads the whole list: with -q it stops at the match, tart dies of SIGPIPE, and pipefail calls that a miss.
+exists() { tart list --quiet 2>/dev/null | grep -x "$1" >/dev/null; }
 running() { tart list --format json 2>/dev/null | python3 -c 'import json,sys; n=sys.argv[1]
 sys.exit(0 if any(v["Name"]==n and v.get("Running") for v in json.load(sys.stdin)) else 1)' "$1"; }
 vm_ip() { tart ip "$VM" --wait "${1:-0}"; }

@@ -1,6 +1,6 @@
 <!--
 title: Terminal — Glass Power Tools
-description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, workgroups, port forwarding and SFTP. A local shell on the Mac.
+description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, workgroups, tmux, port forwarding and SFTP, looks of your own, and Focus Mode rooms on Vision Pro. A local shell on the Mac.
 -->
 <main class="page" id="content">
 
@@ -15,8 +15,8 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 </section>
 
 <figure class="window-shot">
-  <img class="only-dark" src="static/shots/mac-terminal-dark.webp" width="2480" height="1560" alt="A terminal window on a Mac with its sidebar open, listing the terminal on alpha, which is running btop: the CPU's graph and cores, memory, the network and the shop's processes.">
-  <img class="only-light" src="static/shots/mac-terminal-light.webp" width="2480" height="1560" alt="The same window in the light appearance.">
+  <img class="screen only-dark" src="static/shots/mac-terminal-dark.webp" width="3008" height="1880" alt="A terminal window on a Mac on its desktop, connected to alpha and running btop: the CPU's graph and sixteen cores, memory, disks, the network and the shop's processes with their commands.">
+  <img class="screen only-light" src="static/shots/mac-terminal-light.webp" width="3008" height="1880" alt="The same window in the light appearance.">
   <figcaption>A terminal on a Mac running btop, with its tabs in the sidebar.</figcaption>
 </figure>
 
@@ -38,7 +38,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     </div>
     <div class="card">
       <h3>Tabs, splits and workgroups</h3>
-      <p>Tabs on every device. On the Mac, split panes, tabs named after what runs in them, and tabs you drag from one window to another. A workgroup saves a set of terminal tabs, with startup commands, opens them together, and is on all your devices.</p>
+      <p>Tabs on every device. On the Mac, split panes, tabs named after what runs in them, and tabs you drag from one window to another. A workgroup saves a set of terminal tabs, with startup commands, opens them together, and is on all your devices. Its terminals on a Mac open from your other devices, another Mac included, over SSH to that Mac, on the same tmux sessions.</p>
     </div>
     <div class="card">
       <h3>Sessions that keep running</h3>
@@ -50,7 +50,11 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     </div>
     <div class="card">
       <h3>Links and paths</h3>
-      <p>Right-click an address or a path a terminal prints, or pinch and hold it on Vision Pro: open the link, open the file in the Editor, show it in the Finder or in Files, or watch a log file grow in a new tab. On the Mac, rest the pointer on a path to see its file over the terminal: code highlighted, Markdown rendered, pictures, PDFs and 3D models shown, from the Mac or the server. A link to a 3D model opens in 3D.</p>
+      <p>Right-click an address or a path a terminal prints, or pinch and hold it on Vision Pro: open the link, open the file in the Editor, show it in the Finder or in Files, or watch a log file grow in a new tab. On the Mac, rest the pointer on a path to see its file over the terminal, and on Vision Pro use Quick Look: code highlighted, Markdown rendered, pictures, PDFs and 3D models shown, from this device or the server, and the end of a log file, which keeps up as it grows when the log is on this Mac. A link to a 3D model opens in 3D.</p>
+    </div>
+    <div class="card">
+      <h3>Paste a picture, see a diagram</h3>
+      <p>On iPhone, iPad and Vision Pro, paste a picture or a file into a terminal, and it is uploaded to the machine and its path typed for you, for a coding agent to read. A Mermaid diagram a terminal prints gets a mark beside it: choose it to see the diagram drawn.</p>
     </div>
     <div class="card">
       <h3>SQL into the query editor</h3>
@@ -79,9 +83,9 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
   <h2>Looks</h2>
   <p class="intro">Give a terminal window a look of its own, in its This Window settings, on the Mac, iPad and Vision Pro. Start From sets a whole look at once; then change any part of it. The pictures here are from a Mac, where the looks have been checked; on iPad and Vision Pro they have not been looked at yet.</p>
   <ul class="list">
-    <li><strong>Behind the text:</strong> a picture of yours, which can be blurred, pixelated and toned to the theme; Digital Rain, which falls faster while the terminal prints; a Synthwave horizon; or a Phosphor Screen.</li>
+    <li><strong>Behind the text:</strong> a picture of yours, which can be blurred, pixelated and toned to the theme; Digital Rain, which falls faster while the terminal prints; a Synthwave horizon; an aurora; a starfield that streaks while the terminal prints; a Blueprint drafting sheet; or a Phosphor Screen.</li>
     <li><strong>Color schemes:</strong> bring in macOS Terminal profiles (<code>.terminal</code> files, or a whole folder of them, as color-scheme collections come) and choose among them with a preview of each, for every terminal or one window. They're kept in iCloud Drive, so every device has them. See <a href="help/terminal-settings.html#choose-a-theme-or-a-color-scheme">Choose a theme or a color scheme</a>.</li>
-    <li><strong>Focus Mode on Vision Pro:</strong> surround yourself with a night sky, dusk, a grid or a studio, or your own 3D room or 360° photo, and walk about in it. See <a href="help/terminal-sessions.html#focus-mode-on-vision-pro">Focus Mode on Vision Pro</a>.</li>
+    <li><strong>Focus Mode on Vision Pro:</strong> surround yourself with a night sky, dusk, a grid or a studio, or your own 3D room or 360° photo, and walk about in it. A room of your own can come alive: its animation plays, its clocks keep your time, its sounds play around you at the <strong>Room Sound</strong> level you set, and now and then something passes by. <strong>Open Immersed</strong> opens it all the way round. See <a href="help/terminal-sessions.html#focus-mode-on-vision-pro">Focus Mode on Vision Pro</a>.</li>
     <li><strong>The text:</strong> green, amber or digital-green phosphor, which recolours everything a program draws, its own colours included; or Vaporwave's palette. A glow can follow the letters.</li>
     <li><strong>Readable first:</strong> the window's Readability lays a scrim behind the text, and the bright parts of a picture are held down so even dim text reads over them. The motion stops under Reduce Motion, in Low Power Mode, and when the window is in the background.</li>
   </ul>
@@ -103,6 +107,10 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
       <figcaption><strong>Green Phosphor.</strong> The screen of an old green terminal.</figcaption>
     </figure>
     <figure>
+      <img class="window" src="static/shots/mac-look-blueprint.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac in the Blueprint look: btop on alpha in pale blue over a fine grid on deep blue.">
+      <figcaption><strong>Blueprint.</strong> A drafting sheet, with the text in its white.</figcaption>
+    </figure>
+    <figure>
       <img class="window" src="static/shots/mac-look-picture.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac with a picture behind its text: btop on alpha over an evening landscape of blue sky, purple mountains and a low sun, its text glowing amber.">
       <figcaption><strong>A picture.</strong> Any picture of yours, here a made-up evening, with an amber glow on the text.</figcaption>
     </figure>
@@ -118,8 +126,8 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
   <h2>Pick up where you left off</h2>
   <p class="intro">With a machine's terminals kept in tmux, Active lists what runs there on every device: open on another device, detached, or open here. Choose one to join it, or take it over. A workgroup keeps each of its terminals' sessions, so after a quit, a crash or an update its windows come back on them with everything still running.</p>
   <figure class="window-shot">
-    <img class="only-dark" src="static/shots/mac-active-dark.webp" width="2880" height="1800" loading="lazy" alt="Active in the Connections window on a Mac: tmux sessions running on alpha (shop, open elsewhere; jobs, detached), on build (release, open elsewhere) and on nas (backups, detached), each with its repository and branch or folder, and when it was last used.">
-    <img class="only-light" src="static/shots/mac-active-light.webp" width="2880" height="1800" loading="lazy" alt="The same window in the light appearance.">
+    <img class="screen only-dark" src="static/shots/mac-active-dark.webp" width="3008" height="1880" loading="lazy" alt="Active in the Connections window on a Mac: tmux sessions running on alpha (shop, open elsewhere; jobs, detached), on build (release, open elsewhere) and on nas (backups, detached), each with its repository and branch or folder, and when it was last used.">
+    <img class="screen only-light" src="static/shots/mac-active-light.webp" width="3008" height="1880" loading="lazy" alt="The same window in the light appearance.">
     <figcaption>Active on a Mac: sessions running on three machines, to open here.</figcaption>
   </figure>
   <p><a href="help/terminal-tmux.html">Keep terminals running with tmux</a> · <a href="help/terminal-workgroups.html">Workgroups</a></p>
@@ -138,11 +146,11 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 
 <section class="band">
   <h2>On each device</h2>
-  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-10-28 the Mac ran 0.4.548, and the iPhone and the Vision Pro 0.4.545. Not every newer change has been tried on every device yet, and Scale Text on iPad only in Apple's simulator.</p>
+  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-10-30 the Mac, the iPhone and the Vision Pro all ran 0.4.568. Not every newer change has been tried on every device yet, and Scale Text on iPad only in Apple's simulator.</p>
   <div class="two">
     <div>
       <h3>Vision Pro</h3>
-      <p>Each connection opens its own window, named after the machine. One button steps a window through tabs, grid and carousel. A window can shrink into a small glass orb with its terminal live inside, and its tabs as dots around it; pinch one to bring the window back on that tab. Select text as Apple's own apps do, with pinches or a trackpad, even while tmux has the mouse. Focus Mode dims the room around you.</p>
+      <p>Each connection opens its own window, named after the machine, with its tabs in a sidebar. A pinch on <strong>Terminal View</strong> shrinks the window into a small glass orb with its terminal live inside and its tabs as dots around it, and a hold chooses tabs, grid, carousel or the orb. Orbs can gather in one dock. Select text as Apple's own apps do, with pinches or a trackpad, even while tmux has the mouse. Focus Mode surrounds you with a room of your choosing, and can move, keep time and play its sounds.</p>
       <h3>Mac</h3>
       <p>A terminal window with tabs and split panes, keyboard shortcuts, a command palette that reaches every machine and service, and a local shell. The plus button lists the terminals already running on each machine, to open one as a tab, and each tab's tooltip names its tmux session, machine, program and folder. When a machine in your library is this Mac, its Terminal opens a local shell rather than an SSH connection to itself. Opening the tab sidebar widens the window rather than taking room from the terminal, so its rows and columns stay as they are. Programs such as Claude Code draw smoothly: the terminal answers the questions they ask before they draw, and takes each screen update as one frame.</p>
     </div>

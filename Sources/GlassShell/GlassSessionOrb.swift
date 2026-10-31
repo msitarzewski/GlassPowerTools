@@ -323,10 +323,15 @@ private struct GlassSessionOrbModifier: ViewModifier {
 }
 
 #if DEBUG
-enum GlassSessionOrbDemo {
-    static var shrinksOnOpen: Bool {
+public enum GlassSessionOrbDemo {
+    /// The dock's screenshot (`--demo-open dock`, 2026-10-30): a window opened while this is on goes
+    /// into its orb a few seconds after it opens, as `--demo-session-orb` sends every one; one opened
+    /// after it is off stays a window beside the dock.
+    @MainActor public static var shrinksNext = false
+
+    @MainActor static var shrinksOnOpen: Bool {
         let arguments = ProcessInfo.processInfo.arguments
-        return arguments.contains("--ui-testing") && arguments.contains("--demo-session-orb")
+        return arguments.contains("--ui-testing") && (shrinksNext || arguments.contains("--demo-session-orb"))
     }
 
     /// `--demo-orb-names`: every name drawn as it is for a look, to check where each sits — the

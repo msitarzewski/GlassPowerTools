@@ -2,14 +2,19 @@
 
 When a project's folder is in a git repository, the Editor shows what changed and does the rest of git too: staging a whole file, a hunk or single lines; committing and amending; pulling, pushing and fetching; branches, the history, stashes and tags; merges and rebases, with the conflicts they stop on; who changed each line; and cloning a repository.
 
-The Editor runs git where the folder is: this Mac's own git for a folder on this Mac, and the server's git, over the project's SSH connection, for a folder on a server — with that machine's keys and remotes. So a server's project has all of this on iPhone, iPad and Apple Vision Pro too. If git isn't installed there, the Editor says so and how to install it.
+The Editor runs git where the folder is: this Mac's own git for a folder on this Mac, and the server's git, over the project's SSH connection, for a folder on a server — with that machine's keys and remotes. So a server's project has all of this on iPhone, iPad and Apple Vision Pro too. If git isn't installed there, the Editor says so and how to install it. It needs Git 2.16 or later; with an older one, it says so, and to update it there.
 
 > [!NOTE]
 > A folder on an iPhone, iPad or Apple Vision Pro itself shows no git: there is no git on those devices for the app to run.
 
 ## Open Source Control
 
-The foot of the file list shows the branch and how many files differ from the last commit. The file list marks each changed file: **M** modified, **A** added, **D** deleted, **R** renamed, **U** new and not yet added to git, **!** a conflict. A dot marks a folder with a changed file somewhere inside it.
+The foot of the file list shows the branch and how many files differ from the last commit. The file list marks each changed file: **M** modified, **A** added, **D** deleted, **R** renamed, **U** new and not yet added to git, **!** a conflict.
+
+- A staged file's letter is drawn on its color, as a badge. A dot beside the badge means the file has changed again since it was staged: a commit takes the staged version.
+- An orange dot marks a folder with a changed file somewhere inside it, and a red dot a folder with a conflict.
+- Files and folders git ignores, from `.gitignore`, are dimmed.
+- Hold the pointer over a mark, or on Vision Pro look at it, to read what it means. A renamed file's says where it came from.
 
 Choose the branch to open **Source Control**, a tab in the editor window. Right-click the branch, or pinch and hold it, for **Show History**, **Show Branches**, **Pull**, **Push** and **Fetch**. **On Mac:** the **Git** menu has each part of Source Control (**Show Changes** is ⌃⇧G), **Pull**, **Push**, **Fetch**, **New Branch…**, **Stash Changes…**, and **Blame** and **File History** for the file in front.
 
@@ -20,7 +25,13 @@ Along the top of Source Control:
 - **Changes**, **History**, **Branches**, **Stashes** and **Tags**: the parts of Source Control.
 - **Diff Options** (the sliders): **Unified** or **Side by Side**, how many lines around each change (**3**, **10** or the **Whole File**), and **Ignore Whitespace**. They apply to every diff.
 
+Diffs also follow the window's **Wrap Long Lines** (see [Editor settings](editor-settings.md)). With it off, each line stays on one line, and each hunk's lines scroll sideways together under its bar.
+
 Source Control keeps itself up to date while it is open. When git can't do something, the line under the top says why and what to do; choose its close button to dismiss it.
+
+### Show only changed files
+
+**Show Only Changed Files**, the filter button beside the branch at the foot of the file list, shows only the files git sees as changed and the folders that hold them, every folder open until you close it. Deleted files and folders are listed too, struck through; choose one to see it in **Changes**. The **Filter** field still applies. When nothing has changed, the list says **No Changed Files**. Choose the button again, now **Show All Files**, to see every file.
 
 ## Changes
 
@@ -30,7 +41,7 @@ Source Control keeps itself up to date while it is open. When git can't do somet
 - **Staged Changes**: what the next commit holds, against the last commit. This list appears once something is staged.
 - **Changes**: what isn't staged yet, against what is staged, with new files in full.
 
-A file staged and then changed again is in both lists. Choose a file's name to fold its lines away, its open button to open it, or a line to open the file at that line. Changed words inside a changed line are highlighted. Right-click a file for **Stage**, **Unstage**, **Discard Changes…**, **Open**, **Blame**, **File History**, **Open on GitHub** and **Copy Path**.
+A file staged and then changed again is in both lists. A renamed file shows **from** and the path it had. Choose a file's name to fold its lines away, its open button to open it, or a line to open the file at that line. Changed words inside a changed line are highlighted. Right-click a file for **Stage**, **Unstage**, **Discard Changes…**, **Open**, **Blame**, **File History**, **Open on GitHub** and **Copy Path**.
 
 ### Stage files, hunks and lines
 

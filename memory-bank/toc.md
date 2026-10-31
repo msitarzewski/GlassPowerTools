@@ -120,6 +120,7 @@ source applications are obsolete and no longer compile.
 | [Icon suite exploration](tasks/2026-10/2026-10-28_icon-suite-exploration.md) | Parked: colour directions for the family's icons |
 | [The headset's stalls](tasks/2026-10/2026-10-29_headset-stalls.md) | Half-second keystrokes on the headset: the Terminal Themes folder read on the main thread |
 | [Workgroups across machines (D91), and the rest of the app for more than one Mac](tasks/2026-10/2026-10-30_workgroup-machines.md) | Mac terminals belong to their Mac; SSH key records kept across devices; the sweep's other findings |
+| [The site's pictures: Git, the dock, SQL](tasks/2026-10/2026-10-30_site-pictures-git-dock.md) | Demo surfaces for Git in the editor and the orb dock; Vision Pro pictures and pages; the Mac's wait on the VM |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

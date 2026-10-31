@@ -36,7 +36,9 @@ struct GlassDemoModeTask: ViewModifier {
         content.task {
             await run()
             guard GlassDemoMode.closesConnections else { return }
-            try? await Task.sleep(for: .seconds(5))
+            // A cancelled task ends here: with `try?` its sleep returned at once and closed the
+            // window straight away, before the surface could open.
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
             dismissWindow()
         }
     }
@@ -138,6 +140,10 @@ enum GlassDemoMode {
             // A 3D model in the editor's viewer (D78): RealityKit on the Mac, iPhone and iPad, and
             // Apple's Quick Look volume as it opens on Vision Pro. Written here, as the project is.
             await openEditor(editor, preview: false, model: true)
+        case "editor-git", "editor-history", "editor-blame":
+            // Git in the editor (2026-10-30, the owner: the site shows none of it): the shop as a
+            // real repository (GlassDemoGit.swift) — today's changes, its history, or a file's blame.
+            await openGitEditor(editor, page: surface)
         case "editor-window", "editor-settings":
             // A window with settings of its own (W23), and This Window open over it.
             await openEditor(editor, preview: false, windowSettings: GlassEditorRuntime.demoWindowSettings,
@@ -201,25 +207,8 @@ enum GlassDemoMode {
             // Session transfer with tmux (the owner, 2026-10-18: "Don't forget session tranfer with
             // tmux"): Active listing what runs on the machines — open on another device, or
             // detached — to pick up here. Made-up sessions; nothing is behind them.
-            while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
-            var sessions: [GlassRunningSession] = []
-            if let alpha = terminalService("alpha", in: shell)?.endpointID {
-                sessions += GlassTerminalCapability.demoRunningSessions(on: alpha, [
-                    ("glass-1", nil, "shop", "shop", "main", 1, 1),
-                    ("glass-2", "jobs", "shop", "shop", "main", 0, 35),
-                ])
-            }
-            if let build = terminalService("build", in: shell)?.endpointID {
-                sessions += GlassTerminalCapability.demoRunningSessions(on: build, [
-                    ("glass-1", "release", "shop", "shop", "release/2.15", 1, 3),
-                ])
-            }
-            if let nas = terminalService("nas", in: shell)?.endpointID {
-                sessions += GlassTerminalCapability.demoRunningSessions(on: nas, [
-                    ("glass-1", nil, "backups", nil, nil, 0, 190),
-                ])
-            }
-            shell.demoRunningSessions(sessions)
+            // The library behind it is the one in use, so the sidebar's counts are the library's.
+            await fillLibrary(shell: shell, terminal: terminal, editor: editor)
             shell.showActiveConnections()
         case "workgroups":
             // Workgroups that come back after a quit (the owner, 2026-10-18): a saved set of
@@ -270,20 +259,7 @@ enum GlassDemoMode {
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
             terminal.requestDemoReplay(name: "bravo", output: Data("ann@bravo:~$ ".utf8))
         case "library-history":
-            // The library's overview with a month of invented connections behind it: the chart and
-            // Most used, for checking how its tiles and sections line up.
-            while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
-            var connections: [(host: String, daysAgo: Int, kind: HostServiceKind)] = []
-            for day in 0..<30 where day % 3 != 1 {
-                connections.append(("alpha", day, day % 2 == 0 ? .ssh : .database))
-                if day % 4 == 0 { connections.append(("bravo", day, .rdp)) }
-                if day % 5 == 0 { connections.append(("build", day, .ssh)) }
-            }
-            shell.demoRecordConnections(connections)
-            // Two more devices, as iCloud would bring them (D81): the overview's All Devices and
-            // its device choice. Invented names, as the rest of the demo's.
-            shell.demoOtherDevices([("Studio Mac", [("alpha", .ssh, 3), ("build", .ssh, 2)]),
-                                    ("Vision Pro (Lab)", [("bravo", .rdp, 2), ("alpha", .database, 1)])])
+            await fillLibrary(shell: shell, terminal: terminal, editor: editor)
         case "terminal-ring", "terminal-agents", "terminal-agents-grid":
             // 2026-10-15: ten terminals in one window, for its orb's ring (`--demo-session-orb`, and
             // `--demo-orb-names` to see where every name sits). `terminal-agents` (2026-10-27): five
@@ -313,6 +289,31 @@ enum GlassDemoMode {
             // The Connections window at its first size with a machine's details showing (W29).
             while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
             if let alpha = shell.hosts.first(where: { $0.displayName == "alpha" }) { shell.showHost(alpha.id) }
+        case "dock":
+            // The orb dock (D88; 2026-10-30, the owner: "we don't have screen shots of the amazing
+            // dock on the website!"): coding agents at work, a monitor on the build machine, the
+            // shop's database and the editor, each gathered into the dock a few seconds after it
+            // opens, then the shop's monitor open beside it. `--demo-orb-name <title>` shows one name.
+            #if os(visionOS)
+            GlassUITestRun.settingsDefaults.set(true, forKey: GlassOrbDock.settingKey)
+            GlassSessionOrbDemo.shrinksNext = true
+            let ticks = (1...6).map { Data("\r\n\u{1B}[2m  ⎿  reading line \($0)\u{1B}[0m".utf8) }
+            terminal.requestDemoTabs(names: ["✳ Storefront checkout redesign", "✳ Fix the flaky login tests",
+                                             "✳ Migrate orders to Postgres"],
+                                     output: Data(agentTranscript.utf8), grid: false,
+                                     ticks: ticks, every: .milliseconds(100))
+            try? await Task.sleep(for: .seconds(2))
+            terminal.requestDemoScreen(name: "build", draw: GlassDemoBtop.screen(rows:columns:), windowSettings: demoLook)
+            try? await Task.sleep(for: .seconds(2))
+            database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop", showsDiagram: false)
+            try? await Task.sleep(for: .seconds(2))
+            await openEditor(editor, preview: false)
+            try? await Task.sleep(for: .seconds(12))
+            GlassSessionOrbDemo.shrinksNext = false
+            // `--demo-dock-alone`: the dock by itself.
+            guard !arguments.contains("--demo-dock-alone") else { return }
+            terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:), windowSettings: demoLook)
+            #endif
         case "orb", "orb-looked-at":
             // Connections shrunk into its orb by the real idle path (W29): two terminals open, so
             // it is not the only window and Active counts two. Needs `--demo-idle-seconds <n>`;
@@ -344,6 +345,13 @@ enum GlassDemoMode {
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
             database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop",
                                          showsDiagram: surface == "diagram")
+        case "database-sql":
+            // SQL from a terminal (2026-10-20; pictured 2026-10-30): a query a coding agent printed in
+            // alpha's terminal, brought to the query editor as Open in SQL Editor brings it, the
+            // orders table beside it. The terminal opens first, so the database stands in front.
+            terminal.requestDemoReplay(name: "alpha", output: Data(sqlTranscript.utf8), windowSettings: demoLook)
+            try? await Task.sleep(for: .seconds(3))
+            database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop", start: .sql(demoSQL))
         case "database-server", "database-main":
             // W32: the server's overview, or the `main` database's, for their titles and tiles.
             database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop",
@@ -415,6 +423,98 @@ enum GlassDemoMode {
         guard let host = shell.hosts.first(where: { $0.displayName == name }),
               let ssh = host.services.first(where: { $0.kind == .ssh }) else { return nil }
         return (ssh.endpointID, host.address ?? "192.0.2.1")
+    }
+
+    /// The library as one in use looks (the owner, 2026-10-30, of a library picture half
+    /// empty: "There's a balance that needs to be had between showing the product and
+    /// chaotic display"): a month of invented connections and minutes in use behind the
+    /// overview's chart and Most used, the machines last connected in Recent, favourites,
+    /// tmux sessions in Active, and saved workgroups, keys and projects in the sidebar.
+    /// The collections come with the machines (`#` in `--ui-testing-seed-hosts`).
+    private static func fillLibrary(shell: GlassShellModel, terminal: GlassTerminalRuntime,
+                                    editor: GlassEditorRuntime) async {
+        while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+        var connections: [(host: String, daysAgo: Int, kind: HostServiceKind)] = []
+        var minutes: [(host: String, daysAgo: Int, kind: HostServiceKind, minutes: Int)] = []
+        for day in 0..<30 {
+            // Lighter at the weekend, and no two weekdays alike.
+            let weekend = day % 7 >= 5, vary = (day * 37) % 7
+            connections.append(("alpha", day, .ssh))
+            minutes.append(("alpha", day, .ssh, weekend ? 40 : 150 + vary * 30))
+            if !weekend && day % 2 == 0 {
+                connections.append(("alpha", day, .database))
+                minutes.append(("alpha", day, .database, 20 + vary * 5))
+            }
+            if day % 2 == 1 {
+                connections.append(("build", day, .ssh))
+                minutes.append(("build", day, .ssh, 30 + vary * 12))
+            }
+            if day % 3 == 0 {
+                connections.append(("db", day, .database))
+                minutes.append(("db", day, .database, 25 + vary * 8))
+            }
+            if day % 3 == 1 {
+                connections.append(("staging", day, .ssh))
+                minutes.append(("staging", day, .ssh, 20 + vary * 6))
+            }
+            if day % 4 == 2 {
+                connections.append(("bravo", day, .rdp))
+                minutes.append(("bravo", day, .rdp, 45 + vary * 15))
+            }
+            if day % 6 == 3 { connections.append(("win", day, .rdp)); minutes.append(("win", day, .rdp, 30)) }
+            if day % 7 == 6 { connections.append(("nas", day, .ssh)); minutes.append(("nas", day, .ssh, 10)) }
+            if day % 9 == 4 { connections.append(("pi", day, .ssh)); minutes.append(("pi", day, .ssh, 8)) }
+        }
+        shell.demoRecordConnections(connections)
+        shell.demoRecordMinutes(minutes)
+        shell.demoMarkFavorites(["alpha", "build", "db"])
+        // The footer as on a device signed out of iCloud, which the screenshot VM is.
+        shell.demoSignedOutOfICloud()
+        // Two more devices, as iCloud would bring them (D81): the overview's All Devices and
+        // its device choice. Invented names, as the rest of the demo's.
+        shell.demoOtherDevices([("Studio Mac", [("alpha", .ssh, 3, 120), ("build", .ssh, 2, 40)]),
+                                ("Vision Pro (Lab)", [("bravo", .rdp, 2, 60), ("alpha", .database, 1, 20)])])
+        shell.demoRunningSessions(runningSessions(in: shell))
+        if let alpha = terminalService("alpha", in: shell), let build = terminalService("build", in: shell),
+           let nas = terminalService("nas", in: shell), let staging = terminalService("staging", in: shell),
+           let db = terminalService("db", in: shell) {
+            terminal.demoLibraryExtras(workgroups: [
+                ("Shop", [(alpha.endpointID, "alpha", alpha.address, "web", "cd ~/shop && docker compose logs -f web", "glass-3"),
+                          (build.endpointID, "build", build.address, "release", "cd ~/shop && make release", "glass-2"),
+                          (nas.endpointID, "nas", nas.address, "backups", "tail -f /var/log/backup.log", "glass-2")]),
+                ("Staging", [(staging.endpointID, "staging", staging.address, "app", "cd ~/shop && make serve", "glass-1"),
+                             (db.endpointID, "db", db.address, "psql", "psql shop", "glass-1")]),
+            ], keys: [("ann@studio", false), ("deploy", false), ("Secure Enclave", true)])
+        }
+        // Folders on this device, as Open Folder keeps them.
+        for name in ["shop", "docs", "infra", "website"] {
+            let folder = URL.documentsDirectory.appending(path: name, directoryHint: .isDirectory)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            editor.remember(.local(folder))
+        }
+    }
+
+    /// tmux sessions running on the machines, open on another device or detached, as Active lists
+    /// them when the machines answer. Made up; nothing is behind them.
+    private static func runningSessions(in shell: GlassShellModel) -> [GlassRunningSession] {
+        var sessions: [GlassRunningSession] = []
+        if let alpha = terminalService("alpha", in: shell)?.endpointID {
+            sessions += GlassTerminalCapability.demoRunningSessions(on: alpha, [
+                ("glass-1", nil, "shop", "shop", "main", 1, 1),
+                ("glass-2", "jobs", "shop", "shop", "main", 0, 35),
+            ])
+        }
+        if let build = terminalService("build", in: shell)?.endpointID {
+            sessions += GlassTerminalCapability.demoRunningSessions(on: build, [
+                ("glass-1", "release", "shop", "shop", "release/2.15", 1, 3),
+            ])
+        }
+        if let nas = terminalService("nas", in: shell)?.endpointID {
+            sessions += GlassTerminalCapability.demoRunningSessions(on: nas, [
+                ("glass-1", nil, "backups", nil, nil, 0, 190),
+            ])
+        }
+        return sessions
     }
 
     /// A believable few minutes in a shell on `alpha`: invented repository, invented containers.
@@ -505,6 +605,30 @@ enum GlassDemoMode {
         return lines.joined(separator: "\r\n")
     }()
 
+    /// A coding agent answering with `demoSQL`, printed as a code block, for `database-sql`.
+    static let sqlTranscript: String = {
+        let e = "\u{1B}["
+        let dot = "\(e)38;5;174m⏺\(e)0m"
+        let dim = "\(e)2m"
+        let query = demoSQL.split(separator: "\n").map { "  \(e)36m\($0)\(e)0m" }
+        let lines = [
+            "\u{1B}]0;✳ Claude Code\u{07}",
+            "\(e)2m>\(e)0m Who are the shop's best customers?",
+            "",
+            "\(dot) This ranks customers by what their delivered orders came to:",
+            "",
+        ] + query + [
+            "",
+            "  Run it on the shop database to see the list.",
+            "",
+            "\(dim)────────────────────────────────────────────────────────────────────\(e)0m",
+            "> ",
+            "\(dim)────────────────────────────────────────────────────────────────────\(e)0m",
+        ]
+        // The cursor back in the answer box, after its "> ".
+        return lines.joined(separator: "\r\n") + "\(e)A\r\(e)2C"
+    }()
+
     /// The invented shop's repository, written into Documents and opened: several files in tabs,
     /// the Swift one in front; for `preview`, the README with its rendered preview beside it. With
     /// `windowSettings`, the window keeps them as its own (W23); with `opensSettings`, Editor
@@ -514,8 +638,17 @@ enum GlassDemoMode {
                                    opensSettings: Bool = false, model: Bool = false,
                                    previewAlone: Bool = false) async {
         let root = URL.documentsDirectory.appending(path: "shop", directoryHint: .isDirectory)
+        // The shop as its last commit has it (GlassDemoGit.swift), so the file list is a project's,
+        // with the files the pictures show over it; afresh, so no repository is left from `editor-git`.
+        #if os(macOS) || targetEnvironment(simulator)
+        try? FileManager.default.removeItem(at: root)
+        let files = GlassDemoShopFiles.first + GlassDemoShopFiles.products + GlassDemoShopFiles.stockAlerts
+            + GlassDemoShopFiles.orders + GlassDemoShopFiles.lastAddress + projectFiles
+        #else
+        let files = projectFiles
+        #endif
         do {
-            for (path, text) in projectFiles {
+            for (path, text) in files {
                 let url = root.appending(path: path)
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                         withIntermediateDirectories: true)
@@ -540,8 +673,67 @@ enum GlassDemoMode {
             for file in others where file.pathExtension.lowercased() == "usdz" { _ = await workspace.open(file) }
         }
         if preview, let last { workspace.previewModes[last.id] = previewAlone ? .previewOnly : .beside }
+        await openSourcesFolders(in: workspace)
         editor.present(window)
     }
+
+    /// `Sources` and the folders in it opened in the file list (2026-10-30, the owner, of a picture
+    /// with four rows over an empty column: "There's a balance that needs to be had between showing
+    /// the product and chaotic display"). A folder's children load as it opens, so each is waited for.
+    private static func openSourcesFolders(in workspace: GlassEditorWorkspace) async {
+        func folder(_ name: String, in parent: GlassEditorProjectNode?) async -> GlassEditorProjectNode? {
+            for _ in 0..<50 {
+                if let found = parent?.children?.first(where: { $0.isDirectory && $0.name == name }) { return found }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            return nil
+        }
+        guard let sources = await folder("Sources", in: workspace.projectRoots.values.first) else { return }
+        workspace.setExpanded(true, for: sources.id)
+        for _ in 0..<50 where sources.children == nil { try? await Task.sleep(for: .milliseconds(100)) }
+        for child in sources.children ?? [] where child.isDirectory { workspace.setExpanded(true, for: child.id) }
+    }
+
+    /// The shop as a repository with a history, open in the editor at `page`: `editor-git` the
+    /// Changes tab — the relay staged, the address checks and the README changed, a file new and
+    /// one gone — `editor-history` Source Control's History, `editor-blame` a file's Blame. Off the
+    /// Mac, the simulator's app runs the Mac's `git` (`GlassEditorLocalFileAccess.demoGitRunner`).
+    private static func openGitEditor(_ editor: GlassEditorRuntime, page: String) async {
+        #if os(macOS) || targetEnvironment(simulator)
+        #if !os(macOS)
+        GlassEditorLocalFileAccess.demoGitRunner = GlassDemoGitRunner()
+        #endif
+        let root = URL.documentsDirectory.appending(path: "shop", directoryHint: .isDirectory)
+        guard await GlassDemoShop.makeRepository(at: root), let window = editor.openProject(root) else { return }
+        let workspace = editor.workspace(for: window)
+        let file = root.appending(path: "Sources/Checkout/ShippingAddress.swift")
+        _ = await workspace.open(file)
+        // The repository reads a moment after the project opens.
+        for _ in 0..<100 {
+            if let id = workspace.projects.first?.id, workspace.repositories[id]?.state == .ready { break }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        switch page {
+        case "editor-history": workspace.showSourceControl(.history)
+        case "editor-blame": workspace.showGit(.blame(file.path), of: file.path)
+        default: workspace.showChanges()
+        }
+        await openSourcesFolders(in: workspace)
+        editor.present(window)
+        #endif
+    }
+
+    /// The query in `database-sql`: the shop's best customers by delivered orders.
+    static let demoSQL = """
+    SELECT c.name, c.city, COUNT(o.id) AS orders,
+           SUM(o.total_cents) / 100.0 AS spent
+    FROM orders o
+    JOIN customers c ON c.id = o.customer_id
+    WHERE o.status = 'delivered'
+    GROUP BY c.id
+    ORDER BY spent DESC
+    LIMIT 25;
+    """
 
     /// A blue box and an orange ball, in USD's text form, for `editor-model`.
     private static let demoModel = """
@@ -729,7 +921,8 @@ private struct DemoRemoteScreen: View {
             HStack {
                 Text("Applications").fontWeight(.semibold)
                 Spacer()
-                Text("Mon 09:41").fontWeight(.semibold)
+                // Today, as the Mac's menu bar beside it says (9:41 there too, site_shots.sh).
+                Text("\(Date.now.formatted(.dateTime.weekday(.abbreviated))) 09:41").fontWeight(.semibold)
                 Spacer()
                 Image(systemName: "network"); Image(systemName: "speaker.wave.2.fill"); Image(systemName: "battery.75percent")
             }

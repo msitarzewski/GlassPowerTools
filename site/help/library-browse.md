@@ -60,7 +60,7 @@ Your Mac may also be a machine in your library, added so your other devices can 
 Once they are linked, on this Mac:
 
 - The machine's row stands for this Mac. It comes first, and the line under its name starts **This Mac ·**. When **This Mac** has no services of its own, its row joins the machine's, which also lists **Local Shell** when the machine has no Terminal service of its own; otherwise both rows stay.
-- **Connect** on the machine's Terminal service opens a terminal on this Mac, in tmux when local terminals are kept in tmux, instead of connecting to the Mac over SSH. A basic terminal, the command palette's **without tmux**, and a Workgroup still connect over SSH.
+- **Connect** on the machine's Terminal service opens a terminal on this Mac, in tmux when local terminals are kept in tmux, instead of connecting to the Mac over SSH. A Workgroup's terminals on the machine open on this Mac too, as local terminals. A basic terminal and the command palette's **without tmux** still connect over SSH.
 - Its databases are This Mac's: a local terminal's **Open in SQL Editor** offers them (see [Open SQL in the SQL editor](terminal-sessions.md#open-sql-in-the-sql-editor-mac)).
 - Its Desktop services, such as Screen Sharing, aren't offered here, since they would show the screen you're looking at. They stay in the library for your other devices.
 - **Active** lists the Mac's tmux sessions once, under **This Mac**.

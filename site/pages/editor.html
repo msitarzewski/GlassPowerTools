@@ -1,6 +1,6 @@
 <!--
 title: Editor — Glass Power Tools
-description: Edit files on this device or on a server over SFTP. Projects with a file tree, fifteen highlighted languages, Markdown, HTML, SVG and CSV previews, and 3D models.
+description: Edit files on this device or on a server over SFTP. Projects with a file tree, Git, fifteen highlighted languages, Markdown, HTML, SVG and CSV previews, and 3D models.
 -->
 <main class="page" id="content">
 
@@ -15,8 +15,8 @@ description: Edit files on this device or on a server over SFTP. Projects with a
 </section>
 
 <figure class="window-shot">
-  <img class="only-dark" src="static/shots/mac-editor-dark.webp" width="2480" height="1560" alt="The editor on a Mac: the shop project's files in the sidebar, three tabs (compose.yaml, README.md and ShippingAddress.swift), and ShippingAddress.swift open with its Swift highlighted.">
-  <img class="only-light" src="static/shots/mac-editor-light.webp" width="2480" height="1560" alt="The same window in the light appearance.">
+  <img class="screen only-dark" src="static/shots/mac-editor-dark.webp" width="3008" height="1880" alt="The editor on a Mac: the shop project's files in the sidebar, three tabs (compose.yaml, README.md and ShippingAddress.swift), and ShippingAddress.swift open with its Swift highlighted.">
+  <img class="screen only-light" src="static/shots/mac-editor-light.webp" width="3008" height="1880" alt="The same window in the light appearance.">
   <figcaption>The editor on a Mac, with a project open.</figcaption>
 </figure>
 
@@ -25,12 +25,27 @@ description: Edit files on this device or on a server over SFTP. Projects with a
   <figcaption>The same project on Apple Vision Pro.</figcaption>
 </figure>
 
+<figure class="window-shot">
+  <img class="screen only-dark" src="static/shots/mac-editor-git-dark.webp" width="3008" height="1880" loading="lazy" alt="The editor's Changes tab on a Mac, for the shop project in a folder on the Mac, on its main branch with five changes. compose.yaml is staged, its mail relay changed from mail.example.com to relay.example.com; below, README.md has an unstaged change to its deploy step, and LegacyExport.swift is deleted. The commit message box waits above them.">
+  <img class="screen only-light" src="static/shots/mac-editor-git-light.webp" width="3008" height="1880" loading="lazy" alt="The same window in the light appearance.">
+  <figcaption>Git in the editor on a Mac: today's changes in a folder on the Mac, staged and not, hunk by hunk.</figcaption>
+</figure>
+
+<figure class="window-shot">
+  <img class="room" src="static/shots/vision-editor-git.webp" width="2400" height="1350" loading="lazy" alt="The editor's Changes tab on Vision Pro: the shop project on its main branch with five changes. compose.yaml is staged, its mail relay changed from mail.example.com to relay.example.com; below, README.md has an unstaged change to its deploy step, and LegacyExport.swift is deleted. The file list marks the changed files.">
+  <figcaption>The same changes on Apple Vision Pro. There, and on iPhone and iPad, Git works for a project on a server, running the server's git.</figcaption>
+</figure>
+
 <section class="band">
   <h2>What it does</h2>
   <div class="grid">
     <div class="card">
       <h3>Projects, here or on a server</h3>
       <p>A project is a folder. Open one on this device, or open a server's folder from its Files browser; if the server's connection drops, the project makes a new one. The Projects list syncs where each project is, never its files.</p>
+    </div>
+    <div class="card">
+      <h3>Git</h3>
+      <p>What changed, staged a whole file, a hunk or single lines at a time; commit and amend; pull, push and fetch; history, branches, stashes, tags, conflicts and blame. It runs git where the folder is: the Mac's own, or the server's over the project's connection. A folder on an iPhone, iPad or Vision Pro itself has no git to run.</p>
     </div>
     <div class="card">
       <h3>Fifteen languages</h3>
@@ -62,10 +77,10 @@ description: Edit files on this device or on a server over SFTP. Projects with a
 
 <section class="band">
   <h2>On each device</h2>
-  <p class="intro">Written from the app's code. On 2026-10-17 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.471.</p>
+  <p class="intro">Written from the app's code. On 2026-10-30 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.568.</p>
   <ul class="list">
     <li><strong>Vision Pro and iPad:</strong> an editor window with the file list on the left and tabs across the top. On Vision Pro the window's controls, Preview among them, are the row below the window. Projects in the library also opens a new document, or files and folders. With a keyboard, ⌘S saves, and asks where for a new document.</li>
-    <li><strong>Mac:</strong> the same, with File and Text menus: New Editor Window, Open for files and folders, Find and Replace, and Go to Line. Viewers use Quick Look.</li>
+    <li><strong>Mac:</strong> the same, with File, Text and Git menus: New Editor Window, Open for files and folders, Clone Repository…, Find and Replace, Go to Line, and each part of Source Control with Pull, Push and Fetch. Viewers use Quick Look.</li>
     <li><strong>iPhone:</strong> the Editor fills the screen, and each folder is its own screen. Your documents and unsaved changes are kept when you step back to the library.</li>
   </ul>
 </section>

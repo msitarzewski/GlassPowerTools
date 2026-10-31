@@ -1959,3 +1959,30 @@ which library machine the Mac is, but listed workgroups as not done.
    its ended sessions. The Mac's own window restoration is unchanged (a reboot brings its tabs back on new sessions).
 
 Task note `tasks/2026-10/2026-10-30_workgroup-machines.md`.
+
+## D92 — Focus Mode rooms in Apple's own format — Approved 2026-10-31 (direction; nothing built)
+**Owner, 2026-10-31:** "Should we spend some time making is a normal/expected flow/API/interface before releaseing it to
+the wild?", "Let's explore anything we can to make this simple for someone familiar with Apple's existing tooling to
+build envs for us", then, on the written proposal, "go ahead, hold the how-to and commit the rest".
+
+**Why:** D89's living rooms read names in the file (`moving`, `clock`, `clock_digital`, `snd_`, `event_`) and two
+folders beside it, and Add Environment copies only the file. Reality Composer Pro 3, Apple's editor for this, exports
+one `.reality` and "doesn't preserve … many names"; its components survive. Tested here: an Audio Library with its
+sound, an ambient emitter, a reverb and an animation all arrive in a compiled `.reality` and a plain USDZ; a custom
+component arrives in a compiled `.reality` as the app's own registered type, and crashed RealityKit on the Mac inside
+a plain USDZ.
+
+**Decision:**
+1. A room is one `.reality` from Reality Composer Pro 3. The app plays and honours Apple's components: animation
+   libraries and Sequences, audio libraries on Spatial/Ambient/Channel emitters (at Room Sound), Reverb, the Virtual
+   Environment Probe, the editor's lights, authored collision. Try Out lists what a room has.
+2. What Apple has no component for comes from one plugin module with a fixed name (`GlassRoomKit`): clock hand,
+   digital clock, now and then, start. Its names are the contract.
+3. A plain USDZ keeps today's name convention; one carrying our components is refused when added.
+4. Terminals are never placed by a room ("Let's not lock terminals, that defeats the vision I think"). No code in
+   rooms (no Script Graph). Video: a later experiment.
+5. The help says what a room does, not how to make one, until version 1 is built and published (help, sample room,
+   plugin).
+
+**Status:** direction approved; steps and evidence in `tasks/2026-10/2026-10-31_room-format.md`. Open with the owner:
+installing Reality Composer Pro 3 here, the plugin's licence, a Feedback report for the USDZ crash.

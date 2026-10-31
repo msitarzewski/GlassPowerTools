@@ -688,19 +688,45 @@ public final class GlassTerminalRuntime {
     public func demoShowWorkgroup(name: String,
                                   terminals: [(endpointID: EndpointID, machine: String, address: String,
                                                label: String, command: String?, tmux: String)]) {
+        let preset = demoSaveWorkgroup(name: name, colorTag: .orange, terminals: terminals)
+        showWorkgroupsPanel()
+        workgroupsModel.selection = .preset(preset.id)
+    }
+    /// Screenshots only (`--demo-open library-history`): what a library in use has beside its
+    /// machines, for the sidebar's counts — workgroups saved, as `demoShowWorkgroup` saves one, and
+    /// SSH keys, each a name and whether it is in the Secure Enclave. The keys are records alone,
+    /// held in memory: no key material is made or stored.
+    public func demoLibraryExtras(workgroups: [(name: String, terminals: [(endpointID: EndpointID, machine: String,
+                                                                            address: String, label: String,
+                                                                            command: String?, tmux: String)])],
+                                  keys: [(name: String, secureEnclave: Bool)]) {
+        let colors: [ServerColorTag] = [.blue, .green, .purple, .orange]
+        for (index, workgroup) in workgroups.enumerated() {
+            demoSaveWorkgroup(name: workgroup.name, colorTag: colors[index % colors.count], terminals: workgroup.terminals)
+        }
+        settingsManager.sshKeys += keys.map {
+            StoredSSHKey(name: $0.name, algorithm: $0.secureEnclave ? "ECDSA P-256" : "ED25519",
+                         storageKind: $0.secureEnclave ? .secureEnclave : .imported,
+                         algorithmKind: $0.secureEnclave ? .ecdsaP256 : .ed25519)
+        }
+    }
+    /// The workgroup both demos save, its machines given their in-memory terminal records.
+    @discardableResult
+    private func demoSaveWorkgroup(name: String, colorTag: ServerColorTag,
+                                   terminals: [(endpointID: EndpointID, machine: String, address: String,
+                                                label: String, command: String?, tmux: String)]) -> LayoutPreset {
         let servers = sessionManager.serverManager
         for terminal in terminals where servers.server(for: terminal.endpointID.rawValue) == nil {
             servers.servers.append(ServerConfiguration(id: terminal.endpointID.rawValue, name: terminal.machine,
                                                        host: terminal.address, username: "ann"))
         }
-        var preset = LayoutPreset(name: name, colorTag: .orange, sessionIntents: terminals.map {
+        var preset = LayoutPreset(name: name, colorTag: colorTag, sessionIntents: terminals.map {
             LayoutPreset.SessionIntent(serverID: $0.endpointID.rawValue, label: $0.label, startupCommand: $0.command,
                                        tmuxSession: $0.tmux)
         })
         preset.openingView = .grid
         settingsManager.upsertLayoutPreset(preset)
-        showWorkgroupsPanel()
-        workgroupsModel.selection = .preset(preset.id)
+        return preset
     }
     #endif
     public func requestShowTailscale() { enqueue(.showTailscale) }

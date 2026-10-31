@@ -674,6 +674,19 @@ struct TerminalWindowView: View {
                 }
             }
         }
+        // `--demo-nudge ahead,right,turn°`: Fine Position's step and turn (a positive turn is to the
+        // left), which asks nothing of what is in the way: a viewpoint past a desk no pinch can reach
+        // over, as the loft's for the site's picture (2026-10-30).
+        if let index = arguments.firstIndex(of: "--demo-nudge"), arguments.indices.contains(index + 1) {
+            let numbers = arguments[index + 1].split(separator: ",").compactMap { Double($0) }
+            if numbers.count == 3 {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(14))
+                    FocusEnvironmentStage.shared.walking?.nudge(forward: numbers[0], right: numbers[1],
+                                                                turn: numbers[2] * .pi / 180)
+                }
+            }
+        }
         #endif
         #endif
         #if os(visionOS)

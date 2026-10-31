@@ -175,7 +175,36 @@ use the disposable test VM only).
   since lost its record. Now each change writes and deletes only its own records. Same task note. The sweep's other
   findings (local-folder projects with no machine, SQLite paths, loopback addresses, …) wait for his choice.
   0.4.568 (with a test-isolation fix to the library's remote-change listener) is on all three, read back; no new
-  crash reports. Nothing committed.
+  crash reports. Committed at his word (`0440f3f0`), not pushed.
+- **Then the site's pictures (his "go ahead with all three": the dock, the new editor, databases):** Vision Pro
+  pictures of Git in the editor and of the orb dock made from new demo surfaces and placed on the home and editor
+  pages (not deployed, not committed). Then, Parallels quit at his word, the Mac pictures: Git in the editor and SQL
+  from a terminal (dark and light), on the editor and databases pages. Parallels was not the cause: the main
+  screenshot VM no longer boots (a copy of the clean one does, at once), so the shots came from
+  `glasspowertools-mac26-run`. Not deployed, not committed. `tasks/2026-10/2026-10-30_site-pictures-git-dock.md`.
+- **Then whole screens on Apple's wallpaper (his "yes to all three", and "I'd love it if we could shoot all of these
+  with the default Apple background visible"):** the main VM recreated from clean (boots). Every main Mac picture
+  retaken as the whole 1504 × 940 screen: macOS 27's default wallpaper, the menu bar, 9:41. The demo library is
+  lived-in (nine machines, four collections, a month of use), and no window has an empty column (terminal sidebar
+  closed, the editor's `Sources` open). The iPad library is landscape (`ipad-landscape.webp`, through a UI test
+  that turns the simulator). Pages and CSS updated; `build_site.py` passes; previewed dark and light. Open: his word
+  on the pictures, then commit and deploy (his yes was "when you're happy with the pictures"); his choice on the
+  library's "Not synced on this build" footer and on the terminal looks' gallery (still cut-out windows).
+  `--demo-close-connections` left no window at all on the Mac (not understood; the Mac shots minimise Connections).
+- **Then his five asks (same afternoon):** the iCloud footer says what to do (**Sign in to iCloud to sync**, grey;
+  red only for a failure; **On this device only** for a build without iCloud), with tests seen to bite; looks kept,
+  Blueprint added to the terminal page; Focus Mode pictures in his Loft (its digital clock above the window, his ask)
+  and Ridge Studio, through a new DEBUG `--demo-nudge`; and a docs pass from an audit: the help (terminal pages, orb
+  dock, workgroups across machines, Git marks, log following, pasting pictures, living rooms and how to make a room,
+  the new sync words), the site pages, README, PRIVACY and SECURITY (the Mac's git reaching remotes). Shell tests 373
+  pass. Not committed, not deployed: his word on the pictures and the text.
+- **Then the room format (2026-10-31):** explored how someone using Apple's tools would build a Focus Mode room
+  (Reality Composer Pro 3, `realitytool`, Apple's samples, a compiled test room); written up as his doc, approved as a
+  direction ("go ahead"), recorded as D92 with the plan in `tasks/2026-10/2026-10-31_room-format.md`. The help's
+  "Make a room of your own" is held until version 1 ("hold the how-to"); the help says what a room does. Then
+  "commit the rest": all of the 10-30/31 work committed (not pushed, not deployed). **Next:** D92's step 1 (play
+  Apple's components) when he says; his open choices: Reality Composer Pro 3 here, the plugin's licence, a Feedback
+  report.
 
 ## 2026-10-27 — the orb dock's ninth to thirteenth rounds, the terminal redraw storm, and living rooms committed and pushed (0.4.535–0.4.541)
 - **Pushed 2026-10-27 at his word ("push it"):** eight commits, `dcad5dcb`…`61a3bd0f` (0.4.495–0.4.541), each scanned for

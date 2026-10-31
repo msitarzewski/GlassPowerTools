@@ -83,10 +83,18 @@ public struct GlassEditorLocalFileAccess: GlassEditorFileAccess {
     public var gitRunner: (any GlassEditorGitRunner)? {
         #if os(macOS)
         GlassEditorLocalGit.shared
+        #elseif DEBUG
+        Self.demoGitRunner
         #else
         nil
         #endif
     }
+
+    #if DEBUG
+    /// Screenshots only (`App/GlassDemoMode.swift`, 2026-10-30): a `git` for the iPhone, iPad and
+    /// Vision Pro simulators, which run on a Mac and can start its own. Nil everywhere else.
+    public static var demoGitRunner: (any GlassEditorGitRunner)?
+    #endif
 
     public func contents(ofDirectory path: String) async throws -> [GlassEditorProjectNode] {
         let url = URL(filePath: GlassEditorProject.normalized(path), directoryHint: .isDirectory)

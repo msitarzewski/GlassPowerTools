@@ -555,13 +555,26 @@ raw captures are in the git-ignored `.scratch/`. Observed:
   no `CODE_SIGN_ENTITLEMENTS`, no hardened runtime). A `--ui-testing <uuid>` run uses none of them: its catalog and
   storage are a folder of its own and it never attaches CloudKit. The sidebar says "Not synced on this build".
 - **The screen starts at 1024 × 768 points**, whatever `tart set --display` says; `vmtool display set 1920x1200` gives
-  1920 × 1200 at 2x (`site_shots.sh` sets it each run).
+  1920 × 1200 at 2x. The site's pictures use 1504 × 940 (2026-10-30; the VM offers no 1440 × 900), which
+  `site_shots.sh` sets each run.
 - **A capture from SSH raises "com.apple.sshd-session is requesting to bypass the system private window picker"**,
   although setup quiets the notice for `sshd-keygen-wrapper`; pressing its Allow (`vmtool press UserNotificationCenter
   Allow`) clears it, and `site_shots.sh` presses it around every capture.
-- **A window-only capture (`screencapture -l`) draws the glass flat**, as over nothing (an opaque gray sidebar). The
-  site's pictures are the screen in the window's frame (`-R`), cut out by the window-only capture's outline, over a
-  desktop picture in the site's colours, so the glass shows a wash of it and nothing of Apple's wallpaper.
+- **A window-only capture (`screencapture -l`) draws the glass flat**, as over nothing (an opaque gray sidebar). Until
+  2026-10-30 the site's pictures were the screen in the window's frame (`-R`), cut out by that outline, over a desktop
+  picture in the site's colours. Since then (the owner's ask) they are the whole screen over macOS 27's default
+  wallpaper (`macvm/wallpaper.py`, from the copy macOS keeps on the host), with the menu bar and the clock set to 9:41;
+  only `looks` are still cut out.
+- **Whole-screen shots need** (`site_shots.sh` prepare): the Dock hidden from the GUI session (from SSH the setting
+  didn't take), network time off and `sudo date` before each capture (Cirrus' admin has passwordless sudo), and
+  `AppleShowScrollBars WhenScrolling` (with no trackpad macOS draws scroll bars always).
+- **`--demo-close-connections` left no window at all on the Mac** (2026-10-30, every launch after a full run, with
+  btop; on 10-20 with a look). Not understood: the library window never appeared, even for a moment, and
+  without the flag both windows did. The Mac shots minimise Connections instead (`connections_away`); the simulators
+  still use the flag. The demo's close step also no longer closes at once when its task is cancelled.
+- **`vmtool press <app> <button> <window>`** presses in one window only (two windows can each have Hide Sidebar).
+  A window with a subtitle has the accessibility title "alpha – ann@192.0.2.10:22", "alpha" in the window list;
+  either matches.
 - **Window titles the shots find:** the library "All Connections"; `terminal` "alpha"; `database` "orders" (the open
   table); `diagram` "main"; `desktop` "bravo"; `editor` "ShippingAddress.swift".
 - **The demo desktop says "The remote session is not ready."** on a Mac: as its window becomes key it sends the Caps
@@ -597,8 +610,19 @@ workgroups"; then "run btop or something for the terminal examples"):
   `defaultWindowPlacement` with `.leading`/`.trailing` turns the side windows toward the viewer and brings them close,
   so they ran off both edges of the simulator's fixed view; the placement's size was not honoured either. Tried and
   removed; the Vision Pro pictures are one service each.
-- `macvm.sh start` once said "no VM named glasspowertools-mac26" while the simulators were busy; `tart list --quiet`
-  listed it a moment later and a retry started it.
+- `macvm.sh start` said "no VM named …" at random: `tart list --quiet | grep -qx` under `pipefail`, where grep stops
+  at the match, tart dies of SIGPIPE (141) and pipefail calls it a miss (2 of 6 tries). Fixed 2026-10-30: grep reads
+  the whole list.
+- **No address means a guest that never booted, not the host's network** (2026-10-30). `glasspowertools-mac26` came up
+  with no IP on 10-23, 10-28 and 10-30, first blamed on Parallels' bridges; with Parallels quit it still had none, one
+  core at 100% and the guest agent silent, and no `bridge100` (the host makes it only once the guest's network comes
+  up). A fresh copy of `-clean` (`macvm.sh reset`, then `GLASS_MACVM=glasspowertools-mac26-run`) had an address in
+  seconds and took the pictures; `-clean` has the base's setup. Recreating the base from clean is the owner's call.
+- **The Cirrus image turns on keyboard navigation for every control** (`AppleKeyboardUIMode` 3), so an editor window's
+  first tab wore a focus ring in every picture from 10-18; `site_shots.sh` sets 0, as a Mac ships, and the Changes
+  tab's commit Message box holds the focus instead.
+- **`vmtool drag x1 y1 x2 y2` and `click x y`** post mouse events (CGEvent, the same Accessibility trust as `press`):
+  how `site_shots.sh sql` opens the sidebar's database and drags the query editor's divider.
 - **Glass shows whatever is behind it, so the VM's screen is cleared first** (`site_shots.sh`): desktop widgets hidden
   (`com.apple.WindowManager StandardHideWidgets`), a leftover "quit unexpectedly" report pressed OK, and notification
   banners closed before every capture (`macvm/close-banners.applescript`, each banner's Close action; macOS 26 posts

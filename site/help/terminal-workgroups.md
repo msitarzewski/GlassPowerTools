@@ -20,7 +20,7 @@ With **Sync terminal settings** on (Settings ▸ **Terminal** ▸ **Edit Theme**
 ## Create a Workgroup
 
 - **On Vision Pro, iPad and iPhone:** choose the plus button (**New workgroup**) above the list. To capture the SSH terminals you have open now, choose the button beside it (**Save current SSH sessions as workgroup**). Each terminal in tmux is saved with its session.
-- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs, its split layout, the tmux session each terminal is in, and the window's own settings (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)), which the Workgroup opens with on every device. With no Workgroup selected, **New Workgroup** in the detail also starts an empty one.
+- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs, its split layout, the tmux session each terminal is in, which Mac its local tabs run on (see [Mac terminals open on their Mac](#mac-terminals-open-on-their-mac)), and the window's own settings (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)), which the Workgroup opens with on every device. With no Workgroup selected, **New Workgroup** in the detail also starts an empty one.
 
 In **New Workgroup**:
 
@@ -65,18 +65,28 @@ When a terminal's machine keeps sessions running with tmux, the Workgroup rememb
 - **Opening it again** attaches each terminal to its own session, so everything you left running is there. Nothing is typed into a session that is still running.
 - **A session that has ended** is started again under the same name, and only then does the tab's startup command run.
 - **A terminal without a session yet** gets a new one the first time the Workgroup opens, and the Workgroup keeps it from then on, on all your devices.
-- **On another device**, the Workgroup joins the same sessions, as a second screen on the same work.
-- New terminals you open on a machine never take a session a Workgroup keeps there.
+- **On another device**, the Workgroup joins the same sessions, as a second screen on the same work. Its Mac terminals do too, on their Mac (see below).
+- Each machine has one set of tmux session names, however a Workgroup reaches it: as a Mac's own terminal or over SSH. New terminals you open on a machine never take a session a Workgroup keeps there.
+- **A session renamed in tmux** while a terminal shows it, for example with `tmux rename-session`, stays the Workgroup's: the Workgroup keeps it under its new name.
 - **A basic terminal**, one opened outside tmux, is saved as one, and opens outside tmux again on every device (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)).
 
 In **Edit Tab**, **tmux session** shows the session a tab opens on. **Start a New One** gives the tab a new session next time; the old one keeps running, and **Active** lists it.
 
+## Mac terminals open on their Mac
+
+A Workgroup's local tabs are terminals on a Mac, and each one records which Mac. A Mac records itself when it saves the Workgroup or opens those tabs, once it is linked to its own machine in your library (see [When a machine in your library is this Mac](library-browse.md#when-a-machine-in-your-library-is-this-mac)).
+
+- **On that Mac**, they open as local tabs. An SSH tab to that Mac's own machine opens as a local tab there too, instead of connecting to itself.
+- **On every other device**, another Mac included, each opens over SSH to that Mac, through its Terminal service in your library, and joins its own tmux session there: the same one the Mac's tab shows. Nothing is typed into a session that is running. One that has ended is made again on that Mac, in the terminal's folder, and only then does its startup command run. A basic terminal starts a new shell there, in its folder.
+
+The Mac is reached over SSH, so it needs **Remote Login** on, as for picking up its sessions from **Active** (see [Local terminals on a Mac](terminal-tmux.md#local-terminals-on-a-mac)).
+
 ## Open a Mac Workgroup on Vision Pro, iPad or iPhone
 
-Local terminals run only on a Mac. When a Workgroup has local tabs, **Use SSH Instead of Local** appears first.
+Local terminals run only on a Mac. Most open on their Mac, as above. **Use SSH Instead of Local** appears first only when this device can't open one there: its Mac isn't in your library on this device, or no Mac has recorded itself on it yet. The sheet lists only those terminals.
 
-1. For each local tab, pick a connection in **Use SSH connection**, or leave **Skip this terminal**.
-2. Optionally enter a **Remote directory (blank uses SSH default)** and a **Startup command (optional)**.
+1. For each, pick a connection in **Use SSH connection**, or leave **Skip this terminal**.
+2. **Remote directory (blank uses SSH default)** starts as the terminal's folder on the Mac, when it has one; change it if the work is somewhere else on that machine. Optionally change the **Startup command (optional)**.
 3. Turn on **Remember replacements on this device** to offer the same choices next time. They are not synced.
 4. Choose **Open Workgroup**.
 

@@ -79,6 +79,7 @@ Open **Settings** and choose **Databases**. The same page is **All Databases** i
 - **Redact literals in query history** replaces quoted strings and numbers before a statement is kept in history. It never changes what is sent to the database.
 - **Notify when a query fails** shows a private notification with no SQL, schema names or server details.
 - **SQL editor text** and **Results grid text** set their text sizes, from 10 to 32 pt. **Show line numbers** and **Format JSON automatically while editing** are beside them.
+- **On iPhone, iPad and Vision Pro**, **Scale grid with system text size** (on by default): **Results grid text** is the grid's size at the standard text size, and a larger text size in the system's Settings makes the grid larger too, its rows and columns with it. Turn it off to keep the grid at **Results grid text**. It is kept on this device only.
 
 ## Give a database window its own settings
 
@@ -98,6 +99,6 @@ Each setting follows **All Databases** (or **Appearance**) until you change it h
 
 A database window doesn't reopen when the app relaunches, so its settings are kept for its database: the next window you open on that database starts with them, after a relaunch too. **Open in New Window**, in the schema browser, gives the new window the settings of the one you opened it from. They're kept on this device.
 
-Some settings are only ever for every window. **Query history limit**, **Redact literals in query history** and **Notify when a query fails** govern the history and notifications every window shares, and **Show schema sidebar when space allows** only decides how a new window starts on iPad. **Read-only** belongs to the database service; see [Make a service read-only](database-add-service.md#make-a-service-read-only). **Material**, in **Appearance**, doesn't change a database window, so **This Window** doesn't offer it.
+Some settings are only ever for every window. **Query history limit**, **Redact literals in query history** and **Notify when a query fails** govern the history and notifications every window shares, **Scale grid with system text size** applies to every grid, and **Show schema sidebar when space allows** only decides how a new window starts on iPad. **Read-only** belongs to the database service; see [Make a service read-only](database-add-service.md#make-a-service-read-only). **Material**, in **Appearance**, doesn't change a database window, so **This Window** doesn't offer it.
 
 **On iPhone:** the workspace is a screen rather than a window, so **Settings**, in the ⋯ menu, opens **All Databases**.

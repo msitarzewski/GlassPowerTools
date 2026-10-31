@@ -137,6 +137,9 @@ public final class GlassDatabaseRuntime {
     /// database's overview (W32).
     public enum DemoStart: Sendable {
         case table, server, database
+        /// SQL as Open in SQL Editor brings it from a terminal (2026-10-30): in a query tab of its
+        /// own, unrun, with the table it names open beside it.
+        case sql(String)
     }
 
     /// Screenshots only: This Window opens over the next workspace window, once.

@@ -58,8 +58,10 @@ public enum GlassCatalogSyncStatus: Equatable, Sendable {
     case syncing
     case synced(Date)
     /// iCloud is signed out, restricted, or the container is unavailable. Not an error the user
-    /// caused, and not something retrying will fix on its own.
-    case unavailable(String)
+    /// caused, and not something retrying will fix on its own. `short` is the library footer's
+    /// line, what to do rather than that something is wrong (the owner, 2026-10-30, of the footer:
+    /// "less errory and more informative").
+    case unavailable(String, short: String)
     case failed(String)
 }
 

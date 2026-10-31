@@ -35,10 +35,22 @@
 It started as an SSH client for Apple Vision Pro, and the headset still leads the design. Each
 session is a normal window you place around you, so a server's terminal, its database and its
 desktop can sit side by side in the room. A window you aren't using can shrink into a small glass
-orb, with its session live inside it, until you pinch it back.
+orb, with its session live inside it, until you pinch it back, and the orbs can gather in one dock,
+with a terminal's tabs on a ring around its orb.
 
 Every window is glass. **Opacity** sets how much of the theme's colour is painted, **Glass** how
 much the room is frosted behind it; the pictures here use 78% and 50%.
+
+<table>
+  <tr>
+    <td width="50%"><img src="site/static/shots/vision-focus-loft.webp" alt="Focus Mode on Vision Pro in a loft high over Midtown at night: a terminal running btop in front of the city's lit towers, the time and date on the wall above the windows."></td>
+    <td width="50%"><img src="site/static/shots/vision-focus-ridge.webp" alt="Focus Mode on Vision Pro in a studio with glass walls: a terminal running btop where the room meets its glass, golden hills beyond."></td>
+  </tr>
+  <tr>
+    <td><sub><strong>Focus Mode in a room of your own.</strong> Its animation plays, a clock on the wall keeps your time, its sounds play around you, and now and then something passes the window.</sub></td>
+    <td><sub><strong>Walk about in it.</strong> Pinch the floor to go there. Built in, too: a night sky, dusk, a grid and a studio. These two rooms are the author's own files.</sub></td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -66,7 +78,7 @@ work running.
   </tr>
   <tr>
     <td><sub><strong>Move a session between devices.</strong> Active lists what runs in tmux on each machine. Join one here, or take it over: start a build on the Mac and watch it from the headset.</sub></td>
-    <td><sub><strong>Workgroups that come back.</strong> After a quit, a crash or an update, the windows return on the same sessions, with everything still running.</sub></td>
+    <td><sub><strong>Workgroups that come back.</strong> After a quit, a crash or an update, the windows return on the same sessions, with everything still running. A workgroup's terminals on a Mac open from your other devices over SSH to that Mac.</sub></td>
   </tr>
 </table>
 
@@ -79,7 +91,7 @@ The same app, with a local shell, menus and windows that are as see-through as y
     <td width="50%">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-terminal-dark.webp">
-        <img src="site/static/shots/mac-terminal-light.webp" alt="A terminal window on a Mac with its sidebar open, running btop on alpha.">
+        <img src="site/static/shots/mac-terminal-light.webp" alt="A terminal window on a Mac's desktop, running btop on alpha.">
       </picture>
     </td>
     <td width="50%">
@@ -109,7 +121,7 @@ The same app, with a local shell, menus and windows that are as see-through as y
   </tr>
   <tr>
     <td><sub><strong>Remote desktops.</strong> RDP and VNC, with the remote resolution following your window.</sub></td>
-    <td><sub><strong>Editor.</strong> Files on this device or on a server, with highlighting, previews, and viewers for pictures, PDFs and 3D models.</sub></td>
+    <td><sub><strong>Editor.</strong> Files on this device or on a server, with highlighting, previews, Git, and viewers for pictures, PDFs and 3D models.</sub></td>
   </tr>
 </table>
 
@@ -155,7 +167,7 @@ Vision Pro, in a window's **This Window** settings.
 The same library and the same machines. The iPhone gives each session the whole screen.
 
 <p align="center">
-  <img src="site/static/shots/ipad-library.webp" height="420" alt="The library on iPad, with a month of connections.">
+  <img src="site/static/shots/ipad-landscape.webp" height="420" alt="The library on iPad in landscape, in three columns, with a month of use.">
   &nbsp;&nbsp;
   <img src="site/static/shots/iphone-terminal.webp" height="420" alt="btop on alpha across the whole iPhone screen.">
 </p>
@@ -180,7 +192,7 @@ Glass Power Tools starts from the machine instead:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-library-dark.webp">
-  <img src="site/static/shots/mac-library-light.webp" alt="The library on a Mac: six machines, each with an icon per service, and a month of connections from three devices.">
+  <img src="site/static/shots/mac-library-light.webp" alt="The library on a Mac: nine machines in four collections, each with an icon per service, and a month of time in use from three devices.">
 </picture>
 
 **What it is not.** Not a service: no server of ours sits between you and your machines. Not on every
@@ -197,10 +209,15 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   be picked up on another device, and with tmux 3.2 or later the terminal keeps every line itself, so
   you scroll and select through the whole history. Windows scale as well as resize, and each can have
   a look of its own. Color schemes come from macOS Terminal profiles, any number of them, kept in
-  iCloud Drive for every device. On the Mac, a file whose path a terminal prints previews over it,
-  SQL it prints opens in the query editor on that machine's database, and the folder button opens the
-  shell's folder in the Finder, Files or the Editor. On Vision Pro, Focus Mode surrounds you with an
-  environment, built in or your own 3D room or 360° photo, to walk about in.
+  iCloud Drive for every device. A file whose path a terminal prints previews over it (on the Mac and
+  Vision Pro), with a log file's end (followed as it grows on the Mac), and a Mermaid diagram it prints
+  draws with one choice. On the Mac, SQL it prints opens in the query editor on that machine's database, and the
+  folder button opens the shell's folder in the Finder, Files or the Editor; on iPhone, iPad and Vision
+  Pro, a picture or file pasted into a terminal is uploaded and its path typed. A workgroup's
+  terminals on a Mac open from your other devices over SSH to that Mac. On Vision Pro, orbs gather in
+  a dock, and Focus Mode surrounds you with an environment, built in or your own 3D room or 360°
+  photo, to walk about in: a room of your own can move, keep the time on its clocks, play its sounds
+  around you and, now and then, show something passing by.
 - **Databases:** MySQL, PostgreSQL and SQLite — browse, filter and edit rows, follow foreign keys,
   see a live diagram of every table and key (in three dimensions on Vision Pro), write and explain
   queries (or ask the on-device assistant for one), reach a database directly with TLS, through its
@@ -221,7 +238,8 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   own record in the library, so its Terminal opens a local shell rather than SSH to itself. Active
   and Show All Windows show what is open and running on every device; widgets, Siri and Shortcuts,
   Spotlight, Controls and Handoff reach your machines, and on the Mac so do the Finder's Services,
-  toolbar button and Quick Action.
+  toolbar button and Quick Action, and Share ▸ Send to a Machine sends files to a machine (elsewhere,
+  a Shortcuts action does). `ssh://` links connect to a machine in the library, or fill in a new one.
 
 ## How to use it
 
@@ -275,7 +293,8 @@ Apple Developer team.
 
 The app talks to the servers you add and to iCloud, and to nothing else unless you connect a
 Tailscale account for device discovery, or open a link to a 3D model that a terminal printed; the
-Mac app also checks its update feed. There are no analytics. Secrets live in the Keychain. See
+Mac app also checks its update feed, and its editor's Pull, Push, Fetch and Clone run the Mac's own git,
+which reaches the repository's remote. There are no analytics. Secrets live in the Keychain. See
 [SECURITY.md](SECURITY.md) for how credentials and connections are protected — and what is not
 protected — and how to report a vulnerability.
 

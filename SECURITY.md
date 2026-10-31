@@ -31,7 +31,9 @@ this repository's `PATCHES.md` files record what is changed locally.
 - **Nothing is sent anywhere else.** The app connects to the servers you add, to iCloud for sync,
   and, only if you connect a Tailscale account for device discovery, to Tailscale's API. A link a
   terminal prints is opened only after you confirm it; a link to a 3D model is then downloaded from
-  that address (http or https, at most 512 MB) and kept only if its bytes are a model's. The Mac app
+  that address (http or https, at most 512 MB) and kept only if its bytes are a model's. On the Mac,
+  Pull, Push, Fetch and Clone in the editor run the Mac's own git, which reaches the repository's
+  remote with your git settings and keys (for a folder on a server, the server's git does). The Mac app
   also checks its update feed — Sparkle asks on its second launch whether to do so automatically,
   and installs only updates signed with the project's key. It has no analytics or
   telemetry. The editor's Markdown preview runs with a content security policy that

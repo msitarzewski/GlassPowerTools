@@ -204,6 +204,10 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
         #if DEBUG
         case .demoConnect(let config, let showsDiagram, let windowSettings, let opensSettings, let start):
             runtime.demoOpensSettings = opensSettings
+            if case .sql(let sql) = start {
+                runtime.sessionManager.queueQuery(name: QueryDocumentTitle.fallback(for: sql), sql: sql,
+                                                  for: config.id, findsTable: true)
+            }
             Task {
                 do {
                     let sessionID = try await runtime.sessionManager.connect(config: config, password: "", openForward: nil)
@@ -217,7 +221,7 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
                     let selection: WorkspaceSelection = switch start {
                     case .table: .table(database: "main", table: "orders")
                     case .server: .connection
-                    case .database: .database("main")
+                    case .database, .sql: .database("main")
                     }
                     present(DatabaseWorkspaceWindowRequest.additional(
                         sessionID: sessionID, initialSelection: selection, id: sessionID,

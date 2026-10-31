@@ -33,6 +33,9 @@ Last changed 18 October 2026. Every change to this page is recorded in the publi
   in the Keychain.
 - **Links you open.** A link a terminal prints opens only after you confirm it. A link to a 3D model
   is then downloaded from that address, and kept only if it is a model.
+- **Git remotes, from the Mac's editor.** Pull, Push, Fetch and Clone in the editor run the Mac's own
+  git for a folder on the Mac, and it reaches the repository's remote with your git settings and keys.
+  For a folder on a server, the server's git does that, not your device.
 - **Nothing from the on-device assistant.** The database assistant runs on your device through Apple
   Intelligence. What it is given is not sent to a server.
 - **Update checks on the Mac.** The Mac app checks glasspowertools.com for updates and downloads them
