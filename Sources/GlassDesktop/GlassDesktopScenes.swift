@@ -241,6 +241,8 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     private let runtime: GlassDesktopRuntime
     private let content: Content
     @Environment(\.openWindow) private var openWindow
+    /// On an iPhone Duo's two pages, only the page in use carries out requests (D93).
+    @Environment(\.glassPageIsFocused) private var pageIsFocused
     @State private var failure: String?
     /// The session to show **in place**, on a device with no second window to put it in.
     ///
@@ -262,7 +264,8 @@ public struct GlassDesktopBootstrap<Content: View>: View {
             .task { await runtime.loadIfNeeded() }
             // `initial`: a connection asked for while no Connections window was open — from the
             // Command Palette over a terminal window, or Siri — is carried out by the one that opens.
-            .onChange(of: runtime.requestSerial, initial: true) { _, _ in drain() }
+            .onChange(of: runtime.requestSerial, initial: true) { _, _ in if pageIsFocused { drain() } }
+            .onChange(of: pageIsFocused) { _, focused in if focused { drain() } }
             .alert("Desktop", isPresented: Binding(get: { failure != nil },
                                                    set: { if !$0 { failure = nil } })) {
                 Button("OK", role: .cancel) { failure = nil }
@@ -275,7 +278,8 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     private var base: some View {
         #if canImport(UIKit) && !os(visionOS)
         content
-            .fullScreenCover(item: $activeDesktop) { connection in
+            // Over the library; on an iPhone Duo, inside its page, and on one page at a time (D93).
+            .glassSessionCover(item: $activeDesktop) { connection in
                 NavigationStack {
                     coverSession(connection)
                     .toolbar {
@@ -296,6 +300,7 @@ public struct GlassDesktopBootstrap<Content: View>: View {
                 }
                 .glassLayers(runtime.layers)
             }
+            .glassShownOnPage(activeDesktop.map { "desktop-\($0.id)" }) { _ in activeDesktop = nil }
         #else
         content
         #endif

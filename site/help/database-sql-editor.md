@@ -38,6 +38,10 @@ A single `SELECT` returns up to 1,000 rows. To change that, set **Result row lim
 
 Choose **Explain Plan** (⌥⌘E) to see how the server would run the statement at the cursor without running it. MySQL and PostgreSQL return the plan as JSON; SQLite returns `EXPLAIN QUERY PLAN` rows.
 
+## Write SQL on iPhone Duo
+
+Half open and standing like a small laptop, iPhone Duo shows the query and its results above the fold, and folding it brings up the keyboard. Between the fold and the keys is a strip: **Run** (touch and hold it for the statement, the selection or all of them, as in the toolbar), **Explain Plan**, and the characters SQL needs that the keyboard hides: `*` `,` `(` `)` `'` `=` `<` `>` `;` `%` `.` `_`. With the keyboard up, the button at the strip's start is **Row**: it puts the keyboard away and shows the row selected in the results below the fold, to read or edit; a change is reviewed before it is written, as in the row editor. **Show Keyboard** brings the keyboard back.
+
 ## Cancel a query
 
 While a query runs, **Cancel Query** appears in the toolbar. If the engine cannot cancel in place, the connection is closed, and the workspace offers **Reconnect**.

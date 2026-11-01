@@ -278,5 +278,30 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         XCTAssertEqual(shownGrid.identifier, grid, "showing the sidebar changed the terminal's rows and columns")
         XCTAssertEqual(shownGrid.frame, frame, "showing the sidebar moved the terminal")
     }
+
+    /// A tab closes from its row's menu (2026-10-31: the owner had two disconnected terminals in a
+    /// window and nothing that closed them). The demo's terminals are connected outside tmux, so
+    /// closing one asks first, as Disconnect does.
+    func testATabClosesFromItsSidebarRow() {
+        launch("terminal-tabs")
+        let rows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'vision-terminal-sidebar-row-'"))
+        let two = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: rows)
+        XCTAssertEqual(XCTWaiter().wait(for: [two], timeout: 40), .completed, "the window's two terminals")
+        let second = rows.element(boundBy: 1)
+        let closed = second.identifier
+
+        second.press(forDuration: 1.5)
+        let close = app.buttons["Close Tab"].firstMatch
+        if !close.waitForExistence(timeout: 10) { attachTree("tab-menu") }
+        XCTAssertTrue(close.exists, "the row's menu has Close Tab")
+        close.tap()
+        let confirm = app.alerts.buttons["Close Tab"].firstMatch
+        if confirm.waitForExistence(timeout: 5) { confirm.tap() }
+
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+                                             object: elements(closed).firstMatch)
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 15), .completed, "the closed terminal's row is gone")
+    }
 }
 #endif

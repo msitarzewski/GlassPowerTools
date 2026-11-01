@@ -46,8 +46,23 @@ use the disposable test VM only).
 - **The Mac's 0.4.569 release (his word, "Release 0.4.569"):** the docs audit found the site and help describing
   0.4.549–0.4.569 while the Mac download was 0.4.548. Release notes brought to 0.4.569; site, README, help, privacy
   date, App Store description and building guide corrected from an independent audit.
-- **Next:** Beta App Review's answer; the devices' versions read back once unlocked; then D93's step 0 (the Duo's
-  poses on Xcode 27.2's Device Hub).
+- **0.4.570 on all three devices (installed and read back, not committed):** Settings on Vision Pro is a sidebar list
+  (the tab ornament held eight of ten pages and dropped Editor and About; `testEverySettingsPageCanBeReached`
+  failed before, passes after); a terminal tab has Close Tab in its menu and a disconnected terminal Close Terminal
+  in its tools menu (the owner had two disconnected tabs with no way to close them;
+  `testATabClosesFromItsSidebarRow`). `testAppearanceMaterialPersistsAcrossRelaunch` skips on visionOS, which has
+  had no Material picker since 2026-10-10.
+- **Now (his word, "Build the duo features next"):** D93. Built 2026-10-31, uncommitted: steps 0, 1, 3–6 (the deck below
+  the fold for every tool) and step 2 (two pages held like a book: any two tools side by side, one session per page,
+  Connect/Show on the Other Page, desktop and editor inside their page on the Duo). Evidence and tests in the task note.
+  0.4.572 built for all three from settled code (source hash unchanged across the build); installed and read back
+  on the Mac (no new crash reports), the Vision Pro and the iPhone (after he unlocked it).
+  Then (his "keep building", 2026-10-31 night): step 7 (Use Both Pages, Swap Pages) and, at his choice after
+  DuoScreen, the desktop's own keyboard and trackpad at once below the fold; help, README, release notes (0.4.573)
+  and the memory bank updated. 0.4.573 built from settled code (source hash unchanged across the build), installed
+  and read back on the Mac (no new crash reports), the Vision Pro and the iPhone. Package tests 3,294 pass;
+  DuoPagesUITests 5 and DuoDeckUITests 6 pass on the Duo simulator. Next: step 8 (site pictures, App Store Duo
+  screenshots); the system's Split View still unchecked. Commit only at his word.
 
 ## 2026-10-28/29 — git first class (0.4.549) and the headset's stalls (0.4.550), uncommitted
 - **Git, end to end, in the editor** (his "build git now, end to end, first class (doff viewer, all of it!)"): built,

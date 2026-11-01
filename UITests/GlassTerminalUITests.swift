@@ -510,10 +510,11 @@ final class GlassTerminalUITests: XCTestCase {
         #else
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "settings picker")
         #endif
-        // visionOS renders the sections TabView as the leading ornament, exposed as a tab bar.
+        // visionOS shows the pages as a sidebar list (2026-10-31): a row reads as a button or a cell.
         func page(_ title: String) -> XCUIElement {
             #if os(visionOS)
-            if app.tabBars.buttons[title].waitForExistence(timeout: 2) { return app.tabBars.buttons[title] }
+            if picker.buttons[title].waitForExistence(timeout: 2) { return picker.buttons[title] }
+            if picker.cells[title].waitForExistence(timeout: 2) { return picker.cells[title] }
             if app.buttons[title].firstMatch.waitForExistence(timeout: 2) { return app.buttons[title].firstMatch }
             #endif
             #if os(macOS)

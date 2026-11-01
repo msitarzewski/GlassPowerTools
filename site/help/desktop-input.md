@@ -42,6 +42,14 @@ Drag on the arrow pad to send arrow keys: one for each short step, along the dir
 - **Trackpad** — the default on iPhone and in a narrow iPad window. Drag anywhere to move the pointer, tap to click where it sits, and tap with two fingers to right-click. Tap, then drag, to move something. If the remote computer does not draw a pointer, the app draws one so you can see where it is.
 - **Direct Touch** — the default in a full-width iPad window. Touching the screen presses the button at that point, which suits a large screen or Apple Pencil. A two-finger tap does not right-click here; use **Trackpad**, or a connected mouse or trackpad.
 
+**On iPhone Duo, half open and standing like a small laptop**, the remote screen fills the top half, sized to it, and the bottom half has a keyboard and a trackpad at once. Folding it half open brings them up.
+
+- **The keyboard** sends each key as the remote computer's own keyboard would, so shortcuts work: **ctrl**, **alt** and **win** (on a Mac over VNC, **ctrl**, **opt** and **⌘**) and **⇧** are held for the next key, and light up while they are. **fn** turns the number row into F1–F12 and the arrows into Home, Page Up, Page Down and End for the next key. Hold **⌫** or an arrow to repeat it.
+- **The shortcut buttons** beside the trackpad start as Copy, Undo and Select All (Ctrl+C, Ctrl+Z and Ctrl+A on a PC; ⌘C, ⌘Z and ⌘A on a Mac). To change one, touch and hold it until it says **Type…**, then type the keys you want on the keyboard, for example **ctrl**, **⇧** and **t**. Shortcuts are kept on this device, apart for PCs and Macs. **esc** is beside them.
+- **The trackpad:** one finger moves the pointer, a tap clicks, tap then drag drags, two fingers scroll, and a two-finger tap right-clicks; each click is felt.
+
+Between the fold and the keys, a strip shows the connection's state, **Keys** and the arrow pad. **Show Keyboard**, at the strip's start, brings up the iPhone's own keyboard for typing text, with its dictation; **Keys and Trackpad** goes back.
+
 In both modes, two fingers scroll the remote desktop, and a connected trackpad or mouse moves the pointer when you hover. The choice is this desktop window's, kept on this device. To choose for every desktop window, use **Pointer** in **All Desktops** (the same as **Settings** > **Desktops**), where **Automatic** chooses as described above. See [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings).
 
 ## Share the clipboard

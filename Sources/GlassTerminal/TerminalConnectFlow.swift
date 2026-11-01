@@ -19,6 +19,8 @@ import UIKit
 
 /// Attached once by `GlassTerminalBootstrap`; runs connect requests posted to the runtime.
 struct TerminalConnectFlow: ViewModifier {
+    /// On an iPhone Duo's two pages, only the page in use carries out requests (D93).
+    @Environment(\.glassPageIsFocused) private var pageIsFocused
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(GlassTerminalRuntime.self) private var runtime
@@ -263,7 +265,11 @@ struct TerminalConnectFlow: ViewModifier {
         // `initial`: a connection asked for while no Connections window was open — from the
         // Command Palette over a terminal window, or Siri — is carried out by the one that opens.
         .onChange(of: runtime.requestSerial, initial: true) { _, _ in
+            guard pageIsFocused else { return }
             for request in runtime.takeRequests() { handle(request) }
+        }
+        .onChange(of: pageIsFocused) { _, focused in
+            if focused { for request in runtime.takeRequests() { handle(request) } }
         }
         #if os(visionOS) || os(iOS)
         // W15: the last run's terminal windows and tabs, once the library has loaded (until then

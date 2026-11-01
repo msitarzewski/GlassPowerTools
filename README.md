@@ -177,6 +177,12 @@ Vision Pro, in a window's **This Window** settings.
 
 The same library and the same machines. The iPhone gives each session the whole screen.
 
+On an iPhone Duo (from 0.4.572), stood half open like a small laptop, each tool keeps its work above the fold and
+puts a deck below it: a strip of the keys it needs, then the keyboard or the tool's own panel — for a remote desktop,
+a keyboard that sends real shortcuts and a trackpad at once; a terminal window's tabs; the editor's preview; the
+database's selected row. Held like a book, the inner display is two pages: a terminal on one side and a database on
+the other, or any two, or one session across both.
+
 <p align="center">
   <img src="site/static/shots/ipad-landscape.webp" height="420" alt="The library on iPad in landscape, in three columns, with a month of use.">
   &nbsp;&nbsp;

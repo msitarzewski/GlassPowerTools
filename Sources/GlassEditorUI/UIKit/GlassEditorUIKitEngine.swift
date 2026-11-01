@@ -51,6 +51,7 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         observeRevealRequests()
         observeLineChanges()
         installKeyboardAccessory()
+        observeAccessoryWithheld()
     }
 
     /// `GlassEditorModel.reveal`: the selection set from outside the view, shown. The AppKit
@@ -175,8 +176,31 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         ]
         bar.items?.last?.accessibilityLabel = "Hide Keyboard"
         bar.items?.last?.accessibilityIdentifier = "editor-hide-keyboard"
-        textView.inputAccessoryView = bar
+        accessoryBar = bar
+        textView.inputAccessoryView = model.keyboardAccessoryWithheld ? nil : bar
         #endif
+    }
+
+    #if os(iOS)
+    /// The bar above the keyboard, kept while it is withheld.
+    private var accessoryBar: UIView?
+    #endif
+
+    /// Withholds the bar above the keyboard while the deck below an iPhone Duo's fold has the keys
+    /// (D93), and puts it back after.
+    private func observeAccessoryWithheld() {
+        withObservationTracking { [weak self] in
+            _ = self?.model.keyboardAccessoryWithheld
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                #if os(iOS)
+                self.textView.inputAccessoryView = self.model.keyboardAccessoryWithheld ? nil : self.accessoryBar
+                if self.textView.isFirstResponder { self.textView.reloadInputViews() }
+                #endif
+                self.observeAccessoryWithheld()
+            }
+        }
     }
 
     private func observeModelConfiguration() {

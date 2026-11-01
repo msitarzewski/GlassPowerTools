@@ -66,6 +66,9 @@ public struct DesktopSessionView: View {
     @Environment(\.displayScale) private var displayScale
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// Where an iPhone Duo's fold crosses the window (D93): stood like a laptop, the remote screen
+    /// sits above it and the deck below, with the trackpad.
+    @State private var deviceFold: GlassDeviceFold?
     #endif
 
     /// Reports the *real* outcome of this session to whoever asked for it — the shell, when the
@@ -215,83 +218,40 @@ public struct DesktopSessionView: View {
 
     private var sessionContent: some View {
         VStack(spacing: 0) {
-            GeometryReader { geometry in
-                ZStack {
-                    ZStack {
-                        DesktopMetalSurface(session: session, viewport: viewport, inputEnabled: remoteInputEnabled,
-                                            keyboardTools: keyboardTools)
-                        cursor(in: geometry.size)
-                    }
-                    #if os(visionOS)
-                    .modifier(DesktopPinchProbe())
-                    #endif
-                    #if !os(visionOS)
-                    .rotation3DEffect(.degrees(reduceMotion ? 0 : viewport.presentation.pitch), axis: (x: 1, y: 0, z: 0))
-                    .rotation3DEffect(.degrees(reduceMotion ? 0 : viewport.presentation.yaw), axis: (x: 0, y: 1, z: 0))
-                    #endif
-                    // Only the remote image is zoomed and panned. The panels below must stay
-                    // legible and inside the window whatever the image is doing.
-                    .scaleEffect(viewport.presentation.zoom)
-                    .offset(x: viewport.presentation.panX, y: viewport.presentation.panY)
-
-                    if session.frame == nil {
-                        // The system's own unavailable-content view, as Apple's apps say a thing is
-                        // not there — not a panel of our own (the owner on the unfolded Duo,
-                        // 2026-10-13: "This feels web, so of out of place").
-                        connectionStatus
-                            #if !os(visionOS)
-                            // On the desktop's black, so its words are light.
-                            .environment(\.colorScheme, .dark)
-                            #endif
-                    }
-                }
-                .onChange(of: geometry.size, initial: true) { _, size in
-                    // Detail first: the size asked for is the window's at the window's scale.
-                    session.apply(profile, to: viewport)
-                    matchWindow(size)
-                    canvasSize = size
-                }
-                .onChange(of: session.capabilities) { _, _ in matchWindow(geometry.size) }
-                .onChange(of: session.isConnected) { _, value in if value { matchWindow(geometry.size) } }
-                .onChange(of: session.matchWindow) { _, value in if value { matchWindow(geometry.size) } }
-                .onChange(of: displayScale) { _, _ in matchWindow(geometry.size) }
-            }
-            .background {
-                // visionOS: nothing. The window's own glass is behind the image, including
-                // letterboxing (W28). An opaque backing would defeat desktop opacity.
-                #if os(macOS)
-                // The Mac's window is clear (`DesktopMetalSurface`), so it gets the same glass as the
-                // headset whenever the desktop is see-through: faded, or with a colour removed. An
-                // opaque desktop keeps its black letterbox (owner, 2026-09-30: "I don't have a
-                // transparency setting here?").
-                if session.frame == nil || (viewport.presentation.mode == .original && viewport.presentation.opacity >= 1) {
-                    Color.black
-                } else {
-                    GlassCanvasBackdrop(blurAmount: profile.frost)
-                }
-                #elseif !os(visionOS)
-                // Into every edge: on a phone on its side the system's controls keep a margin, and
-                // it showed white beside the black (the unfolded Duo, 2026-10-13).
-                if drawsBlackBackdrop { Color.black.ignoresSafeArea() }
-                #endif
-            }
-            // Over a live picture only: without one, the status view says it (`connectionStatus`).
-            if session.frame != nil, session.failurePresentation == nil, session.rendererError == nil,
-               let error = session.errorMessage {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle")
-                    Text(error).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                    Button("Dismiss", systemImage: "xmark") { session.errorMessage = nil }.labelStyle(.iconOnly)
-                }
-                .font(.callout).padding(12).background(.regularMaterial)
-                .accessibilityElement(children: .contain).accessibilityLabel("Session error")
-            }
             #if os(iOS)
+            // An iPhone Duo stood like a laptop (D93): the remote screen above the fold, resized to
+            // it as to any window, and below it the desktop's own keyboard with the trackpad and
+            // shortcuts, which a fresh fold brings up (the owner chose "Keys + trackpad at once"),
+            // or the iPhone's keyboard, for text; the status, Keys and the arrow pad in the strip.
+            GlassFoldDeck(fold: $deviceFold, start: .panel,
+                          keyboard: GlassFoldDeckKeyboard(show: { session.wantsKeyboard = false; session.wantsKeyboard = true },
+                                                          hide: { session.wantsKeyboard = false }),
+                          keyboardWanted: session.wantsKeyboard,
+                          panel: GlassFoldDeckPanel(title: "Keys and Trackpad", systemImage: "rectangle.and.hand.point.up.left") {
+                              DesktopFoldKeysPanel(session: session)
+                          },
+                          controlsColorScheme: .dark) {
+                VStack(spacing: 0) {
+                    picture
+                    errorBanner
+                }
+            } strip: {
+                foldStrip
+            }
+            .background { if laptopFold != nil { Color.black.ignoresSafeArea() } }
+            .onChange(of: laptopFold != nil, initial: true) { _, laptop in
+                session.keyboardAccessoryWithheld = laptop
+            }
             // One bar of controls at a time: while the keyboard is up its own bar has the keys, the
-            // arrow pad and the tools (`DesktopKeyboardBar`), as a terminal's does.
-            if !session.keyboardAccessoryShown { sessionStatusBar }
-            #elseif os(macOS)
+            // arrow pad and the tools (`DesktopKeyboardBar`), as a terminal's does; stood like a
+            // laptop, the deck's strip has them.
+            if !session.keyboardAccessoryShown && laptopFold == nil { sessionStatusBar }
+            #else
+            picture
+            errorBanner
+            #if os(macOS)
             sessionStatusBar
+            #endif
             #endif
         }
         .frame(minWidth: 320, idealWidth: 1280, maxWidth: .infinity, minHeight: 240, idealHeight: 800, maxHeight: .infinity)
@@ -478,6 +438,101 @@ public struct DesktopSessionView: View {
                 Divider().frame(height: 24)
                 GlassActiveConnectionsButton { session.releaseInput(); showActiveConnections() }
             }
+        }
+    }
+    #endif
+
+    /// The remote screen and what is drawn over and around it.
+    private var picture: some View {
+        GeometryReader { geometry in
+            ZStack {
+                ZStack {
+                    DesktopMetalSurface(session: session, viewport: viewport, inputEnabled: remoteInputEnabled,
+                                        keyboardTools: keyboardTools)
+                    cursor(in: geometry.size)
+                }
+                #if os(visionOS)
+                .modifier(DesktopPinchProbe())
+                #endif
+                #if !os(visionOS)
+                .rotation3DEffect(.degrees(reduceMotion ? 0 : viewport.presentation.pitch), axis: (x: 1, y: 0, z: 0))
+                .rotation3DEffect(.degrees(reduceMotion ? 0 : viewport.presentation.yaw), axis: (x: 0, y: 1, z: 0))
+                #endif
+                // Only the remote image is zoomed and panned. The panels below must stay
+                // legible and inside the window whatever the image is doing.
+                .scaleEffect(viewport.presentation.zoom)
+                .offset(x: viewport.presentation.panX, y: viewport.presentation.panY)
+
+                if session.frame == nil {
+                    // The system's own unavailable-content view, as Apple's apps say a thing is
+                    // not there — not a panel of our own (the owner on the unfolded Duo,
+                    // 2026-10-13: "This feels web, so of out of place").
+                    connectionStatus
+                        #if !os(visionOS)
+                        // On the desktop's black, so its words are light.
+                        .environment(\.colorScheme, .dark)
+                        #endif
+                }
+            }
+            .onChange(of: geometry.size, initial: true) { _, size in
+                // Detail first: the size asked for is the window's at the window's scale.
+                session.apply(profile, to: viewport)
+                matchWindow(size)
+                canvasSize = size
+            }
+            .onChange(of: session.capabilities) { _, _ in matchWindow(geometry.size) }
+            .onChange(of: session.isConnected) { _, value in if value { matchWindow(geometry.size) } }
+            .onChange(of: session.matchWindow) { _, value in if value { matchWindow(geometry.size) } }
+            .onChange(of: displayScale) { _, _ in matchWindow(geometry.size) }
+        }
+        .background {
+            // visionOS: nothing. The window's own glass is behind the image, including
+            // letterboxing (W28). An opaque backing would defeat desktop opacity.
+            #if os(macOS)
+            // The Mac's window is clear (`DesktopMetalSurface`), so it gets the same glass as the
+            // headset whenever the desktop is see-through: faded, or with a colour removed. An
+            // opaque desktop keeps its black letterbox (owner, 2026-09-30: "I don't have a
+            // transparency setting here?").
+            if session.frame == nil || (viewport.presentation.mode == .original && viewport.presentation.opacity >= 1) {
+                Color.black
+            } else {
+                GlassCanvasBackdrop(blurAmount: profile.frost)
+            }
+            #elseif !os(visionOS)
+            // Into every edge: on a phone on its side the system's controls keep a margin, and
+            // it showed white beside the black (the unfolded Duo, 2026-10-13).
+            if drawsBlackBackdrop { Color.black.ignoresSafeArea() }
+            #endif
+        }
+    }
+
+    /// Over a live picture only: without one, the status view says it (`connectionStatus`).
+    @ViewBuilder private var errorBanner: some View {
+        if session.frame != nil, session.failurePresentation == nil, session.rendererError == nil,
+           let error = session.errorMessage {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle")
+                Text(error).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                Button("Dismiss", systemImage: "xmark") { session.errorMessage = nil }.labelStyle(.iconOnly)
+            }
+            .font(.callout).padding(12).background(.regularMaterial)
+            .accessibilityElement(children: .contain).accessibilityLabel("Session error")
+        }
+    }
+
+    #if os(iOS)
+    /// The fold across the window: an iPhone Duo stood like a laptop.
+    private var laptopFold: GlassDeviceFold? { deviceFold.flatMap { $0.isAcross ? $0 : nil } }
+
+    /// The deck's strip below the fold: the connection's state, the Keys menu and the arrow pad,
+    /// as the status bar has them; the deck's switch beside it is the keyboard's or the trackpad's.
+    private var foldStrip: some View {
+        HStack(spacing: 12) {
+            Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
+            Text(session.status).font(.caption).lineLimit(1)
+            Spacer(minLength: 4)
+            DesktopKeysMenu(session: session).labelStyle(.iconOnly).glassBarItem()
+            DesktopArrowPad(session: session).glassBarItem()
         }
     }
     #endif

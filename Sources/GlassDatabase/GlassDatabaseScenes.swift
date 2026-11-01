@@ -136,6 +136,8 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
     private let runtime: GlassDatabaseRuntime
     private let content: Content
     @Environment(\.openWindow) private var openWindow
+    /// On an iPhone Duo's two pages, only the page in use carries out requests (D93).
+    @Environment(\.glassPageIsFocused) private var pageIsFocused
     @State private var failureMessage: String?
     #if os(iOS)
     @State private var router = DatabaseIOSRouter()
@@ -164,7 +166,11 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
             // arrives while another is in flight is still seen; `initial`, so one made while no
             // Connections window was open is carried out by the one that opens.
             .onChange(of: runtime.requestSerial, initial: true) { _, _ in
+                guard pageIsFocused else { return }
                 for request in runtime.takeRequests() { handle(request) }
+            }
+            .onChange(of: pageIsFocused) { _, focused in
+                if focused { for request in runtime.takeRequests() { handle(request) } }
             }
             .alert("Database", isPresented: Binding(
                 get: { failureMessage != nil },
@@ -180,14 +186,18 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
     private var platformRoot: some View {
         #if os(iOS)
         // iPhone routes the workspace inside the primary scene; iPad keeps `openWindow`.
-        if let request = router.workspaceRequest,
-           runtime.sessionManager.sessions[request.sessionID] != nil {
-            DatabaseWorkspaceView(sessionID: request.sessionID, initialSelection: request.initialSelection,
-                                  windowSettings: runtime.sessionManager.openingWindowSettings(for: request))
-                .id(request.id)
-        } else {
-            content
+        Group {
+            if let request = router.workspaceRequest,
+               runtime.sessionManager.sessions[request.sessionID] != nil {
+                DatabaseWorkspaceView(sessionID: request.sessionID, initialSelection: request.initialSelection,
+                                      windowSettings: runtime.sessionManager.openingWindowSettings(for: request))
+                    .id(request.id)
+            } else {
+                content
+            }
         }
+        // An iPhone Duo's two pages (D93): a database on one page at a time.
+        .glassShownOnPage(router.workspaceRequest.map { "database-\($0.sessionID)" }) { _ in router.showConnections() }
         #else
         content
         #endif

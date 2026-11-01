@@ -85,7 +85,7 @@ final class DesktopMTKView: MTKView {
     /// SwiftUI's update, and the window's status bar steps aside meanwhile (the owner, 2026-10-15,
     /// two rows of the same controls on the iPhone: "this is kind of a mess").
     private func reportKeyboardBar() {
-        let shown = wantsSoftwareKeyboard && isFirstResponder
+        let shown = wantsSoftwareKeyboard && isFirstResponder && !accessoryWithheld
         DispatchQueue.main.async { [weak self] in
             guard let session = self?.session, session.keyboardAccessoryShown != shown else { return }
             session.keyboardAccessoryShown = shown
@@ -103,11 +103,23 @@ final class DesktopMTKView: MTKView {
     }
     #if os(iOS)
     private var keyboardAccessory: DesktopKeyboardAccessory?
+    /// Stood like a laptop, the deck below the fold has the keys (D93): no bar above the keyboard.
+    private var accessoryWithheld = false
+    /// Whether the surface holds the keys (for a hardware keyboard) while the software keyboard is
+    /// put away. Not stood like a laptop: there the empty stand-in keyboard is laid over the lower
+    /// half, where the trackpad is (D93).
+    private var keepsKeysWithoutKeyboard: Bool { !accessoryWithheld }
     #endif
     var autocorrectionType: UITextAutocorrectionType = .no
     var autocapitalizationType: UITextAutocapitalizationType = .none
     var smartQuotesType: UITextSmartQuotesType = .no
     var smartDashesType: UITextSmartDashesType = .no
+    // No suggestions row either, as a terminal has none: keys go straight to the remote machine,
+    // and on an iPhone Duo stood like a laptop the row would take the strip below the fold, and its
+    // taps (D93; the deck's switch could not put the keyboard away).
+    var spellCheckingType: UITextSpellCheckingType = .no
+    var smartInsertDeleteType: UITextSmartInsertDeleteType = .no
+    var inlinePredictionType: UITextInlinePredictionType = .no
     override var canBecomeFirstResponder: Bool { inputEnabled }
     #endif
 
@@ -213,6 +225,16 @@ final class DesktopMTKView: MTKView {
         }
         wantsSoftwareKeyboard = session.wantsKeyboard && inputEnabled
         if wantsSoftwareKeyboard, !isFirstResponder { becomeFirstResponder() }
+        if accessoryWithheld != session.keyboardAccessoryWithheld {
+            accessoryWithheld = session.keyboardAccessoryWithheld
+            if isFirstResponder { reloadInputViews() }
+            reportKeyboardBar()
+        }
+        // Stood like a laptop with the keyboard put away, the keys' empty stand-in would still hold
+        // the whole lower half, over the trackpad (D93): the surface lets go of the keys instead.
+        if !keepsKeysWithoutKeyboard, !wantsSoftwareKeyboard, isFirstResponder { resignFirstResponder() }
+        // The deck's trackpad steers the desktop's own window (D93).
+        if shown.isPrimary { session.padTarget = self }
         #endif
         renderer?.frame = session.pictureFrame(for: shown)
         renderer?.region = session.pictureRegion(for: shown)
@@ -435,7 +457,11 @@ final class DesktopMTKView: MTKView {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         DesktopInputNotes.note("touch", "type=\(touch.type.rawValue) touches=\(touches.count) protocol=\(session?.connection.protocol.rawValue ?? "-")")
+        #if os(iOS)
+        if keepsKeysWithoutKeyboard || wantsSoftwareKeyboard { becomeFirstResponder() }
+        #else
         becomeFirstResponder()
+        #endif
         #if os(iOS)
         if pointerMode == .trackpad {
             let active = event?.allTouches?.filter { $0.phase != .ended && $0.phase != .cancelled }.count ?? touches.count
@@ -492,7 +518,7 @@ final class DesktopMTKView: MTKView {
     /// the software keyboard, so it never covers the picture otherwise. visionOS has no accessory
     /// view; its toolbar carries the keys and the pad.
     override var inputAccessoryView: UIView? {
-        guard wantsSoftwareKeyboard, let session else { return nil }
+        guard wantsSoftwareKeyboard, !accessoryWithheld, let session else { return nil }
         if keyboardAccessory == nil {
             keyboardAccessory = DesktopKeyboardAccessory(session: session, tools: keyboardTools) { [weak session] in
                 session?.wantsKeyboard = false
@@ -531,17 +557,66 @@ final class DesktopMTKView: MTKView {
 
     /// The controller is a value type, so it is mutated in place here and stored back. Reading a copy
     /// and mutating that would silently discard the cursor position.
-    private func withTrackpad(_ body: (inout TrackpadPointerController) -> [TrackpadAction]) {
+    @discardableResult
+    private func withTrackpad(_ body: (inout TrackpadPointerController) -> [TrackpadAction]) -> [TrackpadAction] {
         let region = session.flatMap { session in shown.map { session.pictureRegion(for: $0) } } ?? .whole(width: 1, height: 1)
         if trackpad == nil {
             trackpad = TrackpadPointerController(region: region, viewSize: bounds.size,
                                                  position: session.flatMap { session in shown.flatMap { session.pointerInPicture(for: $0) } })
         }
-        guard var controller = trackpad else { return }
+        guard var controller = trackpad else { return [] }
         controller.update(region: region, viewSize: bounds.size)
         let actions = body(&controller)
         trackpad = controller
         apply(actions, at: controller.position)
+        return actions
+    }
+
+    // MARK: The trackpad below an iPhone Duo's fold (D93)
+    //
+    // A finger on the deck's trackpad steers this window's pointer exactly as a finger on the
+    // picture does in Trackpad mode: the same controller, so the cursor carries on from where it is,
+    // and the same taps, drags and acceleration. Each returns whether it clicked, for the haptic.
+
+    @discardableResult
+    func padBegan(at point: CGPoint, time: TimeInterval) -> Bool {
+        guard inputEnabled else { return false }
+        return Self.clicks(withTrackpad { $0.began(at: point, time: time) })
+    }
+
+    @discardableResult
+    func padMoved(to point: CGPoint, time: TimeInterval) -> Bool {
+        guard inputEnabled else { return false }
+        return Self.clicks(withTrackpad { $0.moved(to: point, time: time) })
+    }
+
+    @discardableResult
+    func padEnded(time: TimeInterval) -> Bool {
+        guard inputEnabled else { return false }
+        return Self.clicks(withTrackpad { $0.ended(time: time) })
+    }
+
+    func padCancelled() {
+        guard inputEnabled else { return }
+        withTrackpad { $0.cancelled() }
+    }
+
+    @discardableResult
+    func padSecondaryTap() -> Bool {
+        guard inputEnabled else { return false }
+        return Self.clicks(withTrackpad { $0.secondaryTap() })
+    }
+
+    /// Two fingers on the pad scroll where the pointer is, as two fingers on the picture do.
+    func padScroll(by delta: CGPoint) {
+        guard inputEnabled, let input else { return }
+        withTrackpad { _ in [] }
+        guard let position = trackpad?.position else { return }
+        input.send(.scroll(Int((delta.y * 10).rounded()), Int((delta.x * 10).rounded()), position))
+    }
+
+    private static func clicks(_ actions: [TrackpadAction]) -> Bool {
+        actions.contains { if case .press = $0 { true } else { false } }
     }
 
     private func apply(_ actions: [TrackpadAction], at position: DesktopPoint) {

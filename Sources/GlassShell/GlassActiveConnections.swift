@@ -854,6 +854,8 @@ struct GlassRunningSessionRow: View {
 /// One live session. Choosing it switches to it; the swipe ends it.
 struct GlassActiveSessionRow: View {
     let session: GlassOpenSession
+    /// Which of an iPhone Duo's two pages this row is on (D93).
+    @Environment(\.glassPageIndex) private var page
     var didClose: @MainActor () async -> Void = {}
     /// A session whose ending would lose something, waiting on the question.
     @State private var asking: GlassOpenSession?
@@ -892,6 +894,12 @@ struct GlassActiveSessionRow: View {
         }
         .contextMenu {
             Button("Switch To", systemImage: "arrow.right.circle") { session.activate() }
+            // Held like a book, an iPhone Duo shows two pages (D93).
+            if GlassPageFocus.shared.showsTwoPages {
+                Button("Show on the Other Page", systemImage: GlassPageFocus.shared.otherPageSymbol(from: page)) {
+                    GlassPageFocus.shared.openBeside(page) { session.activate() }
+                }
+            }
             Button(session.closeTitle, systemImage: session.closeSymbolName, role: .destructive) { close() }
         }
         .glassAskingBeforeClosing($asking) { Task { await didClose() } }

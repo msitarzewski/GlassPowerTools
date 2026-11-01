@@ -1,10 +1,10 @@
 # Settings and window appearance
 
-Settings for the whole app are in one place. This page covers opening Settings, the **General**, **Appearance**, **Privacy** and **About** pages, how to make windows more or less transparent, and where orbs go on Vision Pro. The pages after **About** (**Connections**, **Terminal**, **Snippets**, **Databases**, **Desktops** and **Editor**) are described in the help for those features.
+Settings for the whole app are in one place. This page covers opening Settings, the **General**, **Appearance**, **Privacy** and **About** pages, how to make windows more or less transparent, and where orbs go on Vision Pro. The pages between **Privacy** and **About** (**Connections**, **Terminal**, **Snippets**, **Databases**, **Desktops** and **Editor**) are described in the help for those features.
 
 ## Open Settings
 
-- **On Vision Pro:** choose **Settings** (gear) in the bar below the library window. Settings opens in its own window, with its pages as tabs beside it, on the page you last used.
+- **On Vision Pro:** choose **Settings** (gear) in the bar below the library window. Settings opens in its own window, with its pages listed down its left side, as in the system's Settings, and opens on the page you last used.
 - **On Mac:** choose **Glass Power Tools** ▸ **Settings…** (⌘,). The pages are icons across the top of the window, and Settings reopens on the page you last used.
 - **On iPad:** choose **Settings** (gear) in the library's toolbar. Choose a page from the control at the top, and choose **Done** when you finish.
 - **On iPhone:** choose **Settings** (gear) in the library's toolbar, then choose a page from the list. Every page has **Done**.

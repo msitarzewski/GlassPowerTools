@@ -38,6 +38,11 @@ public struct GlassEditorWorkspaceView: View {
     /// open. Empty means the root — the project's own folder, or the document in a window that
     /// has no project.
     @State private var compactPath: [GlassEditorCompactRoute] = []
+    #if os(iOS)
+    /// Where an iPhone Duo's fold crosses the window (D93): stood like a laptop, the code above it
+    /// and the deck below.
+    @State private var deviceFold: GlassDeviceFold?
+    #endif
     #endif
     /// Open… off the Mac: one picker for files and folders.
     @State private var isImporting = false
@@ -733,7 +738,7 @@ public struct GlassEditorWorkspaceView: View {
                     // preview alone.
                     let mode = kind == nil ? .text
                         : (workspace.previewModes[document.id] ?? .text).shown(roomBeside: previewHasRoomBeside)
-                    HStack(spacing: 0) {
+                    let textAndPreview = HStack(spacing: 0) {
                         if mode != .previewOnly {
                             GlassEditorView(model: document.model)
                                 .id(document.id)
@@ -747,6 +752,34 @@ public struct GlassEditorWorkspaceView: View {
                                 .id(document.id)
                         }
                     }
+                    #if os(iOS)
+                    // An iPhone Duo stood like a laptop (D93): the code above the fold; below it the
+                    // keyboard, which a fresh fold brings up, or the file's preview when it has one
+                    // and isn't already shown; and between them the keys a code editor wants.
+                    GlassFoldDeck(fold: $deviceFold,
+                                  keyboard: GlassFoldDeckKeyboard(show: { document.model.requestKeyboard(true) },
+                                                                  hide: { document.model.requestKeyboard(false) }),
+                                  panel: kind.flatMap { kind in
+                                      mode == .text ? GlassFoldDeckPanel(title: "Preview", systemImage: "eye") {
+                                          GlassEditorPreviewPane(document: document, kind: kind,
+                                                                 access: workspace.access(for: document),
+                                                                 root: workspace.previewRoot(for: document))
+                                              .id(document.id)
+                                      } : nil
+                                  }) {
+                        textAndPreview
+                    } strip: {
+                        GlassEditorFoldStrip(model: document.model) { workspace.presentFind() }
+                    }
+                    .onChange(of: deviceFold.map(\.isAcross) == true, initial: true) { _, laptop in
+                        document.model.keyboardAccessoryWithheld = laptop
+                        // The project's files, drawn over the left of the window, would cover the
+                        // strip's first keys: a fresh fold closes them; the toolbar opens them again.
+                        if laptop { columnVisibility = .detailOnly }
+                    }
+                    #else
+                    textAndPreview
+                    #endif
                 }
             }
             .navigationTitle(document.displayName)

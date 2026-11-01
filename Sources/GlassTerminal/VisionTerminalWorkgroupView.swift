@@ -314,6 +314,8 @@ struct VisionTerminalWorkgroupView: View {
     @State private var didCloseWorkgroup = false
     /// The terminal being renamed, and the name typed (W11): as a Mac tab's Rename Tab….
     @State private var renamingSession: TerminalSession?
+    /// A tab whose Close Tab asked first: closing it stops work outside tmux.
+    @State private var closingSession: TerminalSession?
     @State private var renameText = ""
     /// Set once this view has left a workgroup that emptied, so it leaves once.
     @State private var didLeaveEmptiedWorkgroup = false
@@ -374,6 +376,15 @@ struct VisionTerminalWorkgroupView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(connectionFailureMessage ?? "The saved host could not be opened.")
+        }
+        .alert("Close Connection?", isPresented: Binding(get: { closingSession != nil },
+                                                          set: { if !$0 { closingSession = nil } })) {
+            Button("Close Tab", role: .destructive) {
+                if let session = closingSession { closeSessionTab(session) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You have an active SSH connection to \(closingSession?.server.name ?? "this machine").")
         }
         .alert("Rename Tab", isPresented: renamingBinding) {
             TextField("Tab Name", text: $renameText)
@@ -572,6 +583,21 @@ struct VisionTerminalWorkgroupView: View {
         TerminalTabMoveActions(workgroupID: workgroupID, canMoveToNewWindow: canMoveToNewWindow,
                                moveToNewWindow: { moveToNewWindow(session) },
                                move: { destination in move(session, to: destination) })
+        Divider()
+        // As a Mac's sidebar row and the family's tab bar have it (2026-10-31: the owner had two
+        // disconnected tabs on Vision Pro, and nothing closed them). A tab in tmux leaves its
+        // session running.
+        Button("Close Tab", systemImage: "xmark", role: .destructive) { requestCloseTab(session) }
+    }
+
+    /// Close Tab from a tab's menu: asking first only when closing stops work, as the terminal's
+    /// own Disconnect does.
+    private func requestCloseTab(_ session: TerminalSession) {
+        if settingsManager.confirmBeforeClosing && session.closeStopsWork {
+            closingSession = session
+        } else {
+            closeSessionTab(session)
+        }
     }
 
     // MARK: Moving tabs (W15, 2026-10-09)
@@ -1140,6 +1166,10 @@ struct VisionTerminalWorkgroupView: View {
                 .accessibilityIdentifier("terminal-workgroup-session-\(session.id.uuidString)")
             }
         }
+        // An iPhone Duo stood like a laptop shows the window's tabs below the fold (D93).
+        .environment(\.terminalFoldTabs, TerminalFoldTabs(
+            sessions: sessions, selected: selectedSessionID ?? workgroup.selectedSessionID,
+            select: { selectedSessionID = $0 }, newTab: { showingSavedHostPicker = true }))
     }
     #endif
 

@@ -26,6 +26,8 @@ public struct GlassShellLibraryView: View {
     @AppStorage(GlassAvailabilityMonitor.settingKey, store: GlassUITestRun.settingsDefaults) private var showsAvailability = false
     @State private var availabilityMonitor = GlassAvailabilityMonitor()
     @Environment(\.scenePhase) private var scenePhase
+    /// Which of an iPhone Duo's two pages this library is on (D93).
+    @Environment(\.glassPageIndex) private var page
     /// The column a service's or tool's icon sits in. It grows with the text: at a fixed 20 points
     /// the icon, which grows, ran under the name at the largest sizes (2026-10-19).
     @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 20
@@ -253,6 +255,13 @@ public struct GlassShellLibraryView: View {
             // Icons in every machine menu, as the Connect menu has (2026-10-04).
             Button("Connect", systemImage: "play.fill") { model.connect(hostID: item.id) }
                 .labelStyle(.titleAndIcon)
+            // Held like a book, an iPhone Duo shows two pages (D93).
+            if GlassPageFocus.shared.showsTwoPages {
+                Button("Connect on the Other Page", systemImage: GlassPageFocus.shared.otherPageSymbol(from: page)) {
+                    GlassPageFocus.shared.openBeside(page) { model.connect(hostID: item.id) }
+                }
+                .labelStyle(.titleAndIcon)
+            }
             Button("Edit", systemImage: "pencil") { if let host = model.host(item.id) { setupMode = .editHost(host) } }
                 .labelStyle(.titleAndIcon)
             Button(item.isFavorite ? "Remove Favorite" : "Add Favorite",
@@ -651,6 +660,8 @@ public struct GlassShellLibraryView: View {
 public struct GlassShellConnectControl: View {
     private let model: GlassShellModel
     private let hostID: HostID
+    /// Which of an iPhone Duo's two pages this control is on (D93).
+    @Environment(\.glassPageIndex) private var page
     private let prominent: Bool
     /// Smaller metrics for narrow rows, such as the spatial sidebar.
     private let compact: Bool
@@ -799,6 +810,20 @@ public struct GlassShellConnectControl: View {
             }
             .accessibilityIdentifier("host-connect-menu-\(service.kind.rawValue)"
                                      + (host.map { GlassShellLibraryView.identifierSuffix(for: service, in: $0) } ?? ""))
+        }
+        // Held like a book, an iPhone Duo shows two pages (D93): any of them on the other.
+        if GlassPageFocus.shared.showsTwoPages {
+            Menu("On the Other Page", systemImage: GlassPageFocus.shared.otherPageSymbol(from: page)) {
+                ForEach(services) { service in
+                    Button(service.displayName) {
+                        GlassPageFocus.shared.openBeside(page) { model.connect(hostID: hostID, endpointID: service.endpointID) }
+                    }
+                    .accessibilityIdentifier("host-connect-other-page-\(service.kind.rawValue)"
+                                             + (host.map { GlassShellLibraryView.identifierSuffix(for: service, in: $0) } ?? ""))
+                }
+            }
+            .labelStyle(.titleAndIcon)
+            .accessibilityIdentifier("host-connect-other-page")
         }
     }
 }

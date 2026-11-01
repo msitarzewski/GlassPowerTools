@@ -134,6 +134,8 @@ struct TerminalWindowView: View {
     @State private var softwareKeyboardVisible = false
     /// Where an iPhone Duo's fold crosses the terminal, while it is partly folded (2026-10-21).
     @State private var deviceFold: GlassDeviceFold?
+    /// The window's tabs, for the deck below the fold (D93).
+    @Environment(\.terminalFoldTabs) private var foldTabs
     /// The terminal's stack on the screen, to lay it out against the fold.
     @State private var stackFrame = CGRect.zero
     #endif
@@ -465,7 +467,17 @@ struct TerminalWindowView: View {
     /// The connection label and the canvas, and on an iPhone Duo stood like a laptop, the bar below
     /// the fold. Their types are erased for the reason `terminalSurface` gives.
     private var phoneFoldLayout: some View {
-        VStack(spacing: 0) {
+        // Stood like a laptop, the terminal above the fold and the shared deck below it (D93):
+        // the keyboard, which a fresh fold brings up, and the bar the keyboard's accessory holds
+        // elsewhere — Tools with the cursor pad, and Keys — just under the fold.
+        GlassFoldDeck(fold: $deviceFold, keyboard: GlassFoldDeckKeyboard(
+            show: { if isTerminalActive { terminalHostModel.focus() } },
+            hide: { if isTerminalActive { terminalHostModel.dismissInputFocus() } }),
+            // With the keyboard put away, the window's tabs (`TerminalFoldTabsPanel`).
+            panel: foldTabs.map { tabs in
+                GlassFoldDeckPanel(title: "Tabs", systemImage: "square.on.square") { TerminalFoldTabsPanel(tabs: tabs) }
+            },
+            controlsColorScheme: themeColorScheme ?? systemColorScheme) {
             VStack(spacing: 0) {
             if !ownsSessionLifecycle && showsConnectionOrnament {
                 connectionLabel
@@ -489,30 +501,15 @@ struct TerminalWindowView: View {
                 ))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            // An iPhone Duo stood like a small laptop: the terminal in the top half, down to the
-            // fold. With the keyboard up, the keyboard's own top is the fold and this is all the
-            // room there is; with it away, the rest stays empty below the bar.
-            .frame(height: laptopTopHeight)
-            if laptopFold != nil { Spacer(minLength: 0) }
+        } strip: {
+            AnyView(laptopBar)
         }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stackFrame = $0 }
-        // Below the fold, the window's own bar, in the strip the keyboard leaves above its keys
-        // (Apple: content up top, controls below, where touch is steadier). Placed on the screen
-        // rather than in the stack: with the keyboard up the stack ends at the fold. (A stack that
-        // ignored the keyboard, the first try, was given only the room above it, overflowed and
-        // was centred, its first rows under the title.)
-        .overlay(alignment: .top) {
-            if let fold = laptopFold {
-                AnyView(laptopBar)
-                    .offset(y: fold.globalFrame.maxY - stackFrame.minY + 4)
-            }
-        }
-        // The fold, read from the window, which nothing shortens.
-        .glassDeviceFold($deviceFold)
         .onChange(of: laptopFold != nil, initial: true) { _, laptop in
             terminalHostModel.setKeyboardAccessoryWithheld(laptop)
         }
-        .onChange(of: bookFold != nil, initial: true) { _, book in
+        // The keyboard spans the window, whichever page the terminal is on (D93).
+        .onChange(of: deviceFold.map { !$0.isAcross } ?? false, initial: true) { _, book in
             terminalHostModel.setKeyboardAccessoryKeepsOffMiddle(book)
         }
     }
@@ -1625,6 +1622,14 @@ struct TerminalWindowView: View {
         }
     }
 
+    /// Disconnected, or stopped by an error: no connection to leave, so the terminal only closes.
+    private var hasNoConnection: Bool {
+        switch session.state {
+        case .disconnected, .error: true
+        case .connecting, .connected, .reconnecting: false
+        }
+    }
+
     private func closeTerminalSession() {
         if ownsSessionLifecycle {
             sessionManager.closeSession(session)
@@ -1788,30 +1793,18 @@ struct TerminalWindowView: View {
         deviceFold.flatMap { $0.isAcross ? $0 : nil }
     }
 
-    /// The terminal's height down to the fold of a Duo stood like a laptop; nil otherwise.
-    private var laptopTopHeight: CGFloat? {
-        laptopFold.map { max(0, min(stackFrame.height, $0.globalFrame.minY - stackFrame.minY)) }
-    }
-
-    /// The Duo's fold down the terminal's middle: the phone held like a book.
+    /// The Duo's fold down the terminal's middle: the phone held like a book. None for a terminal
+    /// on one of its two pages (D93), beside the fold: its bar, moved past the fold, made the
+    /// terminal wider than its page, clipped at both edges (2026-10-31, the Duo simulator).
     private var bookFold: GlassDeviceFold? {
-        deviceFold.flatMap { $0.isAcross ? nil : $0 }
+        deviceFold.flatMap { !$0.isAcross && $0.crosses(stackFrame) ? $0 : nil }
     }
 
-    /// The bar below the fold of a Duo stood like a laptop: what the keyboard's accessory holds —
-    /// the keyboard, Tools and the cursor pad, Keys — where the accessory can't go.
+    /// The deck's strip below the fold of a Duo stood like a laptop: what the keyboard's accessory
+    /// holds — Tools and the cursor pad, Keys — where the accessory can't go. The deck draws the
+    /// keyboard's switch before it.
     private var laptopBar: some View {
         HStack(spacing: 12) {
-            Button {
-                if softwareKeyboardVisible { terminalHostModel.dismissInputFocus() } else { terminalHostModel.focus() }
-            } label: {
-                Label(softwareKeyboardVisible ? "Dismiss Keyboard" : "Show Keyboard",
-                      systemImage: softwareKeyboardVisible ? "keyboard.chevron.compact.down" : "keyboard")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 44, height: 44)
-            }
-            .glassEffect(.regular.interactive(), in: .circle)
-            .accessibilityIdentifier("terminal-laptop-keyboard")
             Spacer(minLength: 0)
             HStack(spacing: 4) {
                 iOSKeyboardToolsMenu
@@ -1825,10 +1818,7 @@ struct TerminalWindowView: View {
                 .frame(width: 44, height: 44)
                 .glassEffect(.regular.interactive(), in: .circle)
         }
-        .padding(.horizontal, 12)
-        .frame(height: 44)
         .disabled(!isTerminalActive)
-        .environment(\.colorScheme, themeColorScheme ?? systemColorScheme)
     }
 
     /// An iPhone on its side: compact height.
@@ -2143,6 +2133,14 @@ struct TerminalWindowView: View {
                     } label: {
                         Label("Cancel Reconnect", systemImage: "stop.circle")
                     }
+                } else if hasNoConnection {
+                    // Nothing to detach from or disconnect: it closes (2026-10-31, the owner had two
+                    // disconnected terminals on Vision Pro, and Detach was greyed out).
+                    Button(role: .destructive) {
+                        closeTerminalSession()
+                    } label: {
+                        Label("Close Terminal", systemImage: "xmark.circle")
+                    }
                 } else {
                     Button(role: .destructive) {
                         if settingsManager.confirmBeforeClosing && session.closeStopsWork {
@@ -2155,7 +2153,6 @@ struct TerminalWindowView: View {
                         Label(session.survivesClose ? "Detach" : "Disconnect",
                               systemImage: session.survivesClose ? "eject" : "xmark.circle")
                     }
-                    .disabled(session.state == .disconnected)
                 }
 
                 if !inMenu {

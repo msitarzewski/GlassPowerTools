@@ -235,6 +235,13 @@ final class IOSAppRouter {
         terminalWorkgroupID = nil
     }
 
+    /// The workgroup shown here has moved to an iPhone Duo's other page (D93): this page shows
+    /// its library, and the workgroup, shown there, is still the one to reopen.
+    func showConnectionsAfterMove() {
+        sftpContext = nil
+        terminalWorkgroupID = nil
+    }
+
     func liveWorkgroups(in sessionManager: SessionManager) -> [TerminalWorkgroup] {
         sessionManager.workgroups.filter { workgroup in
             workgroup.sessionIDs.contains { sessionManager.session(for: $0) != nil }

@@ -1987,7 +1987,7 @@ a plain USDZ.
 **Status:** direction approved; steps and evidence in `tasks/2026-10/2026-10-31_room-format.md`. Open with the owner:
 installing Reality Composer Pro 3 here, the plugin's licence, a Feedback report for the USDZ crash.
 
-## D93 — The iPhone Duo: a deck below the fold, and two services side by side — Approved 2026-10-31 (nothing built)
+## D93 — The iPhone Duo: a deck below the fold, and two services side by side — Approved 2026-10-31; steps 0–6 implemented 2026-10-31 (uncommitted)
 **Owner, 2026-10-31:** "I'd like for the folded (in half) versions of our tools to leverage the two screens to
 perfection … the top screen a remote desktop, then the bottom a keyboard and a toggleable trackpad", then "we should
 allow two of any of our services in fold like a book mode. A terminal the left, a database on the right (or
@@ -2013,3 +2013,17 @@ already ships a keyboard-or-touchpad lower half for its virtual machines.
 
 **Status:** approved; plan and steps in `tasks/2026-10/2026-10-31_duo-deck-plan.md` (steps 0–8). Open: whether a
 physical iPhone Duo is available to test on.
+
+**Implemented 2026-10-31 (0.4.571–0.4.572, uncommitted):** steps 0–6, on the Duo simulator only. Point 4 was built
+differently from its wording, and the owner has not yet ruled on the difference: each page is the whole phone stack
+(every tool's bootstrap around its own library, with its own back button and ⚡), not one library handing each tool's
+session view to the shell by id. Why: no tool had to change how it presents a session, a page behaves exactly as the
+phone it is the width of, and the tools' runtimes are shared, so a session is the same session on either page (one
+page at a time, `glassShownOnPage`). Requests go to the page last touched (`GlassPageFocus`). The desktop and editor,
+full-screen covers on a phone, present inside their page on the Duo (`GlassWindowPresentation.presentsInPages`).
+Not done: Swap Pages, the system's Split View check, step 7 (a tool alone, held like a book), step 8 (help, pictures).
+
+**Later the same day (0.4.573):** step 7 as Use Both Pages and Swap Pages from a three-dot handle above each page.
+**Point 3 changed by the owner:** after DuoScreen, he chose "Keys + trackpad at once" for the desktop: its own
+keyboard sending real chords and the trackpad together, with three recordable shortcuts, rather than a trackpad the
+iPhone keyboard replaces. A microphone button was left out (speech and microphone permissions; his call).

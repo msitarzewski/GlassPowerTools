@@ -536,6 +536,20 @@ struct QueryEditorView: View {
                     editorController: editorController
                 )
                 .environment(\.sqlEditorFocusToken, document.id)
+                #if os(iOS)
+                // Run and Explain for the strip below an iPhone Duo's fold (D93), as the toolbar has them.
+                .environment(\.databaseFoldActions, DatabaseFoldActions(
+                    availability: SQLRunAvailability(
+                        canRun: session?.state.isConnected == true && !isExecuting
+                            && !queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                        hasSelection: selectedRange.length > 0),
+                    run: { mode in
+                        prepareExecution(SQLHighlighter.statementsToExecute(in: queryText, selectedRange: selectedRange, mode: mode))
+                    },
+                    canExplain: session?.state.isConnected == true && !isExecuting
+                        && !queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    explain: { prepareExplainExecution() }))
+                #endif
             } else {
                 ContentUnavailableView(
                     "Session Disconnected",

@@ -99,6 +99,46 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.573 (31 October 2026)
+- **A remote desktop on the iPhone Duo, stood like a laptop: a keyboard and a trackpad at once.** Below the fold, the
+  desktop's own keyboard sends each key as the remote computer's keyboard would, so shortcuts work: ctrl, alt and win
+  (ctrl, opt and ⌘ on a Mac) held for the next key, fn for F1–F12 and Home, End, Page Up and Page Down, and Delete and
+  the arrows repeating while held. Under it, three shortcut buttons (Copy, Undo and Select All to start; touch and
+  hold one, then type the keys you want), Escape, and the trackpad. The iPhone's keyboard, for text and dictation, is
+  the switch in the strip.
+- **Use Both Pages and Swap Pages,** held like a book. Three dots above each page: Use Both Pages spreads one page
+  across the screen for a session on its own — a remote desktop across both halves, a terminal twice as wide, a list
+  beside its details — with the other page waiting underneath; Swap Pages trades their sides.
+### 0.4.572 (31 October 2026)
+- **The iPhone Duo, held like a book: two pages.** Held like a book, or open flat on its side, the inner display
+  shows two pages, one each side of the fold, and each page is the phone as it is: a library, and whatever it
+  opens, with its own back button. A terminal on the left and a database on the right, or any two.
+  - What you open goes to the page you last touched. **Connect on the Other Page** (a machine's menu), **On the
+    Other Page** (Connect's menu) and **Show on the Other Page** (a session's menu in Active) open it beside you.
+  - A session is on one page at a time: chosen on the other page, it moves there, and the page it left goes back
+    to its library.
+  - A remote desktop and the editor open inside their page, as a terminal and a database do. Folded, the page
+    you were using fills the screen, and it is still there, as it was, when you unfold.
+- **A terminal on one side of the fold is that side's width.** Its text ran past both edges.
+### 0.4.571 (31 October 2026)
+- **The iPhone Duo, stood like a laptop.** Each tool keeps its work above the fold and puts a deck below it: a
+  strip of keys just under the fold, then the keyboard or the tool's own panel, with a switch between them. A fresh
+  fold brings the keyboard up once; put away, it stays away, and unfolding puts it back as it was.
+  - **Remote desktop:** the remote screen above the fold, sized to it, and a **trackpad** below, which the fold
+    brings up: one finger moves the pointer, a tap clicks, tap and drag drags, two fingers scroll or tap for a right
+    click, and a click is felt. The strip has Keys and the arrow pad.
+  - **Terminal:** the terminal above, Tools, the arrow pad and Keys in the strip, and with the keyboard away the
+    window's **tabs as live pictures** below. With two tabs the other fills the panel, so a log stays in sight.
+  - **Editor:** the code above; Tab, brackets and quotes, the arrows, Undo, Redo and Find in the strip; the file's
+    preview below. A fold closes the project's files, which covered the strip.
+  - **Database:** the query and its results above; Run, Explain and SQL's keys in the strip; the selected row,
+    in the record editor, below.
+- **A remote desktop's keyboard has no suggestions row,** as a terminal's has none.
+- **Settings on Vision Pro lists its pages down the window's left side**, as the system's Settings does.
+  Its tabs had room for only as many pages as the window was tall, and left Editor and About out.
+- **A terminal tab can always be closed.** On Vision Pro, iPad and iPhone a tab's own menu has **Close Tab**,
+  and a terminal whose connection has ended offers **Close Terminal** in its tools menu, where Detach was
+  greyed out. A disconnected tab had no way to go.
 ### 0.4.549 – 0.4.569 (28 – 31 October 2026)
 - **0.4.569 is the Mac's fourth release**, through Sparkle. Build 569 is also the first TestFlight build
   for testers outside the team, waiting for Apple's Beta App Review.

@@ -51,3 +51,126 @@ on the right (or whatever)." Added to the plan as step 2, right after the deck:
 The desktop's size half open (follow the top half, recommended); what comes up on a fresh fold; the terminal's
 panel; the half-open picture (Apple's image or a Blender render); two terminal tabs side by side later; whether a
 physical Duo is available to test on.
+
+## Step 0 — done 2026-10-31
+- **Device Hub on Xcode 27.2 drives the Duo simulator.** Select the device by setting `selected` on the AXRow whose
+  cell's text is "Duo probe" in Device Hub's sidebar (`~/Software/glass/tmp/duo/dh-select.applescript`); the window
+  then reads "Duo probe – iOS 27.2". Pose buttons as before (`duo/partial/dh.applescript "Partially Open"`, then
+  "Rotate Right" for the laptop pose). Captures in `~/Software/glass/tmp/duo/step0/`.
+- **The 21 October layouts hold on the 27.2 runtime:** held like a book, the bar's halves stay off the middle;
+  stood like a laptop, the terminal above the fold, its bar just under it, and with the keyboard away the lower
+  half empty (where the panel goes).
+- The system's Split View of two Glass windows is left for step 2's checks.
+
+## Step 1 — the shared deck, built 2026-10-31
+- `Sources/GlassConnectionUI/GlassFoldDeck.swift`: `GlassFoldDeck` (work above the fold; a strip under it with the
+  keyboard switch and the tool's keys; the keyboard or the tool's panel below) and `GlassFoldDeckPolicy` (pure: the
+  keyboard on a fresh fold only, put away stays away, unfolding restores). The keyboard is measured in the window
+  (`GlassKeyboardPresence`), and a fresh fold's request is repeated at 0.8 and 2.5 s until the keyboard appears.
+- `GlassDeviceFold` re-reads 0.5, 1.5 and 3 s after a hinge change (UTM's), not 250 ms and 1 s.
+- The terminal's iPhone layout (`TerminalWindowView.phoneFoldLayout`) uses it; only the terminal in front acts.
+- Tests: `GlassFoldDeckPolicyTests` (5; seen failing without the fresh-fold guard), GlassConnectionUI 65 pass.
+- Seen on the Duo simulator, stood like a laptop: the layout as before, and with Device Hub's "Simulate Hardware
+  Keyboard" off, the keyboard comes up by itself on the fold (`~/Software/glass/tmp/duo/step1/`).
+- Order changed (mine): the remote desktop (step 3) before two pages (step 2), the owner's first ask and the
+  deck's simplest proof; two pages next.
+
+## Step 3 — the remote desktop, built 2026-10-31
+- Stood like a laptop: the remote screen above the fold (sized to it, as any window), the strip with the deck's
+  switch, the connection's state, Keys and the arrow pad; below, **the trackpad** (`DesktopTrackpadPad`), which a
+  fresh fold brings up. It steers the same pointer as a finger on the picture (`DesktopMTKView.padBegan…`): one
+  finger points, a tap clicks, tap-drag drags, two fingers tap for a right click or move to scroll; a click is felt.
+- Found on the way: the desktop kept the keys with an empty stand-in keyboard, which on the Duo stood like a laptop
+  still reported the whole lower half; so half open the surface lets go of the keys while the keyboard is put away,
+  the deck takes the tool's word (`keyboardWanted`), and the desktop's keyboard has no suggestions row (spell
+  checking, smart insert/delete and inline predictions off, as SwiftTerm has them).
+- Tests: `UITests/DuoDeckUITests` (3, skip without a Duo stood like a laptop): the trackpad moves the pointer (seen
+  failing with the pad's movement cut), the switch trades trackpad and keyboard (failed before the fix above), a
+  terminal's fold brings up the keyboard.
+
+## Step 4 — the terminal's panel, built 2026-10-31
+- With the keyboard put away, the deck's panel is the window's tabs as live pictures (`TerminalFoldTabsPanel`),
+  the others first, redrawn each second; tap one to bring it up. Up to two tabs, one column (so with two, the other
+  fills the panel: a log followed in it stays in sight); more, two columns. New Terminal Tab at the end. Handed down
+  by the iPhone's tab stack (`VisionTerminalWorkgroupView.compactTerminalTabs`, `\.terminalFoldTabs`).
+- Seen on the Duo simulator with `--demo-open terminal-tabs` (`~/Software/glass/tmp/duo/step4/tabs.png`).
+- Not yet: the file preview brought over from Vision Pro, and SQL and paths opening beside (with step 2's pages).
+
+## Step 5 — the editor, built 2026-10-31
+- Stood like a laptop: the code (or code and preview, as chosen) above the fold; the strip has Tab, brackets and
+  quotes (scrolling), Left/Right, Undo, Redo and Find (`GlassEditorFoldStrip`, each key one undoable edit at the
+  cursor via `GlassEditorModel.apply` and `reveal`); with the keyboard put away, the file's preview below when it
+  has one and isn't already shown. The bar above the keyboard is withheld (`keyboardAccessoryWithheld`, observed by
+  `GlassEditorUIKitEngine`); a fresh fold closes the project's files, which are drawn over the strip's first keys.
+- Test: `DuoDeckUITests.testTheEditorsStripTypesAtTheCursor` (seen failing with the insert cut).
+
+## Step 6 — the database, built 2026-10-31
+- Stood like a laptop: the query and its results above the fold; the strip has Run (the toolbar's own menu,
+  `SQLRunControl`) and Explain, lent by the query editor (`\.databaseFoldActions`), and SQL's keys (`DatabaseFoldStrip`,
+  typing through `SQLEditorController.type`, which now holds the editor model weakly); with the keyboard put away,
+  the selected row in the record editor below, saving through the same review as the record sheet.
+- A table's own tab (no query editor around it) has the keys, and Run stays in the top bar.
+- Test: `DuoDeckUITests.testTheDatabasesStripTypesIntoTheQuery` (seen failing with typing cut). All six Duo tests
+  pass on the Duo simulator stood like a laptop.
+
+## Step 2 — two pages, built 2026-10-31
+- Held like a book, or open flat on its side, the window shows two pages (`Sources/GlassShell/GlassLibraryPages.swift`):
+  each is the whole stack the window draws (every tool's bootstrap around a library), split at the fold read from the
+  window (`GlassDeviceFold`), each told it is compact width. Two pages when the window is a phone's, regular width,
+  on its side, at least 760 × 560 (867 × 635 inside the system's column, measured). One `ForEach` for one page or
+  two, so the first page keeps what it shows when the second appears (unfolding with a session open).
+- **The page in use** (`GlassPageFocus.focused`, `\.glassPageIsFocused`) is the last one touched: a window recognizer
+  that never claims a touch, deciding by the fold's middle, and only for touches on the pages (not a sheet or menu
+  drawn over both). Each tool's request drain runs on the page in use only, and drains again when its page gains it.
+- **One session, one page** (`glassShownOnPage`, keyed per tool: terminal workgroup, database session, desktop,
+  editor window): chosen on the other page, a session moves there and the page it left goes back to its library.
+  A page counts as moved away only from a session it had already claimed (without that, both pages put it away).
+- **On the other page:** Connect on the Other Page (a host row's menu), On the Other Page (Connect's chevron menu),
+  Show on the Other Page (an Active session row's menu). `GlassPageFocus.openBeside` asks the other page to put away
+  what it shows (otherwise a terminal there hides the database's handler and the request waits), puts it in use, then
+  opens. It names the page outright: a menu's own touch lands wherever the menu is drawn.
+- **In-page covers:** the desktop and the editor were full-screen covers, over both pages. On the Duo
+  (`GlassWindowPresentation.presentsInPages`: a phone that answers yes to multiple scenes) they present inside their
+  page (`glassSessionCover`), the library kept under them as a cover keeps it; every other iPhone keeps the cover.
+- **A terminal on a page was wider than it** (640 pt from x −92): its bar, kept right of the fold for a terminal across
+  both halves, was padded past the page. `GlassDeviceFold.crosses(_:)`; the bar moves only for a fold inside the
+  terminal, and the keyboard's accessory still keeps off the middle, the keyboard spanning the window.
+- Found and fixed on the way: pages are placed by `.offset`, so frames read after it were the page's place before it
+  moved; the touch rule had matched no page on the second one.
+- Tests: `GlassDeviceFoldTests` "two pages" (seen failing with `crosses` always true). `UITests/DuoPagesUITests` (3,
+  skip without the Duo held like a book): a terminal fits its page (seen failing at 640 pt without the fix), a session
+  moves to the page that asks (seen failing without the terminal's page record), Show on the Other Page (seen failing
+  without the put-away request). `DuoDeckUITests` 5/5 still pass stood like a laptop; folded, the desktop and editor
+  open in place (captures in `~/Software/glass/tmp/duo/step2/`).
+- Demo surfaces: `pages`, `pages-desktop`, `pages-editor` (the monitor on one page, the other tool on the other).
+- Not done: Swap Pages; the system's Split View of two Glass windows (unchecked); "Open on the Other Page" in Show All
+  Windows and in a session's own menu; the remote desktop's and editor's controls sit in the system's column at the
+  window's edge (the system's placement for a bar beside it, as full-window on 2026-10-18).
+
+## Step 7 — a tool alone, held like a book, built 2026-10-31
+- The plan's book column: a tool alone uses both pages for its own two things. With step 2's pages always split,
+  that needs one page across both: **Use Both Pages** (`GlassPageFocus.useBothPages`), with **Swap Pages** and back to
+  two from a handle of three dots above each page (iPad's idiom, in the band above the bar; `GlassPageHandle`). The
+  spread page takes the window's regular width; the other page waits under it, kept.
+- What each tool does across both, seen on the simulator (`--demo-spread`; captures `step2/spread-*.png`): the library's
+  list beside the detail, the editor's files beside the code, the database's databases beside the query and results,
+  the desktop across both halves, the terminal at 100 columns with its bar right of the fold. The split's column edge
+  falls inside the fold (x ≈ 472, fold 456–496), so nothing sits on it; no per-tool code was needed.
+- Tests: `DuoPagesUITests.testUseBothPages`, `testSwapPages` (seen failing with the spread and the swap cut).
+- Not done: the editor's "code and its preview as two pages" (it shows files beside code instead); Show All Windows'
+  cards in even columns with the gap at the fold.
+
+## The desktop's keys and trackpad at once, built 2026-10-31
+- The owner, after DuoScreen (a Mac-control app for the Duo): "Take a look at this for inspiration for Desktop mode",
+  then chose **"Keys + trackpad at once (Recommended)"** of three offered. Below the fold: the desktop's own keyboard
+  (`DesktopFoldKeyboard`, US layout, five rows of 14.5 key widths; each key its set-1 scancode; ctrl, alt/opt,
+  win/⌘ and shift armed for the next key through the existing sticky modifiers; fn for F1–F12 and Home, End, Page
+  Up, Page Down; Delete and the arrows repeat), and under it three shortcut buttons (Ctrl+C/Z/A on RDP, ⌘C/Z/A on VNC;
+  held, the next key typed with what is armed becomes the shortcut, kept per device and per protocol, a UI test
+  run's apart), Escape, and the trackpad (`DesktopFoldKeysPanel`). The iPhone's keyboard is the deck's switch.
+- Not built from the mockup: a microphone button (on-device dictation would need speech and microphone permission,
+  and the App Privacy answers looked at again: his call); the iPhone keyboard's own dictation is one tap away.
+- Tests: `DesktopFoldKeyboardTests` 6 (every key against the USB HID usage table's scancode, fn, modifiers, row
+  widths, chords and titles, the store; each seen failing when broken); `DuoDeckUITests.testAShortcutRecordsFromTheKeys`
+  (seen failing with recording cut); the deck's six pass stood like a laptop. Not tried against a real RDP or VNC
+  server: the demo desktop has no connection behind it.

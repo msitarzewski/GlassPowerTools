@@ -35,6 +35,14 @@ public struct GlassDeviceFold: Equatable, Sendable {
     /// Across the view: the phone stood like a laptop, with a top half and a bottom half.
     public var isAcross: Bool { frame.width > frame.height }
 
+    /// The fold runs through `globalFrame` (a view's frame on the screen), not past one of its
+    /// edges: a view on one page of a Duo held like a book (D93) is beside the fold, not across it.
+    public func crosses(_ globalFrame: CGRect) -> Bool {
+        let fold = self.globalFrame
+        return isAcross ? fold.minY > globalFrame.minY && fold.maxY < globalFrame.maxY
+                        : fold.minX > globalFrame.minX && fold.maxX < globalFrame.maxX
+    }
+
     /// The fold from the system's division regions: the active one that crosses the view, if any.
     /// A region that doesn't reach across the view (a sliver of a fold at a window's edge) isn't
     /// a fold to lay out around.
@@ -130,7 +138,9 @@ private struct GlassDeviceFoldWindowReader: UIViewRepresentable {
             read()
             rereads?.cancel()
             rereads = Task { @MainActor [weak self] in
-                for delay in [250, 1_000] {
+                // 0.5, 1.5 and 3 s after the update, as UTM reads it (the region can turn active
+                // late; 250 ms and 1 s missed a slow settle, D93).
+                for delay in [500, 1_000, 1_500] {
                     try? await Task.sleep(for: .milliseconds(delay))
                     guard !Task.isCancelled else { return }
                     self?.read()

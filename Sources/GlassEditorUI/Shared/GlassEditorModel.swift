@@ -75,6 +75,10 @@ public final class GlassEditorModel {
         public var serial = 0
     }
 
+    /// An iPhone Duo stood like a laptop (D93): the deck below the fold has the keys, so the bar
+    /// iOS would put above the keyboard, above the fold, is withheld.
+    public var keyboardAccessoryWithheld = false
+
     /// Asks for the keyboard, or asks for it to go away.
     public func requestKeyboard(_ wanted: Bool) {
         keyboardRequest = KeyboardRequest(wantsKeyboard: wanted,

@@ -42,6 +42,20 @@ struct GlassDeviceFoldTests {
                                      partlyOpen: true, in: laptop) == nil)
     }
 
+    @Test("held like a book with two pages, the fold crosses the window but neither page")
+    func pages() throws {
+        // Read in the window, the system's column to its right (867 × 635, 2026-10-31).
+        let fold = try #require(GlassDeviceFold.from(regions: [CGRect(x: 456, y: 0, width: 40, height: 635)],
+                                                     active: [true], in: CGSize(width: 867, height: 635)))
+        #expect(fold.crosses(CGRect(x: 0, y: 0, width: 867, height: 635)), "the window")
+        #expect(!fold.crosses(CGRect(x: 0, y: 0, width: 456, height: 635)), "the left page")
+        #expect(!fold.crosses(CGRect(x: 496, y: 0, width: 371, height: 635)), "the right page")
+        let laptop = try #require(GlassDeviceFold.from(regions: [CGRect(x: 0, y: 456, width: 669, height: 40)],
+                                                       active: [true], in: laptop))
+        #expect(laptop.crosses(CGRect(x: 0, y: 0, width: 669, height: 951)))
+        #expect(!laptop.crosses(CGRect(x: 0, y: 0, width: 669, height: 456)), "above the fold")
+    }
+
     @Test("a view the fold doesn't cross has none: one above it, or a narrow column beside it")
     func notCrossing() {
         // The terminal above the fold: in its coordinates the fold lies past its bottom edge.

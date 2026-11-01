@@ -84,12 +84,41 @@ public struct GlassShellSettingsView: View {
     }
 
     public var body: some View {
-        #if os(macOS) || os(visionOS)
+        #if os(macOS)
         tabs
+        #elseif os(visionOS)
+        sidebar
         #else
         sections
         #endif
     }
+
+    #if os(visionOS)
+    /// **A sidebar of pages, as Apple's own Settings app is on Vision Pro** (the owner, 2026-10-31,
+    /// choosing it over fewer tabs or a taller window). The tabs at the window's side held only as
+    /// many pages as the window was tall, eight at its usual size, and left out Editor and About
+    /// rather than scrolling (measured in the simulator by `testEverySettingsPageCanBeReached`).
+    /// Apple's guidance is a sidebar once an app has more sections than a tab bar holds; a list
+    /// scrolls, so every page stays reachable at any window size.
+    private var sidebar: some View {
+        let selected = options.first { key($0) == storedPane } ?? .shell(.general)
+        return NavigationSplitView {
+            List(options, id: \.self, selection: Binding<GlassShellSettingsSelection?>(
+                get: { selected },
+                set: { if let new = $0 { storedPane = key(new) } })) { selection in
+                Label(title(selection), systemImage: systemImage(selection))
+            }
+            .navigationTitle("Settings")
+            .accessibilityIdentifier("settings-sections")
+        } detail: {
+            // Each page keeps its own stack for whatever it pushes, started afresh per page.
+            NavigationStack {
+                pageContent(selected).navigationTitle(title(selected))
+            }
+            .id(key(selected))
+        }
+    }
+    #endif
 
     #if os(macOS) || os(visionOS)
     /// **Icon tabs: the Mac's toolbar row, the headset's leading ornament** — one `TabView`, drawn
@@ -105,13 +134,6 @@ public struct GlassShellSettingsView: View {
             set: { storedPane = key($0) })) {
             ForEach(options, id: \.self) { selection in
                 Tab(title(selection), systemImage: systemImage(selection), value: selection) {
-                    #if os(visionOS)
-                    // The root of the window must be the `TabView` for the ornament; each pane
-                    // keeps its own stack for whatever it pushes.
-                    NavigationStack {
-                        pageContent(selection).navigationTitle(title(selection))
-                    }
-                    #else
                     if case .capability = selection {
                         // A capability's page can be long (Terminal's is): a set height, scrolling.
                         pageContent(selection).frame(height: 540)
@@ -121,7 +143,6 @@ public struct GlassShellSettingsView: View {
                             .scrollDisabled(true)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    #endif
                 }
             }
         }

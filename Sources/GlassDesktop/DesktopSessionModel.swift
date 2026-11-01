@@ -244,6 +244,13 @@ public final class DesktopSessionModel {
     /// The bar above the software keyboard is on screen (iPhone, iPad): it carries the keys, the
     /// arrow pad and the tools, so the window's status bar steps aside, as a terminal's does.
     public var keyboardAccessoryShown = false
+    #if os(iOS)
+    /// An iPhone Duo stood like a laptop (D93): the window's deck holds the keys below the fold, so
+    /// the bar iOS would put above the keyboard, above the fold, is withheld.
+    public var keyboardAccessoryWithheld = false
+    /// The surface the deck's trackpad steers: the desktop's own window's (D93).
+    @ObservationIgnored weak var padTarget: DesktopMTKView?
+    #endif
     /// How many remote pixels to request per point. RDP only; VNC hosts choose their own resolution.
     public var sourceScale: DesktopSourceScale = .automatic {
         didSet {
@@ -1101,6 +1108,34 @@ public final class DesktopSessionModel {
         for event in DesktopAccessoryKeys.tap(key, holding: takeArmedModifiers()) { input.send(event) }
     }
 
+    /// The Duo keyboard's fn, for the next key (`DesktopFoldKeyboard`): never sent itself.
+    public var fnArmed = false
+
+    /// A key of the keyboard below an iPhone Duo's fold (D93), with fn and the modifiers armed for
+    /// it; a modifier, or fn, armed or put down instead.
+    func pressFoldKey(_ key: DesktopFoldKey) {
+        switch key.action {
+        case .modifier(let modifier): toggleArmed(modifier)
+        case .fn: fnArmed.toggle()
+        case .key:
+            guard let sent = key.sent(fn: fnArmed) else { return }
+            fnArmed = false
+            sendAccessoryKey(sent)
+        }
+    }
+
+    /// A shortcut button's keys, whatever is armed.
+    func sendChord(_ chord: DesktopFoldChord) {
+        guard let input = accessoryQueue() else { return }
+        for event in chord.events { input.send(event) }
+    }
+
+    /// What is armed, taken for a shortcut being recorded instead of sent.
+    func takeArmedForRecording() -> [DesktopStickyModifier] {
+        defer { armedModifiers = []; fnArmed = false }
+        return DesktopStickyModifier.allCases.filter(armedModifiers.contains)
+    }
+
     /// An arrow pad drag began: the armed modifiers go down for the whole of it.
     func beginArrowDrag() {
         guard let input = accessoryQueue() else { return }
@@ -1177,7 +1212,7 @@ public final class DesktopSessionModel {
         screens = []; selectedScreenID = nil
         linkStatistics = nil; displayWindowRequests = []; appliedDisplayWindows = false
         highPerformanceStatus = nil
-        armedModifiers = []; heldForDrag = []
+        armedModifiers = []; heldForDrag = []; fnArmed = false
         accessoryInput?.stop(); accessoryInput = nil; accessoryTransport = nil
         cursor = .systemDefault; cursorBitmap = nil; cursorImage = nil
         pointerPosition = nil; cursorVisible = true

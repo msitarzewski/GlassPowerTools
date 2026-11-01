@@ -1373,6 +1373,10 @@ public struct GlassTerminalBootstrap<Content: View>: View {
                 MainBootstrapView { content }
             }
         }
+        // An iPhone Duo's two pages (D93): a terminal window on one page at a time.
+        .glassShownOnPage(router.terminalWorkgroupID.map { "terminal-\($0)" }) { moved in
+            if moved { router.showConnectionsAfterMove() } else { router.showConnections() }
+        }
         .sheet(isPresented: Binding(
             get: { router.sftpContext != nil },
             set: { if !$0 { router.sftpContext = nil } }

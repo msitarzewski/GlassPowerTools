@@ -727,15 +727,7 @@ struct GlassPowerToolsApp: App {
     /// terminal (Open Folder in Editor) had nothing left to show it (2026-10-21). The editor needs
     /// nothing of the others; it is shown over whichever is on the screen.
     private var mainContent: some View {
-        GlassEditorBootstrap(runtime: editor) {
-            GlassTerminalBootstrap(runtime: terminal) {
-                GlassDatabaseBootstrap(runtime: database) {
-                    GlassDesktopBootstrap(runtime: desktop) {
-                        GlassShellLibraryView(model: model)
-                    }
-                }
-            }
-        }
+        libraryPages
         .glassLayers(layers)
         // The registry reaches every session's own chrome from here: the switcher's control
         // is drawn inside a terminal, a workspace or an editor, and each of those is a view
@@ -778,6 +770,28 @@ struct GlassPowerToolsApp: App {
         // After the bootstraps mount, so each surface's request is drained where it always is.
         .modifier(GlassDemoModeTask { await GlassDemoMode.run(editor: editor, terminal: terminal, database: database, desktop: desktop, layers: layers, shell: model) })
         #endif
+    }
+
+    /// The library inside every capability's bootstrap: on an iPhone Duo held like a book, once on
+    /// each of two pages, each page the phone as it is (D93, `GlassLibraryPages`).
+    @ViewBuilder private var libraryPages: some View {
+        #if os(iOS)
+        GlassLibraryPages { _ in libraryStack }
+        #else
+        libraryStack
+        #endif
+    }
+
+    private var libraryStack: some View {
+        GlassEditorBootstrap(runtime: editor) {
+            GlassTerminalBootstrap(runtime: terminal) {
+                GlassDatabaseBootstrap(runtime: database) {
+                    GlassDesktopBootstrap(runtime: desktop) {
+                        GlassShellLibraryView(model: model)
+                    }
+                }
+            }
+        }
     }
 
     #if DEBUG || GLASS_STRESS_HARNESS

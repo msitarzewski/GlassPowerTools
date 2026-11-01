@@ -132,6 +132,18 @@ In **Active**, swipe left on a session and choose **Close**, or right-click it (
 
 A terminal kept in tmux says so under its name, and its action is **Detach** instead: it leaves the session running on the machine, where **Active** then lists it as **Detached**.
 
+## Two at once on iPhone Duo
+
+Held half open like a book, or open flat on its side, iPhone Duo's inner screen shows two pages, one each side of the fold. Each page is the iPhone as you know it: the library, and whatever you open from it, with its own back button and ⚡. Put a terminal on one page and a database on the other, or any two sessions.
+
+- What you open goes to the page you last touched.
+- To open something on the other page, touch and hold a machine in the library and choose **Connect on the Other Page**; or in the menu beside **Connect**, choose **On the Other Page** and then a service. In **Active**, touch and hold a session and choose **Show on the Other Page**. The other page first puts away what it was showing, as its back button would: a terminal, database or editor stays open in **Active**, and a remote desktop is closed.
+- A session is on one page at a time. Choose it on the other page and it moves there; the page it left goes back to its library.
+- Each page has three dots at its top, above its bar. Touch them for:
+  - **Use Both Pages:** this page spreads across the whole screen, for one session on its own: a remote desktop across both halves, a terminal twice as wide, the library's list beside a machine's details, the editor's files beside the code, or a database's tables beside the query and its results. The other page waits underneath, with what it was showing. **Use Two Pages**, from the same dots, brings it back.
+  - **Swap Pages:** the two pages trade sides, each keeping what it shows.
+- Folded, or stood like a small laptop, the page you were using fills the screen; the other page keeps its session, and both are there again when you open the phone like a book.
+
 ## Bring the library back on Vision Pro
 
 When you leave the library window alone, it gets out of the way. After two minutes with no tap, scroll or typing in it, while another of the app's windows is open, it shrinks into a small glass orb in the same place. The orb shows the app's icon, and on its rim ⚡ and the number of sessions **Active** lists, when there are any.

@@ -87,3 +87,59 @@ public enum GlassWindowPresentation {
     }
     #endif
 }
+
+extension GlassWindowPresentation {
+    /// An iPhone Duo: a phone that answers yes to more than one scene (measured above, folded and
+    /// unfolded). Its sessions open inside their page (D93), as a terminal's and a database's do
+    /// on every phone; a cover would take both pages. Asked where needed, never stored.
+    public static var presentsInPages: Bool {
+        #if canImport(UIKit) && !os(visionOS)
+        UIDevice.current.userInterfaceIdiom == .phone && UIApplication.shared.supportsMultipleScenes
+        #else
+        false
+        #endif
+    }
+}
+
+extension View {
+    /// A session over the library, as a window is on a phone: a full-screen cover, and on an iPhone
+    /// Duo the same inside its page (D93), the library kept under it as a cover keeps it.
+    public func glassSessionCover<Item: Identifiable, Cover: View>(
+        item: Binding<Item?>, onDismiss: (() -> Void)? = nil, @ViewBuilder content: @escaping (Item) -> Cover
+    ) -> some View {
+        modifier(GlassSessionCover(item: item, onDismiss: onDismiss, cover: content))
+    }
+}
+
+private struct GlassSessionCover<Item: Identifiable, Cover: View>: ViewModifier {
+    @Binding var item: Item?
+    let onDismiss: (() -> Void)?
+    let cover: (Item) -> Cover
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if canImport(UIKit) && !os(visionOS)
+        if GlassWindowPresentation.presentsInPages {
+            ZStack {
+                content
+                    .opacity(item == nil ? 1 : 0)
+                    .allowsHitTesting(item == nil)
+                    .accessibilityHidden(item != nil)
+                if let item {
+                    cover(item)
+                        .id(item.id)
+                        .transition(.move(edge: .bottom))
+                }
+            }
+            .animation(.default, value: item?.id)
+            .onChange(of: item?.id) { old, new in
+                if old != nil, new == nil { onDismiss?() }
+            }
+        } else {
+            content.fullScreenCover(item: $item, onDismiss: onDismiss, content: cover)
+        }
+        #else
+        content
+        #endif
+    }
+}

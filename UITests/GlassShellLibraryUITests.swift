@@ -327,9 +327,10 @@ final class GlassShellLibraryUITests: XCTestCase {
     private func selectSettingsPage(_ title: String) {
         let picker = element("settings-sections")
         #if os(visionOS)
-        // The sections are a TabView there; visionOS renders its tabs as the leading ornament,
-        // which XCUITest exposes as a tab bar rather than as children of the TabView element.
-        let candidates = [app.tabBars.buttons[title], picker.buttons[title], app.buttons[title].firstMatch]
+        // The pages are a sidebar list there (2026-10-31; a tab bar ornament before, which left out
+        // the pages it had no room for). A row reads as a button or a cell, depending on the list.
+        let candidates = [picker.buttons[title], picker.cells[title], picker.staticTexts[title],
+                          app.buttons[title].firstMatch]
         let button = candidates.first(where: { $0.waitForExistence(timeout: 2) }) ?? candidates[0]
         #elseif os(macOS)
         _ = picker
@@ -468,6 +469,38 @@ final class GlassShellLibraryUITests: XCTestCase {
         XCTAssertTrue(element("host-row-Searchable Host").waitForExistence(timeout: 10))
     }
 
+    /// Every Settings page can be reached. The Mac's toolbar tabs once dropped the last pages off
+    /// their end (2026-09-30), and on Vision Pro the owner found Editor and About missing from the
+    /// tabs at the window's side (2026-10-31). The tabs' frames go in the report.
+    func testEverySettingsPageCanBeReached() {
+        openSettings()
+        var report: [String] = []
+        var unreachable: [String] = []
+        for title in ["General", "Appearance", "Privacy", "Connections", "Terminal", "Snippets",
+                      "Databases", "Desktops", "Editor", "About"] {
+            #if os(visionOS)
+            let list = element("settings-sections")
+            let candidates = [list.buttons[title], list.cells[title], list.staticTexts[title], app.buttons[title].firstMatch]
+            let button = candidates.first(where: { $0.waitForExistence(timeout: 2) }) ?? candidates[0]
+            #elseif os(macOS)
+            let button = app.toolbars.buttons[title].firstMatch
+            #else
+            let picker = element("settings-sections")
+            let button = picker.buttons[title].exists ? picker.buttons[title] : picker.radioButtons[title]
+            #endif
+            let found = button.waitForExistence(timeout: 5)
+            let hittable = found && button.isHittable
+            report.append("\(title): exists \(found), hittable \(hittable), frame \(found ? "\(button.frame)" : "-")")
+            if !hittable { unreachable.append(title) }
+        }
+        let attachment = XCTAttachment(string: (report + ["window \(app.windows.firstMatch.frame)"]).joined(separator: "\n"))
+        attachment.name = "settings-pages"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        snap("settings-pages")
+        XCTAssertEqual(unreachable, [], "Settings pages that can't be reached")
+    }
+
     /// An Appearance choice survives a relaunch.
     ///
     /// Rewritten 2026-09-13. It used to drive `layers-paints-theme`, which **no longer exists**:
@@ -479,7 +512,12 @@ final class GlassShellLibraryUITests: XCTestCase {
     /// Material is the control used now: it is a `Picker` rather than a slider, and slider drags
     /// synthesize on iOS alone (the visionOS simulator and macOS refuse them), so this is the one
     /// appearance control whose change can be driven on all three platforms.
-    func testAppearanceMaterialPersistsAcrossRelaunch() {
+    func testAppearanceMaterialPersistsAcrossRelaunch() throws {
+        #if os(visionOS)
+        // Found 2026-10-31: visionOS has had no Material picker since 2026-10-10 (`GlassLayerControls`,
+        // aa9f9fe3), so this failed there for a control that isn't drawn. The Mac and iOS still run it.
+        try XCTSkipIf(true, "visionOS has no Material picker")
+        #endif
         openSettings()
         selectSettingsPage("Appearance")
 

@@ -28,6 +28,10 @@ When two or more documents are open, they appear as tabs above the text. Choose 
 
 **On Mac:** the window's subtitle shows the project name and its folder, or the folder of a file opened on its own. **On Apple Vision Pro**, the same is at the right-hand end of the status bar at the bottom of the window.
 
+## Type on iPhone Duo
+
+Half open and standing like a small laptop, iPhone Duo shows the text (or the text and its preview, as you chose) above the fold, and folding it brings up the keyboard. Between the fold and the keys is a strip: **Tab**, brackets and quotes and the other characters code needs (swipe for more), **Left** and **Right**, **Undo**, **Redo** and **Find**. Each types or acts at the cursor. With the keyboard up, the button at the strip's start is **Preview** for a file that has one: it puts the keyboard away and shows the file's preview below the fold. **Show Keyboard** brings the keyboard back. Folding closes the project's file list, which would cover the strip.
+
 ## Create a new file in a project
 
 1. In the file list, open the context menu on a folder, or on a file in the folder you want.

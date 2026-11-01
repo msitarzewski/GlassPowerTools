@@ -118,6 +118,11 @@ enum GlassDemoMode {
            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
         }
+        // `--demo-spread`: on an iPhone Duo held like a book, the page in use across both halves
+        // (D93, Use Both Pages), for a tool alone.
+        if ProcessInfo.processInfo.arguments.contains("--demo-spread") {
+            GlassPageFocus.shared.useBothPages(GlassPageFocus.shared.focused)
+        }
         #endif
         // `--demo-look <look>` and `--demo-picture <file>` (D84): the terminal window's look — one of
         // This Window's Start From looks (`digitalRain`, `synthwave`, `amberPhosphor`,
@@ -346,6 +351,27 @@ enum GlassDemoMode {
         case "files":
             // The window and its header; with nothing connected, the list says so.
             terminal.requestDemoFiles(name: "alpha", path: "/home/ann/shop")
+        #if os(iOS)
+        case "pages", "pages-desktop", "pages-editor":
+            // Two services side by side on an iPhone Duo held like a book (D93): the monitor in one
+            // page, then in the other the shop's database, a remote desktop, or the shop's code.
+            terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:), windowSettings: demoLook)
+            try? await Task.sleep(for: .seconds(3))
+            GlassPageFocus.shared.focusOtherPage()
+            try? await Task.sleep(for: .milliseconds(500))
+            switch surface {
+            case "pages-desktop":
+                let renderer = ImageRenderer(content: DemoRemoteScreen())
+                renderer.scale = 1
+                guard let picture = renderer.cgImage else { return }
+                await desktop.requestDemoDesktop(name: "bravo", host: "192.0.2.20", picture: picture,
+                                                 windowSettings: desktopSettings, opensSettings: false)
+            case "pages-editor":
+                await openEditor(editor, preview: false)
+            default:
+                database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop", showsDiagram: false)
+            }
+        #endif
         case "database", "diagram":
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
             database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop",

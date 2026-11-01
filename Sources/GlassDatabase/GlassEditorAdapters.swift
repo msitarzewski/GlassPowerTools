@@ -107,6 +107,28 @@ private extension String {
 final class SQLEditorController {
     fileprivate var applyText: ((String) -> Void)?
     fileprivate var applySelection: ((NSRange) -> Void)?
+    /// The editor's model, once the surface has built: for the keyboard and for typing below an
+    /// iPhone Duo's fold (D93).
+    fileprivate weak var model: GlassEditorModel?
+
+    /// Asks for the SQL editor's keyboard, or for it to go away.
+    func requestKeyboard(_ wanted: Bool) {
+        model?.requestKeyboard(wanted)
+    }
+
+    /// Stood like a laptop, the deck below the fold has the keys: no bar above the keyboard.
+    func setKeyboardAccessoryWithheld(_ withheld: Bool) {
+        model?.keyboardAccessoryWithheld = withheld
+    }
+
+    /// Types `text` over the selection, as one undoable edit, and puts the cursor after it.
+    func type(_ text: String) {
+        guard let model else { return }
+        let range = model.selectedRange
+        guard (try? model.apply(TextEdit(replacementRange: range, text: text), intent: .typing)) != nil else { return }
+        let caret = range.lowerBound + text.utf16.count
+        model.reveal(caret..<caret)
+    }
     private var pendingText: String?
     private var pendingSelection: NSRange?
     private var completionSpace: (text: String, offset: Int)?
@@ -634,6 +656,7 @@ final class SQLEditorBridgeCoordinator<Engine> {
         applySelection: @escaping (Range<Int>) -> Void
     ) {
         self.controller = controller
+        controller.model = model
         controller.attach(
             applyText: { [weak self] newText in
                 guard newText != model.text else { return }

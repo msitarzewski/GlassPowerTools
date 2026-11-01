@@ -623,11 +623,13 @@ public struct GlassEditorBootstrap<Content: View>: View {
     /// an `onChange` is the shape the desktop's session uses, and it works because the change is
     /// observed where SwiftUI can see it.
     @State private var presented: GlassEditorWindowPresentation?
+    /// On an iPhone Duo's two pages, only the page in use carries out requests (D93).
+    @Environment(\.glassPageIsFocused) private var pageIsFocused
 
     public var body: some View {
         base
             .onChange(of: runtime.presentationSerial) { _, _ in
-                guard let id = runtime.requestedWindowID else { return }
+                guard pageIsFocused, let id = runtime.requestedWindowID else { return }
                 if Self.canOpenWindows {
                     openWindow(id: GlassEditorRuntime.windowID, value: id)
                     runtime.clearPresentation()
@@ -642,7 +644,8 @@ public struct GlassEditorBootstrap<Content: View>: View {
     private var base: some View {
         #if os(iOS)
         content
-            .fullScreenCover(item: $presented, onDismiss: { runtime.clearPresentation() }) { window in
+            // Over the library; on an iPhone Duo, inside its page, and on one page at a time (D93).
+            .glassSessionCover(item: $presented, onDismiss: { runtime.clearPresentation() }) { window in
                 let id = window.id
                 if true {
                     // **No `NavigationStack` around it.** The editor is a `NavigationSplitView`,
@@ -659,6 +662,7 @@ public struct GlassEditorBootstrap<Content: View>: View {
                         .glassLayers(runtime.layers)
                 }
             }
+            .glassShownOnPage(presented.map { "editor-\($0.id)" }) { _ in presented = nil }
         #else
         content
         #endif

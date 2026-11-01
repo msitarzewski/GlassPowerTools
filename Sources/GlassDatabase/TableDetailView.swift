@@ -1518,6 +1518,13 @@ struct DataTabView: View {
     /// The table context owns its editor handle; the document context shares
     /// QueryEditorView's, so its document-level actions reach the same editor.
     @State private var ownedEditorController = SQLEditorController()
+    #if os(iOS)
+    /// Where an iPhone Duo's fold crosses the window (D93): stood like a laptop, the query and its
+    /// results above it, and below, the keyboard or the selected row.
+    @State private var deviceFold: GlassDeviceFold?
+    /// Run and Explain, lent by the query editor for the strip below the fold.
+    @Environment(\.databaseFoldActions) private var foldActions
+    #endif
     private var editorController: SQLEditorController {
         externalEditorController ?? ownedEditorController
     }
@@ -1696,6 +1703,51 @@ struct DataTabView: View {
     }
 
     private var presentedView: some View {
+        #if os(iOS)
+        // An iPhone Duo stood like a laptop (D93): the keyboard, which a fresh fold brings up, or
+        // the selected row in the record editor, below the fold; Run, Explain and SQL's keys between.
+        GlassFoldDeck(fold: $deviceFold,
+                      keyboard: GlassFoldDeckKeyboard(show: { editorController.requestKeyboard(true) },
+                                                      hide: { editorController.requestKeyboard(false) }),
+                      panel: displaysEditor ? GlassFoldDeckPanel(title: "Row", systemImage: "list.bullet.rectangle") {
+                          foldRecord
+                      } : nil) {
+            presentedContent
+        } strip: {
+            DatabaseFoldStrip(controller: editorController, actions: foldActions)
+        }
+        .onChange(of: deviceFold.map(\.isAcross) == true, initial: true) { _, laptop in
+            editorController.setKeyboardAccessoryWithheld(laptop)
+        }
+        #else
+        presentedContent
+        #endif
+    }
+
+    #if os(iOS)
+    /// The selected row, below the fold: edited as the record sheet edits it, and every change
+    /// shown for review before it is written.
+    @ViewBuilder private var foldRecord: some View {
+        if let result, let rowIdx = selectedRowIndex, rowIdx < result.rows.count {
+            RecordEditorView(
+                columns: columnMeta.isEmpty ? result.columns : columnMeta,
+                mode: .edit(rowIndex: rowIdx, originalRow: result.rows[rowIdx]),
+                dialect: session?.connection?.dialect,
+                onSave: { edits, _ in
+                    queuedRecordMutation = .update(edits: edits, rowIndex: rowIdx)
+                    presentQueuedRecordMutation()
+                },
+                onDiscard: { selectedRowIndex = nil }
+            )
+            .id(rowIdx)
+        } else {
+            ContentUnavailableView("No Row Selected", systemImage: "tablecells",
+                                   description: Text("Choose a row in the results to see it here."))
+        }
+    }
+    #endif
+
+    private var presentedContent: some View {
         VStack(spacing: 0) {
             if displaysEditor {
                 // SQL editor area remains subordinate to the user-controlled canvas.
