@@ -428,13 +428,30 @@ a.card:hover { text-decoration: none; border-color: var(--border-strong); backgr
 }
 .devices .tablet img { border-radius: 18px; }
 .devices .phone img { border-radius: 24px; }
-/* The iPad and the iPhone on their own, the same height. */
-.devices.pair { grid-template-columns: 1.33fr 0.46fr; max-width: 920px; margin-left: auto; margin-right: auto; }
+/* The iPad and the iPhone on their own, the same height: columns in proportion to their bezels (1800 × 1380 and
+   800 × 1633). */
+.devices.pair { grid-template-columns: 1.304fr 0.49fr; max-width: 920px; margin-left: auto; margin-right: auto; }
 @media (max-width: 760px) {
   .devices { grid-template-columns: 1fr 1fr; }
   .devices figure:first-child { grid-column: 1 / -1; }
-  .devices.pair { grid-template-columns: 1.33fr 0.46fr; }
+  .devices.pair { grid-template-columns: 1.304fr 0.49fr; }
   .devices.pair figure:first-child { grid-column: auto; }
+}
+/* Pictures in Apple's own product bezels (iPhone, iPad, iPhone Duo, MacBook Pro): the device is the frame, so no
+   border or rounding of ours. Apple's, used under its licence: THIRD-PARTY-NOTICES.md, "Artwork". */
+.window-shot img.bezel, .gallery img.bezel, .devices img.bezel {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  /* Apple's product images are shown as they are: no shadow, reflection or highlight added. */
+  filter: none;
+}
+.devices.duo { grid-template-columns: 1fr 1fr; gap: 28px; }
+@media (max-width: 760px) {
+  .devices.duo { grid-template-columns: 1fr; }
+  .devices.duo figure:first-child { grid-column: auto; }
 }
 .caption { text-align: center; max-width: 640px; margin: 10px auto 0; }
 

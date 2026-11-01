@@ -1,18 +1,26 @@
 #!/bin/zsh
 # The website's Mac screenshots, taken inside the macOS screenshot VM (Tools/Screenshots/macvm), never on this
-# Mac's screen, and written to site/static/shots/ as WebP: mac-<shot>-dark.webp and mac-<shot>-light.webp.
+# Mac's screen, and written to site/static/shots/ as WebP: macbook-<shot>-dark.webp and macbook-<shot>-light.webp,
+# the whole screen in Apple's MacBook Pro bezel; mac-look-<name>.webp, a window cut out by its outline.
 #
 #   Tools/Screenshots/macvm/macvm.sh build-app        # Debug, ad-hoc signed: the demo mode is DEBUG-only
 #   Tools/Screenshots/macvm/macvm.sh start
 #   Tools/Screenshots/macvm/macvm.sh install-app
-#   Tools/Screenshots/site_shots.sh                   # every shot, or name some: site_shots.sh terminal library
+#   BEZELS=<Apple's bezel PNGs> Tools/Screenshots/site_shots.sh   # every shot, or name some: … terminal library
+#
+# The whole-screen pictures are shown in Apple's MacBook Pro (M5) 14-inch bezel (the owner, 2026-10-31), as Apple's
+# marketing guidelines ask: Space Black for Dark Mode, Silver for light, placed by bezel.py. The bezels are Apple's
+# (Apple Design Resources, Product Bezels), under its licence, and not in this repository: BEZELS is the folder
+# holding their PNGs. The screen is that MacBook Pro's own, 1512 × 982 points, and its notch covers the middle of
+# the menu bar, as it does on the Mac, so the windows are placed below a notched Mac's taller menu bar.
 #
 # Each shot launches the app fresh on made-up machines (App/GlassDemoMode.swift, as Tools/Screenshots/shoot.sh
 # does on the simulators), opens one surface, and gives its window the same frame every time. Every window is at
 # Opacity 78%, Glass 50%, Medium (the owner's choice, 2026-10-18), and the service shots close the Connections
 # window. The picture is the whole screen, 1504 × 940 points as a 13-inch MacBook Air's, with the menu bar, the
 # clock at 9:41 and macOS's default desktop picture (macvm/wallpaper.py), the owner's choice of 2026-10-30: the
-# glass shows a real desktop through it. The window fills most of the screen, so its text stays readable on the
+# glass shows a real desktop through it. (Until 2026-10-31 the screen was 1504 × 940, a 13-inch MacBook Air's,
+# without a bezel.) The window fills most of the screen, so its text stays readable on the
 # site, and is no bigger than what is in it. `looks` are still cut out by the window's outline, for the gallery's
 # small pictures. `workspace` is four windows at once: a terminal running a btop-style monitor, a database, a
 # desktop and the editor. `editor-git` is the editor's Changes on the made-up shop's repository
@@ -31,9 +39,11 @@ HOSTS="alpha@192.0.2.10#Production:ssh+database|bravo@192.0.2.20#Office:ssh+rdp|
 HOSTS+="|build@192.0.2.40#Production:ssh|win@192.0.2.50#Office:rdp|db@192.0.2.60#Production:ssh+database"
 HOSTS+="|staging@192.0.2.70#Staging:ssh+database|pi@192.0.2.80#Home:ssh"
 GLASS="--demo-glass 0.78,0.5,thin"
-# The screen, in points, and the menu bar's height on it.
-SCREEN_W=1504 SCREEN_H=940 MENU_BAR=28
+# The screen, in points: a 14-inch MacBook Pro's. The menu bar is a notched Mac's, 38 points, clear of the notch.
+SCREEN_W=1512 SCREEN_H=982 MENU_BAR=38
 mkdir -p "$RAW" "$OUT"
+[[ -f "${BEZELS:-}/MacBook Pro M5 14-inch Space Black.png" && -f "${BEZELS:-}/MacBook Pro M5 14-inch Silver.png" ]] || {
+  echo "site_shots: set BEZELS to the folder holding Apple's MacBook Pro M5 14-inch bezels (Space Black, Silver)" >&2; exit 1; }
 
 gui() { timeout 90 $VM gui "$1"; }
 events() { gui "osascript -e 'tell application \"System Events\" to $1'" >/dev/null 2>&1 || true; }
@@ -107,13 +117,20 @@ screen() {  # name: the whole screen, the clock at 9:41 as Apple's own pictures 
   gui "screencapture -x -t png /tmp/shot-screen.png"
   sleep 1; notice
   timeout 60 $VM ssh "cat /tmp/shot-screen.png && rm -f /tmp/shot-screen.png" > "$RAW/$name.png"
-  python3 -I - "$RAW/$name.png" "$OUT/mac-$name.webp" <<'EOF'
+  if [[ $name == workspace-* ]]; then
+    # Its own 1920 × 1200 screen, which no bezel has: the screen alone.
+    python3 -I - "$RAW/$name.png" "$OUT/mac-$name.webp" <<'EOF'
 import sys
 from PIL import Image
 screen = Image.open(sys.argv[1]).convert("RGB")
 screen.save(sys.argv[2], "WEBP", quality=88, method=6)
 print(f"{sys.argv[2]}: {screen.size[0]}x{screen.size[1]}")
 EOF
+    return
+  fi
+  local finish="Space Black"
+  [[ $name == *-light ]] && finish="Silver"
+  python3 -I Tools/Screenshots/bezel.py "$RAW/$name.png" "$BEZELS/MacBook Pro M5 14-inch $finish.png" "$OUT/macbook-$name.webp"
 }
 capture() {  # name title…: the screen around those windows, cut out by their outlines
   local name=$1 found id frame x y w h left=100000 top=100000 right=0 bottom=0 i

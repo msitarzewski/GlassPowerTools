@@ -61,8 +61,14 @@ use the disposable test VM only).
   DuoScreen, the desktop's own keyboard and trackpad at once below the fold; help, README, release notes (0.4.573)
   and the memory bank updated. 0.4.573 built from settled code (source hash unchanged across the build), installed
   and read back on the Mac (no new crash reports), the Vision Pro and the iPhone. Package tests 3,294 pass;
-  DuoPagesUITests 5 and DuoDeckUITests 6 pass on the Duo simulator. Next: step 8 (site pictures, App Store Duo
-  screenshots); the system's Split View still unchecked. Commit only at his word.
+  DuoPagesUITests 5 and DuoDeckUITests 6 pass on the Duo simulator. Committed and pushed at his word (23114fd1).
+- **Then (his "keep going, then commit and push when done"):** step 8. Apple's own product bezels for every device
+  picture but Vision Pro's (his choices: Duo bezel; "iPhone, iPad and Mac"; he accepted Apple's Design Resources
+  licence for the four bezels): the Duo composites through PhotoCraft's CLI (installed, MCP registered here), the
+  iPad, iPhone and Mac pictures through `Tools/Screenshots/bezel.py`; the Mac's VM screen now a 14-inch MacBook Pro's.
+  A home-page "iPhone Duo" section; `THIRD-PARTY-NOTICES.md` notes the frames are Apple's. App Store Duo screenshots
+  prepared outside the repository (upload at his word). Apple's resizability check: findings in the task note.
+  The site is built, not deployed. Next: the resizability findings as their own tested pass; Swap/Split View checks.
 
 ## 2026-10-28/29 — git first class (0.4.549) and the headset's stalls (0.4.550), uncommitted
 - **Git, end to end, in the editor** (his "build git now, end to end, first class (doff viewer, all of it!)"): built,

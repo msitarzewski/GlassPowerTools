@@ -174,3 +174,32 @@ physical Duo is available to test on.
   widths, chords and titles, the store; each seen failing when broken); `DuoDeckUITests.testAShortcutRecordsFromTheKeys`
   (seen failing with recording cut); the deck's six pass stood like a laptop. Not tried against a real RDP or VNC
   server: the demo desktop has no connection behind it.
+
+## Step 8 — pictures, App Store screenshots, and Apple's resizability check (2026-10-31, night)
+- **Apple's rules for device pictures** (developer.apple.com/app-store/marketing/guidelines, Product Images): use
+  Apple's own product bezels, as is; "rendering in 3D or creating any simulation of an Apple product" is not
+  permitted, so D93's Blender fallback is dropped. The owner accepted Apple's Design Resources licence for the iPhone
+  Duo, iPhone 18, iPad Pro (M5) and MacBook Pro (M5) bezels (identical licence text). Bezel files stay outside the
+  repository; `THIRD-PARTY-NOTICES.md` ("Artwork") says the frames are Apple's and not under this project's licences.
+- **Duo pictures:** Apple's partly open Duo bezels are PSDs with a warped smart object; PhotoCraft's CLI (0.18.0,
+  installed and registered as an MCP server for this project) fills them with `photocraft-cli run … --cmd
+  layer.smartObjects.replaceContents` (its `serve`, MCP and the app's control port refuse the warp filter). Contents
+  at 400 % (11412 × 8028); laptop pose turned 90° clockwise. Seven composites; two on the home page's new "iPhone Duo"
+  section (`duo-laptop-desktop.webp`, `duo-book-terminal-database.webp`), checked at desktop and phone widths.
+- **Bezels for the iPhone, iPad and Mac pictures** (the owner chose "iPhone, iPad and Mac"): `Tools/Screenshots/bezel.py`
+  places a screenshot under a front-facing bezel's opening (flood-filled from its middle; a capture of another size is
+  an error). `device_shots.sh` frames the iPad Pro 13-inch and iPhone 18 Pro Max pictures (`*-bezel.webp`, new names so
+  cached old shapes aren't squeezed); `site_shots.sh` takes the Mac's whole-screen pictures at a 14-inch MacBook Pro's
+  1512 × 982 points (the VM's tart display set to that, `macvm.sh` default too) and frames them Space Black (dark) and
+  Silver (light) as `macbook-<shot>-<theme>.webp`. `BEZELS` names the folder of Apple's PNGs.
+- **App Store:** Apple has an iPhone Duo screenshot class (inner 2853 × 2007 / 2007 × 2853, outer 2034 × 1398 /
+  1398 × 2034, no alpha); submitting earns the product page's "optimized for iPhone Duo" badge, and from April 2027 it
+  is required for apps built with the iOS 27.1 SDK or later. A set of 12 (7 inner, 5 outer) is prepared outside the
+  repository; uploading waits for the owner's word and a TestFlight build with the Duo work.
+- **Apple's app-resizability skill** (`xcrun agent skills export`): prerequisites pass (launch screen declared, iPad
+  all four orientations, no `UIRequiresFullScreen`). No `UIScreen.main`. Findings left for a tested pass of their own,
+  as they change phone and iPad behaviour: 17 `UIDevice.current.userInterfaceIdiom` checks in 12 files (layout choices
+  in the terminal, database, editor and shell; Apple's guidance is to decide by size class or space, and to read
+  idiom from the trait collection when it is needed at all), one `interfaceOrientations` request (the DEBUG demo's
+  `--demo-landscape`), and safe-area reads in the All Windows pane and the editor's preview to check against an
+  asymmetric (Duo) safe area.

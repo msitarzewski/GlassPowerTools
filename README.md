@@ -90,14 +90,14 @@ The same app, with a local shell, menus and windows that are as see-through as y
   <tr>
     <td width="50%">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-terminal-dark.webp">
-        <img src="site/static/shots/mac-terminal-light.webp" alt="A terminal window on a Mac's desktop, running btop on alpha.">
+        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/macbook-terminal-dark.webp">
+        <img src="site/static/shots/macbook-terminal-light.webp" alt="A terminal window on a Mac's desktop, running btop on alpha.">
       </picture>
     </td>
     <td width="50%">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-database-dark.webp">
-        <img src="site/static/shots/mac-database-light.webp" alt="A database window on a Mac: the shop database's tables, a query and a grid of orders.">
+        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/macbook-database-dark.webp">
+        <img src="site/static/shots/macbook-database-light.webp" alt="A database window on a Mac: the shop database's tables, a query and a grid of orders.">
       </picture>
     </td>
   </tr>
@@ -108,14 +108,14 @@ The same app, with a local shell, menus and windows that are as see-through as y
   <tr>
     <td>
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-desktop-dark.webp">
-        <img src="site/static/shots/mac-desktop-light.webp" alt="A remote desktop window on a Mac, connected to bravo at 1920 × 1080.">
+        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/macbook-desktop-dark.webp">
+        <img src="site/static/shots/macbook-desktop-light.webp" alt="A remote desktop window on a Mac, connected to bravo at 1920 × 1080.">
       </picture>
     </td>
     <td>
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-editor-dark.webp">
-        <img src="site/static/shots/mac-editor-light.webp" alt="The editor on a Mac: a project's files, three tabs and Swift open with its highlighting.">
+        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/macbook-editor-dark.webp">
+        <img src="site/static/shots/macbook-editor-light.webp" alt="The editor on a Mac: a project's files, three tabs and Swift open with its highlighting.">
       </picture>
     </td>
   </tr>
@@ -126,8 +126,8 @@ The same app, with a local shell, menus and windows that are as see-through as y
   <tr>
     <td colspan="2">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-all-windows-dark.webp">
-        <img src="site/static/shots/mac-all-windows-light.webp" alt="Show All Windows on a Mac: a terminal window's three tabs, a database, a remote desktop and the editor, as live pictures in groups.">
+        <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/macbook-all-windows-dark.webp">
+        <img src="site/static/shots/macbook-all-windows-light.webp" alt="Show All Windows on a Mac: a terminal window's three tabs, a database, a remote desktop and the editor, as live pictures in groups.">
       </picture>
     </td>
   </tr>
@@ -184,9 +184,9 @@ database's selected row. Held like a book, the inner display is two pages: a ter
 the other, or any two, or one session across both.
 
 <p align="center">
-  <img src="site/static/shots/ipad-landscape.webp" height="420" alt="The library on iPad in landscape, in three columns, with a month of use.">
+  <img src="site/static/shots/ipad-landscape-bezel.webp" height="420" alt="The library on iPad in landscape, in three columns, with a month of use.">
   &nbsp;&nbsp;
-  <img src="site/static/shots/iphone-terminal.webp" height="420" alt="btop on alpha across the whole iPhone screen.">
+  <img src="site/static/shots/iphone-terminal-bezel.webp" height="420" alt="btop on alpha across the whole iPhone screen.">
 </p>
 
 ## Why one app
@@ -208,8 +208,8 @@ Glass Power Tools starts from the machine instead:
   grouped by machine, on every device.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/mac-library-dark.webp">
-  <img src="site/static/shots/mac-library-light.webp" alt="The library on a Mac: nine machines in four collections, each with an icon per service, and a month of time in use from three devices.">
+  <source media="(prefers-color-scheme: dark)" srcset="site/static/shots/macbook-library-dark.webp">
+  <img src="site/static/shots/macbook-library-light.webp" alt="The library on a Mac: nine machines in four collections, each with an icon per service, and a month of time in use from three devices.">
 </picture>
 
 **What it is not.** Not a service: no server of ours sits between you and your machines. Not on every

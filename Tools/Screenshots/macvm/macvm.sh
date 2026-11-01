@@ -40,9 +40,11 @@ RUN_VM="glasspowertools-mac26-run"
 VM="${GLASS_MACVM:-$BASE_VM}"
 CPUS=6
 MEMORY_MB=16384
-# Points, so tart sizes the VM for the host's Retina scale: screenshots come out at 2x (3840×2400 px), sharp enough
-# for the website. ("2560x1600px" would mean pixels at 1x.)
-DISPLAY_SIZE="1920x1200"
+# Points, so tart sizes the VM for the host's Retina scale: screenshots come out at 2x, sharp enough for the website.
+# ("3024x1964px" would mean pixels at 1x.) A 14-inch MacBook Pro's screen (3024 × 1964 px), for the website's
+# pictures in Apple's MacBook Pro bezel (2026-10-31); until then 1920x1200, which site_shots.sh's `workspace` needs:
+# `tart set <vm> --display 1920x1200` for that one.
+DISPLAY_SIZE="1512x982"
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRATCH="$ROOT/.scratch/macvm"
 SHOTS="$ROOT/.scratch/shots/macvm"

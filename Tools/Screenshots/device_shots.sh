@@ -1,9 +1,15 @@
 #!/bin/bash
 # The website's device pictures, from the simulators (the Mac's come from the VM: site_shots.sh), in Dark Mode:
-# site/static/shots/vision-*.webp, ipad-landscape.webp and iphone-terminal.webp.
+# site/static/shots/vision-*.webp, ipad-landscape-bezel.webp and iphone-terminal-bezel.webp.
 #
 #   IOS_APP=<Debug-iphonesimulator/Glass Power Tools.app> VISION_APP=<Debug-xrsimulator/Glass Power Tools.app> \
-#     IOS_XCTESTRUN=<a Debug iOS Simulator build-for-testing's .xctestrun> Tools/Screenshots/device_shots.sh [name …]
+#     IOS_XCTESTRUN=<a Debug iOS Simulator build-for-testing's .xctestrun> BEZELS=<Apple's bezel PNGs> \
+#     Tools/Screenshots/device_shots.sh [name …]
+#
+# The iPad and the iPhone are shown in Apple's own product bezels (the owner, 2026-10-31), as Apple's marketing
+# guidelines ask, placed by bezel.py: the iPad Pro (M5) 13-inch in Space Black and the iPhone 18 Pro Max in Black.
+# The bezels are Apple's (Apple Design Resources, Product Bezels), under its licence, and not in this repository:
+# BEZELS is the folder holding their PNGs. Vision Pro has no bezel; its pictures are the room as it is.
 #
 # With names (vision-dock, vision-editor-git, …), only those are taken again; the others are left as they are.
 #
@@ -46,7 +52,7 @@ shot() {  # name app udid surface settle [demo arguments] [an orb's name to show
     Tools/Screenshots/shoot.sh "$3" "$4" "$RAW/$1.png" "$5"
 }
 
-IPAD="$(simulator "iPad Pro 13-inch (M5)")"; IPHONE="$(simulator "iPhone 17 Pro Max")"; VISION="$(simulator "Apple Vision Pro")"
+IPAD="$(simulator "iPad Pro 13-inch (M5)")"; IPHONE="$(simulator "iPhone 18 Pro Max")"; VISION="$(simulator "Apple Vision Pro")"
 for s in "$IPAD" "$IPHONE" "$VISION"; do [ -n "$s" ] || { echo "device_shots: a simulator is missing" >&2; exit 1; }; done
 # Only the simulators the pictures asked for are started.
 if [ -z "${ONLY// /}" ] || [[ "$ONLY" == *" ipad-"* ]]; then ready "$IPAD" ios; fi
@@ -99,6 +105,7 @@ xcrun simctl io "$VISION" screenshot "$RAW/vision-room.png" >/dev/null 2>&1
 
 python3 -I - "$RAW" "$OUT" $ONLY <<'PY'
 import os
+import subprocess
 import sys
 from PIL import Image, ImageChops, ImageFilter
 raw, out, only = sys.argv[1], sys.argv[2], set(sys.argv[3:])
@@ -143,14 +150,19 @@ for name in ["vision-focus-loft", "vision-focus-ridge"]:
     x, y = (shot.width - width) // 2, (shot.height - height) // 2
     shot.crop((x, y, x + width, y + height)).resize((2400, 1350), Image.LANCZOS).save(f"{out}/{name}.webp", "WEBP", quality=86, method=6)
     print(f"{out}/{name}.webp: 2400x1350")
-for name, width in [("ipad-landscape", 1600), ("iphone-terminal", 780)]:
+bezels = os.environ.get("BEZELS", "")
+framed = [("ipad-landscape", 'iPad Pro (M5) 13" - Space Black - Landscape.png', 1800),
+          ("iphone-terminal", "iPhone 18 Pro Max - Black - Portrait.png", 800)]
+for name, bezel, width in framed:
     if only and name not in only:
         continue
+    if not os.path.exists(f"{bezels}/{bezel}"):
+        sys.exit(f"device_shots: {name} needs BEZELS, the folder holding Apple's \"{bezel}\"")
     im = Image.open(f"{raw}/{name}.png").convert("RGB")
     # The UI test's capture is the iPad's screen as it is fixed, portrait, with the landscape picture across it.
     if name == "ipad-landscape" and im.height > im.width:
         im = im.rotate(90, expand=True)
-    height = round(im.size[1] * width / im.size[0])
-    im.resize((width, height), Image.LANCZOS).save(f"{out}/{name}.webp", "WEBP", quality=86, method=6)
-    print(f"{out}/{name}.webp: {width}x{height}")
+    im.save(f"{raw}/{name}-screen.png")
+    subprocess.run([sys.executable, "-I", "Tools/Screenshots/bezel.py", f"{raw}/{name}-screen.png", f"{bezels}/{bezel}",
+                    f"{out}/{name}-bezel.webp", "--width", str(width)], check=True)
 PY

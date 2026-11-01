@@ -105,6 +105,7 @@ The two BoringSSL texts, and where they came from, are in `Documentation/ThirdPa
 |---|---|---|
 | The database icon (`HeroiconCircleStack`) | Heroicons v2.2.0 `outline/circle-stack`, Tailwind Labs, redrawn as a SwiftUI path | MIT, `Documentation/ThirdPartyLicenses/heroicons/LICENSE` |
 | AI agents' marks in Show All Windows (`TerminalAgent`) | Lobe Icons @ `05a9b8c41e4735a4a2b6d2f1e43574bd8ec6c8cb`, `packages/static-svg/icons`, LobeHub: eight monochrome SVGs, byte for byte but for the `<title>`, carried as text. The marks are their owners' trademarks | MIT, © 2023 LobeHub, `Documentation/ThirdPartyLicenses/lobe-icons/LICENSE` |
+| The devices around the website's and README's pictures (`site/static/shots/*-bezel.webp`, `macbook-*.webp`, `duo-*.webp`) | Apple's product bezels (Apple Design Resources, Product Bezels: iPhone 18, iPad Pro (M5), MacBook Pro (M5), iPhone Duo), with this app's own screens inside, as Apple's App Store marketing guidelines ask | Apple Inc.'s, under Apple's License Agreement for Apple Design Resources: **not** covered by this repository's licences. They may be used only as that licence and Apple's marketing guidelines allow (depicting apps for Apple's platforms), and the bezels may not be extracted, copied or redistributed on their own. The bezel files themselves are not in this repository. |
 
 ## Authored for this application
 
