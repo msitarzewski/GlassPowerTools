@@ -85,6 +85,16 @@ public struct GlassTerminalWorkgroup: Sendable, Equatable, Identifiable {
     public let id: UUID
     public let name: String
     public let terminals: Int
+    /// Its databases and remote desktops (B-F40).
+    public var services = 0
+
+    /// What it opens, as Favorites says it: "3 terminals", "2 terminals · 1 database or desktop".
+    public var summary: String {
+        let terminalCount = terminals == 1 ? "1 terminal" : "\(terminals) terminals"
+        guard services > 0 else { return terminalCount }
+        let serviceCount = services == 1 ? "1 database or desktop" : "\(services) databases and desktops"
+        return terminals == 0 ? serviceCount : "\(terminalCount) · \(serviceCount)"
+    }
 }
 
 /// A saved database SQL in a terminal can open in (2026-10-20), as the composition root names it.
@@ -220,6 +230,13 @@ public final class GlassTerminalRuntime {
     public var sqlDestinations: (@MainActor (UUID) -> [GlassTerminalSQLDestination])?
     /// Open in SQL Editor: the SQL, unrun, in a new query tab on that database.
     public var openSQL: (@MainActor (_ sql: String, _ database: UUID) -> Void)?
+    /// The library's databases and remote desktops a saved workgroup can open with its terminals
+    /// (B-F40), by their services' endpoints, in the library's order. Set by the composition root,
+    /// which holds the library; nil offers none.
+    public var workgroupServiceChoices: (@MainActor () -> [UUID])?
+    /// A service as Favorites names it (its title, its kind and machine, its symbol) and how it
+    /// connects, the library's own Connect; nil once it has left the library.
+    public var describeService: (@MainActor (UUID) -> GlassFavoriteDescription?)?
     /// Whether a saved server is this Mac's own library machine (D86), which the shell knows: its
     /// tmux sessions are This Mac's, listed once from here rather than asked for again over SSH.
     public var isThisMacServer: (@MainActor (UUID) -> Bool)?
@@ -395,6 +412,26 @@ public final class GlassTerminalRuntime {
         guard let preset = settingsManager.layoutPresets.first(where: { $0.id == presetID }) else { return }
         enqueue(.openWorkgroup(preset))
     }
+
+    /// Connects a saved workgroup's databases and remote desktops (B-F40), each as the library's
+    /// Connect does: in a window of its own, or on a phone in place. One open already is shown,
+    /// never opened a second time, as its terminals are (W4b). Returns how many have left the
+    /// library, which nothing can open.
+    @discardableResult
+    func openServices(of preset: LayoutPreset) -> Int {
+        let open = openSessions?() ?? []
+        var gone = 0
+        for id in preset.services {
+            if let session = open.first(where: { $0.endpointIDs.contains(EndpointID(rawValue: id)) }) {
+                session.activate()
+            } else if let service = describeService?(id) {
+                service.open()
+            } else {
+                gone += 1
+            }
+        }
+        return gone
+    }
     /// glas.sh's server form, empty or pre-filled (Tailscale import, shell service link).
     public func requestAddServer() { enqueue(.addServer(draft: nil)) }
 
@@ -565,7 +602,7 @@ public final class GlassTerminalRuntime {
     /// The saved workgroups, for Shortcuts and Siri (D72): metadata only.
     public var workgroups: [GlassTerminalWorkgroup] {
         settingsManager.layoutPresets.map {
-            GlassTerminalWorkgroup(id: $0.id, name: $0.name, terminals: $0.sessionIntents.count)
+            GlassTerminalWorkgroup(id: $0.id, name: $0.name, terminals: $0.sessionIntents.count, services: $0.services.count)
         }
     }
 

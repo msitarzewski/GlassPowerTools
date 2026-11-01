@@ -31,6 +31,29 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
+## 2026-11-01 — RESUME HERE: the site deployed, the Duo finished, databases and desktops in Workgroups
+- **Site deployed at his word** ("deploy the site"; he ran the provision step): 108 live files match the build of
+  `c6f9560d` by hash; the old `mac-*`, `ipad-landscape` and `iphone-terminal` pictures 404.
+- **"finish the duo, then workgroups … reuse is essential. DRY, and KISS"** — built, uncommitted:
+  - Duo finish (`tasks/2026-10/2026-10-31_duo-deck-plan.md` step 9): Apple's resizability findings settled (the
+    database's idiom checks ask `GlassWindowPresentation.canOpenWindows`; the terminal's short-window rule by size);
+    All Windows over two pages opens on the page in use, with Show on the Other Page on a card
+    (`GlassShowOnOtherPageButton`, shared with Active); the desktop deck's main-thread spin (a measured frame
+    flipping in its 14th digit) fixed by `glassGlobalFrame`, which ignores changes under half a point (deck and
+    terminal); Split View not reachable in the simulator (recorded).
+  - Workgroups (D94, `tasks/2026-11/2026-11-01_workgroup-services.md`): `LayoutPreset.services`, opened through the
+    one funnel `TerminalConnectFlow.openWorkgroup` with the shell's Connect via Favorites' service description; one
+    already open is shown. Editor and detail sections. Favorites, Active and the library now share one rule for a
+    service named by default (`GlassShellHost.namesOnlyByDefault`).
+  - Tests: DuoPagesUITests 7 (two new), WorkgroupServicesUITests 1, WorkgroupServicesTests 4, the fold and naming
+    unit tests; each new one seen failing with its piece broken. Help (`terminal-workgroups.md`), README, release
+    notes (0.4.574).
+  - 0.4.574 built for all three from settled sources (hash unchanged across the run), installed and read back on
+    the Mac (no new crash reports), the iPhone and the Vision Pro. Package tests 3,300 pass; DuoDeckUITests 6 and
+    DuoPagesUITests 7 pass on the Duo simulator; WorkgroupServicesUITests on the iPhone 18 Pro Max simulator.
+- **Next:** his word on committing; TestFlight with the Duo and workgroup work, then the 12 Duo App Store
+  screenshots (his word for each); the orb-dock/grid embedding of a desktop in a workgroup is not built (KISS).
+
 ## 2026-10-31 — RESUME HERE: the first external TestFlight, Xcode 27.2, Show All Windows on the site
 - **TestFlight (his "spin up the first actual test flight"):** 0.4.569 (569) uploaded for iPhone, iPad and Vision Pro
   with the released Xcode 27.2; What to Test on both builds; both in the external Testers group (public link, 100);
@@ -68,7 +91,10 @@ use the disposable test VM only).
   iPad, iPhone and Mac pictures through `Tools/Screenshots/bezel.py`; the Mac's VM screen now a 14-inch MacBook Pro's.
   A home-page "iPhone Duo" section; `THIRD-PARTY-NOTICES.md` notes the frames are Apple's. App Store Duo screenshots
   prepared outside the repository (upload at his word). Apple's resizability check: findings in the task note.
-  The site is built, not deployed. Next: the resizability findings as their own tested pass; Swap/Split View checks.
+  Pushed (`c6f9560d`). The site deployed at his word on 2026-11-01 ("deploy the site"; he ran the provision step):
+  all 108 live files match the build by hash, the old `mac-*`/`ipad-landscape`/`iphone-terminal` pictures 404.
+  Next: the resizability findings as their own tested pass; the system's Split View and Open on the Other Page from
+  Show All Windows and a session's own menu, unchecked on the Duo (Swap Pages has `testSwapPages`, passing).
 
 ## 2026-10-28/29 — git first class (0.4.549) and the headset's stalls (0.4.550), uncommitted
 - **Git, end to end, in the editor** (his "build git now, end to end, first class (doff viewer, all of it!)"): built,

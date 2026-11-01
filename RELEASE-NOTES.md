@@ -99,6 +99,17 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.574 (1 November 2026)
+- **Databases and remote desktops in Workgroups.** A Workgroup can now open databases and remote desktops from
+  your library with its terminals, or on their own. Add them in the Workgroup's editor under Databases and
+  Desktops; each opens as Connect opens it, and one already open comes forward instead of connecting again.
+- **Favorites name a service by its machine** when its name says nothing more ("Database on alpha" is shown as
+  alpha, Database).
+- **The iPhone Duo:** a card chosen in Show All Windows, held like a book, opens on the page you are using, and a
+  card's menu has Show on the Other Page. Stood like a laptop, a remote desktop could freeze the app as it opened;
+  it no longer does.
+- **Any short window:** a terminal moves Tools to its top bar when there is no height to spare, on any device, not
+  only an iPhone on its side; a database's Disconnect and window settings follow whether it opened in a window.
 ### 0.4.573 (31 October 2026)
 - **A remote desktop on the iPhone Duo, stood like a laptop: a keyboard and a trackpad at once.** Below the fold, the
   desktop's own keyboard sends each key as the remote computer's keyboard would, so shortcuts work: ctrl, alt and win

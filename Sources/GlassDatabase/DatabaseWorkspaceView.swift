@@ -12,9 +12,6 @@ import GlassShell
 import GlassDBKit
 import UniformTypeIdentifiers
 import GlassConnectionUI
-#if os(iOS)
-import UIKit
-#endif
 
 // MARK: - Selection Model
 
@@ -187,15 +184,6 @@ struct WorkspaceTabState: Equatable {
             selected = tabs[min(index, tabs.count - 1)]
         }
         return true
-    }
-}
-
-enum DatabaseWorkspaceConnectionsRoute: Equatable {
-    case inAppRouter
-    case window
-
-    static func resolve(isPhone: Bool) -> Self {
-        isPhone ? .inAppRouter : .window
     }
 }
 
@@ -704,10 +692,8 @@ struct DatabaseWorkspaceView: View {
             showHost(id)
         }
         #if os(iOS)
-        let route = DatabaseWorkspaceConnectionsRoute.resolve(
-            isPhone: UIDevice.current.userInterfaceIdiom == .phone
-        )
-        if route == .inAppRouter, let iOSRouter {
+        // In place where the workspace was presented in place (`GlassDatabaseScenes.present`).
+        if !GlassWindowPresentation.canOpenWindows, let iOSRouter {
             iOSRouter.showConnections()
             return
         }
@@ -965,7 +951,7 @@ struct DatabaseWorkspaceView: View {
         // **Disconnect, where there is no window to close.** A phone's workspace is a route in
         // the primary scene; everywhere else it is a window whose close button ends the session.
         // In the ⋯ overflow the user pointed at (2026-09-21, 22:58); glassdb's label and symbol.
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if !GlassWindowPresentation.canOpenWindows {
             ToolbarItem(placement: .secondaryAction) {
                 Button("Disconnect", systemImage: "xmark.circle") {
                     disconnectWorkspace()

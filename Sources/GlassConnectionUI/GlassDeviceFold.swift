@@ -65,7 +65,26 @@ public struct GlassDeviceFold: Equatable, Sendable {
     }
 }
 
+extension CGRect {
+    /// The same frame, as far as anything drawn can tell: every edge within half a point.
+    public func isWithinHalfAPoint(of other: CGRect) -> Bool {
+        abs(minX - other.minX) < 0.5 && abs(minY - other.minY) < 0.5
+            && abs(maxX - other.maxX) < 0.5 && abs(maxY - other.maxY) < 0.5
+    }
+}
+
 extension View {
+    /// Keeps `frame` at this view's frame in its window (SwiftUI's global space), for a layout
+    /// placed against the device's fold. A change under half a point is no change: a layout that
+    /// follows its own frame is laid out again by every change, and the desktop's deck measured
+    /// 139.97389848344642 and 139.97389848344636 in turn, each laying it out to give the other,
+    /// two thousand times a second until the app was killed (2026-11-01, the Duo simulator).
+    public func glassGlobalFrame(_ frame: Binding<CGRect>) -> some View {
+        onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { new in
+            if !frame.wrappedValue.isWithinHalfAPoint(of: new) { frame.wrappedValue = new }
+        }
+    }
+
     /// Keeps `fold` up to date with where the device's fold crosses this view's window, in the
     /// window's (SwiftUI's global) coordinates: nil while there is none. iOS 27.1 and later;
     /// earlier, and on other platforms, always nil.

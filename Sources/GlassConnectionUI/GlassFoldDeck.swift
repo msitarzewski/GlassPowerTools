@@ -142,7 +142,7 @@ public struct GlassFoldDeck<Work: View, Strip: View, Panel: View>: View {
                 .frame(height: laptopFold.map { max(0, min(frame.height, $0.globalFrame.minY - frame.minY)) })
             if laptopFold != nil { Spacer(minLength: 0) }
         }
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+        .glassGlobalFrame($frame)
         // Placed on the screen rather than in the stack: with the keyboard up the stack ends at the
         // fold, and the strip goes in the keyboard's room above its keys.
         .overlay(alignment: .top) {

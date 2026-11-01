@@ -358,6 +358,12 @@ struct GlassPowerToolsApp: App {
             let endpoint = EndpointID(rawValue: toConnect)
             if let host = model.host(owningEndpoint: endpoint) { model.connect(hostID: host.id, endpointID: endpoint) }
         }
+        // A saved workgroup's databases and desktops (B-F40): the library's, named and connected as
+        // Favorites' services are.
+        terminal.workgroupServiceChoices = { [weak model] in
+            model?.hosts.flatMap { host in host.services.filter { $0.kind != .ssh }.map(\.endpointID.rawValue) } ?? []
+        }
+        terminal.describeService = { [weak model] id in model?.favoriteDescription(.service(EndpointID(rawValue: id))) }
         // The + menu's running terminals (2026-10-15): Active's list, and its refresh when old.
         terminal.runningSessions = { [weak model] in model?.listedRunningSessions ?? [] }
         terminal.refreshRunningSessionsIfDue = { [weak model] in await model?.refreshRunningSessionsIfDue() }
@@ -447,7 +453,7 @@ struct GlassPowerToolsApp: App {
                 guard let workgroup = terminal.workgroups.first(where: { $0.id == id }) else { return nil }
                 return GlassFavoriteDescription(
                     title: workgroup.name,
-                    subtitle: workgroup.terminals == 1 ? "1 terminal" : "\(workgroup.terminals) terminals",
+                    subtitle: workgroup.summary,
                     symbol: .system("rectangle.3.group"),
                     open: { terminal.requestOpenWorkgroup(id) })
             case .folder(let endpoint, let path):

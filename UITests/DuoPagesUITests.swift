@@ -190,5 +190,63 @@ final class DuoPagesUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [shown], timeout: 15), .completed, "the database is on the first page")
         XCTAssertNil(onPage(0, terminals), "the first page put its terminal away for it")
     }
+
+    /// All Windows, held from the first page's ⚡ over both pages: the card it holds for the page in
+    /// use opens there.
+    private func openAllWindowsFromTheFirstPage() throws {
+        let bolt = try XCTUnwrap(onPage(0, app.buttons.matching(identifier: "active-connections-bolt")), "the terminal's ⚡")
+        bolt.press(forDuration: 1.2)
+        let cards = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'all-windows-card-'"))
+        XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 10), "All Windows' cards")
+        shoot("all windows")
+    }
+
+    /// The card for a `kind` of session: a terminal's is its window's or its tab's.
+    private func card(_ kind: String) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "all-windows-card-\(kind)")).firstMatch
+    }
+
+    /// A card chosen in All Windows opens on the page in use, which puts away what it shows; the
+    /// screen shown last, on the other page, is not the one left.
+    func testAllWindowsOpensOnThePageInUse() throws {
+        try launch("pages")
+        let queries = app.descendants(matching: .any).matching(identifier: "db-query-editor")
+        XCTAssertTrue(queries.firstMatch.waitForExistence(timeout: 30), "the database")
+        XCTAssertNotNil(onPage(0, terminals), "the terminal on the first page")
+        try openAllWindowsFromTheFirstPage()
+        card("database").tap()
+        sleep(2)
+        shoot("chosen")
+
+        let roots = app.navigationBars.matching(identifier: "Databases")
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.onPage(0, roots) != nil && self.onPage(0, self.terminals) == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [shown], timeout: 15), .completed,
+                       "the database on the first page, its terminal put away")
+    }
+
+    /// Show on the Other Page, from a card's menu in All Windows: the terminal goes to the second
+    /// page, which puts away its database, and the first page goes back to its library.
+    func testAllWindowsShowsOnTheOtherPage() throws {
+        try launch("pages")
+        let queries = app.descendants(matching: .any).matching(identifier: "db-query-editor")
+        XCTAssertTrue(queries.firstMatch.waitForExistence(timeout: 30), "the database")
+        try openAllWindowsFromTheFirstPage()
+        card("terminal").press(forDuration: 1.2)
+        let other = app.buttons["Show on the Other Page"].firstMatch
+        XCTAssertTrue(other.waitForExistence(timeout: 10), "Show on the Other Page in the card's menu")
+        other.tap()
+        sleep(2)
+        shoot("shown")
+
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.onPage(1, self.terminals) != nil && self.onPage(0, self.terminals) == nil
+                && self.onPage(1, queries) == nil
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [moved], timeout: 15), .completed,
+                       "the terminal alone on the second page")
+    }
 }
 #endif

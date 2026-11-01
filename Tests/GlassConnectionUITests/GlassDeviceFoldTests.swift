@@ -65,4 +65,16 @@ struct GlassDeviceFoldTests {
         #expect(GlassDeviceFold.from(regions: [CGRect(x: 300, y: 0, width: 20, height: 669)],
                                      active: [true], in: CGSize(width: 320, height: 669)) == nil)
     }
+
+    /// The desktop's deck measured these two frames in turn, each laying it out to give the other,
+    /// until the app was killed (2026-11-01): a change in the last digits is no change.
+    @Test("a frame that moved by less than half a point is the same frame; one that moved a point is not")
+    func measuredFrames() {
+        let measured = CGRect(x: 0, y: 139.97389848344642, width: 669, height: 838.6666666666665)
+        let again = CGRect(x: 0, y: 139.97389848344636, width: 669, height: 838.6666666666667)
+        #expect(measured != again, "the two frames the deck flipped between")
+        #expect(measured.isWithinHalfAPoint(of: again))
+        #expect(!measured.isWithinHalfAPoint(of: measured.offsetBy(dx: 0, dy: 1)))
+        #expect(!measured.isWithinHalfAPoint(of: measured.insetBy(dx: 0, dy: -0.5)), "taller by a point")
+    }
 }

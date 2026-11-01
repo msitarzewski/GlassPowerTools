@@ -252,6 +252,8 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   viewer (unified or side by side, changed words highlighted), staging a file, a hunk or single lines,
   commit and amend, pull and push, the history with its graph, branches, stashes, tags, merges and
   rebases with a conflict resolver, blame, and cloning. On the Mac it can be your default text editor.
+- **Together:** a workgroup opens terminals on several machines with the databases and remote
+  desktops you work beside them, each where it belongs, and brings back what is already open.
 - **Everywhere you are:** the library, favorites, workgroups and projects sync through iCloud, and
   credentials through iCloud Keychain; keys made in the Secure Enclave stay on their device. Your
   Library shows the time you spend on each machine, added up across your devices, and a Mac knows its

@@ -1,6 +1,6 @@
 # Save and open terminal Workgroups
 
-A Workgroup is a saved set of terminal tabs, each with a connection and an optional startup command, that you open together. This page covers finding Workgroups, creating and editing them, and what happens when you open one.
+A Workgroup is a saved set of terminal tabs, each with a connection and an optional startup command, and of databases and remote desktops, that you open together. This page covers finding Workgroups, creating and editing them, and what happens when you open one.
 
 ## Find your Workgroups
 
@@ -33,12 +33,13 @@ In **New Workgroup**:
    - **Startup command**: an optional command to run once after the tab connects, for example `cd /srv/shop && git status`.
    - For a local tab: **Shell** and **Working directory**, or leave them empty to use the app's defaults.
 4. To reorder tabs on Mac, use **Move Up** and **Move Down** in a tab's menu. Elsewhere, choose **Edit** above the tabs and drag them.
-5. Optionally, give it a look under **Look** and **Text**: choose **Start From** ▸ **Choose a Look**, or set each part, as in a window's own settings (see [Backgrounds and glowing text](terminal-looks.md)). Every window the Workgroup opens starts with it, on all your devices. A picture you choose stays on this device; your others show the look without it.
-6. Choose **Save**. If another Workgroup already has that name, choose **Replace** to update it, on all your devices, or **Keep Both**.
+5. Optionally, choose **Add Database or Desktop** under **Databases and Desktops** for each database or remote desktop from your library to open with it (see [Databases and desktops in a Workgroup](#databases-and-desktops-in-a-workgroup)).
+6. Optionally, give it a look under **Look** and **Text**: choose **Start From** ▸ **Choose a Look**, or set each part, as in a window's own settings (see [Backgrounds and glowing text](terminal-looks.md)). Every window the Workgroup opens starts with it, on all your devices. A picture you choose stays on this device; your others show the look without it.
+7. Choose **Save**. If another Workgroup already has that name, choose **Replace** to update it, on all your devices, or **Keep Both**.
 
 To rebuild a Workgroup from a window, arrange the window, choose **Save Workspace as Workgroup…**, give it the Workgroup's name, and choose **Replace**.
 
-A Workgroup holds up to 32 terminals.
+A Workgroup holds up to 32 terminals and 16 databases and desktops. It needs at least one of either.
 
 > [!IMPORTANT]
 > Startup commands are saved with the Workgroup. Do not put passwords or tokens in them.
@@ -57,6 +58,14 @@ If the Workgroup is already open on this device, its window or terminals come fo
 - **On iPhone:** after asking for any missing password, the Workgroup opens on its first terminal, and only that one connects. Choose another from the menu at the top to connect it: each is named by its tab's label or the terminal's own name, or else by its place and its Terminal service's name, for example **Terminal 2 · Terminal on alpha**, and a filled dot means it is connected. Terminals you have opened stay connected. After the app has been in the background, only the terminal on screen reconnects; the others reconnect when you choose them.
 
 If some terminals cannot open, the others still do, and a message lists what failed and why.
+
+## Databases and desktops in a Workgroup
+
+A Workgroup can open databases and remote desktops from your library with its terminals, or on their own: the database and dashboards you watch while a deploy runs, say. Add them in the editor under **Databases and Desktops**; each is listed by its machine and kind, as in Favorites, and **Remove** takes it out.
+
+When you open the Workgroup, each opens as **Connect** opens it from your library, asking for a password if it needs one: in a window of its own on a Mac, iPad and Vision Pro, and on iPhone in place, with the terminals in front and the rest in **Active**. One already open comes forward instead of connecting again. One you have since removed from your library is skipped, and a message says so.
+
+Saving a Mac window over a Workgroup with **Replace** keeps the Workgroup's databases and desktops.
 
 ## Workgroups and tmux
 

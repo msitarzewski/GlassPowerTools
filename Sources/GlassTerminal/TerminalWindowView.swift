@@ -415,7 +415,7 @@ struct TerminalWindowView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // An iPhone on its side has no height to spare: Tools moves to the top bar instead.
             // A Duo stood like a laptop has its own bar below the fold.
-            if !keyboardToolsShown && !isPhoneLandscape && laptopFold == nil {
+            if !keyboardToolsShown && !hasNoHeightToSpare && laptopFold == nil {
             AnyView(bottomStatusBar)
                 .controlSize(.small)
                 .glassEffect(.regular, in: .capsule)
@@ -431,7 +431,7 @@ struct TerminalWindowView: View {
             }
         }
         .toolbar {
-            if isPhoneLandscape && isTerminalActive && !keyboardToolsShown {
+            if hasNoHeightToSpare && isTerminalActive && !keyboardToolsShown {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         bottomStatusBarContents(compact: true, inMenu: true)
@@ -504,7 +504,7 @@ struct TerminalWindowView: View {
         } strip: {
             AnyView(laptopBar)
         }
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stackFrame = $0 }
+        .glassGlobalFrame($stackFrame)
         .onChange(of: laptopFold != nil, initial: true) { _, laptop in
             terminalHostModel.setKeyboardAccessoryWithheld(laptop)
         }
@@ -1821,9 +1821,10 @@ struct TerminalWindowView: View {
         .disabled(!isTerminalActive)
     }
 
-    /// An iPhone on its side: compact height.
-    private var isPhoneLandscape: Bool {
-        verticalSizeClass == .compact && UIDevice.current.userInterfaceIdiom == .phone
+    /// No height to spare: compact height, as an iPhone on its side is (decided by the space, not
+    /// the device, as Apple's resizing guidance asks).
+    private var hasNoHeightToSpare: Bool {
+        verticalSizeClass == .compact
     }
 
     private var iOSKeyboardToolsMenu: some View {

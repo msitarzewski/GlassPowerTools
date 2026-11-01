@@ -395,8 +395,15 @@ final class GlassAllWindowsPaneController {
         } completion: { [weak self] in
             self?.tearDown()
             guard let chosen else { return }
-            leave?()
-            chosen()
+            // An iPhone Duo's two pages (D93): what is chosen opens on the page in use, which puts
+            // away what it shows. The screen shown last may be on the other page.
+            let pages = GlassPageFocus.shared
+            if pages.showsTwoPages {
+                pages.openOnPage(pages.focused, chosen)
+            } else {
+                leave?()
+                chosen()
+            }
         }
     }
 

@@ -2027,3 +2027,14 @@ Not done: Swap Pages, the system's Split View check, step 7 (a tool alone, held 
 **Point 3 changed by the owner:** after DuoScreen, he chose "Keys + trackpad at once" for the desktop: its own
 keyboard sending real chords and the trackpad together, with three recordable shortcuts, rather than a trackpad the
 iPhone keyboard replaces. A microphone button was left out (speech and microphone permissions; his call).
+
+## D94 — Databases and desktops in Workgroups — Implemented 2026-11-01 (uncommitted)
+**Owner:** "finish the duo, then workgroups. Remember that reuse is essential. DRY, and KISS." (B-F40.)
+**Decision (mine, under that direction):** a saved workgroup also lists databases and remote desktops, by their
+library services' endpoint IDs (`LayoutPreset.services`, at most 16), and may hold them without terminals. Opening
+one connects each as the library's Connect does, in its own window or on a phone in place, and shows one already
+open instead; the terminals open as before. Named and connected through the shell's existing service description
+(Favorites'), handed to the terminal by the composition root. No schema change: an older build reads the terminals
+and drops the services only if it saves the workgroup again (as `windowSettings`, W22). Not done: embedding a
+desktop in the terminal window's grid or carousel. Task note `tasks/2026-11/2026-11-01_workgroup-services.md`.
+

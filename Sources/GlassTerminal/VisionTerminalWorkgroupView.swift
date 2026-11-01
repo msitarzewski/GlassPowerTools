@@ -797,7 +797,7 @@ struct VisionTerminalWorkgroupView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("terminal-workgroup-tabs")
         #else
-        if usesCompactPhoneNavigation {
+        if Self.usesCompactPhoneNavigation {
             NavigationStack {
                 compactTerminalTabs(workgroup: workgroup, sessions: sessions)
                     .navigationBarTitleDisplayMode(.inline)
@@ -1217,8 +1217,9 @@ struct VisionTerminalWorkgroupView: View {
     #if os(iOS)
     /// Every iPhone, in every orientation. A Pro Max on its side reports a regular width, and
     /// the iPad layout's tab bar then put a session pill under the terminal and rebuilt the
-    /// screen on every rotation (2026-10-04, landscape on a Pro Max).
-    private var usesCompactPhoneNavigation: Bool {
+    /// screen on every rotation (2026-10-04, landscape on a Pro Max). One terminal at a time, so
+    /// its others connect when shown (`TerminalConnectFlow.opensWorkgroupSlotsLazily`).
+    static var usesCompactPhoneNavigation: Bool {
         UIDevice.current.userInterfaceIdiom == .phone
     }
 

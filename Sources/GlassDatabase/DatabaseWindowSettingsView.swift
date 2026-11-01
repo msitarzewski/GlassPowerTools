@@ -17,9 +17,7 @@
 import SwiftUI
 import GlassLayers
 import GlassConnectionUI
-#if canImport(UIKit)
-import UIKit
-#endif
+import GlassShell
 
 /// The sections of a database window's Settings, the window's own first: the owner, on the Vision
 /// Pro, found the terminal's window-level controls only once they came first and said what they
@@ -137,14 +135,10 @@ struct DatabaseWindowSettingsView: View {
         _settings = settings
     }
 
-    /// Whether this device's database workspace is a window with settings of its own: everywhere
-    /// but iPhone, where it is a screen in the library's window.
+    /// Whether this device's database workspace is a window with settings of its own: wherever it
+    /// opens as a window (`GlassDatabaseScenes.present`), not where it is a screen in the library's.
     @MainActor static var isOffered: Bool {
-        #if os(iOS)
-        UIDevice.current.userInterfaceIdiom != .phone
-        #else
-        true
-        #endif
+        GlassWindowPresentation.canOpenWindows
     }
 
     /// What Opacity does in a database window, for the section's footer. **On Vision Pro** the

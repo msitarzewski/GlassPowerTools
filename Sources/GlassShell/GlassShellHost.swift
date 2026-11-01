@@ -193,6 +193,19 @@ extension GlassShellHost {
     }
 }
 
+public extension GlassShellHost {
+    /// Whether `service`'s own name says nothing its kind and this machine don't: none, its kind,
+    /// the machine's name, or the name the setup gives a service it is not told one for ("Terminal
+    /// on alpha"). One rule for every place that names a service by its kind and machine instead.
+    nonisolated func namesOnlyByDefault(_ service: HostServiceLink) -> Bool {
+        let name = service.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let kind = GlassServicePresentation.displayName(for: service.kind)
+        return name.isEmpty || [kind, displayName, "\(kind) on \(displayName)"].contains {
+            $0.caseInsensitiveCompare(name) == .orderedSame
+        }
+    }
+}
+
 public extension GlassShellModel {
     /// A service's name with its machine's: "Terminal on alpha" for one named only by its kind or
     /// its machine, its own name where that already says the machine ("MySQL on alpha"), and
@@ -200,8 +213,7 @@ public extension GlassShellModel {
     nonisolated static func paletteName(of service: HostServiceLink, on host: GlassShellHost) -> String {
         let kind = GlassServicePresentation.displayName(for: service.kind)
         let name = service.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty || name.caseInsensitiveCompare(kind) == .orderedSame
-            || name.caseInsensitiveCompare(host.displayName) == .orderedSame {
+        if host.namesOnlyByDefault(service) {
             return "\(kind) on \(host.displayName)"
         }
         if name.range(of: " on \(host.displayName)", options: [.caseInsensitive, .anchored, .backwards]) != nil {

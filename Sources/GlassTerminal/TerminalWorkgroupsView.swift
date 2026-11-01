@@ -158,6 +158,24 @@ struct TerminalWorkgroupsView: View {
         preset.workspaceLayout?.tabs.count ?? preset.sessionIntents.count
     }
 
+    /// What a saved workgroup holds: its tabs (with `detail`, its terminals and startup commands
+    /// too), then its databases and desktops when it has any (B-F40), as Favorites counts them.
+    static func contents(_ preset: LayoutPreset, detail: Bool = false) -> String {
+        var parts: [String] = []
+        if !preset.sessionIntents.isEmpty {
+            parts.append(tabCount(tabTotal(preset)))
+            if detail {
+                parts.append("\(preset.sessionIntents.count) terminals")
+                parts.append("\(preset.sessionIntents.filter { $0.startupCommand != nil }.count) startup commands")
+            }
+        }
+        if !preset.services.isEmpty {
+            parts.append(GlassTerminalWorkgroup(id: preset.id, name: preset.name, terminals: 0,
+                                                services: preset.services.count).summary)
+        }
+        return parts.joined(separator: " · ")
+    }
+
     @ViewBuilder
     private func workgroupResults(
         connectionLibrary: ConnectionLibraryProjection
@@ -221,12 +239,12 @@ struct TerminalWorkgroupsView: View {
                     // same place, the colour after the name (2026-10-07). The count is the one the
                     // detail shows — a Mac workgroup's tabs, else its sessions.
                     GlassLibraryConnectionRow(name: preset.name,
-                                              subtitle: Self.tabCount(Self.tabTotal(preset)),
+                                              subtitle: Self.contents(preset),
                                               isFavorite: runtime.favorites?.isFavorite(.workgroup(preset.id)) ?? false,
                                               color: preset.colorTag.color)
                     .tag(ConnectionWorkgroupSelection.preset(preset.id))
                     .accessibilityLabel(
-                        "\(preset.name), \(Self.tabCount(Self.tabTotal(preset)))"
+                        "\(preset.name), \(Self.contents(preset))"
                     )
                     .accessibilityHint("Select to show workgroup details")
                     .accessibilityIdentifier(
@@ -395,7 +413,7 @@ struct TerminalWorkgroupsView: View {
                             Text(preset.name)
                                 .font(.title2.bold())
                                 .textSelection(.enabled)
-                            Text("\(Self.tabCount(Self.tabTotal(preset))) · \(preset.sessionIntents.count) terminals · \(preset.sessionIntents.filter { $0.startupCommand != nil }.count) startup commands")
+                            Text(Self.contents(preset, detail: true))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -443,6 +461,13 @@ struct TerminalWorkgroupsView: View {
                     }
                 }
                 #endif
+                if !preset.services.isEmpty {
+                    Section("Databases and Desktops") {
+                        ForEach(preset.services, id: \.self) { id in
+                            WorkgroupServiceRow(description: runtime.describeService?(id))
+                        }
+                    }
+                }
             }
             .formStyle(.grouped)
             .safeAreaInset(edge: .bottom, spacing: 0) {

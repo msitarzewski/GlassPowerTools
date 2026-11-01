@@ -609,11 +609,7 @@ public struct GlassShellLibraryView: View {
     static func connectOpensText(_ service: HostServiceLink, host: GlassShellHost) -> String {
         let kind = GlassServicePresentation.displayName(for: service.kind)
         let name = service.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let redundant = name.isEmpty
-            || name.caseInsensitiveCompare(host.displayName) == .orderedSame
-            || name.caseInsensitiveCompare(kind) == .orderedSame
-            || name.caseInsensitiveCompare("\(kind) on \(host.displayName)") == .orderedSame
-        return redundant ? kind : "\(kind) · \(name)"
+        return host.namesOnlyByDefault(service) ? kind : "\(kind) · \(name)"
     }
 
     // MARK: Alerts

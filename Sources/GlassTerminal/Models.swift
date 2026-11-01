@@ -2450,6 +2450,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     /// should enable focus on motion by default"). A workgroup saved with it off stays off.
     nonisolated static let followsActivityByDefault = true
     static let maximumSessionCount = 32
+    static let maximumServiceCount = 16
 
     struct SessionIntent: Codable, Hashable {
         static let currentSchemaVersion = 3
@@ -2784,6 +2785,12 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     /// (`TerminalWindowSettingsCoding`): a build from W20 on still reads the look, and one from
     /// before W22 drops the rest only if it saves the workgroup again.
     var windowSettings = GlassWindowOverrides()
+    /// Its databases and remote desktops (B-F40, 2026-11-01), opened with its terminals, each as
+    /// the library's Connect opens it: their library services' endpoint IDs, as `serverID` names
+    /// a terminal's. Written only when there are any, and without a schema change, as
+    /// `windowSettings` was: a build from before reads the terminals, skips a workgroup that has
+    /// none, and drops these only if it saves the workgroup again.
+    var services: [UUID] = []
 
     init(
         id: UUID = UUID(),
@@ -2850,8 +2857,9 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     var isValidForPersistence: Bool {
         schemaVersion == Self.currentSchemaVersion
             && name == Self.normalizedName(name)
-            && !sessionIntents.isEmpty
+            && !(sessionIntents.isEmpty && services.isEmpty)
             && sessionIntents.count <= Self.maximumSessionCount
+            && services.count <= Self.maximumServiceCount
             && sessionIntents.allSatisfy(\.isSupported)
             && (workspaceLayout?.isValid(sessionCount: sessionIntents.count) ?? true)
     }
@@ -2890,6 +2898,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         case modifiedAt
         case look
         case windowSettings
+        case services
     }
 
     init(from decoder: Decoder) throws {
@@ -2902,6 +2911,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt)
         // Settings that can't be read cost the workgroup those settings, never the workgroup (W20, W22).
         windowSettings = TerminalWindowSettingsCoding.decode(from: container, look: .look, settings: .windowSettings)
+        services = Array(((try? container.decodeIfPresent([UUID].self, forKey: .services)) ?? []).prefix(Self.maximumServiceCount))
         workspaceLayout = try container.decodeIfPresent(WorkspaceLayout.self, forKey: .workspaceLayout)
         openingView = try container.decodeIfPresent(OpeningView.self, forKey: .openingView) ?? .tabs
         autoFocusOnActivity = try container.decodeIfPresent(Bool.self, forKey: .autoFocusOnActivity) ?? Self.followsActivityByDefault
@@ -2933,5 +2943,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(lastUsed, forKey: .lastUsed)
         try container.encodeIfPresent(modifiedAt, forKey: .modifiedAt)
         try TerminalWindowSettingsCoding.encode(windowSettings, into: &container, look: .look, settings: .windowSettings)
+        if !services.isEmpty { try container.encode(services, forKey: .services) }
     }
 }

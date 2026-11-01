@@ -8,6 +8,8 @@
 
 import SwiftUI
 import GlassLayers
+import GlassConnectionUI
+import GlassShell
 
 struct WorkgroupEditorContext: Identifiable {
     let id = UUID()
@@ -22,6 +24,8 @@ struct WorkgroupEditorContext: Identifiable {
     /// The settings the workgroup's window opens with (W20's look, W22): a captured window's, or
     /// the one being edited's. The editor changes their Look and Text (D84) and keeps the rest.
     var windowSettings = GlassWindowOverrides()
+    /// Its databases and remote desktops (B-F40), by their library services' endpoints.
+    var services: [UUID] = []
 
     static func new(
         name: String = "Workgroup",
@@ -46,7 +50,8 @@ struct WorkgroupEditorContext: Identifiable {
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
             gridCardWidth: preset.gridCardWidth,
-            windowSettings: preset.windowSettings
+            windowSettings: preset.windowSettings,
+            services: preset.services
         )
     }
 
@@ -66,7 +71,8 @@ struct WorkgroupEditorContext: Identifiable {
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
             gridCardWidth: preset.gridCardWidth,
-            windowSettings: preset.windowSettings
+            windowSettings: preset.windowSettings,
+            services: preset.services
         )
     }
 
@@ -206,6 +212,9 @@ struct WorkgroupEditorView: View {
     /// "This way they can have personality from launch").
     @State private var windowSettings: GlassWindowOverrides
     @State private var tabs: [WorkgroupTabDraft]
+    @State private var services: [UUID]
+    /// The library, for its databases and desktops (B-F40); without it, none are offered.
+    @Environment(GlassTerminalRuntime.self) private var runtime: GlassTerminalRuntime?
     @State private var selectedTabID: UUID?
     @State private var editingTab: WorkgroupTabDraft?
     @State private var pendingDeletionIDs: [UUID] = []
@@ -229,6 +238,7 @@ struct WorkgroupEditorView: View {
         _autoFocusOnActivity = State(initialValue: context.autoFocusOnActivity)
         _windowSettings = State(initialValue: context.windowSettings)
         _tabs = State(initialValue: context.sessionIntents.map(WorkgroupTabDraft.init(intent:)))
+        _services = State(initialValue: context.services)
     }
 
     @FocusState private var nameIsFocused: Bool
@@ -420,6 +430,10 @@ struct WorkgroupEditorView: View {
             }
         }
 
+        if let runtime, let describe = runtime.describeService {
+            servicesSection(describe: describe, choices: runtime.workgroupServiceChoices?() ?? [])
+        }
+
         // This Window's Look and Text, which the window opens with; This Window changes them for
         // that window after, and never the saved Workgroup.
         TerminalLooksSettingsView(settings: $windowSettings, subject: "every tab this Workgroup opens")
@@ -450,6 +464,37 @@ struct WorkgroupEditorView: View {
     }
 
     private var canChangeStructure: Bool { context.workspaceLayout == nil }
+
+    /// Its databases and desktops (B-F40), opened with its terminals, each as Connect opens it.
+    private func servicesSection(describe: @escaping @MainActor (UUID) -> GlassFavoriteDescription?,
+                                 choices: [UUID]) -> some View {
+        let addable = choices.filter { !services.contains($0) }
+        return Section {
+            ForEach(services, id: \.self) { id in
+                WorkgroupServiceRow(description: describe(id)) {
+                    services.removeAll { $0 == id }
+                }
+            }
+            Menu {
+                ForEach(addable, id: \.self) { id in
+                    if let service = describe(id) {
+                        Button { services.append(id) } label: {
+                            Text(service.title)
+                            Text(service.subtitle)
+                        }
+                    }
+                }
+            } label: {
+                Label("Add Database or Desktop", systemImage: "plus")
+            }
+            .disabled(addable.isEmpty || services.count >= LayoutPreset.maximumServiceCount)
+            .accessibilityIdentifier("workgroup-add-service")
+        } header: {
+            Text("Databases and Desktops · \(services.count)")
+        } footer: {
+            Text("Each opens with the terminals, as Connect opens it.")
+        }
+    }
 
     #if os(macOS)
     private var tabTable: some View {
@@ -593,7 +638,7 @@ struct WorkgroupEditorView: View {
               !normalizedName.utf8.contains(0) else {
             return "The workgroup name must be at most \(LayoutPreset.maximumNameLength) characters."
         }
-        guard !tabs.isEmpty else { return "Add at least one terminal tab." }
+        guard !tabs.isEmpty || !services.isEmpty else { return "Add a terminal tab, a database or a desktop." }
         guard tabs.count <= LayoutPreset.maximumSessionCount else {
             return "A workgroup can contain at most \(LayoutPreset.maximumSessionCount) tabs."
         }
@@ -654,8 +699,43 @@ struct WorkgroupEditorView: View {
         #endif
         preset.gridCardWidth = context.gridCardWidth ?? replaced?.gridCardWidth
         preset.windowSettings = context.windowSettingsToSave(windowSettings, replacing: replaced)
+        // A window saved over a workgroup brings its terminals; the databases and desktops stay.
+        preset.services = services.isEmpty ? (replaced?.services ?? []) : services
         onSave(preset)
         dismiss()
+    }
+}
+
+/// A workgroup's database or desktop (B-F40), as Favorites names it, with a way to take it out;
+/// one that has left the library says so.
+struct WorkgroupServiceRow: View {
+    let description: GlassFavoriteDescription?
+    var remove: (() -> Void)? = nil
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let description {
+                GlassServiceIcon(description.symbol)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(description.title)
+                    Text(description.subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Image(systemName: "questionmark.circle")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text("No longer in your library").foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            if let remove {
+                Button("Remove \(description?.title ?? "Service")", systemImage: "minus.circle.fill", role: .destructive, action: remove)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.red)
+            }
+        }
     }
 }
 

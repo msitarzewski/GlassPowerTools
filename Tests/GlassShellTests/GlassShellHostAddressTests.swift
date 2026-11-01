@@ -185,6 +185,20 @@ struct GlassShellDetailTextTests {
         #expect(GlassShellLibraryView.connectOpensText(named, host: host) == "Database · Postgres 16")
     }
 
+    /// One rule for a name that says only the kind and machine (2026-11-01): Favorites named a
+    /// service the setup called "Database on alpha" by that name, and then again as its kind and
+    /// machine, so a workgroup's menu read "Database on alpha, Database on alpha".
+    @Test("a service named by default (none, its kind, its machine, or Kind on Host) is named by its kind and machine")
+    func namesOnlyByDefault() throws {
+        let host = GlassShellHost(members: [try HostProfile(displayName: "alpha")])
+        for name in ["", "Database", "alpha", "Database on alpha", "database on Alpha"] {
+            #expect(host.namesOnlyByDefault(HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: name)), "\(name)")
+        }
+        #expect(!host.namesOnlyByDefault(HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "Postgres 16")))
+        #expect(!host.namesOnlyByDefault(HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "Terminal on alpha")),
+                "another kind's default says something")
+    }
+
     @Test("Row subtitle names up to two kinds and counts more")
     func subtitle() {
         #expect(GlassShellModel.subtitle(for: []) == "No services yet")

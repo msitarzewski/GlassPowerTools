@@ -70,13 +70,18 @@ public final class GlassPageFocus {
         swapped.toggle()
     }
 
-    /// Opens what `open` asks for on the page beside `page`. That page puts away what it shows,
-    /// so its library is there, and every tool's handling under it, and is put in use, so it is
-    /// the page that carries the request out. A session already shown on `page` moves.
+    /// Opens what `open` asks for on the page beside `page` (`openOnPage`). A session already
+    /// shown on `page` moves.
     public func openBeside(_ page: Int, _ open: () -> Void) {
-        let other = 1 - page
-        putAwayRequests[other, default: 0] += 1
-        focused = other
+        openOnPage(1 - page, open)
+    }
+
+    /// Opens what `open` asks for on `page`. It puts away what it shows, so its library is there,
+    /// and every tool's handling under it, and is put in use, so it is the page that carries the
+    /// request out.
+    public func openOnPage(_ page: Int, _ open: () -> Void) {
+        putAwayRequests[page, default: 0] += 1
+        focused = page
         open()
     }
 
@@ -106,6 +111,30 @@ public final class GlassPageFocus {
     /// `page` shows `key`, which has since been shown on the other page: it has moved.
     public func hasMoved(_ key: String, from page: Int) -> Bool {
         pageShowing[key].map { $0 != page } ?? false
+    }
+}
+
+/// Show on the Other Page (D93), drawn only while two pages are on screen: `show` brings a session
+/// up on the page beside `page`, this view's own page unless another is named. One control for
+/// every place that offers it.
+public struct GlassShowOnOtherPageButton: View {
+    private let page: Int?
+    private let show: () -> Void
+    @Environment(\.glassPageIndex) private var ownPage
+
+    public init(from page: Int? = nil, show: @escaping () -> Void) {
+        self.page = page
+        self.show = show
+    }
+
+    public var body: some View {
+        let pages = GlassPageFocus.shared
+        if pages.showsTwoPages {
+            let from = page ?? ownPage
+            Button("Show on the Other Page", systemImage: pages.otherPageSymbol(from: from)) {
+                pages.openBeside(from, show)
+            }
+        }
     }
 }
 
@@ -163,12 +192,13 @@ public struct GlassLibraryPages<Page: View>: View {
         self.page = page
     }
 
-    /// Two pages fit: an iPhone whose window is wide and on its side, as a Duo's inner display is
-    /// held like a book or open flat (867 × 635 points inside the system's column, measured on the
-    /// simulator 2026-10-31). A Pro Max on its side reports a regular width too, but at 440 points
-    /// it is too short to share.
+    /// Two pages fit: an iPhone Duo (`GlassWindowPresentation.presentsInPages`) whose window is wide
+    /// and on its side, as its inner display is held like a book or open flat (867 × 635 points
+    /// inside the system's column, measured on the simulator 2026-10-31). An iPad has windows
+    /// instead; a Pro Max on its side reports a regular width too, but at 440 points it is too
+    /// short to share.
     static func showsTwoPages(size: CGSize, regularWidth: Bool) -> Bool {
-        UIDevice.current.userInterfaceIdiom == .phone && regularWidth
+        GlassWindowPresentation.presentsInPages && regularWidth
             && size.width > size.height && size.width >= 760 && size.height >= 560
     }
 

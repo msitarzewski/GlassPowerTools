@@ -13,9 +13,6 @@ import SwiftUI
 import GlassLayers
 import GlassShell
 import GlassSSHTransport
-#if os(iOS)
-import UIKit
-#endif
 
 /// Attached once by `GlassTerminalBootstrap`; runs connect requests posted to the runtime.
 struct TerminalConnectFlow: ViewModifier {
@@ -502,11 +499,26 @@ struct TerminalConnectFlow: ViewModifier {
 
     private func openWorkgroup(_ preset: LayoutPreset) {
         settingsManager.updateLayoutPresetLastUsed(preset.id)
+        // Its databases and desktops first (B-F40), each connected as the library's Connect does;
+        // then its terminals, which on a phone take the screen.
+        let gone = runtime.openServices(of: preset)
+        let notOpened = gone == 0 ? [] : [Self.servicesGoneMessage(gone, in: preset)]
+        guard !preset.sessionIntents.isEmpty else {
+            connectionFailureMessage = notOpened.first
+            return
+        }
         #if os(visionOS) || os(iOS)
-        openVisionWorkgroup(preset)
+        openVisionWorkgroup(preset, notOpened: notOpened)
         #else
+        if let message = notOpened.first { connectionFailureMessage = message }
         openMacWorkgroup(preset)
         #endif
+    }
+
+    /// What a workgroup says of databases and desktops that have left the library.
+    static func servicesGoneMessage(_ count: Int, in preset: LayoutPreset) -> String {
+        let what = count == 1 ? "A database or desktop" : "\(count) databases and desktops"
+        return "\(what) in “\(preset.name)” \(count == 1 ? "is" : "are") no longer in your library. Edit the workgroup to remove \(count == 1 ? "it" : "them")."
     }
 
     /// Whether a Workgroup includes a connection that allows legacy SSH algorithms, which only a
@@ -542,11 +554,12 @@ struct TerminalConnectFlow: ViewModifier {
         #endif
     }
 
-    /// The phone: one slot per terminal, connected when shown (W4b). iPad and Vision Pro open
-    /// every terminal, since their grid and carousel previews need live sessions.
+    /// The phone's navigation, one terminal at a time: one slot per terminal, connected when shown
+    /// (W4b). iPad and Vision Pro open every terminal, since their grid and carousel previews need
+    /// live sessions.
     private var opensWorkgroupSlotsLazily: Bool {
         #if os(iOS)
-        UIDevice.current.userInterfaceIdiom == .phone
+        VisionTerminalWorkgroupView.usesCompactPhoneNavigation
         #else
         false
         #endif

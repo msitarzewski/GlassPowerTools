@@ -174,6 +174,13 @@ struct GlassAllWindowsArrangement: View {
                                     close: { session.requestClose { asking = $0 } },
                                     alwaysOnScreen: allOnScreen)
                     .frame(width: tileSize.width, height: tileSize.height)
+                    #if os(iOS)
+                    // An iPhone Duo's two pages (D93): the pane is over both, so the other page is
+                    // the one beside the page in use.
+                    .contextMenu {
+                        GlassShowOnOtherPageButton(from: GlassPageFocus.shared.focused) { open(session.activate) }
+                    }
+                    #endif
                     .position(x: frame.midX - origin.x, y: frame.midY - origin.y)
             }
         }

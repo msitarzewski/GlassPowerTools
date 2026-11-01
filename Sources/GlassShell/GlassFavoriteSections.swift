@@ -64,8 +64,9 @@ public extension GlassShellModel {
         guard let host = host(owningEndpoint: endpoint),
               let service = host.services.first(where: { $0.endpointID == endpoint }) else { return nil }
         let kindName = GlassServicePresentation.displayName(for: service.kind)
-        // A service called only by its kind — "Terminal" — is named by its machine instead.
-        let namedByKind = service.displayName.isEmpty || service.displayName == kindName
+        // A service called only by its kind — "Terminal", or the setup's "Terminal on alpha" — is
+        // named by its machine instead.
+        let namedByKind = host.namesOnlyByDefault(service)
         return GlassFavoriteDescription(
             title: namedByKind ? host.displayName : service.displayName,
             subtitle: namedByKind ? kindName : "\(kindName) on \(host.displayName)",

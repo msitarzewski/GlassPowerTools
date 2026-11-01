@@ -57,11 +57,7 @@ struct GlassActiveLauncher: Equatable {
     /// Nil when the service's name only restates its heading and machine: the name the setup
     /// gives a service it is not told one for ("Terminal on alpha"), or the machine's own name.
     static func detail(for service: HostServiceLink, on host: GlassShellHost) -> String? {
-        let name = service.displayName
-        let kind = GlassServicePresentation.displayName(for: service.kind)
-        let restated = [host.displayName, kind, "\(kind) on \(host.displayName)"]
-        if name.isEmpty || restated.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) { return nil }
-        return name
+        host.namesOnlyByDefault(service) ? nil : service.displayName
     }
 }
 

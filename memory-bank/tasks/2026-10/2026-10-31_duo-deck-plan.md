@@ -203,3 +203,42 @@ physical Duo is available to test on.
   idiom from the trait collection when it is needed at all), one `interfaceOrientations` request (the DEBUG demo's
   `--demo-landscape`), and safe-area reads in the All Windows pane and the editor's preview to check against an
   asymmetric (Duo) safe area.
+
+## Step 9 — finishing (2026-11-01, the owner: "finish the duo, then workgroups … reuse is essential. DRY, and KISS")
+- **Apple's resizability findings, settled.** Of the 17 device-type checks, the database's three were the question
+  `GlassWindowPresentation.canOpenWindows` already answers (`GlassDatabaseScenes.present` says so: "rather than the
+  idiom … one answer"): Disconnect where there is no window, This Window's settings where there is one, and back to
+  Connections in place. They ask it now, which also covers an iPad with multiwindow off; the route enum that wrapped
+  the idiom is gone. The terminal's "no height to spare" (Tools moves to the top bar) is decided by compact height,
+  any device, not by phone (`hasNoHeightToSpare`); its lazy workgroup slots ask the phone navigation they exist for
+  (`VisionTerminalWorkgroupView.usesCompactPhoneNavigation`) rather than a second idiom check; two pages ask
+  `GlassWindowPresentation.presentsInPages`. Kept as they are, each for a stated reason: the phone's navigation model
+  (one terminal at a time, in place), "This iPhone"/"This iPad", the long-line preview on a phone (its text view
+  draws nothing), Scale offered where windows resize, corner radii, the iPad's This Window. The safe-area reads
+  each take one edge, so the Duo's lopsided safe area is read correctly. `--demo-landscape`'s geometry request is
+  DEBUG only.
+- **All Windows over two pages.** A card chosen there opened on whatever screen was registered last, which could be
+  on the other page, and a terminal on the page in use then hid the database's handler: the database never came
+  (`testAllWindowsOpensOnThePageInUse`, failing with the old path, passing now). With two pages the pane now opens
+  through `GlassPageFocus.openOnPage(focused)` (what `openBeside` was, named for its page), and a card's menu has Show
+  on the Other Page (`testAllWindowsShowsOnTheOtherPage`). One control, `GlassShowOnOtherPageButton`, for the card
+  and the Active row.
+- **Not built, on purpose (KISS):** Show on the Other Page in each session's own menu — the page handle's Swap Pages
+  already moves a session to the other side, keeping what each page shows; the editor's "code and its preview as two
+  pages" — the spread is regular width, so the Preview button already offers code and preview beside each other;
+  All Windows' cards with a gap at the fold — its Mission Control packing centres groups across the width, and a
+  fold-aware packing is a layout change for the owner's eye, not a fix.
+- **The system's Split View: not reachable here.** In the Duo simulator SpringBoard shows no multitasking control
+  over the app, and a swipe up from the bottom goes home (a throwaway probe test, removed). By the code: a Split View
+  half is compact, so it shows one page; tool requests are taken once (`takeRequests`), so two Glass windows could
+  not both open one.
+- **The desktop's deck could spin the main thread forever** (found by this pass's full UI run: one desktop test in
+  each run "main thread busy for 30.0s", a different one each time). Caught by relaunching the desktop demo stood
+  like a laptop until a launch sat at 100% CPU (about one in five), sampled (`GlassFoldDeck.frame.setter` inside a
+  layout loop) and logged: the deck's measured frame alternated between minY 139.97389848344642 and …636 (height
+  838.6666666666665 and …667), each laying the deck out to give the other, two thousand times a second. A layout
+  that follows its own frame now ignores a change under half a point: `glassGlobalFrame` (`GlassDeviceFold.swift`),
+  used by the deck and by the terminal's `stackFrame`, which had the same shape. Test: `GlassDeviceFoldTests`
+  "a frame that moved by less than half a point is the same frame" with the two measured frames (fails with exact
+  equality). On the simulator, launching the desktop demo stood like a laptop: before, about one launch in five sat
+  at 100% CPU (4 of about 20); after, none in 40.
