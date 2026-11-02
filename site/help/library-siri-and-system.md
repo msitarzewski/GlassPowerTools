@@ -72,10 +72,12 @@ Glass Power Tools opens `ssh://` links on every device. A link to a machine in y
 Right-click a folder or a file in the Finder and choose, under **Services**:
 
 - **New Glass Power Tools Tab Here**: a terminal on this Mac in that folder, as a new tab of the terminal window in front, or in a new window when none is open. A file stands for the folder it is in.
-- **New Glass Power Tools Window Here**: the same, in a new terminal window. It is also a Quick Action: under **Quick Actions** in the right-click menu and in the Finder's preview pane.
+- **New Glass Power Tools Window Here**: the same, in a new terminal window.
 - **Open in Glass Power Tools**: a file opens in the editor; a folder opens as an editor project.
 
 If you don't see them, turn them on in **System Settings** ▸ **Keyboard** ▸ **Keyboard Shortcuts** ▸ **Services**.
+
+The first two are also Quick Actions: under **Quick Actions** in the right-click menu and in the Finder's preview pane. If one isn't there, it is turned off: right-click a folder, choose **Quick Actions** ▸ **Customize…**, and turn it on.
 
 For the same three in every Finder window's toolbar, turn on **Glass Power Tools Finder** in **System Settings** ▸ **General** ▸ **Login Items & Extensions** ▸ **Finder**, then in a Finder window choose **View** ▸ **Customize Toolbar…** and drag **Glass Power Tools** into the toolbar.
 

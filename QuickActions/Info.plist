@@ -22,8 +22,9 @@
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.services</string>
+		<!-- Window Here or Tab Here: each Quick Action is its own target, built from this folder. -->
 		<key>NSExtensionPrincipalClass</key>
-		<string>$(PRODUCT_MODULE_NAME).GlassQuickAction</string>
+		<string>$(PRODUCT_MODULE_NAME).$(GPT_QUICK_ACTION_CLASS)</string>
 	</dict>
 </dict>
 </plist>

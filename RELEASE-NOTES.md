@@ -99,6 +99,10 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.575 (1 November 2026)
+- **New Glass Power Tools Tab Here is a Finder Quick Action too** (Mac), beside Window Here: right-click a folder
+  and it is under Quick Actions, and in the Finder's preview pane. If either is missing, turn it on in Quick Actions ▸
+  Customize….
 ### 0.4.574 (1 November 2026)
 - **Databases and remote desktops in Workgroups.** A Workgroup can now open databases and remote desktops from
   your library with its terminals, or on their own. Add them in the Workgroup's editor under Databases and

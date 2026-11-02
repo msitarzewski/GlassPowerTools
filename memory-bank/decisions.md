@@ -1492,6 +1492,11 @@ system search only once switched on in Settings ▸ Privacy (Q4); `.command` fil
 the editor (Q5); order 1 → 2 → 3 → 4, then a spike for 5 (Q6). Built phase by phase, each piece committed as it lands
 (the standing "commit each piece as it lands"); nothing claimed working on a device until the owner has seen it.
 
+**Implemented 2026-11-01:** New Glass Power Tools Tab Here as a Finder Quick Action too, beside Window Here (the
+owner: "add the tab one too"). The Finder lists one action per extension, so it is a second target built from the
+same folder (`tasks/2026-11/2026-11-01_finder-quick-actions.md`). macOS leaves each new action extension off until it
+is turned on in Quick Actions ▸ Customize….
+
 ## D73 — Favorites hold machines, services, projects, workgroups and folders — Implemented 2026-10-13
 **Owner:** "Favorites should be machines OR services OR projects OR Workgroups OR SFTP (at the current folder
 depth), yes?" Asked how the list should look, he chose **sections by kind** (Machines, Services, Projects,

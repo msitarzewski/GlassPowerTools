@@ -260,7 +260,7 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   own record in the library, so its Terminal opens a local shell rather than SSH to itself. Active
   and Show All Windows show what is open and running on every device; widgets, Siri and Shortcuts,
   Spotlight, Controls and Handoff reach your machines, and on the Mac so do the Finder's Services,
-  toolbar button and Quick Action, and Share ▸ Send to a Machine sends files to a machine (elsewhere,
+  toolbar button and Quick Actions, and Share ▸ Send to a Machine sends files to a machine (elsewhere,
   a Shortcuts action does). `ssh://` links connect to a machine in the library, or fill in a new one.
 
 ## How to use it
@@ -303,8 +303,10 @@ The Mac app is at 0.4.569 (its first release was 0.4.491): download it from
 [glasspowertools.com](https://glasspowertools.com) or this repository's
 [releases](https://github.com/msitarzewski/GlassPowerTools/releases). It is signed with a Developer ID,
 notarized by Apple, and updates itself through Sparkle. It cannot be in the Mac App Store, because a
-terminal cannot work inside App Sandbox. The iPhone, iPad and Vision Pro apps are in TestFlight for
-internal testing, and come to the App Store as 1.0. What each build holds is in
+terminal cannot work inside App Sandbox. The iPhone and iPad app is in a TestFlight beta by invitation:
+[request access](mailto:msitarzewski@gmail.com?subject=Glass%20Power%20Tools%20beta&body=The%20email%20of%20my%20Apple%20Account%2C%20for%20the%20TestFlight%20invitation%3A%0D%0A%0D%0AMy%20devices%20(iPhone%2C%20iPad%2C%20Vision%20Pro)%3A%0D%0A) with the email of your Apple Account, and the invitation comes from TestFlight.
+The Vision Pro app follows once Apple's beta review passes. Both come to the App Store as 1.0. What each
+build holds is in
 [RELEASE-NOTES.md](RELEASE-NOTES.md).
 
 ## Build it
