@@ -23,5 +23,6 @@
   built plists; each binary holds `_TtC…GlassQuickTabAction` / `GlassQuickAction` as named. Not run from the Finder
   by an agent: that is the owner's screen. No unit test covers an extension's principal class (no test target
   builds the extensions); the request and its handling are covered (`GlassOpenedURLTests`).
-- **Not done:** a Mac release (Sparkle) with 0.4.575 — the published download is 0.4.569, whose Window Here Quick
-  Action is the one he turned on; iPhone and Vision Pro unchanged at 0.4.574.
+- **Released:** 0.4.575 is the Mac's fifth release, at his word ("ship 0.4.575 for the Mac"): notarized, GitHub
+  release v0.4.575 and the Sparkle feed. In the Developer ID export neither Quick Action needed a provisioning profile
+  (sandbox and a team-prefixed App Group only). iPhone and Vision Pro unchanged at 0.4.574.

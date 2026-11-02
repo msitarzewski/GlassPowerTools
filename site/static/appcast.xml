@@ -6,6 +6,22 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.575</title>
+      <pubDate>Mon, 02 Nov 2026 04:16:45 GMT</pubDate>
+      <sparkle:version>575</sparkle:version>
+      <sparkle:shortVersionString>0.4.575</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.575</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.575</h2>
+<ul>
+  <li><b>Databases and remote desktops in Workgroups.</b> A Workgroup can open databases and remote desktops from your library with its terminals, or on their own. Add them in the Workgroup's editor under Databases and Desktops; each opens as Connect opens it, and one already open comes forward instead of connecting again.</li>
+  <li><b>New Glass Power Tools Tab Here is a Finder Quick Action</b>, beside Window Here: right-click a folder ▸ Quick Actions, or the Finder's preview pane. macOS leaves a new Quick Action off; if one is missing, turn it on in Quick Actions ▸ Customize….</li>
+  <li><b>Favorites name a service by its machine</b> when its name says nothing more ("Database on alpha" shows as alpha, Database).</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.575/GlassPowerTools-0.4.575.zip" length="28552496" type="application/octet-stream" sparkle:edSignature="afLYmpJDNzKzgiv49Yb4Rw14Ld0DSo1o69ah+ljHiKuiYJOcIYEYDv53JAMnX70MTtAriTtNDxYZ0R4+Za8sAg=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.569</title>
       <pubDate>Sat, 31 Oct 2026 23:06:14 GMT</pubDate>
       <sparkle:version>569</sparkle:version>

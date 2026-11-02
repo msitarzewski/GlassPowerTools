@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.569 (31 October 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.575 (1 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
-updated through Sparkle. iPhone, iPad and Vision Pro builds go to TestFlight for internal testing; their
+updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.569)
+## What it holds (0.4.575)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -49,7 +49,8 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   paths typed, and on a server they are uploaded first. AI coding agents are
   recognised on tabs and cards.
 - A workgroup's terminals on a Mac belong to that Mac: every other device, another Mac too, opens
-  them there over SSH, on their own tmux sessions.
+  them there over SSH, on their own tmux sessions. A workgroup can open databases and remote desktops
+  from the library too, with its terminals or on their own.
 - Color schemes from macOS Terminal profiles, any number, kept in iCloud Drive for every device and
   chosen with a preview of each, for every terminal or one window.
 - On Vision Pro, Focus Mode surrounds you with a built-in environment or your own 3D room or 360°
@@ -84,7 +85,7 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ### Across the system
 - Widgets (Machines, Machine, Active), Siri and Shortcuts, Spotlight, Controls, Handoff and
-  `ssh://` links. On the Mac: the Finder's Services, toolbar button and Quick Action, Share ▸ Send to
+  `ssh://` links. On the Mac: the Finder's Services, toolbar button and Quick Actions, Share ▸ Send to
   a Machine, Open With and the Dock menu.
 - Light, Dark or System for the whole app on the Mac, iPhone and iPad; window opacity and glass
   everywhere; and on Vision Pro, session windows that shrink into an orb, or into one dock.
@@ -100,6 +101,7 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 ## Recent builds
 
 ### 0.4.575 (1 November 2026)
+- **0.4.575 is the Mac's fifth release**, through Sparkle. iPhone, iPad and Vision Pro stay at TestFlight build 574.
 - **New Glass Power Tools Tab Here is a Finder Quick Action too** (Mac), beside Window Here: right-click a folder
   and it is under Quick Actions, and in the Finder's preview pane. If either is missing, turn it on in Quick Actions ▸
   Customize….

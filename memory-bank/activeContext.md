@@ -40,9 +40,14 @@ use the disposable test VM only).
 - **Finder Quick Actions** (`tasks/2026-11/2026-11-01_finder-quick-actions.md`): Window Here was installed but off
   on his Mac (turned on); Tab Here added as a second extension (`GlassPowerToolsQuickTab`), **0.4.575** on the Mac
   only, installed and read back, both on. The help says how to turn one on.
-- **His word for the above:** "deploy and push" (the site, then the commit and push).
+- **His word for the above:** "deploy and push": 4542eb77 pushed, the site deployed (he ran provision), 108 live
+  files match by hash.
+- **Mac 0.4.575 released at his word** ("ship 0.4.575 for the Mac"): `Tools/Release/release-mac.sh` with Xcode 27.2
+  (27B52); app and disk image notarized and stapled; GitHub release v0.4.575 (Latest, tag at 4542eb77) with the dmg,
+  zip and checksums, the downloads matching the build; the feed entry in `site/static/appcast.xml`. The site carries
+  the feed: live once he runs provision.
 - **Next:** when visionOS 569/574 pass review, update "Vision Pro to follow"; invite testers by email at his word;
-  the 12 Duo App Store screenshots at his word; a Mac release with 0.4.575 only if he asks; the Finder toolbar
+  the 12 Duo App Store screenshots at his word; the Finder toolbar
   extension is still off on his Mac (his choice).
 
 ## 2026-11-01 — the site deployed, the Duo finished, databases and desktops in Workgroups
