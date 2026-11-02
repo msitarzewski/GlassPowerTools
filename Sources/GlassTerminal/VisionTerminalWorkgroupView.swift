@@ -152,6 +152,20 @@ extension LayoutPreset.OpeningView {
     }
 }
 
+/// Calls `shown` as the window is shown again without appearing anew: grown back from its orb, or
+/// the app back in front (`connectShownTerminals`). Inside the window, where its orb is known.
+private struct VisionTerminalShownAgain: View {
+    let shown: () -> Void
+    @Environment(\.glassSessionOrb) private var orb
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        Color.clear
+            .onChange(of: orb?.isWindow) { _, isWindow in if isWindow == true { shown() } }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { shown() } }
+    }
+}
+
 /// Bounded, in-memory viewport images only. This view neither owns a renderer
 /// nor feeds input, and its timer is cancelled when the card leaves the layout.
 private struct VisionTerminalPreview: View {
@@ -402,7 +416,7 @@ struct VisionTerminalWorkgroupView: View {
         .onAppear {
             sessionManager.serverManager.loadServersIfNeeded()
             synchronizeSelection()
-            connectShownSlot()
+            connectShownTerminals()
             #if DEBUG && os(visionOS)
             if Self.demoOpensGrid.remove(workgroupID) != nil { presentation = .grid }
             // Screenshots only: `--demo-sidebar-toggle` in a `--ui-testing` run hides the sidebar a
@@ -445,6 +459,8 @@ struct VisionTerminalWorkgroupView: View {
                 }
             }
         }
+        // Shown again without appearing anew: grown back from its orb, or the app back in front.
+        .background { VisionTerminalShownAgain(shown: connectShownTerminals) }
         #endif
         .onChange(of: liveSelectedSessionID) { _, newSelection in
             if selectedSessionID != newSelection {
@@ -454,7 +470,7 @@ struct VisionTerminalWorkgroupView: View {
         .onChange(of: selectedSessionID) { _, newSelection in
             guard let newSelection else { return }
             sessionManager.selectSession(newSelection, inWorkgroup: workgroupID)
-            connectShownSlot()
+            connectShownTerminals()
         }
         // W15: a workgroup whose last tab moved to another window, or that Active closed, is
         // gone: its window closes, as a Mac window does when its last tab leaves; an iPhone or
@@ -1308,10 +1324,24 @@ struct VisionTerminalWorkgroupView: View {
 
     /// iPhone and iPad: the slot on screen connects if it needs to, and the hidden ones wait to be
     /// shown (W4b). An iPad makes slots only for a workgroup it reopens at launch (W15); one it
-    /// opens otherwise has no slots, and this does nothing. Vision Pro keeps every terminal
-    /// connected for its previews.
-    private func connectShownSlot() {
-        #if os(iOS)
+    /// opens otherwise has no slots, and this does nothing.
+    ///
+    /// Vision Pro shows every terminal of a window — its previews, the grid, the carousel — so as
+    /// the window is shown (opened, out of the dock, grown from its orb, the app back in front)
+    /// every terminal here that dropped connects again, and one whose shell ended while the window
+    /// was away closes, as it would have with the window open. Nothing did either, and tabs stayed
+    /// "Disconnected" (the owner, 2026-11-01: "both connections show 'disconnected' and didn't
+    /// reconnect when I opened it").
+    private func connectShownTerminals() {
+        #if os(visionOS)
+        for session in sessionManager.sessions(inWorkgroup: workgroupID) where session.shellEnded && session.isDown {
+            closeSessionTab(session)
+        }
+        Task { @MainActor in
+            _ = await TerminalWorkgroupOpening.connectDropped(inWorkgroup: workgroupID, sessionManager: sessionManager,
+                                                              settingsManager: settingsManager)
+        }
+        #else
         Task { @MainActor in
             do {
                 try await TerminalWorkgroupOpening.connectShownSlot(in: workgroupID, sessionManager: sessionManager,

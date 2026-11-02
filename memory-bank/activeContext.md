@@ -31,7 +31,20 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-01 (evening) — RESUME HERE: TestFlight 574, the beta by invitation, both Finder Quick Actions
+## 2026-11-01 (night) — RESUME HERE: Vision Pro terminals come back when their window is shown
+- **His report:** "I'd named a window [name], but both connections show 'disconnected' and didn't reconnect when I
+  opened it" (and "still concerned about the dock, active connections, and reliability").
+- **Found and fixed** (`tasks/2026-11/2026-11-01_terminals-back-when-shown.md`): on Vision Pro nothing
+  connected a down terminal as its window was shown; Active skipped relaunched windows' terminals; a shell that
+  ended in the dock left its tab. Now `connectShownTerminals` (on appear, tab chosen, grown from the orb, app back)
+  with the existing connect-on-show; `shellEnded`; connection diagnostics in the headset's file. Help and release
+  notes 0.4.576. Package tests: one existing Active test updated to the narrowed slot rule; all pass.
+- **0.4.576** installed and read back on the Mac, iPhone and Vision Pro (no new Mac crash reports). **Committed and
+  pushed at his word** (2026-11-02, "commit and push 0.4.576").
+- **Next:** his check on the headset (a window's tabs reconnect as it is shown; if one still says Disconnected, copy
+  the headset's diagnostics file, which now has connection lines). TestFlight 576 on his word.
+
+## 2026-11-01 (evening): TestFlight 574, the beta by invitation, both Finder Quick Actions
 - **Committed and pushed at his word** ("commit and push, then spin up a TestFlight"): e139efc0, the Duo and D94.
   **0.4.574** uploaded for iOS and visionOS, What to Test written, in Testers, submitted for Beta App Review
   (`tasks/2026-10/2026-10-31_external-testflight.md`, "Review and invite-only").

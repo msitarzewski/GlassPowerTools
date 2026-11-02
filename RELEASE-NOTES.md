@@ -100,6 +100,16 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.576 (1 November 2026)
+- **Vision Pro: a window's terminals come back when it is shown.** A terminal that was down stayed "Disconnected" when
+  its window was opened, brought out of the dock or grown back from its orb: one whose connection was lost while the
+  app was away, one whose five tries ran out, or one that didn't connect after a relaunch. Each now connects again as
+  its window is shown, and when you come back to the app; one you disconnected yourself stays as it is. A terminal
+  whose shell ended while its window was in the dock closes as the window opens, instead of staying behind with no
+  way back. Choosing a relaunched window's terminal in Active or the dock reconnects it too.
+- **A terminal that can't connect as it is shown says why** (every device), instead of only "Disconnected".
+- **Vision Pro's diagnostics file records each terminal's connection** — connected, lost, retrying, given up, ended,
+  disconnected by hand — with no names, addresses or text, so the next "why is it disconnected?" has an answer.
 ### 0.4.575 (1 November 2026)
 - **0.4.575 is the Mac's fifth release**, through Sparkle. iPhone, iPad and Vision Pro stay at TestFlight build 574.
 - **New Glass Power Tools Tab Here is a Finder Quick Action too** (Mac), beside Window Here: right-click a folder

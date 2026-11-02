@@ -67,11 +67,15 @@ A Workgroup that includes such a connection does not open, on any device. Open t
 
 ## When a connection drops
 
-The app checks the connection every 60 seconds. After three checks go unanswered, the connection counts as lost.
+The app checks the connection every 60 seconds, and again as soon as you come back to the app or the Mac wakes. After three checks go unanswered, or the one on coming back, the connection counts as lost.
 
 If **Auto-reconnect on disconnect** is on (it is by default), the terminal tries again up to five times, waiting longer before each try. **On Vision Pro**, the window shows **Reconnecting...** with the attempt number, for example **(2/5)**, and a close button beside it that stops trying. **On Mac**, the window's subtitle says **Reconnecting…**. On every device, **Cancel Reconnect** in the session's tools menu stops trying.
 
 Auto-reconnect does not run when you disconnect yourself or when the remote shell exits normally, for example after `exit`. To try again by hand, choose **Reconnect** in the session's tools menu.
+
+**On Vision Pro**, a window's terminals that are not connected connect again whenever the window is shown: when it opens, comes out of the dock or grows back from its orb, and when you come back to the app. That covers a terminal whose connection was lost while the app was away, one whose tries above ran out, and one that didn't connect after the app was relaunched. A terminal you disconnected yourself stays disconnected. A terminal whose shell ended while its window was in the dock (for example, its tmux session was ended on another device) closes as the window opens, as it would have with the window open.
+
+Choosing a terminal kept in tmux in **Active** reconnects it if its connection dropped.
 
 To change auto-reconnect, open Settings, then **Connections**, and use **Auto-reconnect on disconnect**.
 

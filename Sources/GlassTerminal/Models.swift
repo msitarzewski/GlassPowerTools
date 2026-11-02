@@ -378,6 +378,7 @@ class TerminalSession: Identifiable, Hashable {
             }
             // A connection's control-mode client ends with it; the next one reads the pane afresh.
             if oldValue == .connected, state != .connected { endTmuxControl() }
+            if oldValue != state { noteConnection("\(oldValue.diagnosticName) -> \(state.diagnosticName)") }
         }
     }
     var output: [TerminalLine] = []
@@ -429,6 +430,11 @@ class TerminalSession: Identifiable, Hashable {
     private(set) var didRequestInitialTerminalPresentation = false
     private(set) var hasMeasuredTerminalGeometry = false
     private var userInitiatedDisconnect: Bool = false
+    /// Its shell ended on a connection that stood — an `exit`, or tmux's client leaving (detached,
+    /// taken over by another device, its session ended) — rather than the connection dropping. Its
+    /// window closes it; one that was away (in the dock) closes it as it is shown, and never
+    /// connects it again (2026-11-01).
+    private(set) var shellEnded = false
     private var reconnectTask: Task<Void, Never>?
     var reconnectAttemptCount: Int = 0
     var recorder: SessionRecorder?
@@ -611,6 +617,15 @@ class TerminalSession: Identifiable, Hashable {
         tmuxPaneObserved?(pane, first)
     }
 
+    /// A line about this terminal's connection in the headset's diagnostics file, which can be
+    /// copied off a Vision Pro (`TerminalSelectionDiagnostics`): states and causes, never names,
+    /// addresses or text. Two tabs said Disconnected with nothing to say why (2026-11-01).
+    func noteConnection(_ event: String) {
+        #if os(visionOS)
+        TerminalSelectionDiagnostics.record?("connection terminal=\(id.uuidString.prefix(4)) \(event)")
+        #endif
+    }
+
     /// Not connected and not on its way: never connected, dropped, failed or disconnected.
     var isDown: Bool {
         switch state {
@@ -619,11 +634,11 @@ class TerminalSession: Identifiable, Hashable {
         }
     }
 
-    /// A slot just shown should connect: it never has, or it lost its connection while hidden or
-    /// failed to open. Not one someone disconnected, one already on its way, or one waiting for a
-    /// host-key answer.
+    /// A terminal just shown should connect: it never has, or it lost its connection while hidden
+    /// or failed to open. Not one someone disconnected, one whose shell ended, one already on its
+    /// way, or one waiting for a host-key answer.
     var connectsOnShow: Bool {
-        purpose == .terminal && !userInitiatedDisconnect && pendingHostKeyChallenge == nil && isDown
+        purpose == .terminal && !userInitiatedDisconnect && !shellEnded && pendingHostKeyChallenge == nil && isDown
     }
 
     init(
@@ -826,6 +841,7 @@ class TerminalSession: Identifiable, Hashable {
     
     func connect() async {
         userInitiatedDisconnect = false
+        shellEnded = false
         if state == .connecting {
             appendLine(TerminalLine(text: "Connection already in progress. Please wait…", style: .system))
             return
@@ -900,6 +916,7 @@ class TerminalSession: Identifiable, Hashable {
     
     func disconnect() {
         userInitiatedDisconnect = true
+        noteConnection("disconnected by hand")
         flushPendingTerminalOutputNow()
         cancelPendingTerminalWrites()
         cancelPendingTerminalResizes()
@@ -933,10 +950,17 @@ class TerminalSession: Identifiable, Hashable {
         guard autoReconnectEnabled,
               purpose == .terminal,
               !userInitiatedDisconnect
-        else { return }
+        else {
+            noteConnection("lost; auto-reconnect \(autoReconnectEnabled ? "not for this terminal" : "is off")")
+            return
+        }
         // W4b: a slot hidden on an iPhone reconnects when it is shown (`connectsOnShow`), so a
         // workgroup coming back from suspension reconnects only the terminal on screen.
-        guard !connectsWhenShown else { return }
+        guard !connectsWhenShown else {
+            noteConnection("lost; reconnects when shown")
+            return
+        }
+        noteConnection("lost; auto-reconnecting")
 
         reconnectTask?.cancel()
         flushPendingTerminalOutputNow()
@@ -1263,6 +1287,8 @@ class TerminalSession: Identifiable, Hashable {
     }
 
     func handleCleanRemoteExit() {
+        noteConnection("shell ended on a live connection (an exit, or tmux's client left)")
+        shellEnded = true
         let connectionToDisconnect = detachSSHConnection(for: .cleanRemoteExit)
         flushPendingTerminalOutputNow()
         cancelPendingTerminalWrites()
@@ -1655,6 +1681,17 @@ enum SessionState: Equatable {
         case .connected: return "Connected"
         case .reconnecting: return "Reconnecting..."
         case .error(let message): return "Error: \(message)"
+        }
+    }
+
+    /// The state without its message, for the diagnostics file (`noteConnection`).
+    var diagnosticName: String {
+        switch self {
+        case .disconnected: "disconnected"
+        case .connecting: "connecting"
+        case .connected: "connected"
+        case .reconnecting: "reconnecting"
+        case .error: "error"
         }
     }
     

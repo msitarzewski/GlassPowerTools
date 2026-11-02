@@ -1100,10 +1100,12 @@ public final class GlassTerminalCapability: GlassCapability {
     }
 
     /// Choosing a terminal in tmux whose connection dropped takes you back into its session, as
-    /// its row says it will (2026-10-24). Not one someone disconnected, and not an iPhone slot,
-    /// which connects as it is shown (W4b).
+    /// its row says it will (2026-10-24). Not one someone disconnected, and not an iPhone or iPad
+    /// slot, which connects as it is shown (W4b). A Vision Pro window reopened after a relaunch is
+    /// made of slots too, and choosing one in Active or the dock did nothing (2026-11-01).
     static func reconnectIfDropped(_ session: TerminalSession, runtime: GlassTerminalRuntime) {
-        guard session.survivesClose, session.connectsOnShow, !session.isWorkgroupSlot else { return }
+        guard session.survivesClose, session.connectsOnShow,
+              !(session.isWorkgroupSlot && TerminalWorkgroupOpening.slotsConnectWhenShown) else { return }
         runtime.enqueue(.reconnect(sessionID: session.id))
     }
 

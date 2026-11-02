@@ -170,6 +170,16 @@ enum TerminalWorkgroupOpening {
         return failures
     }
 
+    /// iPhone and iPad connect a slot as it is shown (`connectShownSlot`, W4b). Vision Pro shows
+    /// every terminal of a window, and connects its slots as any other terminal.
+    static var slotsConnectWhenShown: Bool {
+        #if os(iOS)
+        true
+        #else
+        false
+        #endif
+    }
+
     /// The selected slot is the one on screen: it connects if it needs to, and every other slot
     /// waits to be shown — after the app was suspended, only the visible one reconnects. A
     /// terminal added to the workgroup some other way is left as it is.

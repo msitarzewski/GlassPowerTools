@@ -298,26 +298,34 @@ class SessionManager {
         return session
     }
 
-    /// Connects a slot that is being shown: one never connected, or one whose connection was lost
-    /// while it was hidden. A connection already open to the same server is shared, as a new
-    /// terminal shares it; otherwise it signs in with the saved credentials.
+    /// Connects a terminal that is being shown: one never connected, or one whose connection was
+    /// lost while it was hidden. A connection already open to the same server is shared, as a new
+    /// terminal shares it; otherwise it signs in as its Reconnect does.
     func connectWhenShown(_ session: TerminalSession, settingsManager: SettingsManager) async throws {
         // Once at a time: the opener and the view both ask, and the state says "connecting"
         // only once the sign-in starts.
         guard session.connectsOnShow, slotsConnecting.insert(session.id).inserted else { return }
         defer { slotsConnecting.remove(session.id) }
-        let context = try reconnectContext(for: session)
-        let jumpHostChain = try resolveJumpHostChain(for: context.server)
-        session.server = context.server
-        session.jumpHostChain = jumpHostChain
-        session.updateConfiguredInitialTerminalGeometry(settingsManager.initialTerminalGeometry(for: context.server))
-        var shared = false
-        if let connection = session.getSSHConnection(),
-           let source = reusableConnection(for: context.server, jumpHostChain: jumpHostChain) {
-            shared = await connection.shareTransport(from: source)
-        }
-        if !shared {
-            session.connectionPreparation = try prepareConnection(for: context.server).authentication
+        session.noteConnection("connect on show")
+        do {
+            let context = try reconnectContext(for: session)
+            let jumpHostChain = try resolveJumpHostChain(for: context.server)
+            session.server = context.server
+            session.jumpHostChain = jumpHostChain
+            session.updateConfiguredInitialTerminalGeometry(settingsManager.initialTerminalGeometry(for: context.server))
+            var shared = false
+            if let connection = session.getSSHConnection(),
+               let source = reusableConnection(for: context.server, jumpHostChain: jumpHostChain) {
+                shared = await connection.shareTransport(from: source)
+            }
+            if !shared {
+                session.connectionPreparation = try preparation(for: session, context: context).authentication
+            }
+        } catch {
+            // Said in the terminal, which otherwise stays "Disconnected" with nothing to say why
+            // (2026-11-01).
+            session.reportError(error.localizedDescription)
+            throw error
         }
         guard sessions.contains(where: { $0.id == session.id }) else { return }
         await session.connect()
@@ -357,13 +365,7 @@ class SessionManager {
     ) async throws {
         session.cancelReconnect()
         let context = try reconnectContext(for: session)
-        let prepared: ConnectionPreparationResult
-        switch try origin(for: session) {
-        case .savedProfile:
-            prepared = try prepareConnection(for: context.server)
-        case .transient:
-            prepared = try prepareConnection(for: context.server, providedPassword: context.password)
-        }
+        let prepared = try preparation(for: session, context: context)
         session.server = context.server
         session.updateConfiguredInitialTerminalGeometry(
             settingsManager.initialTerminalGeometry(for: context.server)
@@ -409,6 +411,15 @@ class SessionManager {
                 server: server,
                 password: try Self.decodeTransientPassword(transientPasswords[session.id])
             )
+        }
+    }
+
+    /// How a terminal signs in again: as its saved machine, or with the password a terminal opened
+    /// without one was given.
+    private func preparation(for session: TerminalSession, context: ReconnectContext) throws -> ConnectionPreparationResult {
+        switch try origin(for: session) {
+        case .savedProfile: try prepareConnection(for: context.server)
+        case .transient: try prepareConnection(for: context.server, providedPassword: context.password)
         }
     }
 

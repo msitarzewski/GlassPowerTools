@@ -440,18 +440,32 @@ extension TerminalWorkgroupOpening {
         return "A terminal"
     }
 
-    /// Vision Pro: connects every slot of the reopened workgroups — one machine's one after
-    /// another, so a second terminal shares the first one's connection, and the machines side by
-    /// side, so one that doesn't answer holds up no other. A terminal that doesn't connect stays
-    /// in its place, saying why, and **Reconnect** tries again. Returns what failed.
+    /// Vision Pro: connects every slot of the reopened workgroups. Returns what failed.
     static func connectReopened(_ workgroupIDs: [UUID], sessionManager: SessionManager,
                                 settingsManager: SettingsManager) async -> [String] {
         let slots = workgroupIDs.flatMap { sessionManager.sessions(inWorkgroup: $0) }.filter(\.isWorkgroupSlot)
+        return await connect(slots, sessionManager: sessionManager, settingsManager: settingsManager)
+    }
+
+    /// Vision Pro: every terminal of a window being shown that is down and should connect
+    /// (`connectsOnShow`): never connected since a relaunch, its connection lost while the app was
+    /// away, or given up on after its retries (2026-11-01). Returns what failed.
+    static func connectDropped(inWorkgroup workgroupID: UUID, sessionManager: SessionManager,
+                               settingsManager: SettingsManager) async -> [String] {
+        let dropped = sessionManager.sessions(inWorkgroup: workgroupID).filter(\.connectsOnShow)
+        return await connect(dropped, sessionManager: sessionManager, settingsManager: settingsManager)
+    }
+
+    /// One machine's terminals one after another, so a second terminal shares the first one's
+    /// connection, and the machines side by side, so one that doesn't answer holds up no other. A
+    /// terminal that doesn't connect stays in its place, saying why, and **Reconnect** tries again.
+    private static func connect(_ terminals: [TerminalSession], sessionManager: SessionManager,
+                                settingsManager: SettingsManager) async -> [String] {
         var byServer: [UUID: [TerminalSession]] = [:]
         var order: [UUID] = []
-        for slot in slots {
-            if byServer[slot.server.id] == nil { order.append(slot.server.id) }
-            byServer[slot.server.id, default: []].append(slot)
+        for terminal in terminals {
+            if byServer[terminal.server.id] == nil { order.append(terminal.server.id) }
+            byServer[terminal.server.id, default: []].append(terminal)
         }
         let machines = order.map { serverID in
             let sessions = byServer[serverID] ?? []

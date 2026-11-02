@@ -241,7 +241,7 @@ struct TerminalActiveListingTests {
         #expect(capability.openSessions().first?.subtitle == "Reconnecting... · in tmux (Terminal 1)")
     }
 
-    @Test("Choosing a dropped tab in tmux reconnects it; not one disconnected on purpose, a slot, or a plain shell")
+    @Test("Choosing a dropped tab in tmux reconnects it; not one disconnected on purpose, a plain shell, or a slot where slots connect as shown")
     func choosingADroppedTabReconnectsIt() throws {
         let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
@@ -271,7 +271,10 @@ struct TerminalActiveListingTests {
         #expect(runtime.takeRequests().compactMap(reconnects) == [dropped.id])
         for tab in window.tabs.dropFirst() {
             tab.activate()
-            #expect(runtime.takeRequests().compactMap(reconnects).isEmpty, "\(tab.title)")
+            // A slot connects as it is shown on iPhone and iPad (W4b). A Vision Pro window shows
+            // every terminal, and choosing its relaunched window's terminal reconnects it (2026-11-01).
+            let wanted = tab.title == "charlie" && !TerminalWorkgroupOpening.slotsConnectWhenShown ? [slot.id] : []
+            #expect(runtime.takeRequests().compactMap(reconnects) == wanted, "\(tab.title)")
         }
         // The window's own row: its tab in front.
         _ = manager.selectSession(dropped.id, inWorkgroup: group)

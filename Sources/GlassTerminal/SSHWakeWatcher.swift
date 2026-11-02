@@ -12,6 +12,9 @@
 
 import Foundation
 import GlassSSHTransport
+#if os(visionOS)
+import GlassTerminalEmulator
+#endif
 #if os(macOS)
 import AppKit
 #elseif canImport(UIKit)
@@ -32,6 +35,9 @@ final class SSHWakeWatcher {
         let name = UIApplication.willEnterForegroundNotification
         #endif
         observers.append(center.addObserver(forName: name, object: nil, queue: .main) { _ in
+            #if os(visionOS)
+            MainActor.assumeIsolated { TerminalSelectionDiagnostics.record?("connection back in front: asking every connection to answer") }
+            #endif
             Task { await SSHLiveTransports.shared.checkAllAlive() }
         })
     }
