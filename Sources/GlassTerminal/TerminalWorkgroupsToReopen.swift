@@ -378,7 +378,7 @@ extension TerminalWorkgroupOpening {
     /// out and said; the others still come back.
     ///
     /// - Parameter connectsWhenShown: iPhone and iPad connect only the slot on screen (W4b); Vision
-    ///   Pro connects them all, since its grid and carousel show them all.
+    ///   Pro connects them all, since its grid shows them all.
     static func reopen(_ record: TerminalWorkgroupReopenRecord, connectsWhenShown: Bool,
                        sessionManager: SessionManager, settingsManager: SettingsManager) -> Reopened {
         var result = Reopened()

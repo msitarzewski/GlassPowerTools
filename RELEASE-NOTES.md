@@ -100,6 +100,93 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.589 (2 November 2026, Mac)
+- **The orb dock's drops behave again**: pointing at an orb no longer makes its drops shrink to a speck and grow back,
+  the count on Connections shows again (it was hidden under the glass, a dark crescent below the circle), and a dot
+  grows in place when you point at it.
+- **The dock grows without a stumble**: Connections stays put and no "more below" arrow flashes while the dock widens
+  for an orb that came; for a moment its orbs had wrapped into a column.
+
+### 0.4.588 (2 November 2026, Mac)
+- **The orb dock is Apple's Liquid Glass**: the dock is a slab of Apple's clear glass, its orbs and their dots are
+  drops of the same glass instead of grey discs, and Connections is the app's icon floating in a drop instead of on a
+  white circle. The dock's Glass, Material and Opacity still set it: Material Light to Heavy is the clear glass,
+  dimmed a little more behind it as it gets heavier, and Max the frostier glass. macOS draws Liquid Glass clear only
+  in the window you are working in and frosts it in every other, so the dock looks frosted while you work elsewhere.
+- **Dots bud out of their orb** as it lands in the dock.
+- **Smoother motion**: the dock grows and shrinks alongside its orbs' own animations; it held them still until it
+  had finished. A coding agent's mark breathes as a smooth animation instead of being redrawn 30 times a second.
+
+### 0.4.587 (2 November 2026, Mac)
+- **The carousel's front tab is larger**: the row grows into the window, keeping room for the neighbours' outer
+  edges and letting the reflection fade out behind the name. It had kept little more than half the height it was
+  given, about a third of a window.
+
+### 0.4.586 (2 November 2026, Mac)
+- **The carousel's side tabs face the middle**, as Apple's album view turns its covers: each outer edge comes toward
+  you and each inner edge goes back. They had faced out.
+
+### 0.4.585 (2 November 2026, Mac)
+- **The carousel's front tab stands clear of its neighbours.** The first tab either side tucked under it, and
+  through a glass terminal showed as dark bands down its edges; now each starts just past the front's edge.
+
+### 0.4.584 (2 November 2026, Mac)
+- **The carousel is back on the Mac, as an album view** (D97). In a window's Terminal Overview, **Carousel** beside
+  **Grid** puts one tab in front, large, with the rest turned toward it and stacked close on either side, each
+  reflected on the floor, its name below. Its tiles are Show All Windows' — the live picture, the coding agent's
+  mark, the wave while it prints. A trackpad swipe moves the row with your fingers, momentum and all; a drag, the
+  scroll wheel or the arrow keys step it; a click on a tab beside the front brings it forward; Return or a click on
+  the front opens it. Each tab travels through the middle as the row flows. With Auto-focus on activity, the front
+  holds for three seconds before the next tab printing comes forward. Reduce Motion slides the row without turning.
+
+### 0.4.583 (2 November 2026)
+- **A terminal window's overview looks like Show All Windows** (D96), inside the window, with this window's tabs:
+  a live tile per tab with its coding agent's mark, a wave while it prints, its name and folder on hover or
+  selection; type to find, the arrow keys, Return to open, Esc or a click beside the tabs to go back. All tabs or
+  This workgroup, and Auto-focus on activity, stay: with its controls fading after a few idle seconds, it can stand
+  as a live wall. Blur previews softens it too. The card-size slider and the cards of sessions open elsewhere are
+  gone: Show All Windows has everything.
+- **No more carousel**, on the Mac or Vision Pro. The Mac's Terminal Carousel (⌥⇧⌘G) is gone, and Terminal Grid is
+  **Terminal Overview** on ⌥⌘G; Vision Pro's Terminal View menu has Tabs, Grid and Orb. A Workgroup saved to open in
+  the carousel opens in the grid.
+- **⌫ takes back a letter** of what you typed in Show All Windows, as it now does in a window's overview: it did
+  nothing.
+
+### 0.4.582 (2 November 2026, Mac)
+- **The Mac's orb dock springs back to show every orb** when you let go of a resize: as wide as you made it, and
+  exactly as tall as its rows, however tall or short you dragged it. Dragged taller than its orbs, it used to stay
+  that way, empty below them; made shorter, it hid rows to scroll to. Only a dock taller than the screen scrolls now.
+
+### 0.4.581 (2 November 2026)
+- **The Mac's orb dock grows from Connections**, which stays where you put it: orbs reach further to its right, a
+  taller row grows evenly above and below it, a second row goes below, and the dock shrinks back to it as orbs go.
+  It used to keep the middle of its bottom edge, so Connections slid left with every orb.
+- **No dark crescents in a window's corners.** The frost was always rounded at 24 points, whatever the window's
+  own corners, so a window rounded more tightly, such as the Mac's orb dock, showed its paint bare in each corner
+  as a dark edge. The frost now takes the window's own shape.
+- **The Mac's orb dock no longer stacks its orbs under a scroll bar** with a mouse attached: the Mac showed the
+  dock's hidden scroller anyway, and it took the orbs' width as the dock grew.
+### 0.4.580 (2 November 2026)
+- **Shrink to Orb is a circle**, the orb's own glyph, everywhere a window becomes one: on the Mac in every
+  window's toolbar, and on Vision Pro in the bars of desktops, databases and editors, as a terminal's view menu
+  already had it. The two arrows were also the sign for Active's Take Over.
+### 0.4.579 (2 November 2026, Mac)
+- **The Mac's orb dock is only as big as its orbs**, the same distance from them on every side, with no bar under
+  them: drag any empty part of it to move it. Pointing at an orb names it just above the dock, as the Mac's Dock
+  names its icons (beside the dock when it stands taller than wide), so every name, Connections' too, is on one line.
+### 0.4.578 (2 November 2026)
+- **The Mac dock's Connections orb is Vision Pro's**: the app's icon on a white circle, ⚡ and Active's count on its
+  rim, its middle level with the other orbs'. The band across the dock's top is gone: the dock painted a title
+  bar's material it has no title for.
+### 0.4.577 (2 November 2026)
+- **The orb dock on the Mac** (D95), as on Vision Pro: **Shrink to Orb**, in every window's toolbar beside Show All
+  Windows, puts the window in a dock of glass orbs that floats over your windows, its sessions still running. Each
+  terminal window's orb shows the tab in front, with its tabs as dots around it, each with its coding agent in its
+  colour; databases, desktops and editors gather on their machine's orb; Connections is first, with Active's count.
+  Click an orb to bring its window back, a dot for that tab; drag an orb onto another to move it; resize the dock to
+  make it a row or a column. Unlike Vision Pro, the window is only hidden, so nothing reconnects when it comes back.
+  Settings ▸ Appearance ▸ Orbs: the dock above this app's windows, or above all windows, and its own Opacity and Glass.
+  ⌘M still minimizes to the Mac's Dock.
 ### 0.4.576 (1 November 2026)
 - **Vision Pro: a window's terminals come back when it is shown.** A terminal that was down stayed "Disconnected" when
   its window was opened, brought out of the dock or grown back from its orb: one whose connection was lost while the

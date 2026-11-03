@@ -150,11 +150,21 @@ struct MacTerminalWindowPolicyTests {
         let material = try #require(frameView.subviews.compactMap { $0 as? MacTerminalTitlebarMaterialView }.first)
         let sidebarView = sidebar.viewController.view
         material.followSidebarBoundary()
+        // Settled, not a fixed wait: the sidebar slides in over a quarter second and the window follows it after,
+        // and 300 ms caught it mid-slide while the main thread was busy (2026-11-02). Positive, with a long deadline.
+        func settle(_ settled: () -> Bool) async throws {
+            let deadline = ContinuousClock.now + .seconds(30)
+            repeat {
+                frameView.layoutSubtreeIfNeeded()
+                if settled() { return }
+                try await Task.sleep(for: .milliseconds(25))
+            } while ContinuousClock.now < deadline
+        }
         for width in [1180.0, 900.0] {
             window.setContentSize(NSSize(width: width, height: 760))
-            for _ in 0..<12 {
-                frameView.layoutSubtreeIfNeeded()
-                try await Task.sleep(for: .milliseconds(25))
+            try await settle {
+                let frame = sidebarView.convert(sidebarView.bounds, to: frameView)
+                return frame.minX >= -1 && abs(material.frame.minX - frame.maxX) < 1
             }
             let sidebarEdge = sidebarView.convert(sidebarView.bounds, to: frameView).maxX
             #expect(sidebarView.convert(sidebarView.bounds, to: frameView).minX >= -1)
@@ -167,10 +177,7 @@ struct MacTerminalWindowPolicyTests {
         }
         split.toggleSidebar(nil)
         #expect(sidebar.isCollapsed)
-        for _ in 0..<12 {
-            frameView.layoutSubtreeIfNeeded()
-            try await Task.sleep(for: .milliseconds(25))
-        }
+        try await settle { abs(material.frame.minX - frameView.bounds.minX) < 1 }
         #expect(abs(material.frame.minX - frameView.bounds.minX) < 1)
         if #available(macOS 26.1, *) {
             #expect(toolbar.items[sidebarIndex].visibilityPriority.rawValue > save.visibilityPriority.rawValue)
@@ -6030,7 +6037,7 @@ struct glas_shTests {
         try await settle()
         let geometries = sessions.map(\.currentTerminalGeometry)
         for _ in 0..<6 {
-            for mode in [VisionTerminalPresentation.grid, .carousel, .tabs] {
+            for mode in [VisionTerminalPresentation.grid, .tabs] {
                 state.mode = mode
                 try await settle()
                 #expect(state.mode == (sessionCount == 1 ? .tabs : mode))

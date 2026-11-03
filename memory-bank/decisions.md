@@ -2043,3 +2043,97 @@ open instead; the terminals open as before. Named and connected through the shel
 and drops the services only if it saves the workgroup again (as `windowSettings`, W22). Not done: embedding a
 desktop in the terminal window's grid or carousel. Task note `tasks/2026-11/2026-11-01_workgroup-services.md`.
 
+
+## D95 — The orb dock on the Mac — Approved 2026-11-02; implemented 2026-11-02 (0.4.577, uncommitted)
+**Owner:** "We should consider a dock on Mac, exactly like visionOS for the same reason!" The reason (D88): put a
+window away without closing it, its sessions running, and see every one at a glance — each window's coding agents
+in their colours, pulsing while they print — and bring it back in one click. The Mac's own Dock and ⌘M put windows
+away, but among every other app's, as still pictures.
+
+**Asked, he chose:**
+1. **The orb button docks a window**, in every window's toolbar beside Show All Windows; ⌘M still minimizes to the
+   Mac's Dock.
+2. **Where the dock floats is the person's choice:** a setting, above this app's windows (hidden when another app
+   is in front) or above every window.
+3. **Connections is in the dock**, first and larger, as on Vision Pro.
+
+**Decision:** D88's dock on the Mac, as Vision Pro has it: Connections, an orb per docked terminal window with its
+tabs on a ring, an orb per machine for its databases, desktops and editors; held and moved to reorder (a drag on the
+Mac); a shape that decides row or column; its own Opacity and Glass. **One difference, the Mac's to make:** visionOS
+cannot move or hide a window, so a window docks there by closing and opens again as a new scene, which is what left
+a named window's terminals Disconnected (2026-11-01). The Mac hides the window (`orderOut`) and shows it again, so nothing is
+closed, reopened or reconnected. Task note `tasks/2026-11/2026-11-02_mac-orb-dock.md`.
+
+**Rule 62:** the dock is a panel made and owned here. Of the app's SwiftUI windows it changes only their order
+(`orderOut`, `makeKeyAndOrderFront`, as Show All Windows and `GlassLibraryWindows` already did) and, for the fade,
+their alpha for a quarter of a second, put back as they go.
+
+## D96 — A window's overview is Show All Windows for its tabs; no carousel — Approved 2026-11-02; implemented 2026-11-02 (0.4.583, uncommitted)
+**Owner:** "let's give the window's expose view the same UI as the app's version. It was the first draft, really.
+Should we just remove the carousel/iPod photo view from the window version all together?"
+
+**Asked, he chose:**
+1. **The carousel goes on the Mac and on Vision Pro.** The Mac's Terminal Carousel (⌥⇧⌘G) and its Command Center
+   entry go; Vision Pro's Terminal View menu keeps Tabs, Grid and Orb. A workgroup saved to open in Carousel opens
+   in the grid (`LayoutPreset.OpeningView` reads "carousel" as `.grid`).
+2. **The Mac window's overview stays inside the window**, drawn as Show All Windows draws: its tiles (live picture,
+   agent mark, activity wave, caption on hover or selection), type-to-find, the arrow keys, Return, Esc. Auto-focus
+   on activity and the controls that fade when idle stay, so it can stand as a live wall. The card-size slider goes
+   (tiles size to fit, as in Show All Windows; `LayoutPreset.gridCardWidth` with it).
+3. **It lists this window's tabs only**, with the This workgroup / All tabs switch; Show All Windows is everything.
+
+Task note `tasks/2026-11/2026-11-02_window-overview.md`.
+
+## D97 — The carousel as an album view, on the Mac — Approved 2026-11-02; implemented 2026-11-02 (0.4.584, uncommitted)
+**Owner:** after D96 removed the carousel: "i really wanted the carousel to work like the old album view in itunes,
+but we never got there." Offered a real one, on the Mac first: "i dare you 😂 sick live animations, agent like
+expose?" He also asked "should the thumbnail display be consolidated somewhere for all of these views?" —
+answered yes (one tile in GlassShell for Show All Windows, the window's overview, All Windows off the Mac, the Vision
+Pro grid and the orb's picture), as its own step next; not started.
+
+**Decision:** a second style of the window's overview (D96), Grid or Carousel, this Mac's choice kept. The row is a
+function of each tab's distance from the front (`MacTerminalCarouselGeometry`, tested): the front flat and large,
+the first either side well apart, the rest stacked close, turned 64° toward the front, set back, in perspective;
+reflections; Show All Windows' tiles. A trackpad moves it continuously and settles; a drag flings; wheel, arrows and
+clicks step; a click lands on the tab whose strip is under it. Auto-focus on activity holds the front three seconds
+(`MacTerminalActivitySelection.carouselHold`). D96's removal stands on Vision Pro, where depth could do this
+better; not built there. Task note `tasks/2026-11/2026-11-02_window-overview.md`.
+
+
+## D98 — The Mac's orb dock in Liquid Glass — Approved 2026-11-02 (the direction); implemented 2026-11-02 (0.4.588, uncommitted); the look in a window that isn't key is open
+**Owner:** with his screenshots of the dock beside Control Center in its Clear look: "let's make the dock background
+use a liquid texture like Apple's and make the icons liquid drops like buttons vs the gray background … Give the
+Connections orb the same liquid glass treatment? The animations seems pretty low framerate and don't really have
+any actual liquid feel other than what looks like a 4 bit color animation." Then "This is full glass on light",
+"Like this!" (Control Center), and "It's as flat as flat is" (the dock over a photo).
+
+**Found (measured in the VM, macOS 26.6, with probes in the working-files folder, `glass-probe*`):**
+- The dock's Glass was a frost (`GlassCanvasBackdrop`, a SwiftUI material): a blur under a wash, no edge, nothing
+  bent. It does blur the desktop behind a clear panel; on an even wallpaper in dark mode it is an even grey.
+- Its orbs and dots were already Apple's glass, the Regular kind, which dark mode tints grey.
+- **macOS draws Liquid Glass clear (Control Center's look) only in the key window of the active app; in any other
+  window it is frosted**, SwiftUI's `glassEffect` and AppKit's `NSGlassEffectView` alike. The dock never takes the
+  key. Forcing `appearsActive`/`controlActiveState`, or a panel that answers `isKeyWindow` true, changed nothing on
+  26.6. Other developers report the same, with no public switch (Nook moved its floating panels into its main
+  window; NSVisualEffectView has `state = .active`, glass has nothing like it). macOS 27's SDK keeps
+  `appearsActive` apart from the key state; the build sets it, in case 27 honours it for glass — unverified (the
+  VM is 26.6, his Mac 27.2).
+
+**Decision (built):** `GlassLiquidSurface`/`GlassLiquidLook` (GlassLayers): Apple's glass as the dock's slab;
+Glass is how much shows (none: the orbs float on the desktop), Material picks the glass (Light/Medium/Heavy:
+Clear, dimmed behind it 0/12/24%; Max: Regular), Opacity the theme's paint under it; Reduce Transparency opaque.
+Orbs, dots and Connections are drops of the same glass (`glassLiquidKind`); Connections shows the icon's own layers
+(`GlassPowerToolsMark`) in place of the white circle. Dots bud out of their orb as it lands (`GlassOrbBud`). The panel
+casts no shadow of its own (the glass casts its own). **No `GlassEffectContainer`** (0.4.589): in one, anything not
+glass lay under the glass (Connections' count, a dark crescent in his screenshot), a drop drawn again (a z-order
+change on hover) grew back from nothing ("The icons animate on hover, but up and to the left?"), scaling went unseen,
+and the container's content was sized to itself. The rows are laid out at the width the dock grows to
+(`GlassOrbFlowLayout.widthAtLeast`): at the widths along the way they wrapped into a column. Motion: the dock's resize runs beside the orbs' animations instead of holding them until it finished
+(`setFrame(animate:)` is synchronous); an agent's mark breathes by `phaseAnimator`, not a 30 fps `TimelineView`.
+
+**Seen on 27.2 (his screenshots of 0.4.588):** frosted, as on 26 — `appearsActive` does not make it clear there either.
+
+**Open:** which way to take the frosted look. If the dock is still frosted while he works elsewhere, the choices are Apple's
+frosted glass as is, the dock taking the key while the pointer is on it (keys typed then would go to it), or a
+drawn imitation of clear glass (no blur, a bevel; nothing bent). Task note
+`tasks/2026-11/2026-11-02_liquid-dock.md`.

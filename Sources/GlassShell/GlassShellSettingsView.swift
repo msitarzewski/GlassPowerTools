@@ -219,7 +219,7 @@ public struct GlassShellSettingsView: View {
             #if os(macOS) || os(visionOS)
             showAllWindowsSection
             #endif
-            #if os(visionOS)
+            #if os(visionOS) || os(macOS)
             orbsSection
             #endif
         case .privacy: privacy
@@ -243,10 +243,46 @@ public struct GlassShellSettingsView: View {
         Section(GlassShowAllWindows.title) {
             Toggle("Blur previews", isOn: $blursShowAllWindowsPreviews)
                 .accessibilityIdentifier("settings-show-all-windows-blur")
-            Text("Softens what each window shows in Show All Windows (⇧⌘\\), so a screenshot of it can be shared. Names stay sharp. This Mac only.")
+            // Markdown: a lone backslash before ")" escapes it and is not drawn, so it is doubled.
+            Text("Softens what each window shows in Show All Windows (⇧⌘\\\\), so a screenshot of it can be shared. Names stay sharp. This Mac only.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    @AppStorage(GlassOrbDock.floatKey, store: GlassUITestRun.settingsDefaults)
+    private var dockFloats = GlassOrbDockFloat.aboveThisApp.rawValue
+    @AppStorage(GlassOrbDock.lookKey, store: GlassUITestRun.settingsDefaults)
+    private var dockLookData = Data()
+    @AppStorage(GlassOrbDock.sizeKey, store: GlassUITestRun.settingsDefaults)
+    private var dockSize = ""
+
+    /// The orb dock (D95): where it floats, the owner's choice of setting; its size back to fitting its
+    /// orbs; and its own glass and Opacity, following Appearance until set here, as on Vision Pro.
+    @ViewBuilder
+    private var orbsSection: some View {
+        Section("Orbs") {
+            Picker("Dock Floats", selection: $dockFloats) {
+                ForEach(GlassOrbDockFloat.allCases, id: \.rawValue) { place in
+                    Text(place.title).tag(place.rawValue)
+                }
+            }
+            .onChange(of: dockFloats) { _, _ in GlassOrbDockPanel.shared.applyFloat() }
+            .accessibilityIdentifier("settings-orbs-dock-floats")
+            Text("Shrink to Orb, in a window's toolbar, puts the window in the orb dock with its sessions still running. Connections can go there too. Click an orb to bring its window back, drag one onto another to move it, and resize the dock to make it a row or a column. Above This App’s Windows hides the dock while another app is in front.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !dockSize.isEmpty {
+                Button("Fit Dock to Its Orbs", systemImage: "arrow.left.and.right") { dockSize = "" }
+                    .accessibilityIdentifier("settings-orbs-dock-fit")
+            }
+        }
+        GlassWindowLayerControls(overrides: dockLook, title: "Dock")
+    }
+
+    private var dockLook: Binding<GlassWindowOverrides> {
+        Binding(get: { GlassOrbDock.look(from: dockLookData) },
+                set: { dockLookData = GlassOrbDock.data(of: $0) })
     }
     #endif
 

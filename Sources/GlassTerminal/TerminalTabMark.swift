@@ -32,11 +32,21 @@ struct TerminalTabMark: View {
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 16
 
     var body: some View {
-        let pulses = working && !reduceMotion
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !pulses)) { context in
-            icon
-                .foregroundStyle(agent?.accent?.color ?? color)
-                .opacity(pulses ? Self.opacity(at: context.date) : 1)
+        let mark = icon.foregroundStyle(agent?.accent?.color ?? color)
+        Group {
+            // Breathing as an animation between its two ends, which SwiftUI runs at the display's own rate without
+            // drawing the mark again. It was the mark drawn again up to 30 times a second, stepping, and standing
+            // still whenever the app was busy: likely part of what the owner saw in the orb dock (2026-11-02:
+            // "low framerate … what looks like a 4 bit color animation").
+            if working && !reduceMotion {
+                mark.phaseAnimator([Self.full, Self.faint]) { mark, opacity in
+                    mark.opacity(opacity)
+                } animation: { _ in
+                    .easeInOut(duration: Self.breath / 2)
+                }
+            } else {
+                mark
+            }
         }
         .accessibilityHidden(true)
     }
@@ -57,10 +67,9 @@ struct TerminalTabMark: View {
     }
 
     /// A breath every 1.4 seconds, between full and a third: seen at a glance, and never gone.
-    static func opacity(at date: Date) -> Double {
-        let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4
-        return 0.65 + 0.35 * cos(phase * 2 * .pi)
-    }
+    static let breath: Double = 1.4
+    static let full: Double = 1
+    static let faint: Double = 0.3
 }
 
 /// A terminal session's mark, kept current by itself: its agent as its title or its tmux pane names it,

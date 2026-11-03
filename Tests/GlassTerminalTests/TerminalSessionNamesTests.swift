@@ -294,7 +294,7 @@ struct TerminalSessionNamesTests {
 
     /// The owner, on the headset (0.4.318): "the tab names in the tab ornaments didn't keep the
     /// names, so neither did the grid or carousel views."
-    @Test("the tab ornament, the grid and the carousel — every label on iPhone, iPad and Vision Pro — say the name kept on the session")
+    @Test("the tab ornament and the grid — every label on iPhone, iPad and Vision Pro — say the name kept on the session")
     func everySurface() async throws {
         let host = Host()
         host.given = "deploys"
@@ -304,7 +304,7 @@ struct TerminalSessionNamesTests {
             TerminalWorkgroupOpening.label(session, on: surface, position: 2)
         }
         #expect(label(.tabOrnament) == "deploys")
-        #expect(label(.grid) == label(.tabOrnament) && label(.carousel) == label(.tabOrnament))
+        #expect(label(.grid) == label(.tabOrnament))
         #expect(TerminalWorkgroupOpening.LabelSurface.allCases.allSatisfy { label($0) == "deploys" },
                 "the tab bar, the switcher and the connection ornament too")
         #expect(TerminalWorkgroupOpening.slotTitle(session, position: 2) == "deploys")
@@ -315,7 +315,7 @@ struct TerminalSessionNamesTests {
         host.repository = nil
         await settle(session)
         #expect(await eventually { session.terminalName == nil })
-        #expect([label(.tabOrnament), label(.grid), label(.carousel), label(.tabBar)] == Array(repeating: "alpha", count: 4))
+        #expect([label(.tabOrnament), label(.grid), label(.tabBar)] == Array(repeating: "alpha", count: 3))
         #expect(label(.switcher) == "Terminal 3 · alpha")
         session.state = .disconnected
     }

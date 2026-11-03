@@ -32,16 +32,18 @@ public enum GlassLibraryWindows {
 
     static func register(_ window: NSWindow) { windows.add(window) }
 
-    /// Whether a Connections window is open, shown or in the Dock, without bringing it forward.
+    /// Whether a Connections window is open, shown, in the Dock or in the orb dock (D95), without
+    /// bringing it forward.
     public static var isOpen: Bool {
-        windows.allObjects.contains { $0.isVisible || $0.isMiniaturized }
+        windows.allObjects.contains { $0.isVisible || $0.isMiniaturized || GlassOrbDockModel.shared.holds(connectionsWindow: $0) }
     }
 
-    /// Brings a Connections window forward — false when none is open, so the caller opens one.
+    /// Brings a Connections window forward, or back from the orb dock — false when none is open, so
+    /// the caller opens one.
     @discardableResult
     public static func bringForward() -> Bool {
         guard let window = windows.allObjects.first(where: { $0.isVisible || $0.isMiniaturized }) else {
-            return false
+            return GlassOrbDockModel.shared.bringBackConnections()
         }
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)

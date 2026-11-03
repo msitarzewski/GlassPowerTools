@@ -35,7 +35,7 @@ enum VisionTerminalStatus {
 @MainActor @Observable
 final class TerminalWindowActivity {
     private(set) var isBusy = false
-    /// The terminal that printed last, for Auto-focus on activity in the grid and carousel.
+    /// The terminal that printed last, for Auto-focus on activity in the grid.
     private(set) var lastSessionID: UUID?
     /// When each terminal here last printed, for whether the one in front is still at work.
     @ObservationIgnored private(set) var focus = TerminalActivityFocus()
@@ -97,7 +97,7 @@ extension EnvironmentValues {
     @Entry var visionTerminalSidebar: Binding<Bool>? = nil
 }
 
-/// The window's layout — tabs, grid, carousel — as one control, as the editor's preview is (the
+/// The window's layout — tabs or grid (a carousel too until D96) — as one control, as the editor's preview is (the
 /// owner, 2026-10-15: "I'd like the tabs/grid/carousel selector to be a toggle like we have for the
 /// markdown preview in the text editor"). Its glyph is the layout the window is in — an eye says
 /// show or hide, and nothing here is hidden — a pinch moves to the next, and a pinch held lists the
@@ -115,11 +115,11 @@ struct VisionTerminalPresentationPicker: View {
                 }
             }
             if let orb, !orb.isOrb {
-                Button("Orb", systemImage: "circle.circle") { orb.shrink() }
+                Button("Orb", systemImage: GlassSessionOrbButton.symbolName) { orb.shrink() }
                     .accessibilityIdentifier("vision-terminal-presentation-orb")
             }
         } label: {
-            Label("Terminal View", systemImage: orb.map { $0.isOrb ? selection.symbolName : "circle.circle" } ?? selection.symbolName)
+            Label("Terminal View", systemImage: orb.map { $0.isOrb ? selection.symbolName : GlassSessionOrbButton.symbolName } ?? selection.symbolName)
         } primaryAction: {
             // The orb, first (the owner, 2026-10-21: "make Orb the default option in the Tabs menu so
             // a click gets orb view"); with none to become, the next layout, as before.
@@ -133,21 +133,19 @@ struct VisionTerminalPresentationPicker: View {
 }
 
 extension LayoutPreset.OpeningView {
-    /// The layout's glyph: a window with its tab strip, a grid of cards, a stack of cards.
+    /// The layout's glyph: a window with its tab strip, a grid of cards.
     var symbolName: String {
         switch self {
         case .tabs: "rectangle.topthird.inset.filled"
         case .grid: "square.grid.2x2"
-        case .carousel: "rectangle.stack"
         }
     }
 
-    /// The layout a pinch moves to: tabs, grid, carousel, and round again.
+    /// The layout a pinch moves to: tabs, grid, and back. The carousel went (D96, 2026-11-02).
     var next: Self {
         switch self {
         case .tabs: .grid
-        case .grid: .carousel
-        case .carousel: .tabs
+        case .grid: .tabs
         }
     }
 }
@@ -216,13 +214,13 @@ private struct VisionTerminalPreview: View {
 /// keeps a resized window centred, and no app can move one.
 ///
 /// Apple's own tab bar stands there too; this is the same place with the rows a Mac window's sidebar
-/// has. Hidden in the grid, the carousel and the orb, and by its toggle in the window's bar.
+/// has. Hidden in the grid and the orb, and by its toggle in the window's bar.
 private struct VisionTerminalSidebarLayout<Sidebar: View, Detail: View>: View {
     /// Two or more terminals.
     let hasTabs: Bool
     /// The window's toggle leaves it shown.
     let wanted: Bool
-    /// The tabs layout, not the grid or the carousel.
+    /// The tabs layout, not the grid.
     let showsTabs: Bool
     @ViewBuilder let sidebar: Sidebar
     @ViewBuilder let detail: Detail
@@ -447,7 +445,7 @@ struct VisionTerminalWorkgroupView: View {
             }
         }
         #if os(visionOS)
-        // Auto-focus on activity: in the grid and carousel, the terminal printing comes forward.
+        // Auto-focus on activity: in the grid, the terminal printing comes forward.
         // Watched by a view of its own: the terminal that printed last changes with every chunk
         // from another, and this whole window, its bar and tools menu with it, was drawn again for
         // each — forty times a second with five agents at work, and the gear took no pinch (the
@@ -564,9 +562,9 @@ struct VisionTerminalWorkgroupView: View {
 
     // MARK: Names (W11, 2026-10-09)
     //
-    // Every label here — the tab ornament, the tab bar, the grid and carousel cards, the iPhone's
+    // Every label here — the tab ornament, the tab bar, the grid's cards, the iPhone's
     // switcher — is `TerminalWorkgroupOpening.label`, so a name kept on a session shows on all of
-    // them: the headset's ornament, grid and carousel each read the server's name for itself.
+    // them: the headset's ornament and grid each read the server's name for itself.
 
     /// Under the name: in a repository its name and branch, then the machine.
     private func machineLine(of session: TerminalSession) -> String {
@@ -971,7 +969,7 @@ struct VisionTerminalWorkgroupView: View {
         .glassSpatialColumn(workgroup.displayName)
     }
 
-    /// Every terminal in the window, the one shown in front, and the grid and carousel over them.
+    /// Every terminal in the window, the one shown in front, and the grid over them.
     private func spatialTerminals(sessions: [TerminalSession]) -> some View {
         ZStack {
             ForEach(sessions) { session in
@@ -1004,9 +1002,8 @@ struct VisionTerminalWorkgroupView: View {
                 // and compound their per-terminal transparency settings.
                 .allowsHitTesting(presentation != .tabs)
                 .accessibilityHidden(presentation == .tabs)
-                // The grid's and the carousel's controls: Apple's toolbar ornament, as a terminal's
-                // are (W31), and in the same place. Never both: in the grid and the carousel no
-                // terminal is in front, so none contributes its own.
+                // The grid's controls: Apple's toolbar ornament, as a terminal's are (W31), and in the
+                // same place. Never both: in the grid no terminal is in front, so none contributes its own.
                 .toolbar {
                     if presentation != .tabs && sessions.count > 1 {
                         ToolbarItemGroup(placement: .bottomOrnament) {
@@ -1029,7 +1026,7 @@ struct VisionTerminalWorkgroupView: View {
     }
 
     private func spatialOverview(sessions: [TerminalSession]) -> some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             Group {
                 if presentation == .grid {
                     ScrollView {
@@ -1040,24 +1037,6 @@ struct VisionTerminalWorkgroupView: View {
                         }
                         .padding(28)
                     }
-                } else if presentation == .carousel {
-                    let selectedIndex = sessions.firstIndex { $0.id == selectedSessionID } ?? 0
-                    let width = min(720, geometry.size.width * 0.64,
-                                    max(200, (geometry.size.height - 120) * 1.6))
-                    ZStack {
-                        ForEach(Array(sessions.enumerated()).filter { abs($0.offset - selectedIndex) <= 1 }, id: \.element.id) { index, session in
-                            let distance = index - selectedIndex
-                            overviewCard(session, on: .carousel)
-                                .frame(width: width)
-                                .scaleEffect(distance == 0 ? 1 : 0.82)
-                                .rotation3DEffect(.degrees(Double(distance) * -18), axis: (x: 0, y: 1, z: 0))
-                                .offset(x: CGFloat(distance) * width * 0.7)
-                                .zIndex(distance == 0 ? 1 : 0)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .animation(.easeInOut(duration: 0.2), value: selectedSessionID)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1326,7 +1305,7 @@ struct VisionTerminalWorkgroupView: View {
     /// shown (W4b). An iPad makes slots only for a workgroup it reopens at launch (W15); one it
     /// opens otherwise has no slots, and this does nothing.
     ///
-    /// Vision Pro shows every terminal of a window — its previews, the grid, the carousel — so as
+    /// Vision Pro shows every terminal of a window — its previews, the grid — so as
     /// the window is shown (opened, out of the dock, grown from its orb, the app back in front)
     /// every terminal here that dropped connects again, and one whose shell ended while the window
     /// was away closes, as it would have with the window open. Nothing did either, and tabs stayed

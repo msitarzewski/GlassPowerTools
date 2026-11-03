@@ -1,5 +1,6 @@
 #if os(macOS)
 import AppKit
+import GlassConnectionKit
 import GlassConnectionUI
 import GlassShell
 import Observation
@@ -49,11 +50,9 @@ struct MacWorkspaceView: View {
     /// A tab from another window is being dragged over this one.
     @State private var tabDropTargeted = false
     @State private var showingOverview = false
-    @State private var overviewCarousel = false
     @State private var followsActivity = LayoutPreset.followsActivityByDefault
     @State private var appliedOpeningPreferences = false
     @State private var overviewControlsVisible = true
-    @State private var gridCardWidth: Double?
     @State private var sidebarBeforeOverview: NavigationSplitViewVisibility?
     /// The terminal's column's width, and that width held while the window follows its sidebar
     /// (`GlassAdditiveSidebars.willResizeWindow`), so the terminal isn't re-gridded for the points the
@@ -112,6 +111,42 @@ struct MacWorkspaceView: View {
     private func tab(_ id: UUID) -> MacWorkspaceController? {
         windowController.tabs.first { $0.workspaceID == id }
     }
+
+    /// This window as its orb in the orb dock (D95): the tab in front, live; its tabs on the ring, each
+    /// with its agent in its colour, pulsing while it prints, as the sidebar draws them; the whole orb
+    /// pulsing while a tab prints where the window follows activity, as on Vision Pro. Named as Show All
+    /// Windows names the window.
+    private var orbFace: GlassSessionOrbFace {
+        let servers = sessionManager.serverManager.servers
+        let selected = windowController.selectedTab
+        let controller = windowController, tint = windowTint
+        return GlassSessionOrbFace(
+            title: selected.workgroupName ?? selected.windowIdentity(servers: servers).title,
+            symbolName: "apple.terminal",
+            pulses: followsActivity && controller.tabs.contains { $0.isProducingOutput },
+            tabs: controller.tabs.map { tab in
+                GlassSessionOrbTab(
+                    id: tab.workspaceID.uuidString,
+                    title: tab.windowIdentity(servers: servers).title,
+                    symbolName: "apple.terminal",
+                    tint: .primary,
+                    icon: AnyView(TerminalTabMark(agent: tab.tabAgent,
+                                                  color: tint ?? tab.workgroupColor?.color ?? .secondary,
+                                                  working: tab.isProducingOutput,
+                                                  size: GlassSessionOrbTab.iconSize)),
+                    picture: { [weak tab] in tab?.orbPicture() },
+                    select: { [weak controller] in controller?.select(tab.workspaceID) })
+            },
+            dockID: Self.dockID(windowID: controller.windowID),
+            kind: .ssh,
+            // The picture is the terminal's text alone; behind it, the theme the window paints.
+            backdrop: TerminalWindowProfile.resolved(controller.windowSettings, settings: settingsManager)
+                .theme.canvasBackgroundColor.color
+        ) { [weak controller] in controller?.selectedTab.orbPicture() }
+    }
+
+    /// The id a terminal window waits in the orb dock by, and comes back there by after a relaunch.
+    static func dockID(windowID: UUID) -> String { "terminal-window:\(windowID.uuidString)" }
 
     /// The tint this window's own settings give it, if any (W20) — not the terminal setting, which
     /// every window shares and so tells none apart. The sidebar takes it, as a Reminders list
@@ -384,11 +419,7 @@ struct MacWorkspaceView: View {
                 appliedOpeningPreferences = true
                 if let preset = currentWorkgroupPreset {
                     followsActivity = preset.autoFocusOnActivity
-                    gridCardWidth = preset.gridCardWidth
-                    if preset.openingView != .tabs {
-                        overviewCarousel = preset.openingView == .carousel
-                        openOverview()
-                    }
+                    if preset.openingView != .tabs { openOverview() }
                 }
             }
             let tabs = windowController.tabs
@@ -424,12 +455,6 @@ struct MacWorkspaceView: View {
         }
         .onChange(of: windowController.selectedTab.workgroupID) { _, _ in
             followsActivity = currentWorkgroupPreset?.autoFocusOnActivity ?? false
-            gridCardWidth = currentWorkgroupPreset?.gridCardWidth
-        }
-        .onChange(of: gridCardWidth) { _, width in
-            guard var preset = currentWorkgroupPreset, preset.gridCardWidth != width else { return }
-            preset.gridCardWidth = width
-            settingsManager.upsertLayoutPreset(preset)
         }
         .onChange(of: overviewControlsVisible) { _, visible in
             terminalWindow?.toolbar?.isVisible = !showingOverview || visible
@@ -440,6 +465,8 @@ struct MacWorkspaceView: View {
         }
         .accessibilityIdentifier("mac-workspace-tabs")
         .containerBackground(.clear, for: .window)
+        // Into the orb dock by its toolbar's Shrink to Orb (D95): hidden, its terminals running.
+        .glassSessionOrb(orbFace)
         .background {
             MacTerminalWindowReader(
                 tabbingIdentifier: "sh.glas.workspace.\(windowController.windowID.uuidString)",
@@ -501,13 +528,9 @@ struct MacWorkspaceView: View {
         )
         .focusedSceneValue(\.macCommandCenterEntries, [
             MacCommandCenterEntry(id: "workspace.overview", title: "Terminal Overview",
-                                 detail: "Browse tabs in a live grid or carousel") { openOverview() },
-            MacCommandCenterEntry(id: "workspace.grid", title: "Terminal Grid",
-                                 detail: "View all terminal tabs", shortcut: "⌥⌘G") { showOverview(carousel: false) },
-            MacCommandCenterEntry(id: "workspace.carousel", title: "Terminal Carousel",
-                                 detail: "Browse overlapping terminal previews", shortcut: "⌥⇧⌘G") { showOverview(carousel: true) },
+                                 detail: "This window's tabs, live", shortcut: "⌥⌘G") { openOverview() },
             MacCommandCenterEntry(id: "workspace.activity", title: followsActivity ? "Disable Auto-focus on Activity" : "Enable Auto-focus on Activity",
-                                 detail: "Follow new output in Grid or Carousel") { followsActivity.toggle() }
+                                 detail: "Follow new output in Terminal Overview") { followsActivity.toggle() }
         ] + windowController.tabs.enumerated().map { index, tab in
             MacCommandCenterEntry(id: "workspace.tab.\(index + 1)",
                 title: tab.windowIdentity(servers: sessionManager.serverManager.servers).title,
@@ -542,21 +565,15 @@ struct MacWorkspaceView: View {
         .opacity(showingOverview ? 0 : 1)
         .overlay {
             if showingOverview {
+                // Its own backdrop, Show All Windows' (D96).
                 MacTerminalOverview(controller: windowController,
                                     servers: sessionManager.serverManager.servers,
-                                    carousel: $overviewCarousel,
                                     followsActivity: $followsActivity,
                                     controlsVisible: $overviewControlsVisible,
-                                    preferredCardWidth: $gridCardWidth,
                                     activate: { id in
                     windowController.select(id)
                     closeOverview()
                 }, dismiss: closeOverview)
-                .background {
-                    MacTerminalVisualEffect(amount: 1, material: .underWindowBackground)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
             }
         }
         .alert("Workspace Could Not Be Saved", isPresented: Binding(
@@ -576,11 +593,6 @@ struct MacWorkspaceView: View {
 
     private var currentWorkgroupPreset: LayoutPreset? {
         settingsManager.layoutPresets.first { $0.id == windowController.selectedTab.workgroupID }
-    }
-
-    private func showOverview(carousel: Bool) {
-        overviewCarousel = carousel
-        openOverview()
     }
 
     /// Holds the terminal's column at its width while the window follows its sidebar, then lets go.
@@ -648,13 +660,18 @@ struct MacWorkspaceView: View {
     private func workspaceToolbar(selected: MacWorkspaceController) -> some ToolbarContent {
             ToolbarItem(id: "terminal-overview") {
                 Button("Terminal Overview", systemImage: "square.grid.2x2", action: openOverview)
-                    .help("Show all terminal tabs as a grid or carousel")
+                    .help("Show this window's tabs, live (⌥⌘G)")
                     .accessibilityIdentifier("mac-workspace-overview")
             }
             .glassKeepVisibleWhenCompact()
             // Every window and every terminal tab, not just this one's (W9; every kind of window
             // since 2026-10-13). ⇧⌘\ is the Window menu item's, not this button's. The item keeps
             // its old id, so a toolbar arranged around it stays arranged.
+            // Into the orb dock, before Show All Windows, as in every window (D95).
+            ToolbarItem(id: "shrink-to-orb") {
+                GlassSessionOrbButton()
+            }
+            .glassKeepVisibleWhenCompact()
             ToolbarItem(id: "show-all-terminals") {
                 GlassShowAllWindowsButton()
             }

@@ -152,6 +152,11 @@ public struct GlassEditorWorkspaceView: View {
         // the headset, where the window shrinks into its own orb: its picture would be the orb's.
         // There the file in front is the picture.
         .background { GlassEditorPictureWindowReader(workspace: workspace) }
+        #if os(macOS)
+        // Into the orb dock on its project's machine's orb (D95), hidden with its documents open.
+        .glassSessionOrb(GlassSessionOrbFace(title: detailTitle, symbolName: "doc.text",
+                                             dockID: GlassEditorRuntime.sessionID(windowID: windowID)) { nil })
+        #endif
         #endif
         // **The text follows the system's appearance.** `GlassEditorModel` defaults to the dark
         // theme and nothing ever changed it, so in Light mode the window's chrome went light and the
@@ -363,9 +368,11 @@ public struct GlassEditorWorkspaceView: View {
                 .toolbar { toolbarContent(includingDismissal: false) }
         }
     }
+    #endif
 
+    #if os(visionOS) || os(macOS)
     /// What the text's column is titled: the document in front, else the project, else the
-    /// window — the navigation titles the split view's detail had.
+    /// window — the navigation titles the split view's detail had. The window's orb's name too.
     private var detailTitle: String {
         if let document = workspace.selectedDocument { return document.displayName }
         if let project = workspace.projects.first { return project.displayName }

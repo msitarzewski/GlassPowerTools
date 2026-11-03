@@ -19,7 +19,7 @@
 #                                                 wallpaper set <file-in-vm> | ax <bundle-id|name|pid> [depth] |
 #                                                 press <bundle-id|name|pid> <button title> [window] |
 #                                                 place <app> x y w h [title] | display [set WxH] |
-#                                                 drag x1 y1 x2 y2 | click x y
+#                                                 drag x1 y1 x2 y2 | click x y | move x y | scroll x y dx dy
 #   macvm.sh shot <name>                          whole VM screen → .scratch/shots/macvm/<name>.png
 #   macvm.sh winshot <owner> <name>               one window of <owner> ("Glass Power Tools") → …/<name>.png
 #   macvm.sh install-app [App.app]                copy the app (default: build-app's) to /Applications

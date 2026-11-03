@@ -20,7 +20,6 @@ struct WorkgroupEditorContext: Identifiable {
     var workspaceLayout: LayoutPreset.WorkspaceLayout? = nil
     var openingView: LayoutPreset.OpeningView = .tabs
     var autoFocusOnActivity = LayoutPreset.followsActivityByDefault
-    var gridCardWidth: Double? = nil
     /// The settings the workgroup's window opens with (W20's look, W22): a captured window's, or
     /// the one being edited's. The editor changes their Look and Text (D84) and keeps the rest.
     var windowSettings = GlassWindowOverrides()
@@ -49,7 +48,6 @@ struct WorkgroupEditorContext: Identifiable {
             workspaceLayout: preset.workspaceLayout,
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
-            gridCardWidth: preset.gridCardWidth,
             windowSettings: preset.windowSettings,
             services: preset.services
         )
@@ -70,7 +68,6 @@ struct WorkgroupEditorContext: Identifiable {
             workspaceLayout: preset.workspaceLayout,
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
-            gridCardWidth: preset.gridCardWidth,
             windowSettings: preset.windowSettings,
             services: preset.services
         )
@@ -330,7 +327,7 @@ struct WorkgroupEditorView: View {
             .pickerStyle(.segmented)
             .accessibilityIdentifier("workgroup-opening-view")
             Toggle("Auto-focus on activity", isOn: $autoFocusOnActivity)
-                .help("Follow new terminal output while viewing Grid or Carousel. Does not switch active terminal tabs.")
+                .help("Follow new terminal output while viewing Grid. Does not switch active terminal tabs.")
                 .accessibilityIdentifier("workgroup-auto-focus-activity")
             #endif
             LabeledContent {
@@ -697,7 +694,6 @@ struct WorkgroupEditorView: View {
         preset.openingView = replaced?.openingView ?? openingView
         preset.autoFocusOnActivity = replaced?.autoFocusOnActivity ?? autoFocusOnActivity
         #endif
-        preset.gridCardWidth = context.gridCardWidth ?? replaced?.gridCardWidth
         preset.windowSettings = context.windowSettingsToSave(windowSettings, replacing: replaced)
         // A window saved over a workgroup brings its terminals; the databases and desktops stay.
         preset.services = services.isEmpty ? (replaced?.services ?? []) : services

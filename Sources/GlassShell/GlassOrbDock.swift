@@ -875,39 +875,6 @@ public struct GlassOrbDockView: View {
     }
 }
 
-/// Where the dock is scrolled to: its offset, the height it shows, and its content's height.
-struct GlassOrbDockRoom: Equatable {
-    var offset: CGFloat = 0
-    var shown: CGFloat = 0
-    var content: CGFloat = 0
-
-    /// What lies above what is shown, and below it.
-    var above: CGFloat { offset }
-    var below: CGFloat { content - offset - shown }
-}
-
-/// The orbs in rows that wrap, as `GlassOrbFlow` lays them out.
-struct GlassOrbFlowLayout: Layout {
-    var gapAfterFirst: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let used = GlassOrbFlow.size(of: frames(subviews, width: width))
-        return CGSize(width: width.isFinite ? width : used.width, height: used.height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (subview, frame) in zip(subviews, frames(subviews, width: bounds.width)) {
-            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), anchor: .topLeading,
-                          proposal: ProposedViewSize(frame.size))
-        }
-    }
-
-    private func frames(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
-        GlassOrbFlow.frames(of: subviews.map { $0.sizeThatFits(.unspecified) }, width: width, gapAfterFirst: gapAfterFirst)
-    }
-}
-
 /// What a hold on an orb does as it goes.
 enum GlassOrbCarry {
     case lifted

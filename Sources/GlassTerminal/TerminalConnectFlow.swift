@@ -555,7 +555,7 @@ struct TerminalConnectFlow: ViewModifier {
     }
 
     /// The phone's navigation, one terminal at a time: one slot per terminal, connected when shown
-    /// (W4b). iPad and Vision Pro open every terminal, since their grid and carousel previews need
+    /// (W4b). iPad and Vision Pro open every terminal, since their grid previews need
     /// live sessions.
     private var opensWorkgroupSlotsLazily: Bool {
         #if os(iOS)

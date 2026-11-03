@@ -33,8 +33,9 @@ public struct GlassDatabaseScenes: Scene {
                     .environment(settingsManager)
                     .glassLayers(runtime.layers)
                     .glassRegistersWindowOpener()
-                    #if os(visionOS)
+                    #if os(visionOS) || os(macOS)
                     // Shrinks into an orb (2026-10-15); a database has no picture, so its symbol.
+                    // On the Mac its window goes into the orb dock, hidden (D95).
                     .glassSessionOrb(GlassSessionOrbFace(
                         title: sessionManager.session(for: request.sessionID)?.connectionConfig.name ?? "Database",
                         symbolName: "cylinder.split.1x2",

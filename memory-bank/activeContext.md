@@ -31,7 +31,60 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-01 (night) — RESUME HERE: Vision Pro terminals come back when their window is shown
+## 2026-11-02 — RESUME HERE: the orb dock on the Mac (D95)
+- **His ask:** "We should consider a dock on Mac, exactly like visionOS for the same reason!" Asked, he chose: the orb
+  button docks a window (⌘M stays the Mac's), where the dock floats a setting, Connections in the dock.
+- **Built, uncommitted (0.4.577)** (`tasks/2026-11/2026-11-02_mac-orb-dock.md`): the orb's face shared with Vision
+  Pro; `GlassMacOrbDock.swift` (model, panel, dock, orbs); the button in every Mac window; Settings ▸ Appearance ▸
+  Orbs. A docked window is hidden (`orderOut`), never closed. Checked in the macOS VM (four defects found there and
+  fixed); unit tests 9, each seen failing.
+- **0.4.577** on the Mac, Vision Pro and iPhone, read back; package tests 3,313 pass.
+- **0.4.578** (his ask from his screenshot): the Connections orb as on Vision Pro (white circle, ⚡ count on the rim,
+  level with the other orbs); the band across the dock's top gone. Checked in the VM, dark and light. On all three,
+  read back 0.4.578.
+- **0.4.579 (Mac)**: the dock only as big as its orbs, even edges, no bar (an empty part moves it), names above it
+  (his choice), beside a tall one. On the Mac, read back.
+- **0.4.580 (all three)**: his ask, "the vision pro 'circle' icon … should be the standard here, not the two arrows"
+  for Desktop, Database and Editor on every platform: Shrink to Orb is `circle.circle` everywhere
+  (`GlassSessionOrbButton.symbolName`, also the Vision Pro terminal's view menu). Seen in the macOS VM (terminal and
+  database toolbars) and the Vision Pro simulator (database and one-tab terminal bars). Mac and iPhone read back
+  0.4.580; **the headset was away ("vision pro isn't going to be right now"): it is still on 0.4.578**, its 0.4.580
+  build is in `tmp/dd-vision`.
+- **0.4.581 (Mac, iPhone)**: his asks: the Mac dock grows from Connections ("the root position"); the "odd corner
+  display" was frost rounded at 24 over paint the window shapes more tightly (no border was added): the frost takes
+  the paint's radius; and a scroller the Mac showed anyway (`.never`, found in the VM). Tests: shell 385,
+  connection UI 67, layers 53; VM checked. Mac and iPhone read back 0.4.581; **the headset is still on 0.4.578**
+  (0.4.581 built in `tmp/dd-vision`). `swift test` here needs a `--scratch-path` in the working-files folder (`spm-probe`): the
+  repo's `.build` holds the Metal toolchain's old mount path.
+- **0.4.582 (Mac)**: his ask, the dock "should also spring back to the shape that shows all of the orbs": it springs
+  back on release even when its shape is unchanged; a resized dock is as tall as all its rows (screen-limited).
+  VM before/after; shell tests 386. On the Mac, read back.
+- **0.4.583 (all three; D96)**: his ask, the window's overview "the same UI as the app's version", and asked, he chose:
+  no carousel on Mac or Vision Pro, the overview inside the window, its tabs only. Also ⌫ in Show All Windows' find,
+  and a racing sync-notice test settled. Tests 1086/386/67; VM and Vision Pro simulator checked. **Mac, iPhone and
+  Vision Pro read back 0.4.583** (`tasks/2026-11/2026-11-02_window-overview.md`).
+- **0.4.584 (Mac; D97)**: the carousel back as an album view in the window's overview (his "i dare you"); the
+  front holds 3 s under Auto-focus. Tests 1093/386; VM checked. On the Mac, read back. **Proposed next (his question,
+  answered yes): one session tile in GlassShell for every overview, All Windows, the Vision Pro grid and the orb.**
+- **0.4.585 (Mac)**: the carousel's neighbours stand clear of the front (his screenshot showed them tucked under,
+  showing through the glass). On the Mac, read back.
+- **0.4.586 (Mac)**: the carousel's side tabs face the middle, as Apple's (they faced out). On the Mac, read back.
+- **0.4.587 (Mac)**: the carousel's front larger (the row grows into the window); a sidebar test's bare wait settled.
+  On the Mac, read back.
+- **0.4.588 (Mac; D98)**: his ask, the dock "use a liquid texture like Apple's", drops not grey discs, Connections
+  the same: Apple's Liquid Glass slab (`GlassLiquidSurface`), clear drops, the icon's layers in Connections' drop,
+  dots budding, a non-blocking resize, the agent marks' breathing by `phaseAnimator`. **Found: macOS draws Liquid Glass
+  clear only in the key window; the never-key dock is frosted** (26.6 in the VM, 27.2 in his screenshots); no public
+  switch (D98 lists what was tried and others' reports). On the Mac, read back.
+- **0.4.589 (Mac)**: his screenshot of 0.4.588's hover jump and a dark crescent: the `GlassEffectContainer` removed
+  (it re-grew drops on hover and hid the count), rows laid out at the width the dock grows to, end arrows after the
+  size settles. Filmed at 60 fps in the VM (`vm-liquid-video.zsh`, working-files folder). Tests 1094/387/56.
+  (`tasks/2026-11/2026-11-02_liquid-dock.md`)
+- **Next:** his choice for the frosted look (D98 Open); the dock's first drag from its top strip lands 15 pt off
+  (found, not fixed). Commit, push and TestFlight on his word. His check of 0.4.576's reconnect on the headset is still
+  open.
+
+## 2026-11-01 (night): Vision Pro terminals come back when their window is shown
 - **His report:** "I'd named a window [name], but both connections show 'disconnected' and didn't reconnect when I
   opened it" (and "still concerned about the dock, active connections, and reliability").
 - **Found and fixed** (`tasks/2026-11/2026-11-01_terminals-back-when-shown.md`): on Vision Pro nothing

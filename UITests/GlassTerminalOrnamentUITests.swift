@@ -67,7 +67,7 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "Tools menu")).count, 1,
                        "the bar should hold one tools menu")
         // Two terminals, so the presentation picker is in the bar too.
-        XCTAssertTrue(elements("vision-terminal-presentation").firstMatch.exists, "the Tabs/Grid/Carousel picker is missing")
+        XCTAssertTrue(elements("vision-terminal-presentation").firstMatch.exists, "the Tabs/Grid picker is missing")
         // The grid's own controls are not.
         XCTAssertFalse(app.buttons["Open Terminal"].exists, "the grid's bar shows over a terminal")
     }

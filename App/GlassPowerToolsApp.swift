@@ -200,6 +200,10 @@ struct GlassPowerToolsApp: App {
         // Show All Windows lists every open window beside the terminal's (GlassShowAllWindows):
         // the composition root is the one place that holds every capability's sessions.
         GlassShowAllWindows.openSessions = { [model] in model.registry.openSessions() }
+        #if os(macOS)
+        // The orb dock (D95): a panel of its own, showing the library's machines and Active's count.
+        GlassOrbDockPanel.shared.configure(model: model, layers: layers)
+        #endif
         #if os(visionOS)
         // An orb's ring holds its machine's other services (D88): the library knows them.
         GlassSessionOrbServices.dots = { [weak model] endpoints, own, from in

@@ -218,3 +218,36 @@ When there is more in the dock than it shows, an arrow at its top or bottom says
 A terminal window in the dock when the app quits is in the dock again after a relaunch. Its orb shows the picture the window had as it docked until the terminal draws again. The picture is kept on this device, and deleted when the window leaves the dock or its session ends.
 
 Connections, left in the dock, goes back into it once the terminals that came back have connected or given up, unless it is asking you something then, such as a password.
+
+## Put windows in the orb dock on Mac
+
+A window can go into the orb dock with its sessions still running, and come back with one click. The dock is a strip of glass orbs that floats over your windows, no bigger than its orbs, as the dock does on Vision Pro: each orb shows its window's live picture, and its terminals' coding agents in their colours.
+
+- Choose **Shrink to Orb** in the window's toolbar, beside **Show All Windows**. The window fades out and its orb lands in the dock. The window isn't closed: terminals stay connected, and so do databases and desktops.
+- ⌘M still minimizes a window to the Mac's Dock, as in any app.
+- **Shrink to Orb** in the Connections window's toolbar puts Connections in the dock too. **Connections** is always first in the dock, a little larger than the rest, as on Vision Pro: the app's icon on a white circle, with ⚡ and the number of open sessions on its rim.
+- Each terminal window has an orb of its own showing the tab in front, with its tabs as dots around it. Each dot shows what the tab's row in the sidebar shows: the coding agent running in it, in the agent's colour, or a terminal, pulsing while it prints.
+- Databases, remote desktops and editors are gathered by machine: one orb for each machine with any of them open, docked or not, with a dot for each.
+- Point at an orb to see its window's name just above the dock, as the Mac's Dock names its icons; when the dock is taller than it is wide, the name shows beside it. Point at a dot to see its name the same way and its picture in the orb.
+
+The dock goes away when no window is in it and Connections is out of it.
+
+### Bring a window back from the dock on Mac
+
+- Click an orb to bring its window back where it was, at the size it had. On a terminal window's orb, click a dot to bring the window back with that tab in front. On a machine's orb, click a dot to bring back that one window, or the orb to bring back all of them.
+- Click **Connections** to bring the library window back. Clicking the app's icon in the Mac's Dock, with no window on screen, brings it back too.
+- **Active** and **Show All Windows** bring a docked window back too. A docked window isn't listed in the **Window** menu.
+
+### Arrange the dock on Mac
+
+- **Move the dock:** drag any empty part of it, between or around the orbs.
+- **Where it grows:** from **Connections**, which stays where you put it. As orbs come, the dock reaches further to its right, and taller evenly above and below it when an orb has a ring of dots; a second row goes below. As orbs go, it shrinks back to Connections. Near the edge of the screen, the dock moves only as far as it must to stay on screen, and comes back once it's smaller.
+- **Move an orb:** drag it onto another orb to put it in that orb's place. Dropped on **Connections**, it goes first; past the last orb, it goes last. Each orb keeps its place on this Mac.
+- **Resize:** drag an edge or a corner to choose how wide the dock is. The orbs wrap into rows to fit, or stand in a column when the dock is narrow, and once you let go the dock springs back to the height that shows every orb, however tall or short you dragged it. Only a dock taller than the screen scrolls, with an arrow at the end where there's more. Until you resize it, the dock fits its orbs in a row about seven orbs wide, wrapping onto more rows as they come; **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Fit Dock to Its Orbs** goes back to that.
+- **Connect:** right-click **Connections** for **Favorites**, **Recent** and **Dock Settings…**, as on Vision Pro.
+
+Where the dock floats is a setting: above this app's windows, or above every window. See [Orbs on Mac](library-settings.md#orbs-on-mac).
+
+### After a relaunch on Mac
+
+A terminal window in the dock when the app quits is in the dock again after a relaunch, and so is Connections. Databases, desktops and editors aren't reopened when the app starts, so they aren't put back.

@@ -78,7 +78,7 @@ nonisolated enum TerminalWindowSettings {
         min(100_000, max(1_000, $0))
     }
     /// Vision Pro (the owner, 2026-10-15: "add Auto-focus on activity to This Window"): while a
-    /// terminal in the window prints, the grid and carousel bring it forward and the window's orb
+    /// terminal in the window prints, the grid brings it forward and the window's orb
     /// pulses. Unset, the window follows the saved Workgroup it was opened from, else is off.
     static let autoFocusOnActivity = GlassWindowSetting<Bool>("terminal.autoFocusOnActivity", title: "Auto-focus on Activity")
     /// Vision Pro (2026-10-26): what surrounds the person when this window enters Focus Mode, an
@@ -148,7 +148,7 @@ nonisolated enum TerminalWindowSettingsCoding {
 
 /// Everything a terminal is drawn and behaves with (W22): each of its window's settings over the
 /// terminal setting it overrides. The same for a Mac pane (SSH or local), a headset or iPad tab, a
-/// grid or carousel card and the Mac's overview pictures, so a window's tabs always agree.
+/// grid card and the Mac's overview pictures, so a window's tabs always agree.
 struct TerminalWindowProfile: Equatable {
     let look: TerminalLook
     /// The theme, with the window's font family and size over its own.

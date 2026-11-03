@@ -74,49 +74,6 @@ struct MacWorkspaceTests {
         #expect(!policy.shouldHide(at: start.advanced(by: .seconds(9)), canHide: true))
     }
 
-    /// The overview shows every open session beside its own tabs — except the ones its tabs
-    /// already are. Reported 2026-09-21: standing in the overview, the user asked where the
-    /// database was.
-    @Test func overviewShowsSessionsOpenElsewhereButNotItsOwnTabsTwice() {
-        let mine = UUID(), theirs = UUID()
-        let row: (String) -> GlassOpenSession = {
-            GlassOpenSession(id: $0, title: $0, symbolName: "circle", activate: {}, close: {})
-        }
-        let all = [
-            row(GlassTerminalCapability.sessionID(workgroupID: mine)),
-            row(GlassTerminalCapability.sessionID(workgroupID: theirs)),
-            row("database:alpha"),
-            row("editor:notes"),
-        ]
-        let shown = MacOverviewSessions.others(all, excludingWorkgroups: [mine]).map(\.id)
-        #expect(shown == [GlassTerminalCapability.sessionID(workgroupID: theirs), "database:alpha", "editor:notes"])
-        #expect(MacOverviewSessions.others(all, excludingWorkgroups: []).count == 4,
-                "a window with no workgroup tabs excludes nothing")
-    }
-
-    /// A terminal Connect opens on a Mac is in no workgroup, and its own window's overview listed
-    /// it again as open elsewhere: two tabs, "2 open elsewhere", the same two (the owner,
-    /// 2026-10-19). Its own terminals are left out; another window's stay.
-    @Test func overviewLeavesOutItsOwnTerminalsInNoWorkgroup() {
-        let staging = UUID(), production = UUID(), elsewhere = UUID()
-        let row: (String) -> GlassOpenSession = {
-            GlassOpenSession(id: $0, title: $0, symbolName: "circle", activate: {}, close: {})
-        }
-        let all = [staging, production, elsewhere].map { row(GlassTerminalCapability.sessionID(sessionID: $0)) }
-        let shown = MacOverviewSessions.others(all, excludingWorkgroups: [], sessions: [staging, production]).map(\.id)
-        #expect(shown == [GlassTerminalCapability.sessionID(sessionID: elsewhere)])
-    }
-
-    @Test func overviewNavigationCrossesFromTabsIntoSessionsElsewhere() {
-        // One row to browse: arrow keys walk off the last tab onto the first card, and stop at
-        // the ends rather than wrapping — the same arithmetic the tabs always had.
-        let tab = UUID()
-        let ids: [MacOverviewItemID] = [.tab(tab), .session("database:alpha"), .session("editor:notes")]
-        #expect(MacTerminalOverviewNavigation.moved(.tab(tab), by: 1, in: ids) == .session("database:alpha"))
-        #expect(MacTerminalOverviewNavigation.moved(.session("editor:notes"), by: 1, in: ids) == .session("editor:notes"))
-        #expect(MacTerminalOverviewNavigation.moved(MacOverviewItemID?.none, by: 0, in: ids) == .tab(tab))
-    }
-
     @Test func previewTitleColorPrioritizesErrorsAndTransitions() {
         #expect(MacTerminalPreviewStatus.color(for: ["Running", "Error: Connection lost"]) == .red)
         #expect(MacTerminalPreviewStatus.color(for: ["Connected", "Reconnecting..."]) == .orange)
@@ -127,23 +84,39 @@ struct MacWorkspaceTests {
     @Test func workgroupPresentationPreferencesRoundTripAndLegacyDefaults() throws {
         var preset = LayoutPreset(name: "Monitor", sessionIntents: [.init(kind: .local)])
         #expect(preset.autoFocusOnActivity, "on unless set (2026-10-26)")
-        preset.openingView = .carousel
+        preset.openingView = .grid
         preset.autoFocusOnActivity = false
-        preset.gridCardWidth = 460
         let data = try JSONEncoder().encode(preset)
         #expect(try JSONDecoder().decode(LayoutPreset.self, from: data) == preset)
         var legacy = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         legacy.removeValue(forKey: "openingView")
         legacy.removeValue(forKey: "autoFocusOnActivity")
-        legacy.removeValue(forKey: "gridCardWidth")
         let restored = try JSONDecoder().decode(LayoutPreset.self, from: JSONSerialization.data(withJSONObject: legacy))
         #expect(restored.openingView == .tabs)
         #expect(restored.autoFocusOnActivity, "saved before the setting: on, as unset is now")
-        #expect(restored.gridCardWidth == nil)
         let copy = WorkgroupEditorContext.duplicate(preset)
-        #expect(copy.openingView == .carousel)
+        #expect(copy.openingView == .grid)
         #expect(!copy.autoFocusOnActivity, "saved off, it stays off")
-        #expect(copy.gridCardWidth == 460)
+    }
+
+    /// The carousel is gone on the Mac and Vision Pro (D96, 2026-11-02). A workgroup saved to open in it,
+    /// here or synced from a device with an older build, opens in the grid; one with the card width the
+    /// overview's slider kept still reads. Anything else unknown still fails, as before.
+    @Test func workgroupSavedForTheCarouselOpensInTheGrid() throws {
+        let data = try JSONEncoder().encode(LayoutPreset(name: "Monitor", sessionIntents: [.init(kind: .local)]))
+        var saved = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        saved["openingView"] = "carousel"
+        saved["gridCardWidth"] = 460
+        let restored = try JSONDecoder().decode(LayoutPreset.self, from: JSONSerialization.data(withJSONObject: saved))
+        #expect(restored.openingView == .grid)
+        #expect(restored.name == "Monitor" && restored.sessionIntents.count == 1, "the rest of the workgroup kept")
+        let resaved = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored)) as? [String: Any])
+        #expect(resaved["openingView"] as? String == "grid" && resaved["gridCardWidth"] == nil)
+        saved["openingView"] = "cube"
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(LayoutPreset.self, from: JSONSerialization.data(withJSONObject: saved))
+        }
+        #expect(LayoutPreset.OpeningView.allCases == [.tabs, .grid])
     }
 
     @Test func activityFollowingIgnoresHistoryAndYieldsToManualNavigation() {
@@ -165,14 +138,28 @@ struct MacWorkspaceTests {
         #expect(activity.candidate(in: [second: next], now: afterGrace) == nil)
     }
 
-    @Test func overviewNavigationClampsAndRepairsMissingSelection() {
-        let ids = [UUID(), UUID(), UUID(), UUID()]
-        #expect(MacTerminalOverviewNavigation.moved(nil, by: 0, in: ids) == ids[0])
-        #expect(MacTerminalOverviewNavigation.moved(ids[0], by: -1, in: ids) == ids[0])
-        #expect(MacTerminalOverviewNavigation.moved(ids[0], by: 2, in: ids) == ids[2])
-        #expect(MacTerminalOverviewNavigation.moved(ids[3], by: 1, in: ids) == ids[3])
-        #expect(MacTerminalOverviewNavigation.moved(UUID(), by: 0, in: ids) == ids[0])
-        #expect(MacTerminalOverviewNavigation.moved(UUID?.none, by: 1, in: [UUID]()) == nil)
+    /// In the carousel the tab in front holds for a moment before the next one printing takes its place: several
+    /// agents printing at once swung the whole row back and forth every half second (2026-11-02).
+    @Test func carouselHoldsTheFrontBeforeFollowingTheNext() {
+        let first = UUID(), second = UUID()
+        let start = ContinuousClock.now
+        let hold = MacTerminalActivitySelection.carouselHold
+        var activity = MacTerminalActivitySelection()
+        activity.baseline([first: start, second: start])
+        let one = start.advanced(by: .milliseconds(500))
+        #expect(activity.candidate(in: [first: one, second: start], now: one, holding: hold) == first)
+        let soon = one.advanced(by: .milliseconds(500))
+        #expect(activity.candidate(in: [first: one, second: soon], now: soon, holding: hold) == nil, "still holding the first")
+        let later = one.advanced(by: hold)
+        #expect(activity.candidate(in: [first: one, second: soon], now: later, holding: hold) == nil,
+                "what printed during the hold is passed over")
+        let after = later.advanced(by: .milliseconds(500))
+        #expect(activity.candidate(in: [first: one, second: after], now: after, holding: hold) == second)
+        // Unheld, as the grid follows: the next one printing straight away.
+        var grid = MacTerminalActivitySelection()
+        grid.baseline([first: start, second: start])
+        #expect(grid.candidate(in: [first: one, second: start], now: one) == first)
+        #expect(grid.candidate(in: [first: one, second: soon], now: soon) == second)
     }
 
     @Test @MainActor func previewDoesNotCreateRuntimeOrAlterWorkspace() throws {

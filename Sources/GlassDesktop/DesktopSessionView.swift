@@ -212,6 +212,15 @@ public struct DesktopSessionView: View {
                 GlassWindowAspectLock(aspect: session.pictureAspect(for: viewport), canvas: canvasSize,
                                       minimum: DesktopWindowSizing.floor)
             }
+            // Into the orb dock with the remote screen live on its machine's orb (D95), its
+            // session running; a second screen's window goes with its desktop.
+            .glassSessionOrb(GlassSessionOrbFace(
+                title: windowTitle, symbolName: "display",
+                dockID: viewport.isPrimary ? GlassDesktopCapability.sessionID(connectionID: session.connection.id) : nil,
+                endpointIDs: [session.connection.id], kind: .rdp
+            ) { [session] in
+                session.frame.flatMap(GlassDesktopCapability.picture(of:))
+            })
             #endif
         #endif
     }
@@ -273,7 +282,11 @@ public struct DesktopSessionView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) { sessionActions }
             #if os(macOS)
-            // Show All Windows, beside the ⚡, as in every window (GlassShowAllWindows).
+            // Into the orb dock, then Show All Windows, beside the ⚡, as in every window (D95,
+            // GlassShowAllWindows).
+            ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
+                GlassSessionOrbButton()
+            }
             ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
                 GlassShowAllWindowsButton()
             }

@@ -177,11 +177,12 @@ struct MenuBarPlacementTests {
                 "⇧⌘G is Find Previous, the shell's Edit ▸ Find item.")
     }
 
-    @Test func optionCommandGIsTerminalGridAlone() throws {
+    /// The carousel on ⌥⇧⌘G went with the overview's first draft (D96, 2026-11-02): the key is free.
+    @Test func optionCommandGIsTerminalOverviewAlone() throws {
         #expect(try owners(of: "g", modifiers: ["command", "option"]) == ["MacWorkspaceCommands.swift"],
-                "⌥⌘G is Terminal Grid.")
-        #expect(try owners(of: "g", modifiers: ["command", "option", "shift"]) == ["MacWorkspaceCommands.swift"],
-                "⌥⇧⌘G is Terminal Carousel.")
+                "⌥⌘G is Terminal Overview.")
+        #expect(try owners(of: "g", modifiers: ["command", "option", "shift"]).isEmpty,
+                "⌥⇧⌘G was Terminal Carousel, which is gone.")
     }
 
     /// ⌘F moved with them, from the terminal's Find in Pane… to the shell's Find…. The other two

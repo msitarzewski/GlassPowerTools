@@ -209,8 +209,6 @@ enum TerminalWorkgroupOpening {
         case tabBar
         /// Vision Pro's overview, as a grid.
         case grid
-        /// Vision Pro's overview, as a carousel.
-        case carousel
         /// The iPhone's session switcher.
         case switcher
         /// The connection ornament above a terminal.

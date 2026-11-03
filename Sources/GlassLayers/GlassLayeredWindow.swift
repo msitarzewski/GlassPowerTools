@@ -175,7 +175,8 @@ struct GlassLayerBackground: View {
         #if os(visionOS)
         EmptyView()
         #else
-        GlassCanvasBackdrop(material: state.material.material, blurAmount: state.frost)
+        // The paint's own corners: none in a window, which shapes both itself.
+        GlassCanvasBackdrop(material: state.material.material, blurAmount: state.frost, cornerRadius: cornerRadius)
         #endif
     }
 }

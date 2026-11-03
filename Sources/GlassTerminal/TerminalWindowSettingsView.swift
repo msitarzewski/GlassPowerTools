@@ -298,7 +298,7 @@ struct TerminalOverridesSettingsView: View {
             } header: {
                 Text("Activity")
             } footer: {
-                Text("While a terminal in this window prints, the grid and carousel bring it forward, and the window's orb pulses.")
+                Text("While a terminal in this window prints, the grid brings it forward, and the window's orb pulses.")
             }
 
             Section {

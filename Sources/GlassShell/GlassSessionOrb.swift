@@ -22,113 +22,6 @@ import GlassConnectionKit
 import GlassConnectionUI
 import GlassLayers
 
-/// A tab of a window shown as its orb: a dot on the ring around it (the owner, 2026-10-15: "redraw
-/// the tabs around the orb evenly distributed with a preview in the orb on hover").
-public struct GlassSessionOrbTab: Identifiable {
-    public let id: String
-    public var title: String
-    public var symbolName: String
-    /// The dot's glyph colour: the tab's state, as its tab label shows it.
-    public var tint: Color
-    /// What the dot shows in place of `symbolName`, drawn by the session's own kind: a terminal's
-    /// coding agent in its colour, pulsing while it works, as its tab in the sidebar shows it
-    /// (2026-10-21).
-    public var icon: AnyView?
-    public var picture: @MainActor () -> Image?
-    /// Brings the tab to the front, as the window grows back on it.
-    public var select: @MainActor () -> Void
-    /// A pinch grows the window back as well as selecting: a tab. A machine's service on the ring
-    /// (D88) comes forward on its own and leaves the orb as it is.
-    public var growsWindow: Bool
-
-    /// The side an `icon` is drawn at, in its dot.
-    public static var iconSize: CGFloat { GlassOrbRingLayout.iconSize }
-
-    public init(id: String, title: String, symbolName: String, tint: Color, icon: AnyView? = nil,
-                growsWindow: Bool = true,
-                picture: @escaping @MainActor () -> Image?, select: @escaping @MainActor () -> Void) {
-        self.id = id
-        self.title = title
-        self.symbolName = symbolName
-        self.tint = tint
-        self.icon = icon
-        self.growsWindow = growsWindow
-        self.picture = picture
-        self.select = select
-    }
-}
-
-/// A machine's other services on an orb's ring (D88; the owner, 2026-10-25: "add Editor, Database,
-/// and Desktop to the orb so it's more of a machine nav than just tabs for a Terminal window").
-/// Set by the composition root, which knows the library; nil where nothing can supply them.
-@MainActor
-public enum GlassSessionOrbServices {
-    /// The services of the machine `endpointIDs` are on, other than `own` kind, then what was opened
-    /// from the window `from` (an editor, from a terminal's folder button), as dots.
-    public static var dots: ((_ endpointIDs: [EndpointID], _ own: HostServiceKind?, _ from: String?) -> [GlassSessionOrbTab])?
-
-    static func dots(for face: GlassSessionOrbFace) -> [GlassSessionOrbTab] {
-        guard !face.endpointIDs.isEmpty || face.dockID != nil else { return [] }
-        return dots?(face.endpointIDs, face.kind, face.dockID) ?? []
-    }
-}
-
-/// What a session window shows as its orb.
-public struct GlassSessionOrbFace {
-    /// The window's name, shown beneath the orb while it is looked at.
-    public var title: String
-    /// The kind's symbol, where there is no picture.
-    public var symbolName: String
-    /// The session's picture now, taken again every second while the orb is on screen.
-    public var picture: @MainActor () -> Image?
-    /// Pulsing: activity in the session, where the window's Auto-focus on activity is on.
-    public var pulses: Bool
-    /// The window's tabs, on a ring around the orb when there are two or more.
-    public var tabs: [GlassSessionOrbTab]
-    /// Whether the window's bar shows Shrink to Orb. A terminal window with a view menu offers the
-    /// orb there instead (the owner, 2026-10-15: "is the orb view just one more option for the view
-    /// menu in terminal mode?").
-    public var showsButton: Bool
-    /// A single tab is on the ring too: a machine's orb in the dock, whose one editor is not the
-    /// orb itself, as a window's one tab is.
-    public var showsSingleTab: Bool
-    /// The window's open session (`GlassOpenSession.id`), by which it waits in the dock (D88); nil
-    /// for a window that shrinks where it is whatever the setting says.
-    public var dockID: String?
-    /// The machines the window's sessions are on, whose other services join the ring (D88).
-    public var endpointIDs: [EndpointID]
-    /// The window's own kind of service, left off the ring: its tabs are already there.
-    public var kind: HostServiceKind?
-
-    public init(title: String, symbolName: String, pulses: Bool = false, tabs: [GlassSessionOrbTab] = [],
-                showsButton: Bool = true, showsSingleTab: Bool = false, dockID: String? = nil,
-                endpointIDs: [EndpointID] = [], kind: HostServiceKind? = nil,
-                picture: @escaping @MainActor () -> Image?) {
-        self.title = title
-        self.symbolName = symbolName
-        self.pulses = pulses
-        self.tabs = tabs
-        self.showsButton = showsButton
-        self.showsSingleTab = showsSingleTab
-        self.dockID = dockID
-        self.endpointIDs = endpointIDs
-        self.kind = kind
-        self.picture = picture
-    }
-
-    /// A ring when there are tabs to put on one: as many as fit around the orb, in order.
-    var ringTabs: [GlassSessionOrbTab] {
-        tabs.count >= (showsSingleTab ? 1 : 2) ? Array(tabs.prefix(GlassOrbRingLayout.maximumTabs)) : []
-    }
-
-    /// The ring with the machine's services after the tabs, as many as fit. Asked only while the
-    /// orb is drawn: it reads every open session, and a window's own body must not (every window
-    /// would draw again whenever any session changed).
-    func ring(services: [GlassSessionOrbTab]) -> [GlassSessionOrbTab] {
-        Array((ringTabs + services).prefix(GlassOrbRingLayout.maximumTabs))
-    }
-}
-
 /// The window's size as its orb: the Connections orb's alone, larger with a ring of tabs, whose names
 /// need room beyond it.
 enum GlassSessionOrbSize {
@@ -153,41 +46,12 @@ private struct GlassHiddenWhileOrb: ViewModifier {
     }
 }
 
-/// The window's orb as its bar sees it: how to become one, and whether it is one.
-public struct GlassSessionOrbControl {
-    public let shrink: @MainActor () -> Void
-    public let isOrb: Bool
-    /// The window at its own size: not its orb, and not still growing back from one. What holds a
-    /// window to a shape (a desktop's, W38) waits for this before holding it again.
-    public let isWindow: Bool
-}
-
-public extension EnvironmentValues {
-    /// Set by `glassSessionOrb` for everything in the window; nil in a window that has no orb.
-    @Entry var glassSessionOrb: GlassSessionOrbControl? = nil
-}
-
 public extension View {
     /// Lets this session window become its orb. Attach to the window's whole content: what it wraps
     /// is what goes out of sight while the window is its orb. The window's bar shows
     /// `GlassSessionOrbButton` first.
     func glassSessionOrb(_ face: GlassSessionOrbFace) -> some View {
         modifier(GlassSessionOrbModifier(face: face))
-    }
-}
-
-/// "Shrink to Orb", first in a session window's bottom bar; nothing in a window without an orb.
-public struct GlassSessionOrbButton: View {
-    @Environment(\.glassSessionOrb) private var orb
-
-    public init() {}
-
-    public var body: some View {
-        if let orb, !orb.isOrb {
-            Button("Shrink to Orb", systemImage: "arrow.down.right.and.arrow.up.left") { orb.shrink() }
-                .help("Shrink this window to an orb. Pinch the orb to bring it back.")
-                .accessibilityIdentifier("session-orb-shrink")
-        }
     }
 }
 
@@ -612,37 +476,6 @@ struct GlassSessionOrbView: View {
     }
 }
 
-/// A sphere's light on the orb's face: brighter toward the upper left, falling away to the rim, with
-/// a small highlight and a rim catching the light, over the picture seen through the glass.
-private struct GlassOrbSphereShading: View {
-    let diameter: CGFloat
-
-    var body: some View {
-        ZStack {
-            RadialGradient(colors: [.white.opacity(0.32), .white.opacity(0)],
-                           center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: diameter * 0.55)
-            RadialGradient(colors: [.clear, .clear, .black.opacity(0.38)],
-                           center: .center, startRadius: 0, endRadius: diameter * 0.52)
-            Ellipse()
-                .fill(.white.opacity(0.55))
-                .frame(width: diameter * 0.26, height: diameter * 0.14)
-                .rotationEffect(.degrees(-30))
-                .blur(radius: 5)
-                .offset(x: -diameter * 0.18, y: -diameter * 0.24)
-            Circle()
-                .strokeBorder(LinearGradient(colors: [.white.opacity(0.7), .white.opacity(0.08), .white.opacity(0.3)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)
-        }
-        .frame(width: diameter, height: diameter)
-        // Cut to the sphere here: the orb's own clip did not hold its corners in on the headset (the
-        // gradients' square showed around the orb in the visionOS 27.2 simulator).
-        .compositingGroup()
-        .clipShape(.circle)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
 /// A name on glass, shown while what it names is looked at: as wide as its words, up to the width
 /// `GlassOrbRingLayout` gives it, then shortened in the middle.
 private struct GlassOrbName: View {
@@ -726,12 +559,12 @@ struct GlassOrbRingLayout: Layout {
     let count: Int
     /// Each tab's name opening from its dot's leading edge, rather than beside the dot away from the orb.
     var namesFromDots = false
-    static let maximumTabs = 12
+    static var maximumTabs: Int { GlassOrbMetrics.maximumTabs }
     /// Large enough to read the agent's mark in it at a glance (the owner, 2026-10-21: "increase the
     /// size of the icons in orb view"); it was 30, its symbol 12.
     static let dotDiameter: CGFloat = 48
     /// A dot's symbol, or its icon's side.
-    static let iconSize: CGFloat = 24
+    static var iconSize: CGFloat { GlassOrbMetrics.iconSize }
     /// Between the orb's rim and a dot's (the owner: "move the dots away from the orb a few more pixels").
     static let gap: CGFloat = 22
     static let nameWidth: CGFloat = 150
@@ -760,7 +593,7 @@ struct GlassOrbRingLayout: Layout {
         let radius = Self.ringRadius
         let outer = count > 0 ? radius + Self.dotDiameter / 2 : GlassConnectionsOrb.diameter / 2
         // Room below for the orb's name: the whole group sits a little high.
-        let center = CGPoint(x: bounds.midX, y: bounds.midY - 14)
+        let center = CGPoint(x: bounds.midX, y: bounds.midY - GlassOrbMetrics.orbRaise)
         subviews[0].place(at: center, anchor: .center, proposal: .unspecified)
         for index in 0..<count {
             let angle = -Double.pi / 2 + 2 * Double.pi * Double(index) / Double(count)
@@ -804,18 +637,4 @@ struct GlassOrbRingLayout: Layout {
     }
 }
 
-/// A ring going out from the orb's rim, again and again, while its session is busy.
-private struct GlassSessionOrbPulse: View {
-    var body: some View {
-        Circle()
-            .strokeBorder(.white.opacity(0.75), lineWidth: 3)
-            .phaseAnimator([0.0, 1.0]) { ring, phase in
-                ring.scaleEffect(1 + 0.22 * phase).opacity(1 - phase)
-            } animation: { phase in
-                phase == 1 ? .easeOut(duration: 1.3) : .linear(duration: 0)
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-}
 #endif

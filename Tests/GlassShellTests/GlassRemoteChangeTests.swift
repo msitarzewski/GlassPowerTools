@@ -94,13 +94,16 @@ struct GlassRemoteChangeTests {
             NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: nil)
             return backend.fetchCount > 0
         })
-        try await Task.sleep(for: .milliseconds(100))
-        let before = backend.fetchCount
+        // Taken in order, each of this library's notices syncs it and each of another's is passed over. The
+        // waits above can leave notices of their own queued, which sync after: one did after a bare 100 ms
+        // under load (2026-11-02) and read as another library's notice syncing. So nothing here counts on
+        // time: once the five are taken, the notices taken outnumber the syncs by them (and by any other
+        // test's notice for its own library, taken here too). Each synced, they never would.
         for _ in 0..<5 {
             NotificationCenter.default.post(name: GlassShellModel.remoteChangeNotification, object: other)
-            try await Task.sleep(for: .milliseconds(20))
         }
-        #expect(backend.fetchCount == before, "another library's notice")
+        #expect(await until { model.remoteChangesTaken - backend.fetchCount >= 5 },
+                "another library's notice synced this one: \(model.remoteChangesTaken) taken, \(backend.fetchCount) syncs")
         withExtendedLifetime(other) {}
     }
 

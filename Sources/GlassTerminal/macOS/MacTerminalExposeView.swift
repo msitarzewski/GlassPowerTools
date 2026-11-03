@@ -64,6 +64,9 @@ struct MacTerminalExposeView: View {
         .onKeyPress(phases: [.down, .repeat]) { press in
             handle(press, groups: groups) ? .handled : .ignored
         }
+        // ⌫ arrives as the system's Delete command, never as a key press: typing found, Delete did nothing
+        // (the VM, 2026-11-02).
+        .onDeleteCommand { if !expose.filter.isEmpty { expose.filter.removeLast() } }
         .background {
             MacTerminalExposePinchMonitor { outcome in
                 if outcome == .pinchedOut { expose.close() }
@@ -124,27 +127,13 @@ struct MacTerminalExposeView: View {
         let windowID: UUID? = if case .window(let id) = group.id { id } else { nil }
         let origin = frames.frame.origin
         let targeted = windowID != nil && dropTarget == windowID
-        return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(targeted ? Color.accentColor : Color.white.opacity(0.14), lineWidth: targeted ? 3 : 1)
-                }
-                .contentShape(.rect(cornerRadius: 18))
-                // The group itself is the window: clicking it goes back to the tab it shows.
-                .onTapGesture {
-                    if let windowID, let window = windows.first(where: { $0.controller.windowID == windowID }) {
-                        expose.choose(.tab(window.controller.selectedTabID))
-                    }
-                }
-            Label(group.title, systemImage: Self.symbol(for: group))
-                .font(.headline)
-                .lineLimit(1)
-                .foregroundStyle(.primary)
-                .frame(width: frames.titleFrame.width, height: frames.titleFrame.height, alignment: .leading)
-                .offset(x: frames.titleFrame.minX - origin.x, y: frames.titleFrame.minY - origin.y)
-                .allowsHitTesting(false)
+        // The group itself is the window: clicking it goes back to the tab it shows.
+        return MacTerminalExposeGroupCard(title: group.title, symbolName: Self.symbol(for: group), frames: frames,
+                                          targeted: targeted) {
+            if let windowID, let window = windows.first(where: { $0.controller.windowID == windowID }) {
+                expose.choose(.tab(window.controller.selectedTabID))
+            }
+        } tiles: {
             ForEach(Array(zip(group.tiles, frames.tileFrames)), id: \.0.id) { tile, frame in
                 tileView(tile, tab: tabID(tile.id).flatMap { tabs[$0] }, windowID: windowID,
                          session: sessionID(tile.id).flatMap { sessions[$0] },
@@ -191,20 +180,12 @@ struct MacTerminalExposeView: View {
                 MacTerminalExposeSessionTile(tile: tile, selected: selected) { expose.choose(tile.id) }
             }
         }
-        .frame(width: size.width, height: size.height)
-        .scaleEffect(hovering && !reduceMotion ? 1.03 : 1)
-        .animation(.easeOut(duration: 0.12), value: hovering)
-        .onHover { inside in
+        .modifier(MacTerminalExposeTileChrome(tile: tile, selected: selected, hovering: hovering, size: size,
+                                              identifier: identifier(tile.id)) { inside in
             if inside { hovered = tile.id } else if hovered == tile.id { hovered = nil }
-        }
-        .onTapGesture { expose.choose(tile.id) }
-        .help([tile.title, tile.location ?? tile.detail].compactMap { $0 }.joined(separator: " — "))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tile.title)
-        .accessibilityValue([tile.location ?? tile.detail, selected ? "Selected" : nil].compactMap { $0 }.joined(separator: ", "))
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { expose.choose(tile.id) }
-        .accessibilityIdentifier(identifier(tile.id))
+        } choose: {
+            expose.choose(tile.id)
+        })
     }
 
     private func tabID(_ id: MacTerminalExposeItemID) -> UUID? {
@@ -262,9 +243,82 @@ struct MacTerminalExposeView: View {
     }
 }
 
+/// A group: its glass, its edge (the accent while a tab is dragged over it), its title, and its tiles, which
+/// the caller places within it. A click on the group itself goes back to the window it is. Show All Windows
+/// draws one per window and kind; a terminal window's own overview draws one for itself (D96).
+struct MacTerminalExposeGroupCard<Tiles: View>: View {
+    let title: String
+    let symbolName: String
+    let frames: MacTerminalExposeLayout.Group
+    var targeted = false
+    let choose: () -> Void
+    @ViewBuilder let tiles: Tiles
+
+    var body: some View {
+        let origin = frames.frame.origin
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(targeted ? Color.accentColor : Color.white.opacity(0.14), lineWidth: targeted ? 3 : 1)
+                }
+                .contentShape(.rect(cornerRadius: 18))
+                .onTapGesture(perform: choose)
+            Label(title, systemImage: symbolName)
+                .font(.headline)
+                .lineLimit(1)
+                .foregroundStyle(.primary)
+                .frame(width: frames.titleFrame.width, height: frames.titleFrame.height, alignment: .leading)
+                .offset(x: frames.titleFrame.minX - origin.x, y: frames.titleFrame.minY - origin.y)
+                .allowsHitTesting(false)
+            tiles
+        }
+    }
+}
+
+/// A tile's size, its lift under the pointer, a click to choose it, and what it says to VoiceOver and in its
+/// help tag: the same for every tile in Show All Windows and in a window's own overview.
+struct MacTerminalExposeTileChrome: ViewModifier {
+    let tile: MacTerminalExposeTile
+    let selected: Bool
+    let hovering: Bool
+    let size: CGSize
+    let identifier: String
+    let hover: (Bool) -> Void
+    let choose: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var helpText: String {
+        [tile.title, tile.location ?? tile.detail].compactMap { $0 }.joined(separator: " — ")
+    }
+
+    private var spokenValue: String {
+        let parts: [String?] = [tile.location ?? tile.detail, selected ? "Selected" : nil]
+        return parts.compactMap { $0 }.joined(separator: ", ")
+    }
+
+    func body(content: Content) -> some View {
+        let scale: CGFloat = hovering && !reduceMotion ? 1.03 : 1
+        return content
+            .frame(width: size.width, height: size.height)
+            .scaleEffect(scale)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+            .onHover { hover($0) }
+            .onTapGesture { choose() }
+            .help(helpText)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(tile.title)
+            .accessibilityValue(spokenValue)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { choose() }
+            .accessibilityIdentifier(identifier)
+    }
+}
+
 /// A tab, live: its panes as images, the activity wave while it prints, and its name and folder
 /// on hover or when selected.
-private struct MacTerminalExposeTabTile: View {
+struct MacTerminalExposeTabTile: View {
     let tab: MacWorkspaceController
     let tile: MacTerminalExposeTile
     let selected: Bool
@@ -430,7 +484,7 @@ private struct MacTerminalExposeSessionTile: View {
 /// Which AI agent a tile's terminal is running (the owner, 2026-10-14: "put a monochrome logo in
 /// the center of the window in expose mode"): the agent's mark, small, white and translucent, sized
 /// to the tile, so it reads over any picture, sharp or blurred, without covering it.
-private struct MacTerminalExposeAgentMark: View {
+struct MacTerminalExposeAgentMark: View {
     let agent: TerminalAgent
 
     var body: some View {
@@ -455,7 +509,7 @@ private struct MacTerminalExposeAgentMark: View {
     }
 }
 
-private struct MacTerminalExposeCaption: View {
+struct MacTerminalExposeCaption: View {
     let title: String
     let detail: String?
     var detailTruncation: Text.TruncationMode = .head
@@ -483,9 +537,10 @@ private struct MacTerminalExposeCaption: View {
 }
 
 /// What typing has narrowed to, and how to drive it.
-private struct MacTerminalExposeHeader: View {
+struct MacTerminalExposeHeader: View {
     let filter: String
     let matches: Int
+    var hint = "Arrows to move · Return to open · drag a terminal onto another window to move it · Esc to close"
 
     var body: some View {
         VStack(spacing: 6) {
@@ -505,7 +560,7 @@ private struct MacTerminalExposeHeader: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(.regularMaterial, in: Capsule())
-            Text("Arrows to move · Return to open · drag a terminal onto another window to move it · Esc to close")
+            Text(hint)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -513,7 +568,7 @@ private struct MacTerminalExposeHeader: View {
     }
 }
 
-private struct MacTerminalExposeEmpty: View {
+struct MacTerminalExposeEmpty: View {
     let filter: String
 
     var body: some View {
@@ -527,7 +582,7 @@ private struct MacTerminalExposeEmpty: View {
 
 /// Mission Control's backdrop: what is behind, blurred by the system material and dimmed. A click
 /// on it closes the overlay. Reduce Transparency turns the material solid, which AppKit does.
-private struct MacTerminalExposeBackdrop: View {
+struct MacTerminalExposeBackdrop: View {
     let close: () -> Void
 
     var body: some View {

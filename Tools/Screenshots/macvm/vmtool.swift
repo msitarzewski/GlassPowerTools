@@ -14,6 +14,7 @@
 //   vmtool place <app> x y w h [title]  move and size the app's front window, or its window with that title (points)
 //   vmtool display [set WIDTHxHEIGHT]  list the main display's modes, or pick one by size in points (HiDPI if any)
 //   vmtool drag x1 y1 x2 y2 / click x y  the left button pressed at one point and let go at the other (points)
+//   vmtool move x y                   the pointer to a point, nothing pressed: what hovering shows (points)
 //   vmtool ax <bundle-id|name|pid> [depth]
 //                                     accessibility tree of the app's windows (role, title, description = the
 //                                     VoiceOver label, identifier, value) and controls with no label at all
@@ -248,6 +249,21 @@ func drag(from start: CGPoint, to end: CGPoint) {
         : "dragged \(Int(start.x)),\(Int(start.y)) to \(Int(end.x)),\(Int(end.y))")
 }
 
+/// A swipe at `point` as a trackpad sends one: pixel deltas, in ten steps a frame apart, so what reads precise scrolling
+/// (a carousel that flows with the fingers) can be driven in the VM.
+func scroll(at point: CGPoint, dx: Int32, dy: Int32) {
+    guard AXIsProcessTrusted() else { fail("not trusted for Accessibility", 3) }
+    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)?
+        .post(tap: .cghidEventTap)
+    usleep(30_000)
+    for _ in 0..<10 {
+        CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy / 10, wheel2: dx / 10, wheel3: 0)?
+            .post(tap: .cghidEventTap)
+        usleep(16_000)
+    }
+    print("scrolled \(dx),\(dy) at \(Int(point.x)),\(Int(point.y))")
+}
+
 // MARK: display
 
 // The guest picks its own screen mode whatever tart's --display says (it's a hint), so screenshots can come out
@@ -296,8 +312,17 @@ case ("drag", _) where args.count == 5 && args.dropFirst().allSatisfy({ Double($
 case ("click", _) where args.count == 3 && args.dropFirst().allSatisfy({ Double($0) != nil }):
     let v = args.dropFirst().compactMap(Double.init)
     drag(from: CGPoint(x: v[0], y: v[1]), to: CGPoint(x: v[0], y: v[1]))
+case ("move", _) where args.count == 3 && args.dropFirst().allSatisfy({ Double($0) != nil }):
+    guard AXIsProcessTrusted() else { fail("not trusted for Accessibility", 3) }
+    let v = args.dropFirst().compactMap(Double.init)
+    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: CGPoint(x: v[0], y: v[1]),
+            mouseButton: .left)?.post(tap: .cghidEventTap)
+    print("moved to \(Int(v[0])),\(Int(v[1]))")
+case ("scroll", _) where args.count == 5 && args.dropFirst().allSatisfy({ Double($0) != nil }):
+    let v = args.dropFirst().compactMap(Double.init)
+    scroll(at: CGPoint(x: v[0], y: v[1]), dx: Int32(v[2]), dy: Int32(v[3]))
 default:
     fail("usage: vmtool windows [owner] | wallpaper get | wallpaper set <file> | ax <bundle-id|name|pid> [depth] | "
         + "press <bundle-id|name|pid> <button title> [window title] | place <app> x y w h [title] | display [set WIDTHxHEIGHT] | "
-        + "drag x1 y1 x2 y2 | click x y", 2)
+        + "drag x1 y1 x2 y2 | click x y | move x y | scroll x y dx dy", 2)
 }

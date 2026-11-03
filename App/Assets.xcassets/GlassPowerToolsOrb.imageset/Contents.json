@@ -2,7 +2,7 @@
   "images" : [
     {
       "filename" : "glass-power-tools-orb.png",
-      "idiom" : "vision",
+      "idiom" : "universal",
       "scale" : "2x"
     }
   ],

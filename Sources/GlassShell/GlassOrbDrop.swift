@@ -9,7 +9,7 @@
 //  squashed as it lands, wobbling round again, with a ripple going out from it.
 //
 
-#if os(visionOS)
+#if os(visionOS) || os(macOS)
 import SwiftUI
 
 enum GlassOrbDrop {
@@ -52,8 +52,8 @@ struct GlassOrbDropDeparture: ViewModifier {
 struct GlassOrbDropArrival: ViewModifier {
     @State private var landed = false
 
-    /// Where the orb touches down in its cell: the bottom of the orb (`GlassOrbRingLayout` sets the
-    /// orb 14 points above the cell's middle).
+    /// Where the orb touches down in its cell: the bottom of the orb (the ring's layout sets the orb
+    /// `GlassOrbMetrics.orbRaise` above the cell's middle).
     private static let contact = UnitPoint(x: 0.5, y: 0.61)
 
     /// The orb at rest, as it stays once landed; each track starts by jumping to where the fall
@@ -76,16 +76,16 @@ struct GlassOrbDropArrival: ViewModifier {
                 .background {
                     Circle()
                         .strokeBorder(.white.opacity(0.8), lineWidth: 2)
-                        .frame(width: GlassConnectionsOrb.diameter, height: GlassConnectionsOrb.diameter)
+                        .frame(width: GlassOrbMetrics.orbDiameter, height: GlassOrbMetrics.orbDiameter)
                         .scaleEffect(landing.ripple)
                         .opacity(landing.rippleOpacity)
-                        .offset(y: -14)
+                        .offset(y: -GlassOrbMetrics.orbRaise)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
         } keyframes: { _ in
             KeyframeTrack(\.y) {
-                MoveKeyframe(-70)
+                MoveKeyframe(-GlassOrbMetrics.fall)
                 CubicKeyframe(0, duration: 0.28)
             }
             KeyframeTrack(\.opacity) {

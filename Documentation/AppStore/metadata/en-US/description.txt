@@ -8,7 +8,7 @@ Each session is a window you place around you, so a server's terminal, its datab
 TERMINAL
 • SSH with host keys you confirm, and a stop if a key ever changes
 • Password and key sign-in, including keys made in the Secure Enclave
-• Tabs, a grid or a carousel of terminals, themes and workgroups
+• Tabs or a live grid of terminals, themes and workgroups
 • Port forwarding and an SFTP file browser
 • On Vision Pro, pinch and hold a link or a path a terminal prints: Quick Look shows the file over the terminal, a log's end included, and Watch Log File follows a log in a new tab
 • Keep Sessions Running with tmux: a dropped connection, a closed window or a quit app leaves the work running, and Active picks the session up on another device

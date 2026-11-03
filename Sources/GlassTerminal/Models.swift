@@ -2477,8 +2477,25 @@ struct WorkgroupSSHSubstitution: Codable, Equatable {
 
 struct LayoutPreset: Identifiable, Codable, Hashable {
     enum OpeningView: String, Codable, CaseIterable, Sendable {
-        case tabs, grid, carousel
+        case tabs, grid
         var title: String { rawValue.capitalized }
+
+        /// A workgroup saved to open in the carousel opens in the grid: the carousel is gone on the Mac and
+        /// Vision Pro (D96, 2026-11-02), and an unreadable opening view would have lost the whole workgroup.
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            if let view = Self(rawValue: raw) {
+                self = view
+            } else if raw == Self.legacyCarousel {
+                self = .grid
+            } else {
+                throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                        debugDescription: "No opening view \(raw)"))
+            }
+        }
+
+        /// What builds before D96 wrote for the carousel.
+        static let legacyCarousel = "carousel"
     }
     static let currentSchemaVersion = 4
     nonisolated static let maximumNameLength = 80
@@ -2809,8 +2826,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     var workspaceLayout: WorkspaceLayout? = nil
     var openingView: OpeningView = .tabs
     var autoFocusOnActivity = LayoutPreset.followsActivityByDefault
-    /// Nil lets the grid choose its layout; otherwise a preferred width in points.
-    var gridCardWidth: Double? = nil
     let createdAt: Date
     var lastUsed: Date?
     /// When it was last saved, here or on another device: its sync clock (2026-10-08). Nil for a
@@ -2928,7 +2943,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         case workspaceLayout
         case openingView
         case autoFocusOnActivity
-        case gridCardWidth
         case serverIDs
         case createdAt
         case lastUsed
@@ -2952,7 +2966,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         workspaceLayout = try container.decodeIfPresent(WorkspaceLayout.self, forKey: .workspaceLayout)
         openingView = try container.decodeIfPresent(OpeningView.self, forKey: .openingView) ?? .tabs
         autoFocusOnActivity = try container.decodeIfPresent(Bool.self, forKey: .autoFocusOnActivity) ?? Self.followsActivityByDefault
-        gridCardWidth = try container.decodeIfPresent(Double.self, forKey: .gridCardWidth).map { min(720, max(220, $0)) }
 
         if let decodedIntents = try container.decodeIfPresent([SessionIntent].self, forKey: .sessionIntents) {
             sessionIntents = decodedIntents
@@ -2975,7 +2988,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(workspaceLayout, forKey: .workspaceLayout)
         try container.encode(openingView, forKey: .openingView)
         try container.encode(autoFocusOnActivity, forKey: .autoFocusOnActivity)
-        try container.encodeIfPresent(gridCardWidth, forKey: .gridCardWidth)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(lastUsed, forKey: .lastUsed)
         try container.encodeIfPresent(modifiedAt, forKey: .modifiedAt)

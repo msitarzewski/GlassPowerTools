@@ -985,6 +985,10 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
     private let explicitDismiss: (@MainActor () -> Void)?
     @Environment(\.openWindow) private var openWindow
     @Environment(\.glassActiveConnectionsRoute) private var route
+    #if os(macOS)
+    /// The window's orb, when it can go into the dock (D95).
+    @Environment(\.glassSessionOrb) private var orb
+    #endif
 
     public init(show: GlassShowActiveConnections?, dismissCurrent: (@MainActor () -> Void)? = nil) {
         explicitShow = show
@@ -1012,6 +1016,13 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
 
     public var body: some ToolbarContent {
         #if os(macOS)
+        // Shrink to Orb, before Show All Windows, in every window that can go into the orb dock
+        // (D95): a database's, an editor's.
+        if show != nil, orb != nil {
+            ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
+                GlassSessionOrbButton()
+            }
+        }
         // Show All Windows, beside the ⚡ in every window that carries it: one control, the same
         // everywhere (GlassShowAllWindows, 2026-10-13).
         if show != nil, GlassShowAllWindows.toggle != nil {

@@ -181,18 +181,13 @@ struct MacWorkspaceCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .sidebar) {
-            // ⌘G is Find Next, the shell's (`GlassShellFindCommands`); Grid moved to ⌥⌘G and
-            // Carousel to ⌥⇧⌘G (the owner, 2026-10-08).
-            Button("Terminal Grid") {
-                commandCenterEntries?.first { $0.id == "workspace.grid" }?.action()
+            // ⌘G is Find Next, the shell's (`GlassShellFindCommands`); the window's overview moved to ⌥⌘G
+            // (the owner, 2026-10-08). Its carousel, on ⌥⇧⌘G, went with the first draft (D96).
+            Button("Terminal Overview") {
+                commandCenterEntries?.first { $0.id == "workspace.overview" }?.action()
             }
             .keyboardShortcut("g", modifiers: [.command, .option])
-            .disabled(commandCenterEntries?.contains { $0.id == "workspace.grid" } != true)
-            Button("Terminal Carousel") {
-                commandCenterEntries?.first { $0.id == "workspace.carousel" }?.action()
-            }
-            .keyboardShortcut("g", modifiers: [.command, .option, .shift])
-            .disabled(commandCenterEntries?.contains { $0.id == "workspace.carousel" } != true)
+            .disabled(commandCenterEntries?.contains { $0.id == "workspace.overview" } != true)
             Divider()
             ForEach(1...9, id: \.self) { number in
                 let entry = commandCenterEntries?.first { $0.id == "workspace.tab.\(number)" }

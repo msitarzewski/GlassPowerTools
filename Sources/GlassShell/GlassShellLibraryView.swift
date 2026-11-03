@@ -183,6 +183,9 @@ public struct GlassShellLibraryView: View {
         .frame(minWidth: 900, minHeight: 560)
         // So Window ▸ Workgroups can bring this window forward rather than open another.
         .background { GlassLibraryWindowRegistration() }
+        // Connections goes into the orb dock too, first and larger (D95), by its toolbar's button.
+        .glassSessionOrb(GlassSessionOrbFace(title: "Connections", symbolName: "rectangle.stack",
+                                             dockID: GlassOrbDock.connectionsID) { nil })
         #endif
     }
 
@@ -194,6 +197,10 @@ public struct GlassShellLibraryView: View {
         ForEach(model.registry.registered, id: \.kind) { capability in
             capability.libraryToolbarItems()
         }
+        #if os(macOS)
+        // Into the orb dock, after Show All Windows (D95).
+        GlassSessionOrbButton()
+        #endif
         // On the Mac "Add Host" belongs to the sidebar column (left of the sidebar
         // toggle); compact stacks and the visionOS tab bar have no sidebar region.
         #if !os(macOS)

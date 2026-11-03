@@ -50,6 +50,13 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         Self.dockMenu?()
     }
 
+    /// The Dock icon clicked with no window on screen: Connections back from the orb dock when it is
+    /// there (D95), rather than a second Connections window beside the one put away.
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag, GlassOrbDockModel.shared.bringBackConnections() { return false }
+        return true
+    }
+
     /// What is opened with the app — the Finder's Open With, a drop on the Dock icon, an `ssh://`
     /// link — taken here rather than by a scene's `onOpenURL` (D72; the owner, 2026-10-13: "Open with
     /// opens a new connections window along with the desired file"). SwiftUI delivers a URL to a

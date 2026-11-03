@@ -478,6 +478,9 @@ public final class GlassShellModel: GlassServiceStore {
     /// Whether this build syncs the library at all.
     public var isCatalogSyncAttached: Bool { catalogBackend != nil }
     private var remoteChangeTask: Task<Void, Never>?
+    /// Change notices the listener has taken off its stream, this library's or not, in the order posted. What a
+    /// test waits on to know a notice was passed over: a sync it didn't start can't be seen (2026-11-02).
+    @ObservationIgnored private(set) var remoteChangesTaken = 0
     public private(set) var catalogSyncStatus: GlassCatalogSyncStatus = .idle
     /// What the last completed sync moved, for the iCloud status: how many records the account
     /// holds, how many were taken here, how many were sent from here.
@@ -516,6 +519,7 @@ public final class GlassShellModel: GlassServiceStore {
         remoteChangeTask = Task { [weak self] in
             for await notice in NotificationCenter.default.notifications(named: Self.remoteChangeNotification) {
                 guard let self, !Task.isCancelled else { return }
+                remoteChangesTaken += 1
                 // The push is for every library (no object); one addressed to another model isn't
                 // this one's. A test's notice for its own model made another test's sync run, and
                 // that test read "Syncing" in place of the failure it was checking (2026-10-30).

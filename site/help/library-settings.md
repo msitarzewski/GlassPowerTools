@@ -57,6 +57,17 @@ With **Into the Dock**, a **Dock** section follows, with the dock's own **Opacit
 
 These settings are kept on this device.
 
+## Orbs on Mac
+
+**Settings** ▸ **Appearance** ▸ **Orbs** sets up the orb dock (see [Put windows in the orb dock on Mac](library-connect.md#put-windows-in-the-orb-dock-on-mac)):
+
+- **Dock Floats**: **Above This App’s Windows** (the starting setting), and the dock is hidden while another app is in front; or **Above All Windows**, and it stays over every window, whichever app is in front, on every desktop.
+- **Fit Dock to Its Orbs**, once you have resized the dock: the dock fits its orbs in a row again.
+
+A **Dock** section follows, with the dock's own **Opacity**, **Glass** and **Material**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**.
+
+These settings are kept on this Mac.
+
 ## General
 
 Under **This Device**, give this device a name. **Your Library**'s overview uses it on all your devices when it counts time in use and connections by device (see [The library at a glance](library-browse.md#the-library-at-a-glance)). Left empty, the name is what the system calls the device: on a Mac its computer name; on iPhone, iPad and Vision Pro, the kind of device ("iPhone"), so two of the same kind are best named here.
