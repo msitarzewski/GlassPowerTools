@@ -91,3 +91,23 @@ is unverified on a real Mac.
   site at 1280 wide (dark) and 390 wide (light): pictures load, no sideways scroll.
 - **Seen, not changed:** on Vision Pro the carousel's front tile is lighter and clearer than the site's terminal
   window at the same glass (the room's TV shows through it); for his headset check of D99.
+
+## The corners: a band for the controls, the full width below it (same day)
+- **His report** on the site picture: "a little akward... the curve eating the top of the screen" — the screen's
+  rounded corners cut off the remote's menu bar ("Applications" read "cations").
+- **Measured** on Apple's iPhone Duo bezel (its screen opening, 3 px per point): the corner hides 32 pt at 5 pt down,
+  23 at 10, 12 at 20, 6 at 30, 2.7 at 40, 1 at 50, none by about 65. Offered four fixes with these numbers; **his
+  choice: the top band, full width,** with "the small variants of the glass nav … inset our own controls accordingly,
+  and give the full width to the VM after the curve", as the app in his photo does.
+- **Built:** stood like a laptop, a 40-point band at the top (`DesktopSessionView.laptopBar`, `laptopBarHeight`)
+  holds Back, the desktop's name, and Settings, Clipboard and the ⚡ in a small glass capsule; the remote screen has
+  the full width from there to the fold. The controls are inset by `GeometryProxy.containerCornerInsets` (iOS 26):
+  measured on the Duo simulator, 55 × 55 pt for the whole view at rest, 20 pt for the 40-point band, which sits the
+  controls just inside the curve; a 12-point floor. The strip under the fold is back to the switch, state, Keys and
+  arrows; `GlassFoldDeck`'s `back:` (this morning's) removed, the file as before today.
+- **Test:** `testTheRemoteScreenHasTheTopHalfBelowItsBand` — the remote screen full width, 40 pt down; no navigation
+  bar; Back, Settings, Clipboard and the ⚡ above it, at least 16 pt from each side; Back leaves. Seen failing with
+  the controls at the 12-point floor (Back at x 12) and with no band (the screen at y 0); restored, compared. The Duo
+  suite: five pass; the two keyboard-switch tests fail as before (the simulator's hardware keyboard).
+- The site's Duo picture taken again with the band (same new file name; the site wasn't deployed in between), and
+  its words, the help and the release notes follow.

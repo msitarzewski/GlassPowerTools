@@ -101,9 +101,6 @@ public struct GlassFoldDeck<Work: View, Strip: View, Panel: View>: View {
     /// Put away, the keyboard counts as away whatever frame the system still reports (on a Duo stood
     /// like a laptop, an empty keyboard reported the whole lower half, D93).
     private let keyboardWanted: Bool?
-    /// The way back to the library, first in the strip, for a tool that puts its bar away while the
-    /// phone is stood like a laptop (the desktop, D93): the bar's chevron, moved under the fold.
-    private let back: (@MainActor () -> Void)?
     @State private var policy: GlassFoldDeckPolicy
     @State private var frame: CGRect = .zero
     @State private var keyboardShown = false
@@ -117,12 +114,11 @@ public struct GlassFoldDeck<Work: View, Strip: View, Panel: View>: View {
 
     public init(fold: Binding<GlassDeviceFold?>, start: GlassFoldDeckPolicy.Start = .keyboard,
                 keyboard: GlassFoldDeckKeyboard, keyboardWanted: Bool? = nil, panel: GlassFoldDeckPanel<Panel>?,
-                controlsColorScheme: ColorScheme? = nil, back: (@MainActor () -> Void)? = nil,
+                controlsColorScheme: ColorScheme? = nil,
                 @ViewBuilder work: () -> Work, @ViewBuilder strip: () -> Strip) {
         _fold = fold
         self.keyboard = keyboard
         self.keyboardWanted = keyboardWanted
-        self.back = back
         self.panel = panel
         self.controlsColorScheme = controlsColorScheme
         self.work = work()
@@ -175,7 +171,6 @@ public struct GlassFoldDeck<Work: View, Strip: View, Panel: View>: View {
     private func deck(below fold: GlassDeviceFold) -> some View {
         VStack(spacing: 8) {
             HStack(spacing: 12) {
-                if let back { backButton(back) }
                 keyboardSwitch
                 strip
                     .frame(maxWidth: .infinity)
@@ -207,14 +202,6 @@ public struct GlassFoldDeck<Work: View, Strip: View, Panel: View>: View {
         .frame(width: 44, height: 44)
         .glassEffect(.regular.interactive(), in: .circle)
         .accessibilityIdentifier("glass-fold-deck-keyboard")
-    }
-
-    private func backButton(_ back: @escaping @MainActor () -> Void) -> some View {
-        Button("Connections", systemImage: "chevron.backward") { back() }
-            .labelStyle(.iconOnly)
-            .frame(width: 44, height: 44)
-            .glassEffect(.regular.interactive(), in: .circle)
-            .accessibilityIdentifier("glass-fold-deck-back")
     }
 
     /// A fresh fold's keyboard is asked for again a moment later: the first request can arrive

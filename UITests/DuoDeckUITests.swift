@@ -139,30 +139,34 @@ final class DuoDeckUITests: XCTestCase {
         XCTAssertTrue(shortcut.waitForLabel("Ctrl+T", timeout: 5), "Control and T, recorded (\(shortcut.label))")
     }
 
-    /// Stood like a laptop, the remote screen has the whole top half: no status bar and no bar over
-    /// it (the owner, 2026-11-03). What the bar had is under the fold, and only there: Back, Settings,
-    /// Clipboard and the ⚡; and Back still leaves the desktop. (The library kept under the desktop
-    /// has a bar and a "Connections" of its own in the tree, so the bar's chevron is looked for in
-    /// a bar.)
-    func testTheRemoteScreenHasTheWholeTopHalf() throws {
+    /// Stood like a laptop, the remote screen has the top half's full width, from a band just below the screen's
+    /// rounded corners to the fold (the owner, 2026-11-03: "give the full width to the VM after the curve"). No
+    /// status bar and no navigation bar: the bar's controls are small, in that band, clear of the corners — Back,
+    /// Settings, Clipboard and the ⚡ — and Back still leaves the desktop. (The library kept under the desktop has a
+    /// bar and a "Connections" of its own in the tree, so the bar's chevron is looked for in a bar.)
+    func testTheRemoteScreenHasTheTopHalfBelowItsBand() throws {
         let pad = try launchDesktop()
         let screen = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Remote desktop")).firstMatch
         XCTAssertTrue(screen.waitForExistence(timeout: 10), "the remote screen")
         let window = app.windows.firstMatch.frame
-        XCTAssertLessThan(screen.frame.minY - window.minY, 1,
-                          "the remote screen starts at the window's top: \(screen.frame) in \(window)")
-        let back = element("glass-fold-deck-back")
-        XCTAssertTrue(back.waitForExistence(timeout: 5), "Back, in the strip")
+        XCTAssertEqual(screen.frame.width, window.width, accuracy: 1, "the full width: \(screen.frame) in \(window)")
+        XCTAssertEqual(screen.frame.minY - window.minY, 40, accuracy: 1, "just below the 40-point band: \(screen.frame)")
+        let back = element("session.laptop.back")
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "Back, in the band")
         XCTAssertEqual(app.navigationBars.buttons.matching(NSPredicate(format: "label == %@", "Connections")).count, 0,
-                       "no bar with Back over the desktop")
-        for (name, query) in [("Back", app.descendants(matching: .any).matching(identifier: "glass-fold-deck-back")),
+                       "no navigation bar with Back over the desktop")
+        for (name, query) in [("Back", app.descendants(matching: .any).matching(identifier: "session.laptop.back")),
                               ("Settings", app.descendants(matching: .any).matching(identifier: "session.display")),
                               ("Clipboard", app.buttons.matching(NSPredicate(format: "label == %@", "Clipboard"))),
                               ("the ⚡", app.descendants(matching: .any).matching(identifier: "active-connections-bolt"))] {
             // Every match: a control and its own label can both carry the name, at one place.
             let frames = query.allElementsBoundByIndex.map(\.frame)
-            XCTAssertFalse(frames.isEmpty, "\(name) in the strip")
-            XCTAssertTrue(frames.allSatisfy { $0.minY > screen.frame.maxY }, "\(name) under the fold only, not in a bar as well: \(frames)")
+            XCTAssertFalse(frames.isEmpty, "\(name) in the band")
+            XCTAssertTrue(frames.allSatisfy { $0.maxY <= screen.frame.minY + 1 }, "\(name) above the remote screen only: \(frames)")
+            // Out of the screen's rounded corners, as far as the system says for a band this high (20 points on
+            // the Duo; at the band's own 12-point floor a control's top corner would be under the curve).
+            XCTAssertTrue(frames.allSatisfy { $0.minX >= window.minX + 16 && $0.maxX <= window.maxX - 16 },
+                          "\(name) clear of the corners: \(frames)")
         }
         back.tap()
         XCTAssertTrue(pad.waitForNonExistence(timeout: 10), "Back left the desktop")

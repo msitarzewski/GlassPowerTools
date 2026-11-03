@@ -70,7 +70,7 @@ public struct DesktopSessionView: View {
     /// sits above it and the deck below, with the trackpad.
     @State private var deviceFold: GlassDeviceFold?
     /// The ⚡, handed down by the cover the desktop is shown in on a phone: stood like a laptop, the
-    /// bar that has it is put away and the strip under the fold has it, after Back (`onClose`).
+    /// bar that has it is put away, and the band above the remote screen has it (`laptopBar`).
     @Environment(\.glassActiveConnectionsRoute) private var activeConnectionsRoute
     #endif
 
@@ -243,8 +243,9 @@ public struct DesktopSessionView: View {
                           panel: GlassFoldDeckPanel(title: "Keys and Trackpad", systemImage: "rectangle.and.hand.point.up.left") {
                               DesktopFoldKeysPanel(session: session)
                           },
-                          controlsColorScheme: .dark, back: onClose) {
+                          controlsColorScheme: .dark) {
                 VStack(spacing: 0) {
+                    if laptopFold != nil { laptopBar }
                     picture
                     errorBanner
                 }
@@ -255,9 +256,9 @@ public struct DesktopSessionView: View {
             .onChange(of: laptopFold != nil, initial: true) { _, laptop in
                 session.keyboardAccessoryWithheld = laptop
             }
-            // Stood like a laptop, the remote screen has the whole top half, up to the fold: no
-            // status bar and no bar over it (the owner, 2026-11-03, after Sill and Headroom; Apple:
-            // content above the fold, controls below). What the bar had is in the strip under it.
+            // Stood like a laptop, the remote screen has the top half's full width, from just below
+            // the screen's rounded corners to the fold: no status bar, and the bar's controls small,
+            // in the band above it (`laptopBar`; the owner, 2026-11-03, after another app's).
             .statusBarHidden(laptopFold != nil)
             .toolbarVisibility(laptopFold != nil ? .hidden : .automatic, for: .navigationBar)
             // One bar of controls at a time: while the keyboard is up its own bar has the keys, the
@@ -546,33 +547,61 @@ public struct DesktopSessionView: View {
     /// The fold across the window: an iPhone Duo stood like a laptop.
     private var laptopFold: GlassDeviceFold? { deviceFold.flatMap { $0.isAcross ? $0 : nil } }
 
-    /// The deck's strip below the fold: the desktop's name and state, the Keys menu and the arrow
-    /// pad, as the status bar has them, then what the put-away bar had — Settings, Clipboard and the
-    /// ⚡. Back and the deck's switch (the keyboard's or the trackpad's) come before it.
+    /// The deck's strip below the fold: the connection's state, the Keys menu and the arrow pad,
+    /// as the status bar has them; the deck's switch beside it is the keyboard's or the trackpad's.
     private var foldStrip: some View {
         HStack(spacing: 12) {
             Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(windowTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
-                Text(session.status).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .accessibilityElement(children: .combine)
+            Text(session.status).font(.caption).lineLimit(1)
             Spacer(minLength: 4)
             DesktopKeysMenu(session: session).labelStyle(.iconOnly).glassBarItem()
             DesktopArrowPad(session: session).glassBarItem()
-            HStack(spacing: 2) {
-                sessionActions
-                    .labelStyle(.iconOnly)
-                    .frame(width: 40, height: 40)
-                if let route = activeConnectionsRoute {
-                    GlassActiveConnectionsBolt(show: { session.releaseInput(); route.show() },
-                                               dismissCurrent: route.dismissCurrent)
-                        .frame(width: 40, height: 40)
-                }
-            }
-            .padding(.horizontal, 4)
-            .glassEffect(.regular.interactive(), in: .capsule)
         }
+    }
+
+    /// The band's height, stood like a laptop: below it the screen's rounded corners take no more than
+    /// about 3 points from the remote screen's top row at each side (measured on Apple's iPhone Duo
+    /// bezel, 2026-11-03), so the remote screen has the full width from there to the fold.
+    static let laptopBarHeight: CGFloat = 40
+
+    /// What the bar has, stood like a laptop, in small glass in the band above the remote screen —
+    /// Back, the desktop's name, Settings, Clipboard and the ⚡ — kept out of the screen's rounded
+    /// corners by as much as the system says to (`containerCornerInsets`), as another app on the Duo
+    /// keeps its own (the owner, 2026-11-03: "the small variants of the glass nav").
+    private var laptopBar: some View {
+        GeometryReader { proxy in
+            let corners = proxy.containerCornerInsets
+            HStack(spacing: 8) {
+                if let onClose {
+                    Button("Connections", systemImage: "chevron.backward") { onClose() }
+                        .labelStyle(.iconOnly)
+                        .frame(width: 32, height: 32)
+                        .glassEffect(.regular.interactive(), in: .circle)
+                        .accessibilityIdentifier("session.laptop.back")
+                }
+                Text(windowTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                HStack(spacing: 0) {
+                    sessionActions
+                        .labelStyle(.iconOnly)
+                        .frame(width: 36, height: 32)
+                    if let route = activeConnectionsRoute {
+                        GlassActiveConnectionsBolt(show: { session.releaseInput(); route.show() },
+                                                   dismissCurrent: route.dismissCurrent)
+                            .frame(width: 36, height: 32)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .glassEffect(.regular.interactive(), in: .capsule)
+            }
+            .font(.subheadline)
+            .padding(.leading, max(12, corners.topLeading.width))
+            .padding(.trailing, max(12, corners.topTrailing.width))
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .frame(height: Self.laptopBarHeight)
+        .environment(\.colorScheme, .dark)
     }
     #endif
 

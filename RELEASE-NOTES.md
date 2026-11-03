@@ -102,10 +102,11 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 ## Recent builds
 
 ### 0.4.591 (3 November 2026)
-- **iPhone Duo stood like a small laptop: the remote desktop has the whole top half.** No status bar and no toolbar
-  over it, as other remote desktop apps on the Duo do; the back button, **Settings**, **Clipboard** and ⚡ move to
-  the strip under the fold, beside the desktop's name, **Keys** and the arrow pad. A desktop that can change its size
-  (Windows, most Linux desktops) is resized to fill the half; a Mac's screen keeps its shape.
+- **iPhone Duo stood like a small laptop: the remote desktop has the top half's full width.** It runs from just
+  below the screen's rounded corners down to the fold, so they no longer cut off its menu bar or a window's close
+  button. There is no status bar; the back button, the desktop's name, **Settings**, **Clipboard** and ⚡ are small
+  glass controls in the band above it, kept as far from the corners as the system asks. A desktop that can change
+  its size (Windows, most Linux desktops) is resized to fill the space; a Mac's screen keeps its shape.
 
 ### 0.4.590 (3 November 2026)
 - **A window's overview and its carousel on iPhone, iPad and Vision Pro** (D99), as on the Mac. **Terminal View**
