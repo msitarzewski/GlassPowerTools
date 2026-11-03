@@ -983,7 +983,6 @@ public extension EnvironmentValues {
 public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
     private let explicitShow: GlassShowActiveConnections?
     private let explicitDismiss: (@MainActor () -> Void)?
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.glassActiveConnectionsRoute) private var route
     #if os(macOS)
     /// The window's orb, when it can go into the dock (D95).
@@ -1002,16 +1001,6 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
     }
 
     private var show: GlassShowActiveConnections? { explicitShow ?? route?.show }
-
-    /// Holding the bolt: All Windows, leaving this screen first when a card is chosen. iPhone and
-    /// iPad only so far.
-    private static func allWindows(dismissCurrent: (@MainActor () -> Void)?) -> (@MainActor () -> Void)? {
-        #if os(iOS)
-        { GlassShowAllWindows.presentOverview(dismissCurrent: dismissCurrent) }
-        #else
-        nil
-        #endif
-    }
     private var dismissCurrent: (@MainActor () -> Void)? { explicitDismiss ?? route?.dismissCurrent }
 
     public var body: some ToolbarContent {
@@ -1033,16 +1022,49 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
         #endif
         if let show {
             ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
-                GlassActiveConnectionsButton(action: {
-                    if GlassWindowPresentation.canOpenWindows {
-                        openWindow.openConnections()
-                    } else {
-                        dismissCurrent?()
-                    }
-                    show()
-                }, hold: Self.allWindows(dismissCurrent: GlassWindowPresentation.canOpenWindows ? nil : dismissCurrent))
+                GlassActiveConnectionsBolt(show: show, dismissCurrent: dismissCurrent)
             }
         }
+    }
+}
+
+/// The ⚡ that leaves a screen for Active: in a window's toolbar (`GlassActiveConnectionsToolbarContent`),
+/// or wherever a screen has put its toolbar away — an iPhone Duo stood like a laptop has it in the
+/// strip under the fold (D93).
+public struct GlassActiveConnectionsBolt: View {
+    private let show: GlassShowActiveConnections
+    private let dismissCurrent: (@MainActor () -> Void)?
+    @Environment(\.openWindow) private var openWindow
+
+    public init(show: @escaping GlassShowActiveConnections, dismissCurrent: (@MainActor () -> Void)? = nil) {
+        self.show = show
+        self.dismissCurrent = dismissCurrent
+    }
+
+    /// The screen's route, from the environment.
+    public init(route: GlassActiveConnectionsRoute) {
+        self.init(show: route.show, dismissCurrent: route.dismissCurrent)
+    }
+
+    /// Holding the bolt: All Windows, leaving this screen first when a card is chosen. iPhone and
+    /// iPad only so far.
+    private static func allWindows(dismissCurrent: (@MainActor () -> Void)?) -> (@MainActor () -> Void)? {
+        #if os(iOS)
+        { GlassShowAllWindows.presentOverview(dismissCurrent: dismissCurrent) }
+        #else
+        nil
+        #endif
+    }
+
+    public var body: some View {
+        GlassActiveConnectionsButton(action: {
+            if GlassWindowPresentation.canOpenWindows {
+                openWindow.openConnections()
+            } else {
+                dismissCurrent?()
+            }
+            show()
+        }, hold: Self.allWindows(dismissCurrent: GlassWindowPresentation.canOpenWindows ? nil : dismissCurrent))
     }
 }
 

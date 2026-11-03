@@ -139,6 +139,35 @@ final class DuoDeckUITests: XCTestCase {
         XCTAssertTrue(shortcut.waitForLabel("Ctrl+T", timeout: 5), "Control and T, recorded (\(shortcut.label))")
     }
 
+    /// Stood like a laptop, the remote screen has the whole top half: no status bar and no bar over
+    /// it (the owner, 2026-11-03). What the bar had is under the fold, and only there: Back, Settings,
+    /// Clipboard and the ⚡; and Back still leaves the desktop. (The library kept under the desktop
+    /// has a bar and a "Connections" of its own in the tree, so the bar's chevron is looked for in
+    /// a bar.)
+    func testTheRemoteScreenHasTheWholeTopHalf() throws {
+        let pad = try launchDesktop()
+        let screen = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Remote desktop")).firstMatch
+        XCTAssertTrue(screen.waitForExistence(timeout: 10), "the remote screen")
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(screen.frame.minY - window.minY, 1,
+                          "the remote screen starts at the window's top: \(screen.frame) in \(window)")
+        let back = element("glass-fold-deck-back")
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "Back, in the strip")
+        XCTAssertEqual(app.navigationBars.buttons.matching(NSPredicate(format: "label == %@", "Connections")).count, 0,
+                       "no bar with Back over the desktop")
+        for (name, query) in [("Back", app.descendants(matching: .any).matching(identifier: "glass-fold-deck-back")),
+                              ("Settings", app.descendants(matching: .any).matching(identifier: "session.display")),
+                              ("Clipboard", app.buttons.matching(NSPredicate(format: "label == %@", "Clipboard"))),
+                              ("the ⚡", app.descendants(matching: .any).matching(identifier: "active-connections-bolt"))] {
+            // Every match: a control and its own label can both carry the name, at one place.
+            let frames = query.allElementsBoundByIndex.map(\.frame)
+            XCTAssertFalse(frames.isEmpty, "\(name) in the strip")
+            XCTAssertTrue(frames.allSatisfy { $0.minY > screen.frame.maxY }, "\(name) under the fold only, not in a bar as well: \(frames)")
+        }
+        back.tap()
+        XCTAssertTrue(pad.waitForNonExistence(timeout: 10), "Back left the desktop")
+    }
+
     /// The deck's switch trades the trackpad for the keyboard and back.
     func testTheSwitchTradesTheTrackpadForTheKeyboard() throws {
         let pad = try launchDesktop()

@@ -194,40 +194,8 @@ typealias MacTerminalExposeLayout = GlassAllWindowsLayout
 
 // MARK: Keyboard
 
-enum MacTerminalExposeNavigation {
-    enum Direction { case left, right, up, down }
-
-    /// Where an arrow key goes: to the nearest tile that way on screen, across groups. Left and
-    /// right at the end of a row go on through the reading order, so every tile can be reached
-    /// with them alone. `items` are in reading order; nothing selected selects the first.
-    static func moved<ID: Hashable>(_ selection: ID?, _ direction: Direction,
-                                    in items: [(id: ID, frame: CGRect)]) -> ID? {
-        guard let first = items.first else { return nil }
-        guard let selection, let index = items.firstIndex(where: { $0.id == selection }) else { return first.id }
-        let current = items[index].frame
-        switch direction {
-        case .left, .right:
-            let forward = direction == .right
-            let row = items.filter { item in
-                item.id != selection && item.frame.midY >= current.minY && item.frame.midY <= current.maxY
-                    && (forward ? item.frame.midX > current.midX : item.frame.midX < current.midX)
-            }
-            if let next = row.min(by: { abs($0.frame.midX - current.midX) < abs($1.frame.midX - current.midX) }) {
-                return next.id
-            }
-            let target = index + (forward ? 1 : -1)
-            return items.indices.contains(target) ? items[target].id : selection
-        case .up, .down:
-            let candidates = items.filter { item in
-                direction == .down ? item.frame.minY >= current.maxY - 0.5 : item.frame.maxY <= current.minY + 0.5
-            }
-            guard let nearest = candidates.map(\.frame.midY)
-                .min(by: { abs($0 - current.midY) < abs($1 - current.midY) }) else { return selection }
-            return candidates.filter { abs($0.frame.midY - nearest) < current.height / 2 }
-                .min { abs($0.frame.midX - current.midX) < abs($1.frame.midX - current.midX) }?.id ?? selection
-        }
-    }
-}
+/// Moved to the shell with the layout it walks (D99), so a window's overview off the Mac moves the same way.
+typealias MacTerminalExposeNavigation = GlassAllWindowsNavigation
 
 // MARK: Pinch
 

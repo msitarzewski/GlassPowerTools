@@ -153,3 +153,40 @@ public struct GlassAllWindowsLayout: Equatable, Sendable {
         tileSize = CGSize(width: tileWidth, height: tileHeight)
     }
 }
+
+/// Where the arrow keys go among tiles laid out by `GlassAllWindowsLayout`: Show All Windows' and a window's overview,
+/// on the Mac (`MacTerminalExposeNavigation`, where it began) and off it (D99).
+public enum GlassAllWindowsNavigation {
+    public enum Direction: Sendable { case left, right, up, down }
+
+    /// Where an arrow key goes: to the nearest tile that way on screen, across groups. Left and
+    /// right at the end of a row go on through the reading order, so every tile can be reached
+    /// with them alone. `items` are in reading order; nothing selected selects the first.
+    public static func moved<ID: Hashable>(_ selection: ID?, _ direction: Direction,
+                                    in items: [(id: ID, frame: CGRect)]) -> ID? {
+        guard let first = items.first else { return nil }
+        guard let selection, let index = items.firstIndex(where: { $0.id == selection }) else { return first.id }
+        let current = items[index].frame
+        switch direction {
+        case .left, .right:
+            let forward = direction == .right
+            let row = items.filter { item in
+                item.id != selection && item.frame.midY >= current.minY && item.frame.midY <= current.maxY
+                    && (forward ? item.frame.midX > current.midX : item.frame.midX < current.midX)
+            }
+            if let next = row.min(by: { abs($0.frame.midX - current.midX) < abs($1.frame.midX - current.midX) }) {
+                return next.id
+            }
+            let target = index + (forward ? 1 : -1)
+            return items.indices.contains(target) ? items[target].id : selection
+        case .up, .down:
+            let candidates = items.filter { item in
+                direction == .down ? item.frame.minY >= current.maxY - 0.5 : item.frame.maxY <= current.minY + 0.5
+            }
+            guard let nearest = candidates.map(\.frame.midY)
+                .min(by: { abs($0 - current.midY) < abs($1 - current.midY) }) else { return selection }
+            return candidates.filter { abs($0.frame.midY - nearest) < current.height / 2 }
+                .min { abs($0.frame.midX - current.midX) < abs($1.frame.midX - current.midX) }?.id ?? selection
+        }
+    }
+}

@@ -91,6 +91,8 @@ enum GlassDemoMode {
         // Vision Pro terminal at Blur 0 is completely clear). The site's pictures use
         // `0.78,0.5,thin`: Opacity 78%, Glass 50%, Medium (the owner, 2026-10-18).
         let arguments = ProcessInfo.processInfo.arguments
+        // `--demo-carousel`: a window's overview as the carousel (D99).
+        if arguments.contains("--demo-carousel") { GlassTerminalRuntime.demoOverviewAsCarousel() }
         var demoGlass: (opacity: Double, frost: Double)?
         if let index = arguments.firstIndex(of: "--demo-glass"), arguments.indices.contains(index + 1) {
             let parts = arguments[index + 1].split(separator: ",").map(String.init)
@@ -283,6 +285,16 @@ enum GlassDemoMode {
                 terminal.requestDemoTabs(names: ["build", "logs", "api", "web", "db", "cache", "jobs", "deploy", "docs", "tests"],
                                          output: Data(terminalTranscript.utf8), grid: false)
             }
+        case "terminal-carousel":
+            // The site's carousel (2026-11-03, the owner: "The new coverflow view for terminals too!"): a
+            // window of five tabs, the first a btop-style monitor on alpha and four coding agents at work on
+            // the shop, each with its mark. Off the Mac it opens in the window's overview (with
+            // `--demo-carousel`, the carousel, and `--demo-visit-tabs`, each tab shown first so it has a
+            // picture); on the Mac site_shots.sh shows each tab and opens the overview itself.
+            terminal.requestDemoTabs(names: ["alpha", "✳ Storefront checkout redesign", "✳ Fix the jobs worker",
+                                             "✳ Migrate orders to Postgres", "✳ Draft the release notes"],
+                                     output: Data(agentTranscript.utf8), grid: true, windowSettings: demoLook,
+                                     firstDraw: GlassDemoBtop.screen(rows:columns:))
         case "terminal-tabs", "terminal-grid":
             // W31: one window with two terminals as its tabs, shown in tabs and in the grid, for
             // checking that one bottom bar shows. The shell reports its folder (OSC 7), so Open
@@ -412,10 +424,17 @@ enum GlassDemoMode {
             // not Appearance's), and with `--demo-fade-desktop` an opacity above 0 fades the remote
             // screen (`desktopSettings`, above).
             let windowSettings = surface == "desktop" ? desktopSettings : GlassDesktopRuntime.demoWindowSettings
+            // With `--demo-desktop-resizes`, the made-up server changes its size to the window's as an
+            // RDP server does (the iPhone Duo's top half, 2026-11-03); otherwise it stays 1920 × 1080,
+            // as the site's Mac and Vision Pro pictures and their words have it.
+            var redraw: (@MainActor (DesktopSize) -> CGImage?)?
+            if ProcessInfo.processInfo.arguments.contains("--demo-desktop-resizes") {
+                redraw = { size in DemoRemoteScreen.picture(width: size.width, height: size.height) }
+            }
             await desktop.requestDemoDesktop(
                 name: "bravo", host: "192.0.2.20", picture: picture,
                 windowSettings: windowSettings,
-                opensSettings: surface == "desktop-settings")
+                opensSettings: surface == "desktop-settings", redraw: redraw)
         case "all-windows":
             // All Windows (2026-10-14): a window of three terminals as tabs, the first running
             // the btop-style monitor, the shop's database, a desktop and an editor, then All Windows
@@ -933,6 +952,18 @@ enum GlassDemoMode {
 /// The remote screen in the desktop shot: an invented Linux desktop — wallpaper, a top bar, a
 /// monitoring window and a file list. Drawn here so every pixel is ours; no product's look.
 private struct DemoRemoteScreen: View {
+    /// The screen's size: 1920 × 1080, or a resized desktop's shape at the same width, its windows
+    /// as they were and more of the wallpaper above and below them.
+    var size = CGSize(width: 1920, height: 1080)
+
+    /// The screen drawn `width` × `height` pixels: a desktop resized to that shape (`--demo-desktop-resizes`).
+    @MainActor static func picture(width: Int, height: Int) -> CGImage? {
+        guard width > 0, height > 0 else { return nil }
+        let renderer = ImageRenderer(content: DemoRemoteScreen(size: CGSize(width: 1920, height: 1920 * Double(height) / Double(width))))
+        renderer.scale = Double(width) / 1920
+        return renderer.cgImage
+    }
+
     private struct Sample: Identifiable { let id = UUID(); let minute: Int; let host: String; let load: Double }
     private static let samples: [Sample] = ["web", "db", "jobs"].enumerated().flatMap { index, host in
         (0..<60).map { minute in
@@ -946,6 +977,9 @@ private struct DemoRemoteScreen: View {
         ("doc.text", "nginx.conf", "4 KB"), ("doc.zipper", "shop-2.14.tar.gz", "48 MB"),
         ("doc.text", "README.md", "6 KB"), ("terminal", "deploy.sh", "3 KB"),
     ]
+
+    /// The windows' drop below where they stand on a 1920 × 1080 screen: half of a taller screen's extra height.
+    private var below: CGFloat { max(0, size.height - 1080) / 2 }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -981,7 +1015,7 @@ private struct DemoRemoteScreen: View {
                     .chartForegroundStyleScale(["web": .blue, "db": .green, "jobs": .orange])
                 }
             }
-            .offset(x: 90, y: 110)
+            .offset(x: 90, y: 110 + below)
 
             window(title: "~/shop", width: 620, height: 520) {
                 VStack(spacing: 0) {
@@ -997,9 +1031,9 @@ private struct DemoRemoteScreen: View {
                     }
                 }
             }
-            .offset(x: 1230, y: 360)
+            .offset(x: 1230, y: 360 + below)
         }
-        .frame(width: 1920, height: 1080)
+        .frame(width: size.width, height: size.height)
         .environment(\.colorScheme, .light)
     }
 

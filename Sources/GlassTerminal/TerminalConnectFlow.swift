@@ -397,10 +397,11 @@ struct TerminalConnectFlow: ViewModifier {
             // 2026-10-15: one window of tabs, as the iPhone opens a saved Workgroup or Open as Tab In:
             // the tab in front connected, the rest slots that connect when shown — which All Windows
             // left out (the owner: "in the expose it show one card for all tabs").
-            _ = grid
             let workgroupID = sessionManager.createWorkgroup(name: first.server.name, colorTag: first.server.colorTag,
                                                              windowSettings: windowSettings)
             for session in sessions { _ = sessionManager.appendSession(session, toWorkgroup: workgroupID) }
+            // In the window's overview (D99), as on Vision Pro.
+            if grid { VisionTerminalWorkgroupView.demoOpensGrid.insert(workgroupID) }
             if ProcessInfo.processInfo.arguments.contains("--demo-slots") {
                 for session in sessions.dropFirst() {
                     session.isWorkgroupSlot = true

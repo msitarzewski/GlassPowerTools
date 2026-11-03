@@ -5,17 +5,65 @@ import GlassConnectionKit
 import GlassLayers
 import GlassRDPTransport
 
+/// The demo's session, for its made-up server to answer a resize with a new picture.
+@MainActor private final class DemoSessionReference {
+    weak var model: DesktopSessionModel?
+    var sequence: UInt64 = 1
+}
+
 /// Screenshots only (`App/GlassDemoMode.swift`): a desktop window whose remote screen is a picture
 /// the app drew itself. The same server-less session as `DesktopGlassWindowPreview`: the
 /// operations do nothing, nothing is contacted, and the picture is the only frame it receives.
 extension GlassDesktopRuntime {
     /// With `windowSettings`, the window keeps settings of its own (W25); with `opensSettings`,
-    /// Desktop Settings ▸ This Window opens over it.
+    /// Desktop Settings ▸ This Window opens over it. With `redraw`, the made-up server takes Match
+    /// Window Size as an RDP server does: it says it can change its size, and answers each size
+    /// asked for with a picture drawn at that size (an iPhone Duo's top half, 2026-11-03).
     public func requestDemoDesktop(name: String, host: String, picture: CGImage,
                                    windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
-                                   opensSettings: Bool = false) async {
+                                   opensSettings: Bool = false,
+                                   redraw: (@MainActor (DesktopSize) -> CGImage?)? = nil) async {
+        guard let first = Self.demoFrame(picture, sequence: 1) else { return }
+
+        // Throwaway storage, so the demo never writes into the run's desktop list; its window's
+        // settings are kept in memory only (the store's default).
+        let app = DesktopAppModel(storageDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("glass-demo-\(UUID())"))
+        await app.load()
+        let connection = DesktopConnection(name: name, host: host, username: "ann")
+        var operations = DesktopSessionOperations()
+        operations.connect = { _, _ in }
+        operations.disconnect = { _ in }
+        let session = DemoSessionReference()
+        operations.resize = { _, size, _ in
+            guard let redraw, let model = session.model, let picture = redraw(size) else { return }
+            session.sequence += 1
+            if let frame = Self.demoFrame(picture, sequence: session.sequence) {
+                model.receive(frame, attempt: model.attemptID)
+            }
+        }
+        let model = DesktopSessionModel(connection: connection, app: app, operations: operations)
+        session.model = model
+        model.windowSettings = windowSettings
+        model.demoOpensSettings = opensSettings
+        do {
+            try await model.connect(username: "ann", domain: nil, password: "")
+            await model.receive(.state(.connected), attempt: model.attemptID, connection: connection)
+            if redraw != nil {
+                await model.receive(.displayCapabilities(GlassRDPDisplayCapabilities(maximumMonitors: 1,
+                                                                                     maximumArea: 8192 * 8192)),
+                                    attempt: model.attemptID, connection: connection)
+            }
+            model.receive(first, attempt: model.attemptID)
+        } catch { return }
+        demoSessions[connection.id] = model
+        enqueue(.show(connectionID: connection.id))
+    }
+
+    /// A picture as the frame a server sends: BGRA in memory, which is what the renderer uploads
+    /// (`DesktopMetalRenderer`).
+    private static func demoFrame(_ picture: CGImage, sequence: UInt64) -> GlassRDPFrame? {
         let width = picture.width, height = picture.height
-        // BGRA in memory, which is what the renderer uploads (`DesktopMetalRenderer`).
         var pixels = Data(count: width * height * 4)
         let drawn = pixels.withUnsafeMutableBytes { raw -> Bool in
             guard let space = CGColorSpace(name: CGColorSpace.sRGB),
@@ -27,30 +75,8 @@ extension GlassDesktopRuntime {
             context.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
-        guard drawn else { return }
-
-        // Throwaway storage, so the demo never writes into the run's desktop list; its window's
-        // settings are kept in memory only (the store's default).
-        let app = DesktopAppModel(storageDirectory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("glass-demo-\(UUID())"))
-        await app.load()
-        let connection = DesktopConnection(name: name, host: host, username: "ann")
-        var operations = DesktopSessionOperations()
-        operations.connect = { _, _ in }
-        operations.disconnect = { _ in }
-        operations.resize = { _, _, _ in }
-        let model = DesktopSessionModel(connection: connection, app: app, operations: operations)
-        model.windowSettings = windowSettings
-        model.demoOpensSettings = opensSettings
-        do {
-            try await model.connect(username: "ann", domain: nil, password: "")
-            await model.receive(.state(.connected), attempt: model.attemptID, connection: connection)
-            let frame = try GlassRDPFrame(width: width, height: height, bytesPerRow: width * 4,
-                                          pixels: pixels, sequence: 1)
-            model.receive(frame, attempt: model.attemptID)
-        } catch { return }
-        demoSessions[connection.id] = model
-        enqueue(.show(connectionID: connection.id))
+        guard drawn else { return nil }
+        return try? GlassRDPFrame(width: width, height: height, bytesPerRow: width * 4, pixels: pixels, sequence: sequence)
     }
 
     /// Screenshots only (`--demo-open desktop-disconnected`): a desktop whose session was up and

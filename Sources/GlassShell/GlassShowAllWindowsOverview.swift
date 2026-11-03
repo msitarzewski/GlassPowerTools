@@ -157,18 +157,7 @@ struct GlassAllWindowsArrangement: View {
                        allOnScreen: Bool) -> some View {
         let origin = frames.frame.origin
         return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(.white.opacity(0.14), lineWidth: 1)
-                }
-            Label(machine.name, systemImage: "server.rack")
-                .font(.headline)
-                .lineLimit(1)
-                .frame(width: frames.titleFrame.width, height: frames.titleFrame.height, alignment: .leading)
-                .offset(x: frames.titleFrame.minX - origin.x, y: frames.titleFrame.minY - origin.y)
-                .accessibilityAddTraits(.isHeader)
+            GlassAllWindowsGroupPlate(title: machine.name, symbolName: "server.rack", frames: frames)
             ForEach(Array(zip(machine.sessions, frames.tileFrames)), id: \.0.id) { session, frame in
                 GlassAllWindowsCard(session: session, activate: { open(session.activate) },
                                     close: { session.requestClose { asking = $0 } },

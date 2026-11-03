@@ -80,6 +80,10 @@ shot vision-editor-git "${VISION_APP:-}" "$VISION" editor-git 32 "$GLASS --demo-
 # dock opens under a short Connections window, low enough for the simulator's fixed view, and a terminal with its
 # tabs comes back above it. The close-up keeps the dock alone: in this layout a dot's name is drawn under the
 # terminal's toolbar.
+# A window's overview as the carousel in real depth (D99; the owner, 2026-11-03: "The new coverflow view for terminals
+# too!"): five tabs, a btop-style monitor and four coding agents, each shown once first so it has a picture, the
+# middle one in front.
+shot vision-carousel "${VISION_APP:-}" "$VISION" terminal-carousel 42 "$GLASS --demo-close-connections --demo-carousel --demo-visit-tabs"
 shot vision-dock "${VISION_APP:-}" "$VISION" dock 45 "$GLASS --demo-close-connections --demo-dock-below --demo-library-size 1000x200"
 shot vision-dock-name "${VISION_APP:-}" "$VISION" dock 40 "$GLASS --demo-close-connections --demo-dock-alone" \
   "✳ Storefront checkout redesign"
@@ -112,13 +116,18 @@ raw, out, only = sys.argv[1], sys.argv[2], set(sys.argv[3:])
 room = Image.open(f"{raw}/vision-room.png").convert("RGB")
 # A close-up: the share of what was found to frame, from its left edge, and the room around it.
 closer = {"vision-dock-name": (0.62, 1.12)}
+# The carousel's window is clear above its tiles, so it is found by smaller differences, and framed closer: its
+# find field at the top, the tiles larger (2026-11-03).
+threshold = {"vision-carousel": 12}
+margin = {"vision-carousel": 1.12}
 for name in ["vision-terminal", "vision-database", "vision-desktop", "vision-editor", "vision-active", "vision-workgroups",
-             "vision-editor-git", "vision-dock", "vision-dock-name"]:
+             "vision-editor-git", "vision-dock", "vision-dock-name", "vision-carousel"]:
     if only and name not in only:
         continue
     shot = Image.open(f"{raw}/{name}.png").convert("RGB")
     # Where the windows and their controls are: what differs from the empty room, specks removed.
-    diff = ImageChops.difference(shot, room).convert("L").point(lambda v: 255 if v > 28 else 0)
+    limit = threshold.get(name, 28)
+    diff = ImageChops.difference(shot, room).convert("L").point(lambda v: 255 if v > limit else 0)
     diff = diff.resize((diff.width // 8, diff.height // 8)).filter(ImageFilter.MinFilter(3))
     if name in closer:
         # The dock is high in the room, and the room below it changes a little from run to run: found in the
@@ -132,7 +141,8 @@ for name in ["vision-terminal", "vision-database", "vision-desktop", "vision-edi
     else:
         left, top, right, bottom = (v * 8 for v in diff.getbbox())
         # A 16:9 frame around them, a third larger, inside the capture: the room around the windows, not all of it.
-        width = min(shot.width, max((right - left) * 1.35, (bottom - top) * 1.35 * 16 / 9))
+        m = margin.get(name, 1.35)
+        width = min(shot.width, max((right - left) * m, (bottom - top) * m * 16 / 9))
         height = width * 9 / 16
         x = min(max((left + right) / 2 - width / 2, 0), shot.width - width)
         y = min(max((top + bottom) / 2 - height / 2, 0), shot.height - height)

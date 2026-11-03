@@ -2137,3 +2137,36 @@ and the container's content was sized to itself. The rows are laid out at the wi
 frosted glass as is, the dock taking the key while the pointer is on it (keys typed then would go to it), or a
 drawn imitation of clear glass (no blur, a bevel; nothing bent). Task note
 `tasks/2026-11/2026-11-02_liquid-dock.md`.
+
+## D99 — A window's overview and carousel on iPhone, iPad and Vision Pro — Approved 2026-11-03; implemented 2026-11-03 (0.4.590; committed and pushed 2026-11-03 at his word)
+**Owner:** on 0.4.583 on his iPhone and headset: "both seem to be missing coverflow and the new expose." D96's overview
+and D97's carousel were built on the Mac only (D97: "not built there"). Asked, he chose:
+1. **iPhone and iPad: a Terminal View button** in the terminal's top bar, as Vision Pro has: Tabs, Grid, Carousel.
+2. **Vision Pro: the carousel in real depth** — the side tabs turned and set back in space, not the Mac's drawing in a
+   flat window.
+
+**Plan:** share what the Mac has rather than draw it a third time. Into GlassShell, beside `GlassAllWindowsLayout`:
+the carousel's geometry and placement, its row (flow, drag, tap, caption, accessibility; the Mac's trackpad as a hook),
+and the tile grid's arrow-key navigation; the Mac keeps its names as typealiases where it has them. The overview off
+the Mac draws this window's tabs as All Windows draws its cards off the Mac (picture, agent mark, caption), grouped
+under the window's name, with a selection ring, find, and the arrows, Return and Esc from a keyboard. Grid or
+Carousel is the device's choice (`TerminalOverviewStyle`, the Mac's key); `LayoutPreset.OpeningView` is unchanged (a
+workgroup opens in tabs or the grid). Vision Pro keeps its grid cards' drag, drop and menus.
+
+**Known limit (not new):** off the Mac a terminal draws itself only while on screen; a hidden tab shows the picture
+it took as it left, and one never shown its symbol (`SwiftTermHostView.previewImage`). Task note
+`tasks/2026-11/2026-11-03_overview-everywhere.md`.
+
+**Built (0.4.590):** `GlassCarousel.swift` (GlassShell: `GlassCarouselGeometry` and `GlassCarouselPlacement` moved from
+the Mac, `GlassCarouselRow`, and `depthPose`/`GlassCarouselDepthPlacement` for Vision Pro) and `GlassTabOverview.swift`
+(`GlassOverviewItem`, `GlassOverviewTile`, `GlassOverviewGrid`, `GlassOverviewFindField`; All Windows' group plate
+shared); `GlassAllWindowsNavigation` beside the layout; the Mac's carousel a wrapper on the row, its old names
+typealiases. In GlassTerminal: `TerminalOverviewStyle`/`TerminalViewChoice`, `TerminalWindowOverview` (iOS and
+visionOS) in place of the headset's old grid, `TerminalViewMenu` at the top left on iPhone and iPad. **Depth, as
+measured in the visionOS 27 simulator:** content behind a window's plane still draws; the front stands out by a
+neighbour's reach plus 4% of a tile (twice that drew it over 60% of the window), the neighbours on the plane turned
+50°, the front 40% of the row's width; Apple's glass behind a tile barely showed over the window's, so a tile carries
+its terminal's own canvas, opacity, tint and frost, as the old grid's cards did. **Found on the way:** the iPhone's
+title ran under the bar's buttons with a long name (before this too); three buttons on the right left it about 70
+points, so Terminal View went left and the title keeps to the room between the sides.
+

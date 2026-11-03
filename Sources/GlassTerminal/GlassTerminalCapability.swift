@@ -719,6 +719,11 @@ public final class GlassTerminalRuntime {
         window[TerminalWindowSettings.cursorStyle] = "Bar"
         return window
     }
+    /// Screenshots only (`--demo-carousel`): the window's overview drawn as the carousel (D99) rather than the grid,
+    /// in this run's own settings.
+    public static func demoOverviewAsCarousel() {
+        GlassUITestRun.settingsDefaults.set(TerminalOverviewStyle.carousel.rawValue, forKey: TerminalOverviewStyle.key)
+    }
     /// Screenshots only: the Files window on `name` at `path`, with no connection behind it.
     public func requestDemoFiles(name: String, path: String) { enqueue(.demoFiles(name: name, path: path)) }
     /// Screenshots only (`--demo-open workgroups`): a saved workgroup of `terminals` — each a
@@ -1118,7 +1123,7 @@ public final class GlassTerminalCapability: GlassCapability {
 
     /// A still of a terminal, in whatever image type this platform uses. 800px wide is the
     /// overview's own figure (`VisionTerminalWorkgroupView`), kept so both look the same.
-    private static func preview(of session: TerminalSession) -> Image? {
+    static func preview(of session: TerminalSession) -> Image? {
         #if os(macOS)
         session.terminalHostModel.previewImage(maxPixelWidth: 800).map(Image.init(nsImage:))
         #else

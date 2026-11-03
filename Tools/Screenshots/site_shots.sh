@@ -25,7 +25,8 @@
 # small pictures. `workspace` is four windows at once: a terminal running a btop-style monitor, a database, a
 # desktop and the editor. `editor-git` is the editor's Changes on the made-up shop's repository
 # (App/GlassDemoGit.swift, made with the VM's git); `sql` is SQL from a terminal, two windows at once;
-# `all-windows` is Show All Windows over a terminal's tabs, a database, a desktop and the editor.
+# `all-windows` is Show All Windows over a terminal's tabs, a database, a desktop and the editor; `carousel` is a
+# terminal window's overview as the carousel (D97), its five tabs a btop-style monitor and four coding agents.
 # Look at every picture before publishing it: nothing personal belongs in them.
 set -euo pipefail
 ROOT=${0:A:h:h:h}
@@ -243,6 +244,30 @@ all_windows() {  # dark | light
   sleep 3
   screen "all-windows-$1"
 }
+# `carousel`: a terminal window's overview as the carousel (D97; the owner, 2026-11-03: "The new coverflow view for
+# terminals too!"), opened as a person opens it, with ⌥⌘G. The window holds five tabs (the `terminal-carousel`
+# surface): a btop-style monitor on alpha, then four coding agents at work. A tab has a picture once it has been
+# shown, so each is shown (⌘2 … ⌘5), then the middle one (⌘3) is chosen, for tabs on both sides of it.
+carousel() {  # dark | light
+  SETTLE=20 launch terminal-carousel --demo-carousel
+  connections_away
+  alone alpha
+  place 1240 780
+  timeout 60 $VM tool press "$APP" "Hide Sidebar" alpha >/dev/null 2>&1 || true
+  sleep 2
+  place 1240 780
+  events "tell process \"$APP\" to set frontmost to true"
+  for tab in 2 3 4 5 3; do
+    events "keystroke \"$tab\" using command down"
+    sleep 2
+  done
+  events "keystroke \"g\" using {command down, option down}"
+  sleep 3
+  # The pointer off the window, so no tile is lit under it.
+  timeout 60 $VM tool move $(( SCREEN_W - 20 )) $(( SCREEN_H - 20 )) >/dev/null 2>&1 || true
+  sleep 1
+  screen "carousel-$1"
+}
 dock() {  # hide | show: in the GUI session (from SSH alone the Dock stayed, 2026-10-30)
   gui "defaults write com.apple.dock autohide -bool $([[ $1 == hide ]] && echo true || echo false); killall Dock" >/dev/null 2>&1 || true
   sleep 3
@@ -290,13 +315,13 @@ names=("$@")
 # `workgroups` and `workspace` are there to name, not in the default set: the Mac's workgroup detail cuts its
 # table off at this size, so the site shows the Vision Pro one; and the four windows at once repeated the home
 # page's four service pictures, so the owner kept those (2026-10-18).
-(( $# )) || names=(library terminal database diagram desktop editor editor-git sql active all-windows)
+(( $# )) || names=(library terminal database diagram desktop editor editor-git sql active all-windows carousel)
 prepare
 [[ -n ${(M)names:#database} || -n ${(M)names:#diagram} || -n ${(M)names:#workspace} || -n ${(M)names:#sql}
    || -n ${(M)names:#all-windows} ]] && shop
 for name in $names; do
   [[ $name == looks ]] && { looks; continue; }
-  [[ -n ${SURFACE[$name]:-} || $name == workspace || $name == sql || $name == all-windows ]] \
+  [[ -n ${SURFACE[$name]:-} || $name == workspace || $name == sql || $name == all-windows || $name == carousel ]] \
     || { echo "unknown shot: $name"; exit 2; }
   for look in dark light; do
     appearance $look
@@ -306,6 +331,10 @@ for name in $names; do
     fi
     if [[ $name == all-windows ]]; then
       all_windows $look
+      continue
+    fi
+    if [[ $name == carousel ]]; then
+      carousel $look
       continue
     fi
     if [[ $name == workspace ]]; then

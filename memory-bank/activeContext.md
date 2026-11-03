@@ -31,7 +31,40 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-03 — RESUME HERE: Mac 0.4.589 released
+## 2026-11-03 — RESUME HERE: the Duo's desktop gets the whole top half (0.4.591, uncommitted)
+- **His ask**, with a photo of another app: "How are they getting a full screen on the top for the desktop?"
+  Answered (Sill read from source, Headroom from coverage): no status bar or bar over the picture, and the Mac's
+  picture shaped to the half. His choice: "yes, do the bars first".
+- **Built:** stood like a laptop, the desktop hides the status bar and its bar; Back, Settings, Clipboard and ⚡ in the
+  strip under the fold (`GlassFoldDeck` `back:`, `GlassActiveConnectionsBolt` shared with the toolbar). Help and
+  release notes 0.4.591. Task note `tasks/2026-11/2026-11-03_duo-desktop-top-half.md`.
+- **Checked:** new Duo UI test passes, seen failing without each half; five other deck tests pass; the two
+  keyboard-switch tests fail identically on the code before the change (the simulator has a hardware keyboard on
+  since today's fresh boot; Device Hub's switch isn't scriptable). Not installed anywhere (no physical Duo known).
+- **Open for him:** a Mac's shape in the half (High Performance following the fold, or a one-window mode); the
+  library under an in-page desktop is in the accessibility tree (found, not changed).
+- **Then his "site screen shots … updated and pushed. The new coverflow view for terminals too!" and "install on
+  Vision and iPhone now":** the Duo laptop picture taken again (the demo desktop can now resize, DEBUG flag), the
+  carousel on the home and terminal pages (Mac from the VM, Vision Pro from the simulator). 0.4.591 Release built
+  for iPhone and Vision Pro; both devices were unavailable to devicectl, so not installed yet
+  (`~/Software/glass/tmp/install-591.sh` installs and reads back). Commit and push at his word; the site deploy
+  needs his staging on the host.
+
+## 2026-11-03 — the overview and carousel off the Mac (D99)
+- **His report** on his iPhone and headset (both 0.4.583, read back): "both seem to be missing coverflow and the new
+  expose" — D96/D97 were Mac-only. **His choices:** a Terminal View button on iPhone and iPad (Tabs, Grid,
+  Carousel); on Vision Pro the carousel in real depth. Plan in D99 and
+  `tasks/2026-11/2026-11-03_overview-everywhere.md`.
+- **Built (0.4.590, uncommitted):** the carousel, grid, navigation and find shared in GlassShell; Terminal View at the
+  top left on iPhone and iPad; Vision Pro's overview redrawn as Show All Windows and its carousel in depth (content
+  behind a window's plane draws, measured). The Mac's carousel runs on the shared row, checked in the VM. Tests
+  1099/391/56; new tests seen failing. Simulators: iPhone, iPad, Vision Pro. The build took Mermaid 12.3.0 (its
+  pre-action), acknowledgements regenerated.
+- **0.4.590 installed and read back** on the Mac (running, no new crash report), iPhone and Vision Pro.
+- **Next:** his look on the phone and headset (depth tuned from the simulator only). Commit, push and TestFlight at
+  his word. Still open: D98's frosted look, the dock's first-drag offset, his 0.4.576 headset check.
+
+## 2026-11-03 — Mac 0.4.589 released
 - **His word:** "this is fine. ship it." on 0.4.589, then "approved." for the release run. Committed and pushed
   (c869a828, 0.4.577–0.4.589).
 - **Mac 0.4.589 released**, the Mac's sixth: `Tools/Release/release-mac.sh` with Xcode 27.2 (27B52); app and disk
@@ -40,7 +73,10 @@ use the disposable test VM only).
   `site/static/appcast.xml`. README, the site's downloads and status lines, and the release notes name 0.4.589. The
   help's Mac dock section corrected (Connections is the icon in a drop of glass, not on a white circle) and says what
   Glass and Material do and why the dock looks frosted.
-- **Next:** the site carries the feed: live once he runs provision. Not in "ship it", each on his word: TestFlight
+- **Site live (2026-11-03):** he staged the build and ran provision (the classifier refused my staging write to the
+  server); the feed offers 0.4.589, its zip link answers 200 at the release's size, and all 108 live files match the
+  build by hash.
+- **Next:** not in "ship it", each on his word: TestFlight
   for iPhone, iPad and Vision Pro (574 there; 0.4.589 builds for both); the App Store Connect description. Still
   open: his choice for the frosted look (D98), the dock's first-drag 15 pt offset, his headset check of 0.4.576.
 

@@ -297,6 +297,11 @@ public struct GlassDesktopBootstrap<Content: View>: View {
                     // desktop with no way to a terminal is the dead end this exists to remove.
                     .glassActiveConnectionsToolbar(show: runtime.showActiveConnections,
                                                    dismissCurrent: { activeDesktop = nil })
+                    // The ⚡ for the strip under an iPhone Duo's fold, where the desktop puts this bar
+                    // away stood like a laptop (D93); Back there is the session's `onClose`.
+                    .environment(\.glassActiveConnectionsRoute, runtime.showActiveConnections.map {
+                        GlassActiveConnectionsRoute(show: $0, dismissCurrent: { activeDesktop = nil })
+                    })
                 }
                 .glassLayers(runtime.layers)
             }
@@ -310,7 +315,7 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     private func coverSession(_ connection: DesktopConnection) -> some View {
         #if DEBUG
         if let demo = runtime.demoSessions[connection.id] {
-            DesktopSessionView(previewSession: demo)
+            DesktopSessionView(previewSession: demo, onClose: { activeDesktop = nil })
         } else {
             DesktopSessionView(connection: connection, app: runtime.app,
                                onOutcome: { runtime.reportOutcome($0, for: connection.id) },

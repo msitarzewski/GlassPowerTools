@@ -69,6 +69,9 @@ public struct DesktopSessionView: View {
     /// Where an iPhone Duo's fold crosses the window (D93): stood like a laptop, the remote screen
     /// sits above it and the deck below, with the trackpad.
     @State private var deviceFold: GlassDeviceFold?
+    /// The ⚡, handed down by the cover the desktop is shown in on a phone: stood like a laptop, the
+    /// bar that has it is put away and the strip under the fold has it, after Back (`onClose`).
+    @Environment(\.glassActiveConnectionsRoute) private var activeConnectionsRoute
     #endif
 
     /// Reports the *real* outcome of this session to whoever asked for it — the shell, when the
@@ -108,8 +111,9 @@ public struct DesktopSessionView: View {
 
     /// A session built elsewhere: the simulator fixture, and the screenshot demo.
     #if DEBUG
-    init(previewSession: DesktopSessionModel, showActiveConnections: (@MainActor () -> Void)? = nil) {
-        onClose = nil
+    init(previewSession: DesktopSessionModel, showActiveConnections: (@MainActor () -> Void)? = nil,
+         onClose: (@MainActor () -> Void)? = nil) {
+        self.onClose = onClose
         onOutcome = nil
         self.showActiveConnections = showActiveConnections
         _session = State(initialValue: previewSession)
@@ -239,7 +243,7 @@ public struct DesktopSessionView: View {
                           panel: GlassFoldDeckPanel(title: "Keys and Trackpad", systemImage: "rectangle.and.hand.point.up.left") {
                               DesktopFoldKeysPanel(session: session)
                           },
-                          controlsColorScheme: .dark) {
+                          controlsColorScheme: .dark, back: onClose) {
                 VStack(spacing: 0) {
                     picture
                     errorBanner
@@ -251,6 +255,11 @@ public struct DesktopSessionView: View {
             .onChange(of: laptopFold != nil, initial: true) { _, laptop in
                 session.keyboardAccessoryWithheld = laptop
             }
+            // Stood like a laptop, the remote screen has the whole top half, up to the fold: no
+            // status bar and no bar over it (the owner, 2026-11-03, after Sill and Headroom; Apple:
+            // content above the fold, controls below). What the bar had is in the strip under it.
+            .statusBarHidden(laptopFold != nil)
+            .toolbarVisibility(laptopFold != nil ? .hidden : .automatic, for: .navigationBar)
             // One bar of controls at a time: while the keyboard is up its own bar has the keys, the
             // arrow pad and the tools (`DesktopKeyboardBar`), as a terminal's does; stood like a
             // laptop, the deck's strip has them.
@@ -537,15 +546,32 @@ public struct DesktopSessionView: View {
     /// The fold across the window: an iPhone Duo stood like a laptop.
     private var laptopFold: GlassDeviceFold? { deviceFold.flatMap { $0.isAcross ? $0 : nil } }
 
-    /// The deck's strip below the fold: the connection's state, the Keys menu and the arrow pad,
-    /// as the status bar has them; the deck's switch beside it is the keyboard's or the trackpad's.
+    /// The deck's strip below the fold: the desktop's name and state, the Keys menu and the arrow
+    /// pad, as the status bar has them, then what the put-away bar had — Settings, Clipboard and the
+    /// ⚡. Back and the deck's switch (the keyboard's or the trackpad's) come before it.
     private var foldStrip: some View {
         HStack(spacing: 12) {
             Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
-            Text(session.status).font(.caption).lineLimit(1)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(windowTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
+                Text(session.status).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .accessibilityElement(children: .combine)
             Spacer(minLength: 4)
             DesktopKeysMenu(session: session).labelStyle(.iconOnly).glassBarItem()
             DesktopArrowPad(session: session).glassBarItem()
+            HStack(spacing: 2) {
+                sessionActions
+                    .labelStyle(.iconOnly)
+                    .frame(width: 40, height: 40)
+                if let route = activeConnectionsRoute {
+                    GlassActiveConnectionsBolt(show: { session.releaseInput(); route.show() },
+                                               dismissCurrent: route.dismissCurrent)
+                        .frame(width: 40, height: 40)
+                }
+            }
+            .padding(.horizontal, 4)
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
     }
     #endif

@@ -1854,7 +1854,7 @@ struct TerminalWindowView: View {
         let _ = noteBarDrawn()
         // The sidebar first, where a Mac window's toggle is (the owner, 2026-10-21: "We need a
         // sidebar/tabs toggle in the bottom ornaments"); in the tabs layout, where it is shown.
-        if let visionSidebar, visionPresentation?.wrappedValue != .grid {
+        if let visionSidebar, (visionPresentation?.wrappedValue ?? .tabs) == .tabs {
             Button(visionSidebar.wrappedValue ? "Hide Sidebar" : "Show Sidebar", systemImage: "sidebar.left") {
                 withAnimation { visionSidebar.wrappedValue.toggle() }
             }

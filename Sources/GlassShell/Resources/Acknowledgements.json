@@ -492,7 +492,7 @@
      "title": "LICENSE"
     }
    ],
-   "version": "12.2.0"
+   "version": "12.3.0"
   },
   {
    "group": "Artwork",
@@ -1438,7 +1438,7 @@
      "title": "license-update.mjs"
     }
    ],
-   "version": "3.34.3"
+   "version": "3.34.4"
   },
   {
    "group": "Inside Mermaid",
@@ -1473,11 +1473,11 @@
    "name": "d3",
    "texts": [
     {
-     "body": "Copyright 2010-2023 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "7.9.0"
+   "version": "7.9.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1499,11 +1499,11 @@
    "name": "d3-array",
    "texts": [
     {
-     "body": "Copyright 2010-2023 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.2.4"
+   "version": "3.2.5"
   },
   {
    "group": "Inside Mermaid",
@@ -1512,11 +1512,11 @@
    "name": "d3-axis",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.0"
+   "version": "3.0.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1525,11 +1525,11 @@
    "name": "d3-brush",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.0"
+   "version": "3.0.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1538,11 +1538,11 @@
    "name": "d3-chord",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1551,11 +1551,11 @@
    "name": "d3-color",
    "texts": [
     {
-     "body": "Copyright 2010-2022 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.1.0"
+   "version": "3.1.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1564,11 +1564,11 @@
    "name": "d3-contour",
    "texts": [
     {
-     "body": "Copyright 2012-2023 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2012-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "4.0.2"
+   "version": "4.0.3"
   },
   {
    "group": "Inside Mermaid",
@@ -1577,11 +1577,11 @@
    "name": "d3-delaunay",
    "texts": [
     {
-     "body": "Copyright 2018-2021 Observable, Inc.\nCopyright 2021 Mapbox\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2018-2026 Observable, Inc.\nCopyright 2021 Mapbox\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "6.0.4"
+   "version": "6.0.5"
   },
   {
    "group": "Inside Mermaid",
@@ -1590,11 +1590,11 @@
    "name": "d3-dispatch",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1603,11 +1603,11 @@
    "name": "d3-drag",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.0"
+   "version": "3.0.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1616,11 +1616,11 @@
    "name": "d3-dsv",
    "texts": [
     {
-     "body": "Copyright 2013-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2013-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1629,11 +1629,11 @@
    "name": "d3-ease",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\nCopyright 2001 Robert Penner\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification,\nare permitted provided that the following conditions are met:\n\n* Redistributions of source code must retain the above copyright notice, this\n  list of conditions and the following disclaimer.\n\n* Redistributions in binary form must reproduce the above copyright notice,\n  this list of conditions and the following disclaimer in the documentation\n  and/or other materials provided with the distribution.\n\n* Neither the name of the author nor the names of contributors may be used to\n  endorse or promote products derived from this software without specific prior\n  written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND\nANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED\nWARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE\nDISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR\nANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES\n(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;\nLOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON\nANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+     "body": "Copyright 2010-2026 Mike Bostock\nCopyright 2001 Robert Penner\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification,\nare permitted provided that the following conditions are met:\n\n* Redistributions of source code must retain the above copyright notice, this\n  list of conditions and the following disclaimer.\n\n* Redistributions in binary form must reproduce the above copyright notice,\n  this list of conditions and the following disclaimer in the documentation\n  and/or other materials provided with the distribution.\n\n* Neither the name of the author nor the names of contributors may be used to\n  endorse or promote products derived from this software without specific prior\n  written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND\nANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED\nWARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE\nDISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR\nANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES\n(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;\nLOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON\nANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1642,11 +1642,11 @@
    "name": "d3-fetch",
    "texts": [
     {
-     "body": "Copyright 2016-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2016-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1655,11 +1655,11 @@
    "name": "d3-force",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.0"
+   "version": "3.0.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1672,7 +1672,7 @@
      "title": "LICENSE"
     }
    ],
-   "version": "3.1.2"
+   "version": "3.1.3"
   },
   {
    "group": "Inside Mermaid",
@@ -1681,11 +1681,11 @@
    "name": "d3-geo",
    "texts": [
     {
-     "body": "Copyright 2010-2024 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\nThis license applies to GeographicLib, versions 1.12 and later.\n\nCopyright 2008-2012 Charles Karney\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of\nthe Software, and to permit persons to whom the Software is furnished to do so,\nsubject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS\nFOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR\nCOPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER\nIN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN\nCONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\nThis license applies to GeographicLib, versions 1.12 and later.\n\nCopyright 2008-2012 Charles Karney\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of\nthe Software, and to permit persons to whom the Software is furnished to do so,\nsubject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS\nFOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR\nCOPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER\nIN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN\nCONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.1.1"
+   "version": "3.1.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1694,11 +1694,11 @@
    "name": "d3-hierarchy",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.1.2"
+   "version": "3.1.3"
   },
   {
    "group": "Inside Mermaid",
@@ -1707,11 +1707,11 @@
    "name": "d3-interpolate",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1733,11 +1733,11 @@
    "name": "d3-path",
    "texts": [
     {
-     "body": "Copyright 2015-2022 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2015-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.1.0"
+   "version": "3.1.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1746,11 +1746,11 @@
    "name": "d3-polygon",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1759,11 +1759,11 @@
    "name": "d3-quadtree",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1772,11 +1772,11 @@
    "name": "d3-random",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1798,11 +1798,11 @@
    "name": "d3-scale",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "4.0.2"
+   "version": "4.0.3"
   },
   {
    "group": "Inside Mermaid",
@@ -1811,11 +1811,11 @@
    "name": "d3-scale-chromatic",
    "texts": [
     {
-     "body": "Copyright 2010-2024 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\nApache-Style Software License for ColorBrewer software and ColorBrewer Color Schemes\n\nCopyright 2002 Cynthia Brewer, Mark Harrower, and The Pennsylvania State University\n\nLicensed under the Apache License, Version 2.0 (the \"License\"); you may not use\nthis file except in compliance with the License. You may obtain a copy of the\nLicense at\n\nhttp://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software distributed\nunder the License is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR\nCONDITIONS OF ANY KIND, either express or implied. See the License for the\nspecific language governing permissions and limitations under the License.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\nApache-Style Software License for ColorBrewer software and ColorBrewer Color Schemes\n\nCopyright 2002 Cynthia Brewer, Mark Harrower, and The Pennsylvania State University\n\nLicensed under the Apache License, Version 2.0 (the \"License\"); you may not use\nthis file except in compliance with the License. You may obtain a copy of the\nLicense at\n\nhttp://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software distributed\nunder the License is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR\nCONDITIONS OF ANY KIND, either express or implied. See the License for the\nspecific language governing permissions and limitations under the License.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.1.0"
+   "version": "3.1.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1824,11 +1824,11 @@
    "name": "d3-selection",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.0"
+   "version": "3.0.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1850,11 +1850,11 @@
    "name": "d3-shape",
    "texts": [
     {
-     "body": "Copyright 2010-2022 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.2.0"
+   "version": "3.2.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1863,11 +1863,11 @@
    "name": "d3-time",
    "texts": [
     {
-     "body": "Copyright 2010-2022 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.1.0"
+   "version": "3.1.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1876,11 +1876,11 @@
    "name": "d3-time-format",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "4.1.0"
+   "version": "4.1.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1889,11 +1889,11 @@
    "name": "d3-timer",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1902,11 +1902,11 @@
    "name": "d3-transition",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.1"
+   "version": "3.0.2"
   },
   {
    "group": "Inside Mermaid",
@@ -1915,11 +1915,11 @@
    "name": "d3-zoom",
    "texts": [
     {
-     "body": "Copyright 2010-2021 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
+     "body": "Copyright 2010-2026 Mike Bostock\n\nPermission to use, copy, modify, and/or distribute this software for any purpose\nwith or without fee is hereby granted, provided that the above copyright notice\nand this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\nFITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS\nOF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER\nTORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "3.0.0"
+   "version": "3.0.1"
   },
   {
    "group": "Inside Mermaid",
@@ -1975,20 +1975,20 @@
      "title": "LICENSE-MPL"
     }
    ],
-   "version": "3.4.12"
+   "version": "3.4.17"
   },
   {
    "group": "Inside Mermaid",
    "id": "npm:elkjs",
-   "license": "EPL-2.0",
+   "license": "EPL-2.0 OR GPL-3.0-or-later — EPL-2.0 taken",
    "name": "elkjs",
    "texts": [
     {
-     "body": "# Eclipse Public License - v 2.0\n\nTHE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE\nPUBLIC LICENSE (“AGREEMENT”). ANY USE, REPRODUCTION OR DISTRIBUTION OF\nTHE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.\n\n## 1. DEFINITIONS\n\n“Contribution” means:\n\n-   a\\) in the case of the initial Contributor, the initial content\n    Distributed under this Agreement, and\n-   b\\) in the case of each subsequent Contributor:\n    -   i\\) changes to the Program, and\n    -   ii\\) additions to the Program;\n\n    where such changes and/or additions to the Program originate from\n    and are Distributed by that particular Contributor. A Contribution\n    “originates” from a Contributor if it was added to the Program by\n    such Contributor itself or anyone acting on such Contributor's\n    behalf. Contributions do not include changes or additions to the\n    Program that are not Modified Works.\n\n“Contributor” means any person or entity that Distributes the Program.\n\n“Licensed Patents” mean patent claims licensable by a Contributor which\nare necessarily infringed by the use or sale of its Contribution alone\nor when combined with the Program.\n\n“Program” means the Contributions Distributed in accordance with this\nAgreement.\n\n“Recipient” means anyone who receives the Program under this Agreement\nor any Secondary License (as applicable), including Contributors.\n\n“Derivative Works” shall mean any work, whether in Source Code or other\nform, that is based on (or derived from) the Program and for which the\neditorial revisions, annotations, elaborations, or other modifications\nrepresent, as a whole, an original work of authorship.\n\n“Modified Works” shall mean any work in Source Code or other form that\nresults from an addition to, deletion from, or modification of the\ncontents of the Program, including, for purposes of clarity any new file\nin Source Code form that contains any contents of the Program. Modified\nWorks shall not include works that contain only declarations,\ninterfaces, types, classes, structures, or files of the Program solely\nin each case in order to link to, bind by name, or subclass the Program\nor Modified Works thereof.\n\n“Distribute” means the acts of a) distributing or b) making available in\nany manner that enables the transfer of a copy.\n\n“Source Code” means the form of a Program preferred for making\nmodifications, including but not limited to software source code,\ndocumentation source, and configuration files.\n\n“Secondary License” means either the GNU General Public License, Version\n2.0, or any later versions of that license, including any exceptions or\nadditional permissions as identified by the initial Contributor.\n\n## 2. GRANT OF RIGHTS\n\n-   a\\) Subject to the terms of this Agreement, each Contributor hereby\n    grants Recipient a non-exclusive, worldwide, royalty-free copyright\n    license to reproduce, prepare Derivative Works of, publicly display,\n    publicly perform, Distribute and sublicense the Contribution of such\n    Contributor, if any, and such Derivative Works.\n-   b\\) Subject to the terms of this Agreement, each Contributor hereby\n    grants Recipient a non-exclusive, worldwide, royalty-free patent license\n    under Licensed Patents to make, use, sell, offer to sell, import and\n    otherwise transfer the Contribution of such Contributor, if any, in\n    Source Code or other form. This patent license shall apply to the\n    combination of the Contribution and the Program if, at the time the\n    Contribution is added by the Contributor, such addition of the\n    Contribution causes such combination to be covered by the\n    Licensed Patents. The patent license shall not apply to any other\n    combinations which include the Contribution. No hardware per se is\n    licensed hereunder.\n-   c\\) Recipient understands that although each Contributor grants the\n    licenses to its Contributions set forth herein, no assurances are\n    provided by any Contributor that the Program does not infringe the\n    patent or other intellectual property rights of any other entity. Each\n    Contributor disclaims any liability to Recipient for claims brought by\n    any other entity based on infringement of intellectual property rights\n    or otherwise. As a condition to exercising the rights and licenses\n    granted hereunder, each Recipient hereby assumes sole responsibility to\n    secure any other intellectual property rights needed, if any. For\n    example, if a third party patent license is required to allow Recipient\n    to Distribute the Program, it is Recipient's responsibility to acquire\n    that license before distributing the Program.\n-   d\\) Each Contributor represents that to its knowledge it has sufficient\n    copyright rights in its Contribution, if any, to grant the copyright\n    license set forth in this Agreement.\n-   e\\) Notwithstanding the terms of any Secondary License, no Contributor\n    makes additional grants to any Recipient (other than those set forth in\n    this Agreement) as a result of such Recipient's receipt of the Program\n    under the terms of a Secondary License (if permitted under the terms of\n    Section 3).\n\n## 3. REQUIREMENTS\n\n3.1 If a Contributor Distributes the Program in any form, then:\n\n-   a\\) the Program must also be made available as Source Code, in accordance\n    with section 3.2, and the Contributor must accompany the Program with a\n    statement that the Source Code for the Program is available under this\n    Agreement, and informs Recipients how to obtain it in a reasonable\n    manner on or through a medium customarily used for software exchange;\n    and\n-   b\\) the Contributor may Distribute the Program under a license different\n    than this Agreement, provided that such license:\n    -   i\\) effectively disclaims on behalf of all other Contributors all\n        warranties and conditions, express and implied, including warranties or\n        conditions of title and non-infringement, and implied warranties or\n        conditions of merchantability and fitness for a particular purpose;\n    -   ii\\) effectively excludes on behalf of all other Contributors all\n        liability for damages, including direct, indirect, special, incidental\n        and consequential damages, such as lost profits;\n    -   iii\\) does not attempt to limit or alter the recipients' rights in the\n        Source Code under section 3.2; and\n    -   iv\\) requires any subsequent distribution of the Program by any party to\n        be under a license that satisfies the requirements of this section 3.\n\n3.2 When the Program is Distributed as Source Code:\n\n-   a\\) it must be made available under this Agreement, or if the Program (i)\n    is combined with other material in a separate file or files made\n    available under a Secondary License, and (ii) the initial Contributor\n    attached to the Source Code the notice described in Exhibit A of this\n    Agreement, then the Program may be made available under the terms of\n    such Secondary Licenses, and\n-   b\\) a copy of this Agreement must be included with each copy of\n    the Program.\n\n3.3 Contributors may not remove or alter any copyright, patent,\ntrademark, attribution notices, disclaimers of warranty, or limitations\nof liability (‘notices’) contained within the Program from any copy of\nthe Program which they Distribute, provided that Contributors may add\ntheir own appropriate notices.\n\n## 4. COMMERCIAL DISTRIBUTION\n\nCommercial distributors of software may accept certain responsibilities\nwith respect to end users, business partners and the like. While this\nlicense is intended to facilitate the commercial use of the Program, the\nContributor who includes the Program in a commercial product offering\nshould do so in a manner which does not create potential liability for\nother Contributors. Therefore, if a Contributor includes the Program in\na commercial product offering, such Contributor (“Commercial\nContributor”) hereby agrees to defend and indemnify every other\nContributor (“Indemnified Contributor”) against any losses, damages and\ncosts (collectively “Losses”) arising from claims, lawsuits and other\nlegal actions brought by a third party against the Indemnified\nContributor to the extent caused by the acts or omissions of such\nCommercial Contributor in connection with its distribution of the\nProgram in a commercial product offering. The obligations in this\nsection do not apply to any claims or Losses relating to any actual or\nalleged intellectual property infringement. In order to qualify, an\nIndemnified Contributor must: a) promptly notify the Commercial\nContributor in writing of such claim, and b) allow the Commercial\nContributor to control, and cooperate with the Commercial Contributor\nin, the defense and any related settlement negotiations. The Indemnified\nContributor may participate in any such claim at its own expense.\n\nFor example, a Contributor might include the Program in a commercial\nproduct offering, Product X. That Contributor is then a Commercial\nContributor. If that Commercial Contributor then makes performance\nclaims, or offers warranties related to Product X, those performance\nclaims and warranties are such Commercial Contributor's responsibility\nalone. Under this section, the Commercial Contributor would have to\ndefend claims against the other Contributors related to those\nperformance claims and warranties, and if a court requires any other\nContributor to pay any damages as a result, the Commercial Contributor\nmust pay those damages.\n\n## 5. NO WARRANTY {#warranty}\n\nEXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT\nPERMITTED BY APPLICABLE LAW, THE PROGRAM IS PROVIDED ON AN “AS IS”\nBASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR\nIMPLIED INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF\nTITLE, NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR\nPURPOSE. Each Recipient is solely responsible for determining the\nappropriateness of using and distributing the Program and assumes all\nrisks associated with its exercise of rights under this Agreement,\nincluding but not limited to the risks and costs of program errors,\ncompliance with applicable laws, damage to or loss of data, programs or\nequipment, and unavailability or interruption of operations.\n\n## 6. DISCLAIMER OF LIABILITY {#disclaimer}\n\nEXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT\nPERMITTED BY APPLICABLE LAW, NEITHER RECIPIENT NOR ANY CONTRIBUTORS\nSHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING WITHOUT LIMITATION LOST\nPROFITS), HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN\nCONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)\nARISING IN ANY WAY OUT OF THE USE OR DISTRIBUTION OF THE PROGRAM OR THE\nEXERCISE OF ANY RIGHTS GRANTED HEREUNDER, EVEN IF ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGES.\n\n## 7. GENERAL\n\nIf any provision of this Agreement is invalid or unenforceable under\napplicable law, it shall not affect the validity or enforceability of\nthe remainder of the terms of this Agreement, and without further action\nby the parties hereto, such provision shall be reformed to the minimum\nextent necessary to make such provision valid and enforceable.\n\nIf Recipient institutes patent litigation against any entity (including\na cross-claim or counterclaim in a lawsuit) alleging that the Program\nitself (excluding combinations of the Program with other software or\nhardware) infringes such Recipient's patent(s), then such Recipient's\nrights granted under Section 2(b) shall terminate as of the date such\nlitigation is filed.\n\nAll Recipient's rights under this Agreement shall terminate if it fails\nto comply with any of the material terms or conditions of this Agreement\nand does not cure such failure in a reasonable period of time after\nbecoming aware of such noncompliance. If all Recipient's rights under\nthis Agreement terminate, Recipient agrees to cease use and distribution\nof the Program as soon as reasonably practicable. However, Recipient's\nobligations under this Agreement and any licenses granted by Recipient\nrelating to the Program shall continue and survive.\n\nEveryone is permitted to copy and distribute copies of this Agreement,\nbut in order to avoid inconsistency the Agreement is copyrighted and may\nonly be modified in the following manner. The Agreement Steward reserves\nthe right to publish new versions (including revisions) of this\nAgreement from time to time. No one other than the Agreement Steward has\nthe right to modify this Agreement. The Eclipse Foundation is the\ninitial Agreement Steward. The Eclipse Foundation may assign the\nresponsibility to serve as the Agreement Steward to a suitable separate\nentity. Each new version of the Agreement will be given a distinguishing\nversion number. The Program (including Contributions) may always be\nDistributed subject to the version of the Agreement under which it was\nreceived. In addition, after a new version of the Agreement is\npublished, Contributor may elect to Distribute the Program (including\nits Contributions) under the new version.\n\nExcept as expressly stated in Sections 2(a) and 2(b) above, Recipient\nreceives no rights or licenses to the intellectual property of any\nContributor under this Agreement, whether expressly, by implication,\nestoppel or otherwise. All rights in the Program not expressly granted\nunder this Agreement are reserved. Nothing in this Agreement is intended\nto be enforceable by any entity that is not a Contributor or Recipient.\nNo third-party beneficiary rights are created under this Agreement.\n\n## Exhibit A – Form of Secondary Licenses Notice {#exhibit-a}\n\n“This Source Code may also be made available under the following\nSecondary Licenses when the conditions for such availability set forth\nin the Eclipse Public License, v. 2.0 are satisfied: {name license(s),\nversion(s), and exceptions or additional permissions here}.”\n\n> Simply including a copy of this Agreement, including this Exhibit A is\n> not sufficient to license the Source Code under Secondary Licenses.\n>\n> If it is not possible or desirable to put the notice in a particular\n> file, then You may include the notice in a location (such as a LICENSE\n> file in a relevant directory) where a recipient would be likely to\n> look for such a notice.\n>\n> You may add additional accurate notices of copyright ownership.",
+     "body": "# Eclipse Public License - v 2.0\n\nTHE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE\nPUBLIC LICENSE (“AGREEMENT”). ANY USE, REPRODUCTION OR DISTRIBUTION OF\nTHE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.\n\n## 1. DEFINITIONS\n\n“Contribution” means:\n\n-   a\\) in the case of the initial Contributor, the initial content\n    Distributed under this Agreement, and\n-   b\\) in the case of each subsequent Contributor:\n    -   i\\) changes to the Program, and\n    -   ii\\) additions to the Program;\n\n    where such changes and/or additions to the Program originate from\n    and are Distributed by that particular Contributor. A Contribution\n    “originates” from a Contributor if it was added to the Program by\n    such Contributor itself or anyone acting on such Contributor's\n    behalf. Contributions do not include changes or additions to the\n    Program that are not Modified Works.\n\n“Contributor” means any person or entity that Distributes the Program.\n\n“Licensed Patents” mean patent claims licensable by a Contributor which\nare necessarily infringed by the use or sale of its Contribution alone\nor when combined with the Program.\n\n“Program” means the Contributions Distributed in accordance with this\nAgreement.\n\n“Recipient” means anyone who receives the Program under this Agreement\nor any Secondary License (as applicable), including Contributors.\n\n“Derivative Works” shall mean any work, whether in Source Code or other\nform, that is based on (or derived from) the Program and for which the\neditorial revisions, annotations, elaborations, or other modifications\nrepresent, as a whole, an original work of authorship.\n\n“Modified Works” shall mean any work in Source Code or other form that\nresults from an addition to, deletion from, or modification of the\ncontents of the Program, including, for purposes of clarity any new file\nin Source Code form that contains any contents of the Program. Modified\nWorks shall not include works that contain only declarations,\ninterfaces, types, classes, structures, or files of the Program solely\nin each case in order to link to, bind by name, or subclass the Program\nor Modified Works thereof.\n\n“Distribute” means the acts of a) distributing or b) making available in\nany manner that enables the transfer of a copy.\n\n“Source Code” means the form of a Program preferred for making\nmodifications, including but not limited to software source code,\ndocumentation source, and configuration files.\n\n“Secondary License” means either the GNU General Public License, Version\n2.0, or any later versions of that license, including any exceptions or\nadditional permissions as identified by the initial Contributor.\n\n## 2. GRANT OF RIGHTS\n\n-   a\\) Subject to the terms of this Agreement, each Contributor hereby\n    grants Recipient a non-exclusive, worldwide, royalty-free copyright\n    license to reproduce, prepare Derivative Works of, publicly display,\n    publicly perform, Distribute and sublicense the Contribution of such\n    Contributor, if any, and such Derivative Works.\n-   b\\) Subject to the terms of this Agreement, each Contributor hereby\n    grants Recipient a non-exclusive, worldwide, royalty-free patent license\n    under Licensed Patents to make, use, sell, offer to sell, import and\n    otherwise transfer the Contribution of such Contributor, if any, in\n    Source Code or other form. This patent license shall apply to the\n    combination of the Contribution and the Program if, at the time the\n    Contribution is added by the Contributor, such addition of the\n    Contribution causes such combination to be covered by the\n    Licensed Patents. The patent license shall not apply to any other\n    combinations which include the Contribution. No hardware per se is\n    licensed hereunder.\n-   c\\) Recipient understands that although each Contributor grants the\n    licenses to its Contributions set forth herein, no assurances are\n    provided by any Contributor that the Program does not infringe the\n    patent or other intellectual property rights of any other entity. Each\n    Contributor disclaims any liability to Recipient for claims brought by\n    any other entity based on infringement of intellectual property rights\n    or otherwise. As a condition to exercising the rights and licenses\n    granted hereunder, each Recipient hereby assumes sole responsibility to\n    secure any other intellectual property rights needed, if any. For\n    example, if a third party patent license is required to allow Recipient\n    to Distribute the Program, it is Recipient's responsibility to acquire\n    that license before distributing the Program.\n-   d\\) Each Contributor represents that to its knowledge it has sufficient\n    copyright rights in its Contribution, if any, to grant the copyright\n    license set forth in this Agreement.\n-   e\\) Notwithstanding the terms of any Secondary License, no Contributor\n    makes additional grants to any Recipient (other than those set forth in\n    this Agreement) as a result of such Recipient's receipt of the Program\n    under the terms of a Secondary License (if permitted under the terms of\n    Section 3).\n\n## 3. REQUIREMENTS\n\n3.1 If a Contributor Distributes the Program in any form, then:\n\n-   a\\) the Program must also be made available as Source Code, in accordance\n    with section 3.2, and the Contributor must accompany the Program with a\n    statement that the Source Code for the Program is available under this\n    Agreement, and informs Recipients how to obtain it in a reasonable\n    manner on or through a medium customarily used for software exchange;\n    and\n-   b\\) the Contributor may Distribute the Program under a license different\n    than this Agreement, provided that such license:\n    -   i\\) effectively disclaims on behalf of all other Contributors all\n        warranties and conditions, express and implied, including warranties or\n        conditions of title and non-infringement, and implied warranties or\n        conditions of merchantability and fitness for a particular purpose;\n    -   ii\\) effectively excludes on behalf of all other Contributors all\n        liability for damages, including direct, indirect, special, incidental\n        and consequential damages, such as lost profits;\n    -   iii\\) does not attempt to limit or alter the recipients' rights in the\n        Source Code under section 3.2; and\n    -   iv\\) requires any subsequent distribution of the Program by any party to\n        be under a license that satisfies the requirements of this section 3.\n\n3.2 When the Program is Distributed as Source Code:\n\n-   a\\) it must be made available under this Agreement, or if the Program (i)\n    is combined with other material in a separate file or files made\n    available under a Secondary License, and (ii) the initial Contributor\n    attached to the Source Code the notice described in Exhibit A of this\n    Agreement, then the Program may be made available under the terms of\n    such Secondary Licenses, and\n-   b\\) a copy of this Agreement must be included with each copy of\n    the Program.\n\n3.3 Contributors may not remove or alter any copyright, patent,\ntrademark, attribution notices, disclaimers of warranty, or limitations\nof liability (‘notices’) contained within the Program from any copy of\nthe Program which they Distribute, provided that Contributors may add\ntheir own appropriate notices.\n\n## 4. COMMERCIAL DISTRIBUTION\n\nCommercial distributors of software may accept certain responsibilities\nwith respect to end users, business partners and the like. While this\nlicense is intended to facilitate the commercial use of the Program, the\nContributor who includes the Program in a commercial product offering\nshould do so in a manner which does not create potential liability for\nother Contributors. Therefore, if a Contributor includes the Program in\na commercial product offering, such Contributor (“Commercial\nContributor”) hereby agrees to defend and indemnify every other\nContributor (“Indemnified Contributor”) against any losses, damages and\ncosts (collectively “Losses”) arising from claims, lawsuits and other\nlegal actions brought by a third party against the Indemnified\nContributor to the extent caused by the acts or omissions of such\nCommercial Contributor in connection with its distribution of the\nProgram in a commercial product offering. The obligations in this\nsection do not apply to any claims or Losses relating to any actual or\nalleged intellectual property infringement. In order to qualify, an\nIndemnified Contributor must: a) promptly notify the Commercial\nContributor in writing of such claim, and b) allow the Commercial\nContributor to control, and cooperate with the Commercial Contributor\nin, the defense and any related settlement negotiations. The Indemnified\nContributor may participate in any such claim at its own expense.\n\nFor example, a Contributor might include the Program in a commercial\nproduct offering, Product X. That Contributor is then a Commercial\nContributor. If that Commercial Contributor then makes performance\nclaims, or offers warranties related to Product X, those performance\nclaims and warranties are such Commercial Contributor's responsibility\nalone. Under this section, the Commercial Contributor would have to\ndefend claims against the other Contributors related to those\nperformance claims and warranties, and if a court requires any other\nContributor to pay any damages as a result, the Commercial Contributor\nmust pay those damages.\n\n## 5. NO WARRANTY {#warranty}\n\nEXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT\nPERMITTED BY APPLICABLE LAW, THE PROGRAM IS PROVIDED ON AN “AS IS”\nBASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR\nIMPLIED INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF\nTITLE, NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR\nPURPOSE. Each Recipient is solely responsible for determining the\nappropriateness of using and distributing the Program and assumes all\nrisks associated with its exercise of rights under this Agreement,\nincluding but not limited to the risks and costs of program errors,\ncompliance with applicable laws, damage to or loss of data, programs or\nequipment, and unavailability or interruption of operations.\n\n## 6. DISCLAIMER OF LIABILITY {#disclaimer}\n\nEXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT\nPERMITTED BY APPLICABLE LAW, NEITHER RECIPIENT NOR ANY CONTRIBUTORS\nSHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING WITHOUT LIMITATION LOST\nPROFITS), HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN\nCONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)\nARISING IN ANY WAY OUT OF THE USE OR DISTRIBUTION OF THE PROGRAM OR THE\nEXERCISE OF ANY RIGHTS GRANTED HEREUNDER, EVEN IF ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGES.\n\n## 7. GENERAL\n\nIf any provision of this Agreement is invalid or unenforceable under\napplicable law, it shall not affect the validity or enforceability of\nthe remainder of the terms of this Agreement, and without further action\nby the parties hereto, such provision shall be reformed to the minimum\nextent necessary to make such provision valid and enforceable.\n\nIf Recipient institutes patent litigation against any entity (including\na cross-claim or counterclaim in a lawsuit) alleging that the Program\nitself (excluding combinations of the Program with other software or\nhardware) infringes such Recipient's patent(s), then such Recipient's\nrights granted under Section 2(b) shall terminate as of the date such\nlitigation is filed.\n\nAll Recipient's rights under this Agreement shall terminate if it fails\nto comply with any of the material terms or conditions of this Agreement\nand does not cure such failure in a reasonable period of time after\nbecoming aware of such noncompliance. If all Recipient's rights under\nthis Agreement terminate, Recipient agrees to cease use and distribution\nof the Program as soon as reasonably practicable. However, Recipient's\nobligations under this Agreement and any licenses granted by Recipient\nrelating to the Program shall continue and survive.\n\nEveryone is permitted to copy and distribute copies of this Agreement,\nbut in order to avoid inconsistency the Agreement is copyrighted and may\nonly be modified in the following manner. The Agreement Steward reserves\nthe right to publish new versions (including revisions) of this\nAgreement from time to time. No one other than the Agreement Steward has\nthe right to modify this Agreement. The Eclipse Foundation is the\ninitial Agreement Steward. The Eclipse Foundation may assign the\nresponsibility to serve as the Agreement Steward to a suitable separate\nentity. Each new version of the Agreement will be given a distinguishing\nversion number. The Program (including Contributions) may always be\nDistributed subject to the version of the Agreement under which it was\nreceived. In addition, after a new version of the Agreement is\npublished, Contributor may elect to Distribute the Program (including\nits Contributions) under the new version.\n\nExcept as expressly stated in Sections 2(a) and 2(b) above, Recipient\nreceives no rights or licenses to the intellectual property of any\nContributor under this Agreement, whether expressly, by implication,\nestoppel or otherwise. All rights in the Program not expressly granted\nunder this Agreement are reserved. Nothing in this Agreement is intended\nto be enforceable by any entity that is not a Contributor or Recipient.\nNo third-party beneficiary rights are created under this Agreement.\n\n## Exhibit A – Form of Secondary Licenses Notice {#exhibit-a}\n\n“This Source Code may also be made available under the following\nSecondary Licenses when the conditions for such availability set forth\nin the Eclipse Public License, v. 2.0 are satisfied: GNU General Public License v3.0 or later”\n\n> Simply including a copy of this Agreement, including this Exhibit A is\n> not sufficient to license the Source Code under Secondary Licenses.\n>\n> If it is not possible or desirable to put the notice in a particular\n> file, then You may include the notice in a location (such as a LICENSE\n> file in a relevant directory) where a recipient would be likely to\n> look for such a notice.\n>\n> You may add additional accurate notices of copyright ownership.",
      "title": "LICENSE.md"
     }
    ],
-   "version": "0.9.3"
+   "version": "0.12.1"
   },
   {
    "group": "Inside Mermaid",
@@ -2005,7 +2005,7 @@
      "title": "NOTICE"
     }
    ],
-   "version": "1.52.0"
+   "version": "1.53.1"
   },
   {
    "group": "Inside Mermaid",
@@ -2292,19 +2292,6 @@
     }
    ],
    "version": "2.3.0"
-  },
-  {
-   "group": "Inside Mermaid",
-   "id": "npm:uuid",
-   "license": "MIT",
-   "name": "uuid",
-   "texts": [
-    {
-     "body": "The MIT License (MIT)\n\nCopyright (c) 2010-2020 Robert Kieffer and other contributors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
-     "title": "LICENSE.md"
-    }
-   ],
-   "version": "14.0.3"
   }
  ]
 }

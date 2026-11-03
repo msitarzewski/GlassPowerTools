@@ -3,6 +3,7 @@ import CoreGraphics
 import SwiftUI
 import Testing
 @testable import GlassTerminal
+import GlassShell
 
 /// The window's overview as a carousel (the owner, 2026-11-02: "i really wanted the carousel to work like the old
 /// album view in itunes"): the tab in front flat and large, the rest turned toward it and stacked close, a tab

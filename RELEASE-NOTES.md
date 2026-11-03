@@ -101,6 +101,26 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.591 (3 November 2026)
+- **iPhone Duo stood like a small laptop: the remote desktop has the whole top half.** No status bar and no toolbar
+  over it, as other remote desktop apps on the Duo do; the back button, **Settings**, **Clipboard** and ⚡ move to
+  the strip under the fold, beside the desktop's name, **Keys** and the arrow pad. A desktop that can change its size
+  (Windows, most Linux desktops) is resized to fill the half; a Mac's screen keeps its shape.
+
+### 0.4.590 (3 November 2026)
+- **A window's overview and its carousel on iPhone, iPad and Vision Pro** (D99), as on the Mac. **Terminal View**
+  chooses **Tabs**, **Grid** or **Carousel**: on iPhone and iPad at the top left, beside the back button; on Vision
+  Pro in the window's bar, where it was. **Grid** draws the terminals as All Windows does — a picture of each, its
+  coding agent's mark, its name and where it is — under the window's name, with a field to find one by name or
+  folder, and the arrow keys, Return and Esc with a keyboard. **Carousel** is the Mac's album view; on Vision Pro it
+  stands in real depth, the front out of the window toward you and the rest turned on either side, out into the room.
+  Grid or Carousel is kept for the device. Off the Mac a terminal draws only while on screen, so the others show
+  their last picture, and one not opened yet its symbol.
+- **iPhone: the name at the top no longer runs under the buttons.** A long one, such as a coding agent's, now ends in
+  "…" between the two sides.
+- **Mermaid 12.3.0** draws diagrams (12.2.0 before), taken by the build as every build does; its packages' licences
+  are in Acknowledgements.
+
 ### 0.4.589 (2 November 2026, Mac)
 - **0.4.589 is the Mac's sixth release**, through Sparkle. iPhone, iPad and Vision Pro stay at TestFlight build 574.
 - **The orb dock's drops behave again**: pointing at an orb no longer makes its drops shrink to a speck and grow back,

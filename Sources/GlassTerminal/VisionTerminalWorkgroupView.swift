@@ -83,11 +83,12 @@ final class VisionTerminalPresentationState {
 }
 
 private struct VisionTerminalPresentationKey: EnvironmentKey {
-    static let defaultValue: Binding<VisionTerminalPresentation>? = nil
+    static let defaultValue: Binding<TerminalViewChoice>? = nil
 }
 
 extension EnvironmentValues {
-    var visionTerminalPresentation: Binding<VisionTerminalPresentation>? {
+    /// The window's Terminal View — tabs, grid or carousel (D99) — for the picker in a terminal's bar.
+    var visionTerminalPresentation: Binding<TerminalViewChoice>? {
         get { self[VisionTerminalPresentationKey.self] }
         set { self[VisionTerminalPresentationKey.self] = newValue }
     }
@@ -97,21 +98,21 @@ extension EnvironmentValues {
     @Entry var visionTerminalSidebar: Binding<Bool>? = nil
 }
 
-/// The window's layout — tabs or grid (a carousel too until D96) — as one control, as the editor's preview is (the
-/// owner, 2026-10-15: "I'd like the tabs/grid/carousel selector to be a toggle like we have for the
-/// markdown preview in the text editor"). Its glyph is the layout the window is in — an eye says
-/// show or hide, and nothing here is hidden — a pinch moves to the next, and a pinch held lists the
-/// three. It was a 290-point segmented picker in the bar.
+/// The window's layout — tabs, grid or carousel (the carousel went with D96 and came back, in depth, with D99) — as
+/// one control, as the editor's preview is (the owner, 2026-10-15: "I'd like the tabs/grid/carousel selector to be a
+/// toggle like we have for the markdown preview in the text editor"). Its glyph is the layout the window is in — an
+/// eye says show or hide, and nothing here is hidden — a pinch moves to the next, and a pinch held lists them. It was
+/// a 290-point segmented picker in the bar.
 struct VisionTerminalPresentationPicker: View {
-    @Binding var selection: VisionTerminalPresentation
+    @Binding var selection: TerminalViewChoice
     /// The window's orb, the fourth way to see it (the owner, 2026-10-15: "is the orb view just one
     /// more option for the view menu in terminal mode?").
     @Environment(\.glassSessionOrb) private var orb
     var body: some View {
         Menu {
-            ForEach(VisionTerminalPresentation.allCases, id: \.self) { mode in
-                Toggle(isOn: Binding(get: { selection == mode }, set: { if $0 { selection = mode } })) {
-                    Label(mode.title, systemImage: mode.symbolName)
+            ForEach(TerminalViewChoice.allCases, id: \.self) { choice in
+                Toggle(isOn: Binding(get: { selection == choice }, set: { if $0 { selection = choice } })) {
+                    Label(choice.title, systemImage: choice.symbolName)
                 }
             }
             if let orb, !orb.isOrb {
@@ -132,24 +133,6 @@ struct VisionTerminalPresentationPicker: View {
     }
 }
 
-extension LayoutPreset.OpeningView {
-    /// The layout's glyph: a window with its tab strip, a grid of cards.
-    var symbolName: String {
-        switch self {
-        case .tabs: "rectangle.topthird.inset.filled"
-        case .grid: "square.grid.2x2"
-        }
-    }
-
-    /// The layout a pinch moves to: tabs, grid, and back. The carousel went (D96, 2026-11-02).
-    var next: Self {
-        switch self {
-        case .tabs: .grid
-        case .grid: .tabs
-        }
-    }
-}
-
 /// Calls `shown` as the window is shown again without appearing anew: grown back from its orb, or
 /// the app back in front (`connectShownTerminals`). Inside the window, where its orb is known.
 private struct VisionTerminalShownAgain: View {
@@ -161,48 +144,6 @@ private struct VisionTerminalShownAgain: View {
         Color.clear
             .onChange(of: orb?.isWindow) { _, isWindow in if isWindow == true { shown() } }
             .onChange(of: scenePhase) { _, phase in if phase == .active { shown() } }
-    }
-}
-
-/// Bounded, in-memory viewport images only. This view neither owns a renderer
-/// nor feeds input, and its timer is cancelled when the card leaves the layout.
-private struct VisionTerminalPreview: View {
-    let session: TerminalSession
-    @Environment(SettingsManager.self) private var settings
-    @Environment(\.scenePhase) private var scenePhase
-    /// The window's settings (W20, W22): a card looks like the terminal it shows.
-    @Environment(\.glassWindowOverrides) private var windowSettings
-    @State private var image: UIImage?
-
-    var body: some View {
-        let profile = TerminalWindowProfile.resolved(windowSettings, settings: settings)
-        let look = profile.look
-        ZStack {
-            profile.theme.canvasBackgroundColor.color.opacity(look.opacity)
-            if let tint = look.tintColor {
-                tint.opacity(TerminalCanvasTint.strength(canvasOpacity: look.opacity))
-            }
-            if let image {
-                Image(uiImage: image).resizable().scaledToFit()
-            } else {
-                ProgressView("Preparing preview")
-            }
-        }
-        .modifier(GlassWindowBackground(
-            interactive: false, material: look.material,
-            blurAmount: look.blur, appearance: profile.theme.resolvedAppearance
-        ))
-        .clipShape(.rect(cornerRadius: 12))
-        .allowsHitTesting(false)
-        .task(id: session.id) {
-            while !Task.isCancelled {
-                if scenePhase == .active {
-                    image = session.terminalHostModel.previewImage(maxPixelWidth: 800)
-                }
-                do { try await Task.sleep(for: .seconds(1)) }
-                catch { return }
-            }
-        }
     }
 }
 
@@ -331,14 +272,22 @@ struct VisionTerminalWorkgroupView: View {
     @State private var renameText = ""
     /// Set once this view has left a workgroup that emptied, so it leaves once.
     @State private var didLeaveEmptiedWorkgroup = false
+    /// Grid or carousel: this device's choice for every window's overview (D99), the Mac's key.
+    @AppStorage(TerminalOverviewStyle.key, store: GlassUITestRun.settingsDefaults) private var overviewStyle = TerminalOverviewStyle.grid
+    #if os(iOS)
+    /// iPhone and iPad (D99): the window's tabs, or its overview over them.
+    @State private var phonePresentation: LayoutPreset.OpeningView = .tabs
+    /// The overview's own selection: the tab in front only changes when one is opened, as a phone connects a
+    /// tab when it is shown (W4b) and the carousel passes each it flows through.
+    @State private var overviewSelection: UUID?
+    /// The width of the iPhone's bar, for the room its name has.
+    @State private var barWidth: CGFloat = 390
+    #endif
     #if os(visionOS)
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State var spatialPresentation = VisionTerminalPresentationState()
     /// Output in this window's terminals, for its orb's pulse.
     @State private var activity = TerminalWindowActivity()
-    @FocusState private var overviewFocused: Bool
-    /// The grid card a dragged tab is over (W15).
-    @State private var dropTargetSessionID: UUID?
     /// Whether the window shows its sidebar, as its bar's toggle leaves it.
     @State private var showsSidebar = true
     /// The sidebar's height and its rows', so the space below the rows reaches its foot.
@@ -354,16 +303,43 @@ struct VisionTerminalWorkgroupView: View {
         nonmutating set { spatialPresentation.mode = newValue }
     }
 
-    private var presentationBinding: Binding<VisionTerminalPresentation> {
-        Binding(get: { spatialPresentation.mode }, set: { spatialPresentation.mode = $0 })
-    }
+    #endif
 
     #if DEBUG
     /// Screenshots only (`GlassTerminalRuntime.requestDemoTabs`): workgroups whose window opens in
-    /// the grid.
+    /// the overview.
     static var demoOpensGrid: Set<UUID> = []
     #endif
-    #endif
+
+    /// What the window shows, as its Terminal View lists it (D99): its tabs, or its overview as a grid or a
+    /// carousel. Grid or carousel is kept for the device.
+    private var viewChoice: Binding<TerminalViewChoice> {
+        Binding(get: { TerminalViewChoice(currentPresentation, style: overviewStyle) },
+                set: { choice in
+                    if let style = choice.style { overviewStyle = style }
+                    #if os(iOS)
+                    if choice != .tabs, currentPresentation == .tabs { overviewSelection = selectedSessionID }
+                    #endif
+                    withAnimation(.easeInOut(duration: 0.25)) { currentPresentation = choice.presentation }
+                })
+    }
+
+    private var currentPresentation: LayoutPreset.OpeningView {
+        get {
+            #if os(visionOS)
+            return spatialPresentation.mode
+            #else
+            return phonePresentation
+            #endif
+        }
+        nonmutating set {
+            #if os(visionOS)
+            spatialPresentation.mode = newValue
+            #else
+            phonePresentation = newValue
+            #endif
+        }
+    }
 
     var body: some View {
         #if os(visionOS)
@@ -415,8 +391,10 @@ struct VisionTerminalWorkgroupView: View {
             sessionManager.serverManager.loadServersIfNeeded()
             synchronizeSelection()
             connectShownTerminals()
+            #if DEBUG
+            if Self.demoOpensGrid.remove(workgroupID) != nil { demoOpenOverview() }
+            #endif
             #if DEBUG && os(visionOS)
-            if Self.demoOpensGrid.remove(workgroupID) != nil { presentation = .grid }
             // Screenshots only: `--demo-sidebar-toggle` in a `--ui-testing` run hides the sidebar a
             // few seconds in and shows it again, for the window following it (2026-10-21).
             let arguments = ProcessInfo.processInfo.arguments
@@ -814,6 +792,8 @@ struct VisionTerminalWorkgroupView: View {
         if Self.usesCompactPhoneNavigation {
             NavigationStack {
                 compactTerminalTabs(workgroup: workgroup, sessions: sessions)
+                    .overlay { phoneOverview(workgroup: workgroup, sessions: sessions) }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barWidth = $0 }
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar(.visible, for: .navigationBar)
                     .toolbar(.hidden, for: .tabBar)
@@ -835,6 +815,7 @@ struct VisionTerminalWorkgroupView: View {
         } else {
             NavigationStack {
                 adaptiveTerminalTabs(workgroup: workgroup, sessions: sessions)
+                    .overlay { phoneOverview(workgroup: workgroup, sessions: sessions) }
                     .navigationBarTitleDisplayMode(.inline)
                     .defaultAdaptableTabBarPlacement(.tabBar)
                     .toolbar {
@@ -874,18 +855,7 @@ struct VisionTerminalWorkgroupView: View {
             if count < 2 { presentation = .tabs }
         }
         .onChange(of: presentation) { _, mode in
-            guard sessions.count > 1 || mode == .tabs else {
-                presentation = .tabs
-                return
-            }
-            if mode != .tabs {
-                Task { @MainActor in
-                    await Task.yield()
-                    overviewFocused = true
-                }
-            } else {
-                overviewFocused = false
-            }
+            if sessions.count < 2, mode != .tabs { presentation = .tabs }
         }
     }
 
@@ -983,7 +953,7 @@ struct VisionTerminalWorkgroupView: View {
                     onOpenTerminal: { openSavedHost($0, tmux: $1) },
                     onSessionRequestedClose: { closeSessionTab(session) }
                 )
-                .environment(\.visionTerminalPresentation, sessions.count > 1 ? presentationBinding : nil)
+                .environment(\.visionTerminalPresentation, sessions.count > 1 ? viewChoice : nil)
                 .environment(\.visionTerminalSidebar, sessions.count > 1 ? $showsSidebar : nil)
                 // A grid card or a terminal's title from another window, dropped on the terminal: it
                 // joins this window. This window's own title let go over it changes nothing (W26).
@@ -996,18 +966,36 @@ struct VisionTerminalWorkgroupView: View {
                 .allowsHitTesting(active)
                 .accessibilityHidden(!active)
             }
-            spatialOverview(sessions: sessions)
-                // Each card owns its terminal's canvas and frost. A second,
-                // shared glass panel would obscure passthrough between cards
-                // and compound their per-terminal transparency settings.
-                .allowsHitTesting(presentation != .tabs)
-                .accessibilityHidden(presentation == .tabs)
-                // The grid's controls: Apple's toolbar ornament, as a terminal's are (W31), and in the
-                // same place. Never both: in the grid no terminal is in front, so none contributes its own.
-                .toolbar {
+            if presentation != .tabs {
+                // Each tile draws its terminal's own picture on the window's glass (D99): a second, shared
+                // panel would obscure passthrough between them.
+                TerminalWindowOverview(
+                    title: sessionManager.workgroup(for: workgroupID).map { GlassTerminalCapability.title(of: $0, live: sessions) } ?? "Terminal",
+                    sessions: sessions, selection: $selectedSessionID, style: overviewStyle,
+                    open: { id in
+                        selectedSessionID = id
+                        presentation = .tabs
+                    },
+                    close: { presentation = .tabs },
+                    moving: TerminalOverviewMoving(workgroupID: workgroupID) { tabs, index in
+                        acceptDroppedTabs(tabs, at: index)
+                    }
+                ) { session in
+                    tabActions(for: session)
+                }
+                // A tab from another window dropped anywhere but on a tile joins after the last.
+                .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
+                    acceptDroppedTabs(tabs, at: nil)
+                }
+                .transition(.opacity)
+            }
+        }
+        // The overview's controls: Apple's toolbar ornament, as a terminal's are (W31), and in the same place.
+        // Never both: in the overview no terminal is in front, so none contributes its own.
+        .toolbar {
                     if presentation != .tabs && sessions.count > 1 {
                         ToolbarItemGroup(placement: .bottomOrnament) {
-                            VisionTerminalPresentationPicker(selection: presentationBinding)
+                            VisionTerminalPresentationPicker(selection: viewChoice)
                             // Icons only, as the toolbar draws a label by default.
                             Button("Previous", systemImage: "chevron.left") {
                                 moveOverviewSelection(-1, sessions: sessions)
@@ -1021,97 +1009,7 @@ struct VisionTerminalWorkgroupView: View {
                             .labelStyle(.titleAndIcon)
                         }
                     }
-                }
         }
-    }
-
-    private func spatialOverview(sessions: [TerminalSession]) -> some View {
-        GeometryReader { _ in
-            Group {
-                if presentation == .grid {
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 24)], spacing: 24) {
-                            ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
-                                draggableCard(session, at: index)
-                            }
-                        }
-                        .padding(28)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(.rect)
-            // A tab from another window dropped anywhere but on a card joins after the last.
-            .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
-                acceptDroppedTabs(tabs, at: nil)
-            }
-        }
-        .focusable(presentation != .tabs)
-        .focused($overviewFocused)
-        .focusEffectDisabled()
-        .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return, .space, .escape]) { event in
-            switch event.key {
-            case .leftArrow, .upArrow: moveOverviewSelection(-1, sessions: sessions)
-            case .rightArrow, .downArrow: moveOverviewSelection(1, sessions: sessions)
-            default: presentation = .tabs
-            }
-            return .handled
-        }
-        .accessibilityIdentifier("vision-terminal-overview")
-    }
-
-    private func overviewCard(_ session: TerminalSession, on surface: TerminalWorkgroupOpening.LabelSurface) -> some View {
-        Button {
-            selectedSessionID = session.id
-            presentation = .tabs
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                VisionTerminalPreview(session: session)
-                    .aspectRatio(1.6, contentMode: .fit)
-                Text(TerminalWorkgroupOpening.label(session, on: surface))
-                    .font(.headline)
-                    .foregroundStyle(VisionTerminalStatus.color(for: session.state))
-                    .opacity(selectedSessionID == session.id ? 1 : 0.65)
-                    .lineLimit(1)
-            }
-            .padding(10)
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(selectedSessionID == session.id ? Color.accentColor : .clear,
-                                  lineWidth: 3)
-            }
-            // Where a dragged tab would land.
-            .background {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.accentColor.opacity(dropTargetSessionID == session.id ? 0.22 : 0))
-            }
-            .contentShape(.interaction, RoundedRectangle(cornerRadius: 14))
-        }
-        .buttonStyle(.plain)
-        // A terminal preview is a large interaction target, not a glass button.
-        // The system highlight fills it with an oversized gaze capsule.
-        .hoverEffectDisabled()
-        .focusEffectDisabled()
-        .contextMenu { tabActions(for: session) }
-        .accessibilityLabel("Open \(TerminalWorkgroupOpening.label(session, on: surface)) terminal")
-        .accessibilityValue(session.state.displayName)
-    }
-
-    /// A grid card that drags (W15; the owner: "maybe we do that with grid view? drag and drop"):
-    /// onto another terminal window to move the tab there, still running, or onto another card
-    /// here to take its place. The card itself takes a dropped tab at its own place.
-    private func draggableCard(_ session: TerminalSession, at index: Int) -> some View {
-        overviewCard(session, on: .grid)
-            .draggable(TerminalTabTransfer(workgroupID: workgroupID, sessionID: session.id))
-            .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
-                acceptDroppedTabs(tabs, at: index)
-            } isTargeted: { targeted in
-                if targeted {
-                    dropTargetSessionID = session.id
-                } else if dropTargetSessionID == session.id {
-                    dropTargetSessionID = nil
-                }
-            }
     }
 
     private func moveOverviewSelection(_ delta: Int, sessions: [TerminalSession]) {
@@ -1236,6 +1134,15 @@ struct VisionTerminalWorkgroupView: View {
             .accessibilityIdentifier("terminal-workgroup-connections")
         }
 
+        // The window's Terminal View (D99; the owner's choice, as Vision Pro has it): Tabs, Grid, Carousel. Beside
+        // Connections rather than with + and ⚡, so the two sides weigh the same and the name between them keeps its
+        // room (three buttons on the right left a centred name about 70 points on an iPhone).
+        if sessions.count > 1 {
+            ToolbarItem(placement: .topBarLeading) {
+                TerminalViewMenu(choice: viewChoice)
+            }
+        }
+
         if includesSessionSwitcher {
             ToolbarItem(placement: .principal) {
                 compactSessionSwitcher(sessions: sessions)
@@ -1273,10 +1180,14 @@ struct VisionTerminalWorkgroupView: View {
             HStack(spacing: 5) {
                 Text(selectedSessionName(in: sessions))
                     .font(.headline)
+                    .truncationMode(.tail)
                 Image(systemName: "chevron.down")
                     .font(.caption)
             }
             .lineLimit(1)
+            // Centred between the bar's sides, and no wider than the room they leave: a coding agent's long name ran
+            // under both (2026-11-03, the simulator), as the bar proposes the middle no width of its own.
+            .frame(maxWidth: Self.switcherRoom(barWidth: barWidth))
         }
         // **In the terminal's own light or dark** (the owner, 2026-10-15: "theres no way to switch
         // tabs on iphone"). The title sits over the terminal, not over a bar, and in light mode its
@@ -1286,6 +1197,39 @@ struct VisionTerminalWorkgroupView: View {
         .accessibilityLabel("Terminal Sessions")
         .accessibilityValue(selectedSessionName(in: sessions))
         .accessibilityIdentifier("terminal-workgroup-session-switcher")
+    }
+
+    /// The window's overview over its tabs (D99), from its Terminal View: a tab chosen opens; a tap beside the
+    /// tiles goes back. Only with two or more tabs; with fewer the window is its tab.
+    @ViewBuilder
+    private func phoneOverview(workgroup: TerminalWorkgroup, sessions: [TerminalSession]) -> some View {
+        if phonePresentation != .tabs, sessions.count > 1 {
+            TerminalWindowOverview(
+                title: GlassTerminalCapability.title(of: workgroup, live: sessions),
+                sessions: sessions, selection: $overviewSelection, style: overviewStyle,
+                backdrop: themeCanvas,
+                open: { id in
+                    selectedSessionID = id
+                    withAnimation(.easeInOut(duration: 0.25)) { phonePresentation = .tabs }
+                },
+                close: { withAnimation(.easeInOut(duration: 0.25)) { phonePresentation = .tabs } }
+            ) { session in
+                tabActions(for: session)
+            }
+            .transition(.opacity)
+        }
+    }
+
+    /// What this window paints behind its terminal: its theme's canvas, so an overview tile looks as the tab does.
+    private var themeCanvas: Color {
+        TerminalWindowProfile.resolved(sessionManager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides(),
+                                       settings: settingsManager).theme.canvasBackgroundColor.color
+    }
+
+    /// The width the name in the middle of the bar may take: the bar's, less each side's buttons (a group of two,
+    /// about 116 points, and the margins), at least enough for a few letters.
+    static func switcherRoom(barWidth: CGFloat) -> CGFloat {
+        max(80, barWidth - 2 * 128)
     }
 
     /// This window's terminal theme's light or dark; nil for a theme that follows the system.
@@ -1331,6 +1275,31 @@ struct VisionTerminalWorkgroupView: View {
         }
         #endif
     }
+
+    #if DEBUG
+    /// Screenshots only: the window opens in its overview. With `--demo-visit-tabs` (the site's carousel,
+    /// 2026-11-03), each tab is shown in turn first, as a person going through them would, since off the Mac a tab
+    /// has a picture once it has been on screen; then the middle one is chosen and the overview opens around it.
+    private func demoOpenOverview() {
+        let overview = TerminalViewChoice(.grid, style: overviewStyle)
+        guard ProcessInfo.processInfo.arguments.contains("--demo-visit-tabs"),
+              let workgroup = sessionManager.workgroup(for: workgroupID) else {
+            viewChoice.wrappedValue = overview
+            return
+        }
+        let ids = liveSessions(in: workgroup).map(\.id)
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            for id in ids {
+                selectedSessionID = id
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+            if !ids.isEmpty { selectedSessionID = ids[ids.count / 2] }
+            try? await Task.sleep(for: .seconds(1.5))
+            viewChoice.wrappedValue = overview
+        }
+    }
+    #endif
 
     private func liveSessions(in workgroup: TerminalWorkgroup) -> [TerminalSession] {
         sessionManager.sessions(inWorkgroup: workgroup.id)
