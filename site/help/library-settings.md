@@ -64,7 +64,7 @@ These settings are kept on this device.
 - **Dock Floats**: **Above This App’s Windows** (the starting setting), and the dock is hidden while another app is in front; or **Above All Windows**, and it stays over every window, whichever app is in front, on every desktop.
 - **Fit Dock to Its Orbs**, once you have resized the dock: the dock fits its orbs in a row again.
 
-A **Dock** section follows, with the dock's own **Opacity**, **Glass** and **Material**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**.
+A **Dock** section follows, with the dock's own **Opacity**, **Glass** and **Material**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**. The dock is Apple's Liquid Glass: **Glass** sets how much of it shows, **Material** Light to Heavy is the clear glass, dimmed a little more behind it as it gets heavier, and Max the frostier glass. macOS draws Liquid Glass clear only in the window you are working in, and the dock is never that window, so its glass looks frosted.
 
 These settings are kept on this Mac.
 

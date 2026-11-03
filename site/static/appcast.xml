@@ -6,6 +6,23 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.589</title>
+      <pubDate>Tue, 03 Nov 2026 12:23:44 GMT</pubDate>
+      <sparkle:version>589</sparkle:version>
+      <sparkle:shortVersionString>0.4.589</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.589</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.589</h2>
+<ul>
+  <li><b>The orb dock.</b> Shrink to Orb, in every window's toolbar beside Show All Windows, puts the window in a dock of glass orbs that floats over your windows, its sessions still running. Each terminal window's orb shows the tab in front, with its tabs as dots around it in their coding agents' colours; databases, desktops and editors gather on their machine's orb; Connections comes first, with Active's count. Click an orb to bring its window back, or a dot for that tab; drag one orb onto another to reorder them. The dock is Apple's Liquid Glass and grows from Connections as orbs arrive. Choose where it floats, and its Opacity and Glass, in Settings ▸ Appearance ▸ Orbs. ⌘M still minimizes to the Mac's Dock.</li>
+  <li><b>Terminal Overview (⌥⌘G) looks like Show All Windows</b>, inside the window, with that window's tabs: live tiles, type to find, the arrow keys and Return. <b>Carousel</b>, beside Grid, shows the tabs as an album view: one large in front, the rest turned toward it, a trackpad swipe moving the row. The old Terminal Carousel (⌥⇧⌘G) is gone.</li>
+  <li><b>Shrink to Orb is a circle</b> everywhere a window becomes one.</li>
+  <li>⌫ takes back a letter of what you typed in Show All Windows. A terminal that can't connect as it is shown says why. No dark crescents in a rounded window's corners.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.589/GlassPowerTools-0.4.589.zip" length="28875289" type="application/octet-stream" sparkle:edSignature="YQB6y44aZS5SBnW0/Z7OjH8Bx2lhpj5kkAOlI0Cq40Kpe8dPw8AQ38V0NtznKaABEjwLTHFlgC0vMnndjAfMAA=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.575</title>
       <pubDate>Mon, 02 Nov 2026 04:16:45 GMT</pubDate>
       <sparkle:version>575</sparkle:version>

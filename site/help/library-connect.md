@@ -221,11 +221,11 @@ Connections, left in the dock, goes back into it once the terminals that came ba
 
 ## Put windows in the orb dock on Mac
 
-A window can go into the orb dock with its sessions still running, and come back with one click. The dock is a strip of glass orbs that floats over your windows, no bigger than its orbs, as the dock does on Vision Pro: each orb shows its window's live picture, and its terminals' coding agents in their colours.
+A window can go into the orb dock with its sessions still running, and come back with one click. The dock is a strip of Apple's Liquid Glass, with orbs of the same glass, that floats over your windows, no bigger than its orbs, as the dock does on Vision Pro: each orb shows its window's live picture, and its terminals' coding agents in their colours.
 
 - Choose **Shrink to Orb** in the window's toolbar, beside **Show All Windows**. The window fades out and its orb lands in the dock. The window isn't closed: terminals stay connected, and so do databases and desktops.
 - ⌘M still minimizes a window to the Mac's Dock, as in any app.
-- **Shrink to Orb** in the Connections window's toolbar puts Connections in the dock too. **Connections** is always first in the dock, a little larger than the rest, as on Vision Pro: the app's icon on a white circle, with ⚡ and the number of open sessions on its rim.
+- **Shrink to Orb** in the Connections window's toolbar puts Connections in the dock too. **Connections** is always first in the dock, a little larger than the rest, as on Vision Pro: the app's icon in a drop of glass, with ⚡ and the number of open sessions on its rim.
 - Each terminal window has an orb of its own showing the tab in front, with its tabs as dots around it. Each dot shows what the tab's row in the sidebar shows: the coding agent running in it, in the agent's colour, or a terminal, pulsing while it prints.
 - Databases, remote desktops and editors are gathered by machine: one orb for each machine with any of them open, docked or not, with a dot for each.
 - Point at an orb to see its window's name just above the dock, as the Mac's Dock names its icons; when the dock is taller than it is wide, the name shows beside it. Point at a dot to see its name the same way and its picture in the orb.

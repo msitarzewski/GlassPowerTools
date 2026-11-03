@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.575 (1 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.589 (3 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.575)
+## What it holds (0.4.589)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -88,7 +88,8 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   `ssh://` links. On the Mac: the Finder's Services, toolbar button and Quick Actions, Share ▸ Send to
   a Machine, Open With and the Dock menu.
 - Light, Dark or System for the whole app on the Mac, iPhone and iPad; window opacity and glass
-  everywhere; and on Vision Pro, session windows that shrink into an orb, or into one dock.
+  everywhere; and session windows that shrink into an orb: on the Mac into a dock of Liquid Glass, and on
+  Vision Pro where they stand or into one dock.
 
 ### Known limits
 - The Mac app runs outside App Sandbox (a terminal cannot work inside it), so it will be distributed
@@ -101,6 +102,7 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 ## Recent builds
 
 ### 0.4.589 (2 November 2026, Mac)
+- **0.4.589 is the Mac's sixth release**, through Sparkle. iPhone, iPad and Vision Pro stay at TestFlight build 574.
 - **The orb dock's drops behave again**: pointing at an orb no longer makes its drops shrink to a speck and grow back,
   the count on Connections shows again (it was hidden under the glass, a dark crescent below the circle), and a dot
   grows in place when you point at it.

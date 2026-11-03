@@ -31,7 +31,20 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-02 — RESUME HERE: the orb dock on the Mac (D95)
+## 2026-11-03 — RESUME HERE: Mac 0.4.589 released
+- **His word:** "this is fine. ship it." on 0.4.589, then "approved." for the release run. Committed and pushed
+  (c869a828, 0.4.577–0.4.589).
+- **Mac 0.4.589 released**, the Mac's sixth: `Tools/Release/release-mac.sh` with Xcode 27.2 (27B52); app and disk
+  image notarized and stapled (`spctl`: Notarized Developer ID); GitHub release v0.4.589 (Latest, tag at c869a828)
+  with the dmg, zip and checksums, the downloads byte-identical to the build; the feed entry in
+  `site/static/appcast.xml`. README, the site's downloads and status lines, and the release notes name 0.4.589. The
+  help's Mac dock section corrected (Connections is the icon in a drop of glass, not on a white circle) and says what
+  Glass and Material do and why the dock looks frosted.
+- **Next:** the site carries the feed: live once he runs provision. Not in "ship it", each on his word: TestFlight
+  for iPhone, iPad and Vision Pro (574 there; 0.4.589 builds for both); the App Store Connect description. Still
+  open: his choice for the frosted look (D98), the dock's first-drag 15 pt offset, his headset check of 0.4.576.
+
+## 2026-11-02 — the orb dock on the Mac (D95)
 - **His ask:** "We should consider a dock on Mac, exactly like visionOS for the same reason!" Asked, he chose: the orb
   button docks a window (⌘M stays the Mac's), where the dock floats a setting, Connections in the dock.
 - **Built, uncommitted (0.4.577)** (`tasks/2026-11/2026-11-02_mac-orb-dock.md`): the orb's face shared with Vision

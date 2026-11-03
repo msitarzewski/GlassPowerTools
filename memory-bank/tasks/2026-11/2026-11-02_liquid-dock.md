@@ -50,5 +50,9 @@ and a Mac install, as for every build this session. No commit, push or TestFligh
   docks lands 15 pt off; later drags, and a first drag from its bottom, are exact. The same with the old blocking
   resize. A debug log of every dock move is in (`dock moved to …`).
 
+## Released (2026-11-03)
+- His "this is fine. ship it." on 0.4.589: committed and pushed (c869a828); released as the Mac's 0.4.589 (notarized,
+  GitHub release v0.4.589, the feed entry). The help's Mac dock section brought in line with the glass.
+
 ## Next
-- His choice for the frosted look (D98, Open). The first-drag offset. Commit only at his word.
+- His choice for the frosted look (D98, Open). The first-drag offset. The site live once he runs provision.
