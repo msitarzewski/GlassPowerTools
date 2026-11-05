@@ -6,6 +6,23 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.603</title>
+      <pubDate>Thu, 05 Nov 2026 18:35:03 GMT</pubDate>
+      <sparkle:version>603</sparkle:version>
+      <sparkle:shortVersionString>0.4.603</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.603</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.603</h2>
+<ul>
+  <li><b>The orbs are drops of liquid.</b> A window landing in the orb dock squashes and wobbles like jelly until it settles, and the orbs beside it feel it in turn; the dock's glass stretches past its new size and springs back. A busy terminal's orb has drops falling into it, rings of ripples spreading across its picture. Reduce Motion or Low Power Mode keeps them still.</li>
+  <li><b>The dock is a row or a column</b> (Settings ▸ Appearance ▸ Orbs ▸ Dock), and keeps the length you drag it to: longer shows more orbs, shorter fewer, to whole orbs. A window docked again goes back into its row.</li>
+  <li><b>Undo and redo in the Editor</b>, named as TextEdit names them, and the Editor's Edit menu is TextEdit's: Find and Replace, Use Selection for Find, Paste and Match Style, Spelling and Grammar, Substitutions, Transformations and Speech.</li>
+  <li><b>A terminal that rings its bell while you're not looking</b> stays marked in orange, in its tab, its orb and Show All Windows, until you go to it.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.603/GlassPowerTools-0.4.603.zip" length="29031093" type="application/octet-stream" sparkle:edSignature="xSTwUp/QlA3HhpNj6vnSnGD2NsrhMm4ICMLcDsOWy0iSLTXqFWMhr2n5fMqDqVXT4lokkL1wrrsG8t+SfN2hAg=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.589</title>
       <pubDate>Tue, 03 Nov 2026 12:23:44 GMT</pubDate>
       <sparkle:version>589</sparkle:version>
