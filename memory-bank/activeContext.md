@@ -31,7 +31,20 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-05 — RESUME HERE: the dock keeps a hand's length; On-Screen Keyboard (0.4.603)
+## 2026-11-05 — RESUME HERE: 0.4.603 shipped (Mac release, TestFlight 603)
+- **His word:** "go ahead, ship it". Committed `af5257e5` (0.4.601–0.4.603) and pushed; `release-mac.sh 0.4.603 603`
+  (Xcode 27.2): notarized and stapled; GitHub release v0.4.603 (Latest) with dmg, zip and checksums, downloads
+  byte-identical to the build; the feed entry committed `9a648f14` and pushed. README, site status lines (Vision Pro in
+  the beta since 574, not "to follow"), release notes and help name 0.4.603. All three devices on 0.4.603, read back.
+- **TestFlight 603** (after he signed Xcode in again; the first export failed "App Store Connect access … required"):
+  uploaded for iOS and visionOS, both VALID, encryption answered by Info.plist, What to Test written, both in Testers,
+  both submitted for beta review (WAITING_FOR_REVIEW).
+- **Site live (2026-11-05):** he staged and provisioned; all 111 live files match `_site` by hash, the feed offers
+  0.4.603, and its zip answers 200 at the release's size.
+- **Next:** TestFlight 603's beta review (iOS and visionOS waiting); his headset check of the liquid orbs, the kept
+  dock length and On-Screen Keyboard.
+
+## 2026-11-05 — earlier: the dock keeps a hand's length; On-Screen Keyboard (0.4.603)
 - 0.4.602 (Vision Pro, installed): the drop-shaped glass broke into white shards on the headset after a scroll (his
   pictures); visionOS keeps the system's circle of glass, the whole orb stretched to the drop's oval.
 - 0.4.603: Settings ▸ Terminal ▸ On-Screen Keyboard (Automatic / Only When Asked; he chose a setting); the dock keeps
