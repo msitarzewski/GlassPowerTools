@@ -28,6 +28,10 @@ When two or more documents are open, they appear as tabs above the text. Choose 
 
 **On Mac:** the window's subtitle shows the project name and its folder, or the folder of a file opened on its own. **On Apple Vision Pro**, the same is at the right-hand end of the status bar at the bottom of the window.
 
+## Undo and redo
+
+Each file keeps its own history of changes. **Edit ▸ Undo** (⌘Z) takes back the last change, and **Redo** (⇧⌘Z) brings it back; the menu names what it will undo, for example **Undo Typing**, **Undo Paste** or **Undo Cut**. A run of typing undoes as one change, and a paste, a cut or a **Replace All** each undo on their own. On iPad, iPhone and Vision Pro, ⌘Z and ⇧⌘Z work with a keyboard, and so do the system's own ways to undo: the undo and redo buttons above the on-screen keyboard, swiping left or right with three fingers, and shaking iPhone.
+
 ## Type on iPhone Duo
 
 Half open and standing like a small laptop, iPhone Duo shows the text (or the text and its preview, as you chose) above the fold, and folding it brings up the keyboard. Between the fold and the keys is a strip: **Tab**, brackets and quotes and the other characters code needs (swipe for more), **Left** and **Right**, **Undo**, **Redo** and **Find**. Each types or acts at the cursor. With the keyboard up, the button at the strip's start is **Preview** for a file that has one: it puts the keyboard away and shows the file's preview below the fold. **Show Keyboard** brings the keyboard back. Folding closes the project's file list, which would cover the strip.

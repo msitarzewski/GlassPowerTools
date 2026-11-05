@@ -254,11 +254,11 @@ public struct GlassShellSettingsView: View {
     private var dockFloats = GlassOrbDockFloat.aboveThisApp.rawValue
     @AppStorage(GlassOrbDock.lookKey, store: GlassUITestRun.settingsDefaults)
     private var dockLookData = Data()
-    @AppStorage(GlassOrbDock.sizeKey, store: GlassUITestRun.settingsDefaults)
-    private var dockSize = ""
+    @AppStorage(GlassOrbDockOrientation.key, store: GlassUITestRun.settingsDefaults)
+    private var dockOrientation = GlassOrbDockOrientation.horizontal.rawValue
 
-    /// The orb dock (D95): where it floats, the owner's choice of setting; its size back to fitting its
-    /// orbs; and its own glass and Opacity, following Appearance until set here, as on Vision Pro.
+    /// The orb dock (D95): where it floats, the owner's choice of setting; a row or a column (2026-11-05); and its
+    /// own glass and Opacity, following Appearance until set here, as on Vision Pro.
     @ViewBuilder
     private var orbsSection: some View {
         Section("Orbs") {
@@ -269,13 +269,10 @@ public struct GlassShellSettingsView: View {
             }
             .onChange(of: dockFloats) { _, _ in GlassOrbDockPanel.shared.applyFloat() }
             .accessibilityIdentifier("settings-orbs-dock-floats")
-            Text("Shrink to Orb, in a window's toolbar, puts the window in the orb dock with its sessions still running. Connections can go there too. Click an orb to bring its window back, drag one onto another to move it, and resize the dock to make it a row or a column. Above This App’s Windows hides the dock while another app is in front.")
+            dockOrientationPicker
+            Text("Shrink to Orb, in a window's toolbar, puts the window in the orb dock with its sessions still running. Connections can go there too. Click an orb to bring its window back, and drag one onto another to move it. The dock is a row or a column of orbs that grows and shrinks as they come and go, and scrolls when there are more than fit. Above This App’s Windows hides the dock while another app is in front.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if !dockSize.isEmpty {
-                Button("Fit Dock to Its Orbs", systemImage: "arrow.left.and.right") { dockSize = "" }
-                    .accessibilityIdentifier("settings-orbs-dock-fit")
-            }
         }
         GlassWindowLayerControls(overrides: dockLook, title: "Dock")
     }
@@ -283,6 +280,16 @@ public struct GlassShellSettingsView: View {
     private var dockLook: Binding<GlassWindowOverrides> {
         Binding(get: { GlassOrbDock.look(from: dockLookData) },
                 set: { dockLookData = GlassOrbDock.data(of: $0) })
+    }
+
+    /// The dock a row or a column (the owner, 2026-11-05: "an orientation selection for the dock").
+    private var dockOrientationPicker: some View {
+        Picker("Dock", selection: $dockOrientation) {
+            ForEach(GlassOrbDockOrientation.allCases, id: \.rawValue) { orientation in
+                Text(orientation.title).tag(orientation.rawValue)
+            }
+        }
+        .accessibilityIdentifier("settings-orbs-dock-orientation")
     }
     #endif
 
@@ -308,8 +315,8 @@ public struct GlassShellSettingsView: View {
     private var orbsInDock = false
     @AppStorage(GlassOrbDock.lookKey, store: GlassUITestRun.settingsDefaults)
     private var dockLookData = Data()
-    @AppStorage(GlassOrbDock.sizeKey, store: GlassUITestRun.settingsDefaults)
-    private var dockSize = ""
+    @AppStorage(GlassOrbDockOrientation.key, store: GlassUITestRun.settingsDefaults)
+    private var dockOrientation = GlassOrbDockOrientation.horizontal.rawValue
     @AppStorage(GlassOrbDock.tallSideKey, store: GlassUITestRun.settingsDefaults)
     private var tallDockSide = GlassOrbDockSide.trailing.rawValue
 
@@ -325,11 +332,12 @@ public struct GlassShellSettingsView: View {
                 Text("Into the Dock").tag(true)
             }
             .accessibilityIdentifier("settings-orbs-dock")
-            Text("Into the Dock gathers your orbs, and Connections, in a row you move by its bar. Resize it and they wrap to its shape, and it snaps around them. Pinch an orb to bring its window back above the dock, or beside it when the dock is taller than it is wide.")
+            Text("Into the Dock gathers your orbs, and Connections, in a row or a column you move by its bar. It grows and shrinks as they come and go, and scrolls when there are more than fit. Pinch an orb to bring its window back above a horizontal dock, or beside a vertical one.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if orbsInDock {
-                Picker("Windows From a Tall Dock", selection: $tallDockSide) {
+                dockOrientationPicker
+                Picker("Windows From a Vertical Dock", selection: $tallDockSide) {
                     Text("On Its Left").tag(GlassOrbDockSide.leading.rawValue)
                     Text("On Its Right").tag(GlassOrbDockSide.trailing.rawValue)
                 }
@@ -337,10 +345,6 @@ public struct GlassShellSettingsView: View {
                 Text("In Focus Mode they come back on the side away from where you turned to look at the dock. Elsewhere visionOS doesn't say where you are looking.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            if !dockSize.isEmpty {
-                Button("Fit Dock to Its Orbs", systemImage: "arrow.left.and.right") { dockSize = "" }
-                    .accessibilityIdentifier("settings-orbs-dock-fit")
             }
         }
         if orbsInDock {
@@ -351,6 +355,16 @@ public struct GlassShellSettingsView: View {
     private var dockLook: Binding<GlassWindowOverrides> {
         Binding(get: { GlassOrbDock.look(from: dockLookData) },
                 set: { dockLookData = GlassOrbDock.data(of: $0) })
+    }
+
+    /// The dock a row or a column (the owner, 2026-11-05: "an orientation selection for the dock").
+    private var dockOrientationPicker: some View {
+        Picker("Dock", selection: $dockOrientation) {
+            ForEach(GlassOrbDockOrientation.allCases, id: \.rawValue) { orientation in
+                Text(orientation.title).tag(orientation.rawValue)
+            }
+        }
+        .accessibilityIdentifier("settings-orbs-dock-orientation")
     }
     #endif
 

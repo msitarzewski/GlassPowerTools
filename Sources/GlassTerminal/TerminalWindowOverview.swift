@@ -15,6 +15,7 @@
 import SwiftUI
 import GlassShell
 import GlassLayers
+import GlassTerminalEmulator
 
 /// The overview of one window's tabs.
 struct TerminalWindowOverview<TileMenu: View>: View {
@@ -58,7 +59,8 @@ struct TerminalWindowOverview<TileMenu: View>: View {
             detailTruncation: .tail,
             identifier: "terminal-overview-tab-\(session.id.uuidString.lowercased())",
             picture: { [weak session] in session.flatMap(GlassTerminalCapability.preview(of:)) },
-            mark: { [weak session] in session.flatMap(GlassTerminalCapability.agent(of:))?.markImage })
+            mark: { [weak session] in session.flatMap(GlassTerminalCapability.agent(of:))?.markImage },
+            bellRang: { [weak session] in session?.terminalHostModel.bellNotice.isUnseen == true })
     }
 
     /// Where a tab is, as its sidebar row says it: its repository and branch, its machine, in tmux, and its state
@@ -171,7 +173,8 @@ struct TerminalWindowOverview<TileMenu: View>: View {
             .contextMenu { if let session = session(item.id) { menu(session) } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(item.title)
-            .accessibilityValue([item.detail, selection == item.id ? "Selected" : nil].compactMap { $0 }.joined(separator: ", "))
+            .accessibilityValue([item.bellRang() ? GlassBell.accessibilityWord : nil, item.detail,
+                                 selection == item.id ? "Selected" : nil].compactMap { $0 }.joined(separator: ", "))
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { open(item.id) }
             .accessibilityIdentifier(item.identifier)

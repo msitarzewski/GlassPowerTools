@@ -136,14 +136,18 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertTrue(dock.waitForNonExistence(timeout: 10), "the dock stayed with nothing in it")
     }
 
-    // MARK: The dock's flow, scroll, Connections menu and sides (the owner, 2026-10-26)
+    // MARK: The dock's line, scroll, Connections menu and sides (the owner, 2026-10-26; 2026-11-05)
 
-    /// Two terminal windows shrunk into the dock as they open, the dock resized to `size` (a hand on
-    /// its corner, which the runner cannot drag).
-    private func dockTwoTerminals(resizedTo size: String?) -> (dock: XCUIElement, orbs: XCUIElementQuery, connections: XCUIElement) {
+    /// Two terminal windows shrunk into the dock as they open: a row, or a column (`vertical`); its longest
+    /// shortened to `longest`, so one orb is out of sight; resized to `size` (a hand on its corner, which the runner
+    /// cannot drag).
+    private func dockTwoTerminals(vertical: Bool = false, longest: Int? = nil,
+                                  resizedTo size: String? = nil) -> (dock: XCUIElement, orbs: XCUIElementQuery, connections: XCUIElement) {
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "terminal-move",
                                 "--demo-session-orb", "-com.glasspowertools.orbs.inDock", "YES"]
+            + (vertical ? ["-com.glasspowertools.orbs.dockOrientation", "vertical"] : [])
+            + (longest.map { ["--demo-dock-longest", String($0)] } ?? [])
             + (size.map { ["--demo-dock-resize", $0] } ?? [])
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
@@ -159,17 +163,21 @@ final class GlassSessionOrbUITests: XCTestCase {
         return (dock, orbs, connections)
     }
 
-    /// "Respond like a responsive flex with cards in it where the docked windows move to fit the
-    /// shape of the dock": too narrow for all three, the last wraps to a row of its own, from the
-    /// leading edge under Connections.
-    func testTheDockWrapsItsOrbsToItsShape() {
-        let (_, orbs, connections) = dockTwoTerminals(resizedTo: "600x900")
-        let sorted = orbs.allElementsBoundByIndex.sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) }
-        let first = sorted[0].frame, second = sorted[1].frame, lead = connections.frame
-        XCTAssertLessThan(abs(first.midY - lead.midY), lead.height / 2, "the first orb is not in Connections' row: \(first) \(lead)")
-        XCTAssertGreaterThan(first.minX, lead.maxX, "the first orb is not beside Connections")
-        XCTAssertGreaterThan(second.minY, first.maxY - 20, "the second orb did not wrap to a row of its own: \(second)")
-        XCTAssertLessThan(abs(second.minX - lead.minX), 60, "the wrapped orb does not start at the leading edge: \(second) \(lead)")
+    /// "An orientation selection for the dock. horizontal or vertical" (2026-11-05): a row, Connections then each orb
+    /// beside the last; a column, each below the last.
+    func testTheDockIsARowOrAColumn() {
+        let (_, orbs, connections) = dockTwoTerminals()
+        let row = orbs.allElementsBoundByIndex.map(\.frame).sorted { $0.minX < $1.minX }
+        let lead = connections.frame
+        XCTAssertTrue(row.allSatisfy { abs($0.midY - lead.midY) < lead.height / 2 }, "not one row: \(row) \(lead)")
+        XCTAssertGreaterThan(row[0].minX, lead.maxX, "the first orb is not beside Connections")
+        XCTAssertGreaterThan(row[1].minX, row[0].maxX - 20, "the second orb is not beside the first: \(row)")
+        app.terminate()
+
+        let (_, column, top) = dockTwoTerminals(vertical: true)
+        let stacked = column.allElementsBoundByIndex.map(\.frame).sorted { $0.minY < $1.minY }
+        XCTAssertGreaterThan(stacked[0].minY, top.frame.maxY - 20, "the first orb is not below Connections")
+        XCTAssertGreaterThan(stacked[1].minY, stacked[0].maxY - 20, "the second orb is not below the first: \(stacked)")
         // For the capture from outside.
         sleep(6)
     }
@@ -178,7 +186,7 @@ final class GlassSessionOrbUITests: XCTestCase {
     /// orbs scrolls under a quick drag that starts on an orb, and the orb is not carried.
     func testAQuickDragOnAnOrbScrollsTheDock() {
         // Connections and one orb in view, the other below.
-        let (_, orbs, connections) = dockTwoTerminals(resizedTo: "420x700")
+        let (_, orbs, connections) = dockTwoTerminals(vertical: true, longest: 700)
         let highest = orbs.allElementsBoundByIndex.min { $0.frame.minY < $1.frame.minY }!
         let before = connections.frame.minY
         let names = orbs.allElementsBoundByIndex.map(\.label)
@@ -188,25 +196,28 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertEqual(orbs.allElementsBoundByIndex.map(\.label), names, "a quick drag carried an orb")
     }
 
-    /// "When we resize the dock, let's make sure it snaps to the shape of the visible icons": resized to
-    /// 600x900 (a hand on its corner, which the runner can't drag), the dock gives up the room its orbs
-    /// don't fill once the hand lets go: Connections and an orb in one row, the other below, no more.
-    func testAResizedDockSnapsAroundItsOrbs() {
-        let (dock, _, _) = dockTwoTerminals(resizedTo: "600x900")
-        let snapped = expectation(for: NSPredicate { _, _ in dock.frame.height < 800 }, evaluatedWith: nil)
-        _ = XCTWaiter().wait(for: [snapped], timeout: 15)
+    /// Resized by hand to 600x900 (a hand on its corner, which the runner can't drag), the dock goes back to fitting
+    /// its orbs in its row once the hand lets go (2026-11-05: a size given isn't kept; it had snapped within it, and a
+    /// window docked again landed on a new row).
+    func testAResizedDockGoesBackToFittingItsOrbs() {
+        let (dock, orbs, connections) = dockTwoTerminals(resizedTo: "600x900")
+        let back = expectation(for: NSPredicate { _, _ in dock.frame.height < 400 }, evaluatedWith: nil)
+        _ = XCTWaiter().wait(for: [back], timeout: 15)
         let size = dock.frame.size
-        XCTAssertEqual(size.height, 2 * 320 + 2 * 16, accuracy: 2, "the dock is not two rows of orbs tall: \(size)")
-        XCTAssertLessThan(size.width, 600 - 10, "the dock kept the width it was given: \(size)")
+        XCTAssertEqual(size.height, 320 + 2 * 16, accuracy: 2, "the dock is not one row of orbs tall: \(size)")
+        XCTAssertGreaterThan(size.width, 600 + 10, "the dock kept the width it was given, not its orbs': \(size)")
+        let lead = connections.frame
+        XCTAssertTrue(orbs.allElementsBoundByIndex.allSatisfy { abs($0.frame.midY - lead.midY) < lead.height / 2 },
+                      "the orbs are not in Connections' row")
         // For the capture from outside.
         sleep(4)
     }
 
-    /// "We need end arrows to show that there's more to scroll to in the dock": a dock showing two of
-    /// its three rows has an arrow at its foot and none at its head; a pinch on it scrolls a row, and
+    /// "We need end arrows to show that there's more to scroll to in the dock": a column showing two of
+    /// its three orbs has an arrow at its foot and none at its head; a pinch on it scrolls an orb, and
     /// the arrow at its head comes.
     func testTheDockShowsArrowsWhereThereIsMore() {
-        let (_, _, connections) = dockTwoTerminals(resizedTo: "420x700")
+        let (_, _, connections) = dockTwoTerminals(vertical: true, longest: 700)
         let below = element("orb-dock-more-below"), above = element("orb-dock-more-above")
         XCTAssertTrue(below.waitForExistence(timeout: 10), "no arrow where there is more below")
         XCTAssertFalse(above.exists, "an arrow above, with nothing there")
@@ -217,25 +228,24 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertFalse(below.exists, "an arrow below, with nothing more there")
     }
 
-    /// "I just dropped a window in there and it didn't display because the dock window shrunk": a dock
-    /// snapped to one row (resized to 600x352: Connections and an orb, the other below, out of sight)
-    /// grows to show a window docked into a second row.
-    func testAWindowDockedIntoAShortDockIsShown() {
-        let (dock, orbs, _) = dockTwoTerminals(resizedTo: "600x352")
-        let oneRow = expectation(for: NSPredicate { _, _ in dock.frame.height < 400 }, evaluatedWith: nil)
-        XCTAssertEqual(XCTWaiter().wait(for: [oneRow], timeout: 15), .completed, "the dock did not snap to one row")
-        // The orb in sight brings its window back, and goes into the dock again: it lands after the
-        // other, in the second row.
-        let shown = orbs.allElementsBoundByIndex.min { $0.frame.minY < $1.frame.minY }!
-        shown.tap()
+    /// "Clicking the orb icon puts the window into the dock, but because the dock 'window' shrunk when the window was
+    /// moved out of the dock, it gets reinserted on a new row. That's not expected behavior" (2026-11-05): an orb
+    /// brings its window back, the dock shrinks, and the window goes into the dock again, into the same row.
+    func testAWindowDockedAgainGoesBackIntoTheRow() {
+        let (dock, orbs, connections) = dockTwoTerminals()
+        let before = dock.frame.size
+        orbs.firstMatch.tap()
         let shrink = element("session-orb-shrink")
         XCTAssertTrue(shrink.waitForExistence(timeout: 15), "the window did not come back")
+        let shrunk = expectation(for: NSPredicate { _, _ in dock.frame.width < before.width - 100 }, evaluatedWith: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [shrunk], timeout: 15), .completed, "the dock did not shrink: \(dock.frame)")
         shrink.tap()
-        let both = expectation(for: NSPredicate { _, _ in dock.frame.height > 600 }, evaluatedWith: nil)
-        XCTAssertEqual(XCTWaiter().wait(for: [both], timeout: 20), .completed,
-                       "the dock did not grow to show the window docked into it: \(dock.frame)")
+        let back = expectation(for: NSPredicate { _, _ in orbs.count == 2 && dock.frame.width > before.width - 2 }, evaluatedWith: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [back], timeout: 20), .completed, "the dock did not grow back: \(dock.frame)")
+        XCTAssertEqual(dock.frame.height, before.height, accuracy: 2, "the dock grew a row: \(dock.frame)")
+        let lead = connections.frame
         for orb in orbs.allElementsBoundByIndex {
-            XCTAssertLessThanOrEqual(orb.frame.maxY, dock.frame.maxY + 1, "an orb is out of sight: \(orb.frame) \(dock.frame)")
+            XCTAssertLessThan(abs(orb.frame.midY - lead.midY), lead.height / 2, "an orb is not in Connections' row: \(orb.frame)")
         }
         // For the capture from outside.
         sleep(4)
@@ -256,12 +266,12 @@ final class GlassSessionOrbUITests: XCTestCase {
     }
 
     /// "The windows (in dock mode) should know not to appear on the top in a vertical oriented dock,
-    /// it should appear to the left or right": from a tall dock, a window comes back beside it. The
+    /// it should appear to the left or right": from a vertical dock, a window comes back beside it. The
     /// simulator's head faces straight ahead, so it comes back to the dock's trailing side. The
     /// runner reads each window's frame in that window's own space, so the dock says the side it
     /// chose (`orb-dock-last-side`); where the window stands is the capture's to show.
     func testAWindowFromATallDockComesBackBesideIt() {
-        let (dock, orbs, _) = dockTwoTerminals(resizedTo: "420x1100")
+        let (dock, orbs, _) = dockTwoTerminals(vertical: true)
         XCTAssertEqual(dock.value as? String, "tall")
         orbs.firstMatch.tap()
         XCTAssertTrue(element("terminal-footer-new-tab").waitForExistence(timeout: 15), "the window did not come back")

@@ -47,7 +47,7 @@ final class FocusEnvironmentUITests: XCTestCase {
         }
     }
 
-    func testTheLibraryChoosesForEveryWindowAndThisWindowFollows() {
+    func testTheLibraryChoosesForEveryWindow() {
         launch("terminal-settings", ["--demo-settings-tab", "terminal"])
         let dimmed = element("focus-environment-builtin.dimmed")
         let night = element("focus-environment-builtin.nightSky")
@@ -80,13 +80,31 @@ final class FocusEnvironmentUITests: XCTestCase {
                                      timeout: 5) == .completed, "Night Sky wasn't marked")
         XCTAssertFalse(dimmed.isSelected, "two environments are marked")
 
-        // This Window follows All Terminals' choice.
+        // One for the app (the owner, 2026-11-05: "It needs to be an app level switch"): This Window has none of its own.
         app.buttons["This Window"].tap()
-        let picker = element("terminal-window-focus-environment")
-        reveal(picker)
-        XCTAssertTrue(picker.waitForExistence(timeout: 10), "This Window has no Focus Mode environment")
-        let shown = "\(picker.label) \(picker.value as? String ?? "")"
-        XCTAssertTrue(shown.contains("Night Sky"), "This Window shows \(shown), not All Terminals' Night Sky")
+        sleep(2)
+        XCTAssertFalse(element("terminal-window-focus-environment").exists, "This Window still chooses its own environment")
+    }
+
+    /// Focus Mode is the app's (the owner, 2026-11-05: "I want that environment to persist between moving windows to
+    /// and from the dock"): open, the window goes into the dock and comes back, and Focus Mode is still open. It
+    /// closed as the terminal's view went away.
+    func testFocusModeStaysOpenAsTheWindowGoesIntoTheDockAndBack() {
+        // Opened by the moon, as he does: the view that opens it is the one that goes into the dock.
+        launch("terminal", ["-com.glasspowertools.orbs.inDock", "YES", "-blinkingCursor", "NO"])
+        let moon = element("terminal-focus-mode")
+        XCTAssertTrue(moon.waitForExistence(timeout: 30), "no moon in the terminal's bar")
+        moon.tap()
+        XCTAssertTrue(said(by: moon, "Exit Focus Mode", within: 30), "the moon didn't open Focus Mode: \(words(moon))")
+        let shrink = element("session-orb-shrink")
+        XCTAssertTrue(shrink.waitForExistence(timeout: 10), "no Shrink to Orb")
+        shrink.tap()
+        let orb = element("session-orb")
+        XCTAssertTrue(orb.waitForExistence(timeout: 30), "the window did not go into the dock")
+        sleep(3)
+        orb.tap()
+        XCTAssertTrue(moon.waitForExistence(timeout: 20), "the window did not come back")
+        XCTAssertTrue(said(by: moon, "Exit Focus Mode", within: 10), "Focus Mode closed with the window in the dock: \(words(moon))")
     }
 
     /// A living room's digital clock (2026-10-27, the handoff's third phase): the simulator's test room
@@ -186,6 +204,37 @@ final class FocusEnvironmentUITests: XCTestCase {
         XCTAssertTrue(waitFor(height, raisedBy: before), words(height))
         // Long enough for the height to be kept.
         sleep(2)
+    }
+
+    /// Fine Position from the moon of whichever tab is shown, while Focus Mode is open (the owner,
+    /// 2026-11-05: "The fine tune option is not in my moon?"). Each tab's view kept its own idea of
+    /// whether Focus Mode was open, so a tab that hadn't opened it showed a hollow moon, offered no
+    /// Fine Position, and a pinch on it tried to open Focus Mode again.
+    func testEveryTabsMoonOffersFinePositionWhileFocusModeIsOpen() {
+        launch("terminal-tabs", ["--demo-focus", "night-sky", "-blinkingCursor", "NO"])
+        let rows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "vision-terminal-sidebar-row-"))
+        let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: rows)
+        XCTAssertEqual(XCTWaiter().wait(for: [both], timeout: 40), .completed, "the window's two tabs aren't in its sidebar")
+        XCTAssertTrue(said(by: shownMoon(), "Exit Focus Mode", within: 30), "Focus Mode didn't open: \(words(shownMoon()))")
+
+        // The other tab, which didn't open it.
+        guard let other = (0..<rows.count).map({ rows.element(boundBy: $0) }).first(where: { !$0.isSelected }) else {
+            return XCTFail("no tab other than the one shown")
+        }
+        other.tap()
+        XCTAssertTrue(other.wait(for: \.isSelected, toEqual: true, timeout: 10), "the other tab wasn't shown")
+        let moon = shownMoon()
+        XCTAssertTrue(said(by: moon, "Exit Focus Mode", within: 10), "the other tab's moon reads Focus Mode closed: \(words(moon))")
+        moon.press(forDuration: 1.5)
+        XCTAssertTrue(app.buttons["Fine Position…"].firstMatch.waitForExistence(timeout: 10),
+                      "the other tab's moon has no Fine Position")
+    }
+
+    /// The moon in the bar of the tab on show: every tab has one, and only the shown tab's can be pinched.
+    private func shownMoon() -> XCUIElement {
+        let moons = app.descendants(matching: .any).matching(identifier: "terminal-focus-mode")
+        return (0..<moons.count).map { moons.element(boundBy: $0) }.first { $0.isHittable } ?? moons.firstMatch
     }
 
     /// A room whose lowest point isn't its floor (the loft's sky reaches 6 km below it, Rain Garden's

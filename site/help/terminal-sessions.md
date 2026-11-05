@@ -56,6 +56,16 @@ With two or more terminals, **Terminal View**, at the top left beside the back b
 
 **On Vision Pro, iPad and iPhone**, a terminal is named the way the Mac names its tabs: the name you gave it, else the title its program set, else its Git repository, else its folder, else its server. For a terminal kept in tmux, these come from its tmux session, so a name you give a tab on your Mac shows on your other devices too, without reconnecting. In a repository, the repository and branch come before the machine's address. To rename a terminal, touch and hold its tab (on Vision Pro, pinch and hold its row in the sidebar or its card in **Grid**), or open the menu at the top on iPhone, and choose **Rename Tab…**. Leave the name blank, or choose **Use Automatic Name**, to go back to the automatic name. A terminal kept in tmux keeps the name on its session, so every device shows it.
 
+## When a terminal rings its bell
+
+Programs ring the terminal's bell to ask for you: a coding agent waiting for an answer, a long command finished. When that happens in a terminal you're not looking at, its tab stays marked in orange until you go to it:
+
+- **A tab in an open window** glows orange beneath its row in the sidebar (Vision Pro and Mac). On iPhone, the name at the top glows while another terminal in the set rang, and that terminal shows a bell in the menu; on iPad, the tab's symbol becomes an orange bell.
+- **A window in the orb dock, or shrunk into its orb**: that tab's icon on the orb turns orange. A window with one terminal, whose orb has no tab icons around it, gets an orange rim.
+- **Show All Windows, Grid and Terminal Overview**: the terminal's picture glows orange beneath it. In **Carousel**, its picture's edge glows orange.
+
+Choosing the tab clears it. A bell in the terminal you're looking at leaves nothing behind, and the mark appears whether or not **Bell enabled** plays a sound (see [Terminal settings](terminal-settings.md)).
+
 ## Show All Windows
 
 See every terminal window and its tabs, with every other window you have open, at once, as live pictures, and go straight to one. **On Mac** press ⇧⌘\, or pinch in on a terminal or remote desktop window; **on iPad and iPhone** pull down from the bar at the top of the screen, or touch and hold ⚡; **on Vision Pro** pinch and hold ⚡, and choose **Around You** to stand the pictures around you. On the Mac you can also drag a terminal's picture onto another window's group to move that tab there. See [See everything open with Show All Windows](library-connect.md#see-everything-open-with-show-all-windows).
@@ -75,9 +85,9 @@ Beside the tools menu:
 
 ## Focus Mode on Vision Pro
 
-The moon in a terminal window's bar opens Focus Mode around you, and closes it. Pinch and hold the moon to choose what surrounds you for this window; choosing one opens Focus Mode if it isn't open. While Focus Mode is open, the same menu has **Fine Position…**.
+The moon in a terminal window's bar opens Focus Mode around you, and closes it. Focus Mode is one for the app: it stays open as windows go into the dock and come back, the moon of every terminal window is filled while it is open and closes it, and it closes by itself when you close your last terminal. Pinch and hold the moon to choose what surrounds you; choosing one opens Focus Mode if it isn't open. While Focus Mode is open, the same menu has **Fine Position…**.
 
-**Settings** ▸ **Terminal** ▸ **Focus Mode** (**All Terminals** in a terminal window's settings) chooses for every window: **Dimmed Room**, the room you're in, dimmed (the starting setting); the built-ins **Night Sky**, **Dusk**, **Grid** and **Studio**; and your own 3D rooms and 360° photos. **This Window** ▸ **Focus Mode**, or the moon's menu, chooses for one window. With **Sync terminal settings** on, the choice for every window, **Open Immersed** and **Room Sound** are the same on each of your Vision Pros; your other devices never change them.
+**Settings** ▸ **Terminal** ▸ **Focus Mode** (**All Terminals** in a terminal window's settings) chooses for every window: **Dimmed Room**, the room you're in, dimmed (the starting setting); the built-ins **Night Sky**, **Dusk**, **Grid** and **Studio**; and your own 3D rooms and 360° photos. The moon's menu chooses the same setting. With **Sync terminal settings** on, the choice for every window, **Open Immersed** and **Room Sound** are the same on each of your Vision Pros; your other devices never change them.
 
 - **Add Environment…** adds a 3D room (USDZ or Reality) or a 360° photo, a picture twice as wide as it is tall, from Files; you can also drop one on the list. Each is checked first, and one that can't be added says why: a picture that isn't twice as wide as it is tall, say, or a file named like a 3D file that isn't one inside.
 - Yours are kept in **iCloud Drive ▸ Glass Power Tools ▸ Environments**, so a file put there from your Mac or iPhone appears on your Vision Pro too. Without iCloud Drive, the ones you add stay on this Vision Pro. One still in iCloud downloads when you choose it.
@@ -248,6 +258,8 @@ Folders can't be dropped; drop the files inside them.
 **On iPhone Duo, half open and standing like a small laptop**, the terminal fills the top half and the bar moves below the fold, between the fold and the keys: the keyboard button, **Tools** with the cursor pad, and **Keys**, which adds the arrow keys under **Navigation**. Folding it half open brings up the keyboard. With the keyboard up, the keyboard button is **Tabs**: it puts the keyboard away and shows the window's tabs below the fold as live pictures. Tap one to bring it up, or **New Terminal Tab** to open another. With two tabs, the other one fills the space, so a log you are following stays in sight. **Show Keyboard** brings the keyboard back. Put away, the keyboard stays away until you ask for it, and unfolding leaves it as it was. Held half open like a book, the bar's controls sit beside the fold rather than on it; to put a terminal and another session side by side, see [Two at once on iPhone Duo](library-connect.md#two-at-once-on-iphone-duo).
 
 **On Vision Pro**, the on-screen keyboard has no bar for apps, so the same keys are in the terminal window's bar, under **Keys**: **Escape**, **Tab**, **Control for Next Key**, the arrow keys under **Navigation**, and **Function Keys** F1–F12. Use it when no keyboard is paired.
+
+**With a keyboard connected to Vision Pro**, the small on-screen keyboard (suggestions and the dictation microphone) no longer comes up when you type in a terminal. To dictate or pick an emoji, choose **Keys** > **Show Keyboard**; **Keys** > **Hide Keyboard** puts it away again. It also goes away when you disconnect the keyboard, after which the on-screen keyboard comes up as usual.
 
 ## Snippets
 

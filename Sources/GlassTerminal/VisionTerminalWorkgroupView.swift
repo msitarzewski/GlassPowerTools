@@ -203,7 +203,8 @@ private struct VisionTerminalSidebarLayout<Sidebar: View, Detail: View>: View {
 
 /// One terminal in the window's sidebar, as a Mac tab's row (`MacWorkspaceView.tabRow`): its name,
 /// and under it where it is — its repository and branch, its machine, in tmux — in its state's
-/// colour while not connected; its agent's mark in the agent's colour, pulsing while it prints.
+/// colour while not connected; its agent's mark in the agent's colour, pulsing while it prints; an
+/// orange glow beneath it while its bell, rung out of sight, is unseen (`GlassBell`, 2026-11-03).
 private struct VisionTerminalSidebarRow: View {
     let session: TerminalSession
     /// The mark's colour with no agent's own: the window's tint, else its workgroup's.
@@ -223,10 +224,15 @@ private struct VisionTerminalSidebarRow: View {
         } icon: {
             TerminalSessionMark(session: session, color: color)
         }
+        // Beneath the whole row, as the chosen row's highlight is.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassBellGlow(rang)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(name)
-        .accessibilityValue(whereItIs)
+        .accessibilityValue(rang ? "\(GlassBell.accessibilityWord), \(whereItIs)" : whereItIs)
     }
+
+    private var rang: Bool { session.terminalHostModel.bellNotice.isUnseen }
 
     private var whereItIs: String {
         let machine = "\(session.server.username)@\(session.server.host)"
@@ -503,7 +509,9 @@ struct VisionTerminalWorkgroupView: View {
                     symbolName: "terminal",
                     tint: VisionTerminalStatus.color(for: session.state),
                     // Its agent, in its colour and pulsing while it works, as its sidebar row shows it.
-                    icon: AnyView(TerminalSessionMark(session: session, color: markColor, size: GlassSessionOrbTab.iconSize)),
+                    // Orange where its bell rang out of sight (`GlassBell`).
+                    icon: AnyView(TerminalSessionMark(session: session, color: markColor, size: GlassSessionOrbTab.iconSize,
+                                                      showsBell: true)),
                     picture: { [weak session] in
                         session?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
                     },
@@ -514,7 +522,8 @@ struct VisionTerminalWorkgroupView: View {
             // services onto the ring (D88).
             dockID: GlassTerminalCapability.sessionID(workgroupID: workgroupID),
             endpointIDs: tabs.map { EndpointID(rawValue: $0.server.id) },
-            kind: .ssh
+            kind: .ssh,
+            rang: { tabs.contains { $0.terminalHostModel.bellNotice.isUnseen } }
         ) {
             // The terminal in front, or the one printing where the window follows activity (the
             // owner: "front tab, or whichever is active"). Read as the orb draws, not as the window
@@ -1100,8 +1109,12 @@ struct VisionTerminalWorkgroupView: View {
                         .lineLimit(1)
                 }
             } icon: {
-                Image(systemName: "circle.fill")
-                    .foregroundStyle(workgroup.colorTag.color)
+                // The system draws these tabs, so no glow beneath one: an orange bell while its bell is unseen
+                // (`GlassBell`, 2026-11-03).
+                let rang = session.terminalHostModel.bellNotice.isUnseen
+                Image(systemName: rang ? "bell.fill" : "circle.fill")
+                    .foregroundStyle(rang ? GlassBell.color : workgroup.colorTag.color)
+                    .accessibilityLabel(rang ? GlassBell.accessibilityWord : "")
             }
         }
         .contextMenu { tabActions(for: session) }
@@ -1165,9 +1178,13 @@ struct VisionTerminalWorkgroupView: View {
         Menu {
             Picker("Session", selection: $selectedSessionID) {
                 ForEach(Array(sessions.enumerated()), id: \.element.id) { position, session in
+                    // A bell where its bell rang out of sight (`GlassBell`).
+                    let rang = session.terminalHostModel.bellNotice.isUnseen
                     Label(TerminalWorkgroupOpening.slotTitle(session, position: position),
-                          systemImage: session.state == .connected ? "circle.fill" : "circle")
-                        .accessibilityValue(session.state == .connected ? "Connected" : "Not connected")
+                          systemImage: rang ? "bell.fill" : session.state == .connected ? "circle.fill" : "circle")
+                        .accessibilityValue([rang ? GlassBell.accessibilityWord : nil,
+                                             session.state == .connected ? "Connected" : "Not connected"]
+                            .compactMap { $0 }.joined(separator: ", "))
                         .tag(Optional(session.id))
                 }
             }
@@ -1188,6 +1205,8 @@ struct VisionTerminalWorkgroupView: View {
             // Centred between the bar's sides, and no wider than the room they leave: a coding agent's long name ran
             // under both (2026-11-03, the simulator), as the bar proposes the middle no width of its own.
             .frame(maxWidth: Self.switcherRoom(barWidth: barWidth))
+            // The iPhone's tabs are this menu: it glows beneath while another tab's bell is unseen (`GlassBell`).
+            .glassBellGlow(sessions.contains { $0.id != selectedSessionID && $0.terminalHostModel.bellNotice.isUnseen })
         }
         // **In the terminal's own light or dark** (the owner, 2026-10-15: "theres no way to switch
         // tabs on iphone"). The title sits over the terminal, not over a bar, and in light mode its

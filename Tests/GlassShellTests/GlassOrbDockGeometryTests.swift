@@ -3,95 +3,80 @@ import Foundation
 import Testing
 @testable import GlassShell
 
-/// The orb dock's geometry (D88; the owner, 2026-10-26 and 27): orbs flowing into rows as the dock's
-/// shape allows and the dock snapping around them, a carried orb landing in any direction, names
-/// opening toward the room, and the side a window comes back on from a tall dock.
-@Suite("The orb dock's flow, landings, names and sides")
+/// The orb dock's geometry (D88; the owner, 2026-10-26 and 27, 2026-11-05): orbs in one line, a row or a
+/// column, the dock fitting them and scrolling past its longest; a carried orb landing in any direction,
+/// names opening toward the room, and the side a window comes back on from a vertical dock.
+@Suite("The orb dock's line, landings, names and sides")
 struct GlassOrbDockGeometryTests {
     private let connections = CGSize(width: 240, height: 320)
     private let ringed = CGSize(width: 280, height: 320)
     private let plain = CGSize(width: 200, height: 320)
 
-    @Test("orbs fill a row and wrap to the next when the dock is too narrow; Connections is set apart")
-    func wraps() {
-        let sizes = [connections, ringed, plain, ringed]
-        let wide = GlassOrbFlow.frames(of: sizes, width: 2000, gapAfterFirst: 24)
-        #expect(wide.map(\.minY) == [0, 0, 0, 0], "one row when it fits")
-        #expect(wide.map(\.minX) == [0, 264, 544, 744], "Connections, its gap, then each beside the last")
-
-        let narrower = GlassOrbFlow.frames(of: sizes, width: 700, gapAfterFirst: 24)
-        #expect(narrower.map(\.minY) == [0, 0, 320, 320], "the third starts a row: it would end at 744")
-        #expect(narrower[2].minX == 0 && narrower[3].minX == 200, "a new row starts at the leading edge")
-        #expect(GlassOrbFlow.size(of: narrower) == CGSize(width: 544, height: 640))
+    @Test("a row: Connections, its gap, then each orb beside the last, every middle on one line")
+    func row() {
+        let short = CGSize(width: 200, height: 200)
+        let frames = GlassOrbLine.frames(of: [connections, ringed, short, ringed], .horizontal, gapAfterFirst: 24)
+        #expect(frames.map(\.minX) == [0, 264, 544, 744], "Connections, its gap, then each beside the last")
+        #expect(Set(frames.map(\.midY)) == [160], "one line, a shorter orb on its middle")
+        #expect(GlassOrbLine.size(of: [connections, ringed, short, ringed], .horizontal, gapAfterFirst: 24)
+                == CGSize(width: 1024, height: 320))
     }
 
-    @Test("a dock one orb wide is a column on one line, Connections set apart above")
+    @Test("a column: each orb below the last, on one line down the middle, Connections set apart above")
     func column() {
-        let frames = GlassOrbFlow.frames(of: [connections, ringed, plain], width: 300, gapAfterFirst: 24)
+        let frames = GlassOrbLine.frames(of: [connections, ringed, plain], .vertical, gapAfterFirst: 24)
         #expect(frames.map(\.minY) == [0, 344, 664], "each below the last, the gap after Connections")
-        #expect(frames.map(\.midX) == [150, 150, 150], "on one line down the middle")
+        #expect(Set(frames.map(\.midX)) == [140], "on one line down the middle of the widest")
     }
 
-    @Test("an orb wider than the dock has a row of its own; orbs of different heights stand on the row's middle")
-    func oddSizes() {
-        let frames = GlassOrbFlow.frames(of: [CGSize(width: 100, height: 100), CGSize(width: 500, height: 300)], width: 400)
-        #expect(frames[1].minY == 100, "too wide: a row of its own")
-        let row = GlassOrbFlow.frames(of: [CGSize(width: 100, height: 100), CGSize(width: 100, height: 300)], width: 400)
-        #expect(row[0].midY == row[1].midY)
-    }
-
-    @Test("let go, the dock snaps to the widest row its orbs make, and hugs every row when they fit")
-    func snapsAround() {
+    @Test("the dock fits every orb along its line, one orb thick; past its longest, the whole orbs that fit")
+    func fits() {
         let sizes = [connections, ringed, ringed]
-        // 700 inside: Connections, its gap and one orb (544); the third wraps.
-        let snapped = GlassOrbFlow.snapped(sizes, within: CGSize(width: 732, height: 900), inset: 16, gapAfterFirst: 24)
-        #expect(snapped == CGSize(width: 544 + 32, height: 640 + 32))
-        #expect(GlassOrbFlow.snapped(sizes, within: snapped, inset: 16, gapAfterFirst: 24) == snapped,
-                "snapped again, it stays: the same rows fit")
-
+        #expect(GlassOrbLine.fitted(sizes, .horizontal, inset: 16, gapAfterFirst: 24) == CGSize(width: 856, height: 352))
+        #expect(GlassOrbLine.fitted(sizes, .horizontal, inset: 16, gapAfterFirst: 24, longest: 700)
+                == CGSize(width: 576, height: 352), "Connections and one orb (544) fit in 668; the third is scrolled to")
+        #expect(GlassOrbLine.fitted(sizes, .vertical, inset: 16, gapAfterFirst: 24) == CGSize(width: 312, height: 1016))
+        #expect(GlassOrbLine.fitted(sizes, .vertical, inset: 16, gapAfterFirst: 24, longest: 700)
+                == CGSize(width: 312, height: 696))
+        #expect(GlassOrbLine.fitted(sizes, .horizontal, inset: 16, gapAfterFirst: 24, longest: 100).width == 272,
+                "at least Connections")
+        #expect(GlassOrbLine.fitted([plain], .horizontal, inset: 16, minimum: CGSize(width: 320, height: 320))
+                == CGSize(width: 320, height: 352), "never narrower than visionOS makes a window")
         // Connections a third larger, as in the dock: a fraction of a point wide.
-        let larger = [CGSize(width: 184 * 4.0 / 3, height: 320), ringed, ringed]
-        let rounded = GlassOrbFlow.snapped(larger, within: CGSize(width: 732, height: 900), inset: 16, gapAfterFirst: 24)
+        let larger = [CGSize(width: 184 * 4.0 / 3, height: 320), ringed]
+        let rounded = GlassOrbLine.fitted(larger, .horizontal, inset: 16, gapAfterFirst: 24)
         #expect(rounded.width == (184 * 4.0 / 3 + 24 + 280 + 32).rounded(.up), "whole points, rounded up")
-        #expect(GlassOrbFlow.snapped(larger, within: rounded, inset: 16, gapAfterFirst: 24) == rounded,
-                "rounded down, the second orb would have wrapped")
+        #expect(GlassOrbLine.fitted(larger, .horizontal, inset: 16, gapAfterFirst: 24, longest: rounded.width) == rounded,
+                "given its own size as its longest, the same orbs fit")
     }
 
-    @Test("too short for every row, the dock snaps to the whole rows nearest its height, at least one")
-    func nearestRows() {
-        // A column: Connections, then three orbs below it, ending at 320, 664, 984 and 1304.
-        let sizes = [connections, ringed, ringed, ringed]
-        let column = { (height: CGFloat) in
-            GlassOrbFlow.snapped(sizes, within: CGSize(width: 312, height: height), inset: 16, gapAfterFirst: 24)
+    @Test("a window taken out of the dock and docked again goes back into the row, not onto a new one")
+    func dockedAgain() {
+        // The owner, 2026-11-05: "because the dock 'window' shrunk when the window was moved out of the dock, it gets
+        // reinserted on a new row." The dock's size comes from its orbs alone, never from the size it was left at.
+        let four = [connections, ringed, ringed, plain, ringed]
+        for orientation in GlassOrbDockOrientation.allCases {
+            let before = GlassOrbLine.fitted(four, orientation, inset: 16, gapAfterFirst: 24)
+            let out = GlassOrbLine.fitted(Array(four.dropLast()), orientation, inset: 16, gapAfterFirst: 24)
+            let again = GlassOrbLine.fitted(four, orientation, inset: 16, gapAfterFirst: 24)
+            #expect(out != before, "it shrank as the window left")
+            #expect(again == before, "\(orientation): back to the size it had")
+            let frames = GlassOrbLine.frames(of: four, orientation, gapAfterFirst: 24)
+            let across = orientation == .horizontal ? frames.map(\.midY) : frames.map(\.midX)
+            #expect(Set(across).count == 1, "\(orientation): one line")
         }
-        let nearThree = column(900 + 32), nearTwo = column(700 + 32), tiny = column(100), roomy = column(5000)
-        #expect(nearThree.height == 1016, "900 is nearer three rows (984) than two")
-        #expect(nearTwo.height == 696, "700 is nearer two rows (664) than three")
-        #expect(tiny.height == 352, "at least one row")
-        #expect(roomy.height == 1336, "every row when they fit (1304), no more")
-        #expect(nearTwo.width == 312, "a column is as wide as its widest orb")
-        let alone = GlassOrbFlow.snapped([plain], within: CGSize(width: 100, height: 100), inset: 16,
-                                         minimum: CGSize(width: 320, height: 320))
-        #expect(alone == CGSize(width: 320, height: 352), "never narrower than visionOS makes a window")
     }
 
-    @Test("an orb docked below what a short dock shows grows it to that row, up to three rows; one shown already changes nothing")
-    func showsAnArrival() {
-        // Snapped to one row: Connections and an orb; the third wraps out of sight.
-        let wide = [connections, ringed, ringed]
-        let oneRow = CGSize(width: 576, height: 352)
-        let grown = GlassOrbFlow.showing(2, of: wide, within: oneRow, inset: 16, gapAfterFirst: 24, rows: 3)
-        #expect(grown == CGSize(width: 576, height: 672), "grown to its row (640)")
-        #expect(GlassOrbFlow.showing(1, of: wide, within: oneRow, inset: 16, gapAfterFirst: 24, rows: 3) == oneRow,
-                "already shown")
-
-        // A column one row tall: the second orb is on the third row, the third on the fourth.
-        let column = [connections, ringed, ringed, ringed]
-        let short = CGSize(width: 312, height: 352)
-        let third = GlassOrbFlow.showing(2, of: column, within: short, inset: 16, gapAfterFirst: 24, rows: 3)
-        #expect(third.height == 1016, "to the third row (984), past the one between")
-        #expect(GlassOrbFlow.showing(3, of: column, within: short, inset: 16, gapAfterFirst: 24, rows: 3) == short,
-                "the fourth row is past three: it scrolls to it instead")
+    @Test("the dock is a row until a column is chosen")
+    func orientationSetting() {
+        let name = "GlassOrbDockOrientation.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(GlassOrbDockOrientation.current(in: defaults) == .horizontal)
+        defaults.set("vertical", forKey: GlassOrbDockOrientation.key)
+        #expect(GlassOrbDockOrientation.current(in: defaults) == .vertical)
+        defaults.set("diagonal", forKey: GlassOrbDockOrientation.key)
+        #expect(GlassOrbDockOrientation.current(in: defaults) == .horizontal, "anything else: a row")
     }
 
     @Test("a carried orb lands on the one under it in any direction, first over Connections or ahead, last past them")

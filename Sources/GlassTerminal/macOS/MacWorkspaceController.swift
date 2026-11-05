@@ -649,6 +649,28 @@ final class MacWorkspaceController {
 
     private func observeOutput(of model: SwiftTermHostModel) {
         model.onOutputActivity = { [weak self] in self?.noteOutput() }
+        // A pane made while its tab is in front is in sight from the start.
+        model.bellNotice.isInSight = panesInSight
+    }
+
+    // MARK: The bell (2026-11-03)
+
+    /// Every pane's terminal, SSH and local.
+    private var paneModels: [SwiftTermHostModel] {
+        (state.root?.paneIDs ?? []).compactMap { sessionsByPaneID[$0]?.terminalHostModel ?? localRuntimesByPaneID[$0]?.model }
+    }
+
+    /// A terminal in this tab rang its bell out of sight, and has not been seen since (`TerminalBellNotice`): its row
+    /// glows beneath, its icon on the window's orb turns orange (`GlassBell`).
+    var bellUnseen: Bool { paneModels.contains { $0.bellNotice.isUnseen } }
+
+    /// Whether this tab is in front in a window on screen, which every pane of it is then: a bell is seen as it rings,
+    /// and one rung before is seen now. Told by its window (`MacWorkspaceView`).
+    @ObservationIgnored private var panesInSight = false
+
+    func setInSight(_ inSight: Bool) {
+        panesInSight = inSight
+        for model in paneModels where model.bellNotice.isInSight != inSight { model.bellNotice.isInSight = inSight }
     }
 
     /// An SSH pane's terminal reads what its tmux session says about itself — the name a tab on

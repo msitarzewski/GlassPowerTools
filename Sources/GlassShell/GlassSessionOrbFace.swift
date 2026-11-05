@@ -117,12 +117,17 @@ public struct GlassSessionOrbFace {
     /// terminal's is its text alone, which its window draws over its theme (D95). Nil where the
     /// picture stands on its own.
     public var backdrop: Color?
+    /// A terminal in the window rang its bell out of sight (`GlassBell`, 2026-11-03). Each tab's icon on the ring
+    /// shows its own; a window alone on its orb, with no ring of tabs, takes an orange rim. Read as the orb draws, so
+    /// the dock follows a window it holds, which draws nothing while it waits there.
+    public var rang: @MainActor () -> Bool
 
     public init(title: String, symbolName: String, pulses: Bool = false, tabs: [GlassSessionOrbTab] = [],
                 showsButton: Bool = true, showsSingleTab: Bool = false, dockID: String? = nil,
                 endpointIDs: [EndpointID] = [], kind: HostServiceKind? = nil, backdrop: Color? = nil,
-                picture: @escaping @MainActor () -> Image?) {
+                rang: @escaping @MainActor () -> Bool = { false }, picture: @escaping @MainActor () -> Image?) {
         self.backdrop = backdrop
+        self.rang = rang
         self.title = title
         self.symbolName = symbolName
         self.pulses = pulses
@@ -139,6 +144,9 @@ public struct GlassSessionOrbFace {
     var ringTabs: [GlassSessionOrbTab] {
         tabs.count >= (showsSingleTab ? 1 : 2) ? Array(tabs.prefix(GlassOrbMetrics.maximumTabs)) : []
     }
+
+    /// The orange rim: a bell unseen with no tab on the ring to show it.
+    @MainActor var rimsBell: Bool { ringTabs.isEmpty && rang() }
 
     /// The ring with the machine's services after the tabs, as many as fit. Asked only while the
     /// orb is drawn: it reads every open session, and a window's own body must not (every window
@@ -217,6 +225,17 @@ struct GlassOrbSphereShading: View {
 
 
 /// A ring going out from the orb's rim, again and again, while its session is busy.
+/// A window alone on its orb whose terminal rang its bell out of sight: an orange rim, glowing (`GlassBell`).
+struct GlassSessionOrbBellRim: View {
+    var body: some View {
+        Circle()
+            .strokeBorder(GlassBell.color, lineWidth: 3)
+            .shadow(color: GlassBell.color.opacity(0.9), radius: 6)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 struct GlassSessionOrbPulse: View {
     var body: some View {
         Circle()
@@ -239,35 +258,69 @@ struct GlassOrbDockRoom: Equatable {
     var shown: CGFloat = 0
     var content: CGFloat = 0
 
-    /// What lies above what is shown, and below it.
+    /// What lies before what is shown along the dock's line (above, or on the left), and after it.
     var above: CGFloat { offset }
     var below: CGFloat { content - offset - shown }
 }
 
-/// The orbs in rows that wrap, as `GlassOrbFlow` lays them out.
-struct GlassOrbFlowLayout: Layout {
+/// The orbs in one line, as `GlassOrbLine` lays them out: a row or a column, as long as all of them, in a scroll view
+/// along it.
+struct GlassOrbLineLayout: Layout {
+    var orientation: GlassOrbDockOrientation
     var gapAfterFirst: CGFloat
-    /// The rows are laid out at least this wide, past what is shown, which then shows what fits: a Mac dock growing to
-    /// a width it has been given (`GlassMacOrbDockView`). Laid out at each width along the way, its orbs wrapped into
-    /// a column while it grew, Connections standing in the middle and the next orb out of sight below (the VM,
-    /// 2026-11-02, filmed at 60 fps).
-    var widthAtLeast: CGFloat = 0
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let used = GlassOrbFlow.size(of: frames(subviews, width: max(width, widthAtLeast)))
-        return CGSize(width: width.isFinite ? width : used.width, height: used.height)
+        GlassOrbLine.size(of: sizes(subviews), orientation, gapAfterFirst: gapAfterFirst)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        for (subview, frame) in zip(subviews, frames(subviews, width: max(bounds.width, widthAtLeast))) {
+        let frames = GlassOrbLine.frames(of: sizes(subviews), orientation, gapAfterFirst: gapAfterFirst)
+        for (subview, frame) in zip(subviews, frames) {
             subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), anchor: .topLeading,
                           proposal: ProposedViewSize(frame.size))
         }
     }
 
-    private func frames(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
-        GlassOrbFlow.frames(of: subviews.map { $0.sizeThatFits(.unspecified) }, width: width, gapAfterFirst: gapAfterFirst)
+    private func sizes(_ subviews: Subviews) -> [CGSize] { subviews.map { $0.sizeThatFits(.unspecified) } }
+}
+
+extension GlassOrbDockOrientation {
+    /// The way the dock scrolls.
+    var axis: Axis.Set { self == .horizontal ? .horizontal : .vertical }
+
+    /// Where the dock is scrolled to along its line, from its scroll view's geometry.
+    func room(_ geometry: ScrollGeometry) -> GlassOrbDockRoom {
+        switch self {
+        case .horizontal:
+            GlassOrbDockRoom(offset: geometry.contentOffset.x, shown: geometry.containerSize.width,
+                             content: geometry.contentSize.width)
+        case .vertical:
+            GlassOrbDockRoom(offset: geometry.contentOffset.y, shown: geometry.containerSize.height,
+                             content: geometry.contentSize.height)
+        }
+    }
+
+    /// Where a frame starts and ends along the line.
+    func start(of frame: CGRect) -> CGFloat { self == .horizontal ? frame.minX : frame.minY }
+    func end(of frame: CGRect) -> CGFloat { self == .horizontal ? frame.maxX : frame.maxY }
+
+    /// The arrow at the line's start (`back`) or end, where there is more: its name, symbol, and identifier.
+    func moreArrow(back: Bool) -> (title: String, symbol: String, id: String) {
+        switch (self, back) {
+        case (.horizontal, true): ("More on the Left", "chevron.left", "orb-dock-more-left")
+        case (.horizontal, false): ("More on the Right", "chevron.right", "orb-dock-more-right")
+        case (.vertical, true): ("More Above", "chevron.up", "orb-dock-more-above")
+        case (.vertical, false): ("More Below", "chevron.down", "orb-dock-more-below")
+        }
+    }
+
+    /// Where the arrow at the start (`back`) or end stands.
+    func arrowAlignment(back: Bool) -> Alignment {
+        switch self {
+        case .horizontal: back ? .leading : .trailing
+        case .vertical: back ? .top : .bottom
+        }
     }
 }
+
 #endif

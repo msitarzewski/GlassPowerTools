@@ -11,6 +11,7 @@
 
 #if os(iOS)
 import SwiftUI
+import GlassShell
 import GlassTerminalEmulator
 
 /// The tabs of the window a terminal is in, handed down by the window (`VisionTerminalWorkgroupView`).
@@ -65,6 +66,7 @@ struct TerminalFoldTabsPanel: View {
     private func card(_ session: TerminalSession) -> some View {
         let front = session.id == tabs.selected
         let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let rang = session.terminalHostModel.bellNotice.isUnseen
         return Button {
             tabs.select(session.id)
         } label: {
@@ -97,8 +99,11 @@ struct TerminalFoldTabsPanel: View {
             }
         }
         .buttonStyle(.plain)
+        // Its bell rang out of sight: an orange glow beneath, as beneath a tab (`GlassBell`, 2026-11-03).
+        .glassBellGlow(rang, cornerRadius: 16, spread: 12, outside: true)
         .accessibilityLabel(TerminalWorkgroupOpening.label(session, on: .tabBar))
-        .accessibilityValue(front ? "In the top half" : session.server.name)
+        .accessibilityValue([rang ? GlassBell.accessibilityWord : nil, front ? "In the top half" : session.server.name]
+            .compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(front ? .isSelected : [])
         .accessibilityIdentifier("terminal-fold-tab-\(session.id.uuidString)")
     }

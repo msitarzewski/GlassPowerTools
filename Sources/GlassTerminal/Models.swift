@@ -515,6 +515,11 @@ class TerminalSession: Identifiable, Hashable {
     #if DEBUG
     /// Screenshots and UI tests: a program's title, as a read of its tmux session brings it.
     func demoPaneTitle(_ title: String) { tmuxPane = TerminalTmux.PaneState(title: title) }
+    /// Screenshots and UI tests (`--demo-foreign-grid <rows>`): tmux's window at another client's
+    /// size, `rows` high and this terminal's width, as a session also open on another device shows.
+    func demoForeignGrid(rows: Int) {
+        terminalHostModel.showTmuxGrid(columns: latestTerminalColumns, rows: rows, own: false)
+    }
     #endif
     /// The name someone gave this terminal, here or on another device through its session.
     private(set) var givenName: String?

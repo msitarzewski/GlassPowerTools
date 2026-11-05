@@ -183,21 +183,25 @@ public final class GlassTextViewIOS: UITextView {
 
     // MARK: - Undo authority
 
-    /// No undo manager for this view.
+    /// The editor's own undo, as this view's undo manager (`GlassEditorUndoManager`, set by the engine).
     ///
-    /// `UndoCoordinator` is the single undo authority on both platforms. UIKit
-    /// resolves undo through the responder chain, so returning `nil` here is
-    /// what stops the shake-to-undo gesture and the keyboard's undo affordance
-    /// from driving a second, disagreeing stack. It is best-effort by nature —
-    /// UIKit may still find a manager further up a host app's chain — so the
-    /// package additionally never records into one.
-    public override var undoManager: UndoManager? { nil }
+    /// `UndoCoordinator` is the single undo authority on both platforms. UIKit resolves undo through the responder
+    /// chain — ⌘Z, shake to undo, the three-finger swipe, the keyboard's undo button — so this view's manager is what
+    /// they all reach; it records nothing (registration is disabled, so UIKit's own typing records add nothing) and
+    /// answers from the coordinator. Until 2026-11-03 this returned nil and none of them did anything.
+    var editorUndoManager: UndoManager?
+    public override var undoManager: UndoManager? { editorUndoManager }
 
     // MARK: - Intent-bearing actions
 
     public override func paste(_ sender: Any?) {
         pendingIntent = .paste
         super.paste(sender)
+    }
+
+    public override func cut(_ sender: Any?) {
+        pendingIntent = .cut
+        super.cut(sender)
     }
 
     public override func deleteBackward() {

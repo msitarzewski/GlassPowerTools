@@ -14,6 +14,7 @@
 //
 
 import SwiftUI
+import GlassShell
 import GlassTerminalEmulator
 
 struct TerminalTabMark: View {
@@ -26,13 +27,17 @@ struct TerminalTabMark: View {
     let working: Bool
     /// Its side in points; nil is a list's symbol at the row's text size.
     var size: CGFloat? = nil
+    /// Its terminal rang the bell out of sight (`TerminalBellNotice`): orange, glowing (`GlassBell`).
+    var rang: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The mark's side, as a list's symbol is drawn at the row's text size.
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 16
 
     var body: some View {
-        let mark = icon.foregroundStyle(agent?.accent?.color ?? color)
+        let mark = icon
+            .foregroundStyle(rang ? GlassBell.color : agent?.accent?.color ?? color)
+            .glassBellIconGlow(rang)
         Group {
             // Breathing as an animation between its two ends, which SwiftUI runs at the display's own rate without
             // drawing the mark again. It was the mark drawn again up to 30 times a second, stepping, and standing
@@ -73,17 +78,22 @@ struct TerminalTabMark: View {
 }
 
 /// A terminal session's mark, kept current by itself: its agent as its title or its tmux pane names it,
-/// pulsing while it prints. Vision Pro's sidebar rows and the window's orb draw it, so both say the
+/// pulsing while it prints; orange where its bell rang out of sight, when `showsBell` (an orb's ring, in the dock or
+/// where the window shrank: the owner, 2026-11-03). Vision Pro's sidebar rows and the window's orb draw it, so both say the
 /// same of each terminal (the owner, 2026-10-21: "make sure they represent the llm cli like the
 /// sidebar does").
 struct TerminalSessionMark: View {
     let session: TerminalSession
     let color: Color
     var size: CGFloat? = nil
+    /// Where the mark alone stands for the tab, so its bell shows on it; a sidebar row glows beneath instead.
+    var showsBell = false
 
     var body: some View {
         // Read first: drawn again as output starts and stops, by then with the title an agent set.
         let working = session.terminalHostModel.outputActivity.isActive
-        TerminalTabMark(agent: GlassTerminalCapability.agent(of: session), color: color, working: working, size: size)
+        let rang = showsBell && session.terminalHostModel.bellNotice.isUnseen
+        TerminalTabMark(agent: GlassTerminalCapability.agent(of: session), color: color, working: working, size: size,
+                        rang: rang)
     }
 }

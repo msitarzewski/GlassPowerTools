@@ -29,10 +29,13 @@ public struct GlassOverviewItem: Identifiable {
     public let mark: @MainActor () -> Image?
     /// Shown where it has no picture.
     public let symbolName: String
+    /// Its terminal rang its bell out of sight, unseen since: the tile glows orange beneath (`GlassBell`).
+    public let bellRang: @MainActor () -> Bool
 
     public init(id: UUID, title: String, detail: String?, detailTruncation: Text.TruncationMode = .tail,
                 identifier: String, symbolName: String = "terminal",
-                picture: @escaping @MainActor () -> Image?, mark: @escaping @MainActor () -> Image?) {
+                picture: @escaping @MainActor () -> Image?, mark: @escaping @MainActor () -> Image?,
+                bellRang: @escaping @MainActor () -> Bool = { false }) {
         self.id = id
         self.title = title
         self.detail = detail
@@ -41,6 +44,7 @@ public struct GlassOverviewItem: Identifiable {
         self.symbolName = symbolName
         self.picture = picture
         self.mark = mark
+        self.bellRang = bellRang
     }
 
     /// As the carousel names it.
@@ -116,6 +120,10 @@ public struct GlassOverviewTile: View {
                 .strokeBorder(selected ? Color.accentColor : Color.white.opacity(0.16), lineWidth: selected ? 3 : 1)
         }
         .contentShape(.rect(cornerRadius: 10))
+        // Its bell, unseen: an orange glow beneath the grid's tile, as beneath its tab; on the carousel's (uncaptioned),
+        // which stands in depth clipped to itself, on its edge. Never on the carousel's reflection.
+        .glassBellGlow(live && captioned && item.bellRang(), cornerRadius: 10, spread: 14, outside: true)
+        .glassBellEdge(live && !captioned && item.bellRang())
     }
 }
 

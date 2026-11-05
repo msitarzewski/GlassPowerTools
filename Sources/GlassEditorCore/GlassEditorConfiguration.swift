@@ -12,6 +12,9 @@ public struct GlassEditorConfiguration: Sendable, Hashable {
     public var showsLineNumbers: Bool
     public var wrapsLines: Bool
     public var isEditable: Bool
+    /// Follows Edit ▸ Spelling and Grammar and Edit ▸ Substitutions (`GlassTextChecking`), off until switched on there.
+    /// The Editor's documents do; the database's SQL and record editors never, where a smart quote would break a query.
+    public var followsTextChecking: Bool
     /// Milliseconds to debounce rehighlighting after an edit. Matches the
     /// proven AppKit behavior in glassdb (75ms — INTEGRATION.md A3).
     public var highlightDebounceMilliseconds: Int
@@ -37,6 +40,7 @@ public struct GlassEditorConfiguration: Sendable, Hashable {
         showsLineNumbers: Bool = true,
         wrapsLines: Bool = false,
         isEditable: Bool = true,
+        followsTextChecking: Bool = false,
         highlightDebounceMilliseconds: Int = 75,
         largeFileByteCeiling: UInt64 = 8 * 1024 * 1024,
         minimumContrastRatio: Double = 4.5
@@ -46,6 +50,7 @@ public struct GlassEditorConfiguration: Sendable, Hashable {
         self.showsLineNumbers = showsLineNumbers
         self.wrapsLines = wrapsLines
         self.isEditable = isEditable
+        self.followsTextChecking = followsTextChecking
         self.highlightDebounceMilliseconds = highlightDebounceMilliseconds
         self.largeFileByteCeiling = largeFileByteCeiling
         self.minimumContrastRatio = minimumContrastRatio

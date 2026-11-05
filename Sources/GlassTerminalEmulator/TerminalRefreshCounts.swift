@@ -28,7 +28,12 @@ public final class TerminalRefreshCounts {
         case wholeScrolledBack = "Whole repaints, not at the foot"
         case wholeAllRows = "Whole repaints, every line"
         case rowRepaints = "Changed-line repaints"
+        /// Of those, ones where the screen starts lower than the view's top (`TerminalRepaintBand`).
+        case screenLower = "Changed-line repaints, screen lower"
         case unchangedRows = "Repaints skipped, nothing changed"
+        /// What the system then drew: the whole terminal, or only the band asked for.
+        case drawnWhole = "Terminals drawn whole"
+        case drawnInPart = "Terminals drawn in part"
         case waits = "Main thread waits"
 
         /// The diagnostics file's word for it.
@@ -44,7 +49,10 @@ public final class TerminalRefreshCounts {
             case .wholeScrolledBack: "whole repaints (not at foot)"
             case .wholeAllRows: "whole repaints (every line)"
             case .rowRepaints: "line repaints"
+            case .screenLower: "line repaints (screen lower)"
             case .unchangedRows: "skipped (unchanged)"
+            case .drawnWhole: "drawn whole"
+            case .drawnInPart: "drawn in part"
             case .waits: "waits"
             }
         }

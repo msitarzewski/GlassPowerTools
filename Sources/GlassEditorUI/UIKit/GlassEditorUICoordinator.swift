@@ -105,6 +105,48 @@ public final class GlassEditorUICoordinator: NSObject, UITextViewDelegate {
         model.selectedRange = range(of: textView.selectedRange)
     }
 
+    // MARK: - The selection's own menu
+
+    /// The selection's menu, with the Mac's Edit ▸ Transformations in it (2026-11-03): iPad, iPhone and Vision Pro have
+    /// no Edit menu to hold them. Make Upper Case, Make Lower Case and Capitalize each change the selection as one
+    /// step, "Undo Change Case", and leave it selected.
+    public func textView(_ textView: UITextView, editMenuForTextIn range: NSRange,
+                         suggestedActions: [UIMenuElement]) -> UIMenu? {
+        guard range.length > 0, textView.isEditable, let glassTextView = textView as? GlassTextViewIOS else { return nil }
+        let transformations = UIMenu(title: "Transformations", children: [
+            changeCase("Make Upper Case", in: glassTextView, range: range) { $0.uppercased() },
+            changeCase("Make Lower Case", in: glassTextView, range: range) { $0.lowercased() },
+            changeCase("Capitalize", in: glassTextView, range: range) { $0.capitalized },
+        ])
+        return UIMenu(children: suggestedActions + [transformations])
+    }
+
+    private func changeCase(_ title: String, in textView: GlassTextViewIOS, range: NSRange,
+                            _ change: @escaping (String) -> String) -> UIAction {
+        UIAction(title: title) { [weak self, weak textView] _ in
+            guard let self, let textView else { return }
+            self.changeCase(in: textView, range: range, change)
+        }
+    }
+
+    /// One step of the model, then the view follows it, as an undo does.
+    func changeCase(in textView: GlassTextViewIOS, range: NSRange, _ change: (String) -> String) {
+        let selection = self.range(of: range)
+        guard let selected = try? model.substring(in: selection) else { return }
+        let changed = change(selected)
+        guard changed != selected else { return }
+        do {
+            try model.apply(TextEdit(replacementRange: selection, text: changed), intent: .changeCase)
+        } catch {
+            assertionFailure("Rejected a change of case: \(error)")
+            return
+        }
+        syncTextViewFromModel(textView)
+        let length = (changed as NSString).length
+        textView.selectedRange = NSRange(location: range.location, length: length)
+        model.selectedRange = selection.lowerBound..<(selection.lowerBound + length)
+    }
+
     /// Keeps the sibling gutter aligned while the text view scrolls.
     /// `UITextViewDelegate` refines `UIScrollViewDelegate`, so this arrives
     /// without a second delegate.

@@ -35,6 +35,9 @@ struct MacWorkspaceView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility
     @State private var secureKeyboardEntry = MacSecureKeyboardEntry.shared
     @State private var terminalWindow: NSWindow?
+    /// The window is on screen: not in the orb dock, minimized, hidden or covered whole. Its tab in front is then in
+    /// sight, and a bell there seen as it rings (2026-11-03).
+    @State private var windowOnScreen = false
     /// Puts a reopened window back where it was, and keeps its place in its record (W12).
     @State private var placementTracker = MacWorkspaceWindowPlacementTracker()
     @State private var workgroupEditorContext: WorkgroupEditorContext?
@@ -130,10 +133,9 @@ struct MacWorkspaceView: View {
                     title: tab.windowIdentity(servers: servers).title,
                     symbolName: "apple.terminal",
                     tint: .primary,
-                    icon: AnyView(TerminalTabMark(agent: tab.tabAgent,
-                                                  color: tint ?? tab.workgroupColor?.color ?? .secondary,
-                                                  working: tab.isProducingOutput,
-                                                  size: GlassSessionOrbTab.iconSize)),
+                    // Read as the dock draws it: orange where its bell rang out of sight, the window in the dock
+                    // (`GlassBell`), where the window itself draws nothing.
+                    icon: AnyView(MacTabOrbMark(tab: tab, color: tint ?? tab.workgroupColor?.color ?? .secondary)),
                     picture: { [weak tab] in tab?.orbPicture() },
                     select: { [weak controller] in controller?.select(tab.workspaceID) })
             },
@@ -141,7 +143,8 @@ struct MacWorkspaceView: View {
             kind: .ssh,
             // The picture is the terminal's text alone; behind it, the theme the window paints.
             backdrop: TerminalWindowProfile.resolved(controller.windowSettings, settings: settingsManager)
-                .theme.canvasBackgroundColor.color
+                .theme.canvasBackgroundColor.color,
+            rang: { [weak controller] in controller?.tabs.contains { $0.bellUnseen } == true }
         ) { [weak controller] in controller?.selectedTab.orbPicture() }
     }
 
@@ -290,13 +293,16 @@ struct MacWorkspaceView: View {
                     .accessibilityIdentifier("mac-workspace-tab-close-\(controller.workspaceID.uuidString.lowercased())")
             }
         }
+        // A terminal in it rang its bell out of sight: an orange glow beneath the row (`GlassBell`, 2026-11-03).
+        .glassBellGlow(controller.bellUnseen)
         .onHover { inside in
             if inside { hoveredTabID = controller.workspaceID } else if hoveredTabID == controller.workspaceID { hoveredTabID = nil }
         }
         .accessibilityAction(named: "Close Tab") { requestCloseTabs([controller.workspaceID]) }
         .tag(controller.workspaceID)
         .accessibilityLabel(tabIdentity.title)
-        .accessibilityValue(tabIdentity.subtitle ?? "")
+        .accessibilityValue([controller.bellUnseen ? GlassBell.accessibilityWord : nil, tabIdentity.subtitle]
+            .compactMap { $0 }.joined(separator: ", "))
         .accessibilityIdentifier(
             "mac-workspace-tab-\(controller.workspaceID.uuidString.lowercased())"
         )
@@ -438,6 +444,16 @@ struct MacWorkspaceView: View {
             preset.autoFocusOnActivity = enabled
             settingsManager.upsertLayoutPreset(preset)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in
+            guard let window = note.object as? NSWindow, window === terminalWindow else { return }
+            windowOnScreen = window.occlusionState.contains(.visible)
+        }
+        // The tab in front, in a window on screen and not under its overview, is in sight: its terminals' bells are
+        // seen as they ring. Every other tab's ring out of sight (`TerminalBellNotice`).
+        .onChange(of: BellSight(selected: windowController.selectedTabID, onScreen: windowOnScreen && !showingOverview,
+                                tabs: windowController.tabs.map(\.workspaceID)), initial: true) { _, sight in
+            for tab in windowController.tabs { tab.setInSight(sight.onScreen && tab.workspaceID == sight.selected) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: GlassAdditiveSidebars.willResizeWindow)) { note in
             guard let window = note.object as? NSWindow, window === terminalWindow, terminalColumnWidth > 0 else { return }
             holdTerminalWidth()
@@ -472,6 +488,7 @@ struct MacWorkspaceView: View {
                 tabbingIdentifier: "sh.glas.workspace.\(windowController.windowID.uuidString)",
                 onWindow: { window in
                     terminalWindow = window
+                    windowOnScreen = window.occlusionState.contains(.visible)
                     MacWorkspacePreviewRegistry.shared.register(windowController, window: window)
                     MacWorkspacePreviewRegistry.shared.setTabAdder(windowID: windowController.windowID) { request in
                         addRequestedTab(request)
@@ -974,6 +991,27 @@ struct MacWorkspaceView: View {
         guard let request = windowController.transferTabs(ids) else { return }
         openWindow(id: "workspace", value: request)
     }
+}
+
+/// A tab's icon on its window's orb, read as the dock draws it: its agent in its colour, pulsing while it prints,
+/// orange while its bell is unseen. A window in the dock draws nothing, so what it last drew would stand still.
+private struct MacTabOrbMark: View {
+    /// Weak: the dock keeps a face after its window has gone, and must not keep the tab.
+    weak var tab: MacWorkspaceController?
+    let color: Color
+
+    var body: some View {
+        TerminalTabMark(agent: tab?.tabAgent, color: color, working: tab?.isProducingOutput ?? false,
+                        size: GlassSessionOrbTab.iconSize, rang: tab?.bellUnseen ?? false)
+    }
+}
+
+/// What decides which of a window's tabs is in sight: the one in front, while the window is on screen.
+private struct BellSight: Equatable {
+    let selected: UUID
+    let onScreen: Bool
+    /// A tab added or moved in takes its place too.
+    let tabs: [UUID]
 }
 
 private struct WorkspaceCredentialPrompt: Identifiable {

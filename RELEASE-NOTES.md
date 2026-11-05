@@ -101,6 +101,82 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.600 (5 November 2026)
+- **The orb dock is a row or a column**, on Vision Pro and the Mac: **Settings** ▸ **Appearance** ▸ **Orbs** ▸
+  **Dock**, **Horizontal** or **Vertical**. It grows and shrinks along it as windows come and go, and scrolls past
+  about six orbs in a row (seven on the Mac) or four in a column (the screen's height on the Mac), with arrows at the
+  ends. A window brought back from the dock and docked again goes back into the same row; it could land on a new one,
+  as the dock kept a size it had been given and wrapped its orbs into it. Resized by hand, the dock goes back to
+  fitting its orbs; **Fit Dock to Its Orbs** is gone. A vertical dock sends windows back beside it, as a tall one did.
+- **Focus Mode is the app's on Vision Pro.** It stays open as windows go into the dock and come back (it closed as a
+  terminal's view went away), and it closes by itself once the last terminal closes. Its environment is one for the
+  app: the moon's menu sets **Settings** ▸ **Terminal** ▸ **Focus Mode**'s, and **This Window** no longer has its own.
+
+### 0.4.599 (5 November 2026)
+- **No mini keyboard on Vision Pro while a keyboard is connected.** With a Magic Keyboard (or any) connected, a
+  terminal or a remote desktop takes your typing without visionOS's small on-screen keyboard floating by the window.
+  For dictation or emoji, **Keys** > **Show Keyboard** in a terminal brings it back until **Hide Keyboard**; in a
+  remote desktop, **Keys** > **Type Text…**. With no keyboard connected, the on-screen keyboard comes up as before.
+  Seen in the Vision Pro simulator; typing with a Magic Keyboard is still to be tried on the headset.
+
+### 0.4.598 (5 November 2026)
+- **Files on Vision Pro keeps your size.** A Files window opens at the size you last left one at, on that Vision Pro;
+  until you resize one, at 960 points wide (1,100 was a little too wide), still enough for every column and the names.
+- **The moon offers Fine Position whenever Focus Mode is open.** Focus Mode is one for the app, but each terminal in
+  a window kept its own note of whether it had opened it: on another terminal of the window, or another window, the
+  moon read closed, its menu had no **Fine Position…**, and a pinch tried to open Focus Mode again. Every moon now
+  follows Focus Mode itself: filled while it is open, **Fine Position…** in its menu, a pinch closes it.
+
+### 0.4.597 (5 November 2026)
+- **Files on Vision Pro shows the names.** The window opens wider (1,100 points instead of 700), where every file's
+  name, size, date and permissions fit beside its buttons; at 700 the names were cut to "…". Made narrower, a row gives
+  way to keep the name readable: **Permissions** goes first, then **Edit**, **Get Info** and **Download** fold into
+  one ⋯ menu, then the date. Long names are shortened in the middle, keeping the extension. Folders' sizes and dates
+  now line up with the files'. Checked in the Vision Pro simulator at both widths.
+
+### 0.4.596 (3 November 2026)
+- **The Editor with a keyboard on iPad, iPhone and Vision Pro:** **Find and Replace…** (⌥⌘F), **Find Next** (⌘G),
+  **Find Previous** (⇧⌘G), **Use Selection for Find** (⌘E), **Jump to Selection** (⌘J), **Go to Line** (⌥⌘L) and the
+  text size keys (⌘+, ⌘−, ⌘0), as the Mac's menus have them. Checked with key presses on the iPad simulator; on
+  Vision Pro ⌘Z and ⇧⌘Z were checked the same way, and the other keys are still to be tried on the headset.
+- **Transformations off the Mac:** select text and open its menu for **Make Upper Case**, **Make Lower Case** and
+  **Capitalize**, each undone on its own (**Undo Change Case**); on the Mac, Edit ▸ Transformations now undoes the same.
+- **Settings ▸ Editor ▸ Spelling and Substitutions**, on every device: check spelling while typing, correct
+  automatically, smart quotes, smart dashes, smart copy/paste (and on the Mac grammar, links, data detectors and text
+  replacement). Off until turned on; never in a database's SQL editor.
+
+### 0.4.595 (3 November 2026)
+- **The Editor's Edit menu on the Mac is TextEdit's.** Edit ▸ Find adds **Find and Replace…** (⌥⌘F), **Use
+  Selection for Find** (⌘E) and **Jump to Selection** (⌘J), and the menu adds **Paste and Match Style** (⌥⇧⌘V),
+  **Spelling and Grammar**, **Substitutions**, **Transformations** (Make Upper Case, Make Lower Case, Capitalize) and
+  **Speech**. Spelling and substitutions stay off until you turn them on, apply to every Editor window, and never to
+  a database's SQL editor.
+- **Replace in the find bar** replaces the selected match and moves to the next, beside **All**; each undoes on its own
+  (**Undo Replace**).
+
+### 0.4.594 (3 November 2026)
+- **Undo and redo in the Editor.** **Edit ▸ Undo** (⌘Z) and **Redo** (⇧⌘Z) were grey and did nothing in the
+  Editor on the Mac, and on iPad, iPhone and Vision Pro neither ⌘Z nor the system's undo did anything. Now each takes
+  back or brings back the last change, and the menu names it, as TextEdit does: **Undo Typing**, **Undo Paste**,
+  **Undo Cut**. On iPad, iPhone and Vision Pro the system's own ways to undo (the keyboard's undo and redo buttons, the
+  three-finger swipe, shaking iPhone) now reach the same undo; checked in tests on the simulator, not yet on a device.
+  A cut now undoes on its own, rather than with the deletions beside it.
+
+### 0.4.593 (3 November 2026)
+- **A terminal that rings its bell while you're not looking at it stays marked in orange until you go to it**, on
+  every device. A tab in an open window glows orange beneath its row; a window in the orb dock, or shrunk into its
+  orb, turns that tab's icon orange (a window with one terminal gets an orange rim); **Show All Windows**, **Grid**
+  and **Terminal Overview** glow beneath its picture, and **Carousel** lights its picture's edge. On iPhone the name
+  at the top glows and the terminal shows a bell in the menu; on iPad its tab's symbol becomes an orange bell. A bell
+  in the terminal in front leaves nothing behind, and the mark shows whether or not the bell plays a sound.
+
+### 0.4.592 (3 November 2026, Vision Pro)
+- **Vision Pro: a changed line is asked to be repainted where the terminal draws it, also when the terminal has fewer
+  rows than its window** (a terminal kept in tmux and open on another device too, shown at that device's size).
+  Before, the request named rows above it. Nothing changes on screen: the headset redraws the whole terminal for
+  each request. Typing in a restored terminal that stays out of sight until the window is resized is not explained
+  by this and is still open; the headset's diagnostics now record whether each terminal drew, to catch it next time.
+
 ### 0.4.591 (3 November 2026)
 - **iPhone Duo stood like a small laptop: the remote desktop has the top half's full width.** It runs from just
   below the screen's rounded corners down to the fold, so they no longer cut off its menu bar or a window's close

@@ -300,14 +300,13 @@ public extension Scene {
 /// about 2x what it should be"); Connections first, larger and set apart, then the rest in the order
 /// the owner set by holding an orb and carrying it ("so muscle memory can land").
 ///
-/// The orbs flow into rows as the dock's shape allows (the owner, 2026-10-26: "respond like a
-/// responsive flex with cards in it where the docked windows move to fit the shape of the dock"): a
-/// tall, narrow dock is a column; past what fits, it scrolls. Until the person resizes it, it fits its
-/// orbs in a row. Resized, it snaps around them once the hand lets go (2026-10-27: "let's make sure it
-/// snaps to the shape of the visible icons"): to the widest row they make at that width, and to every
-/// row or the whole rows nearest its height (`GlassOrbFlow.snapped`); the size given is kept on this
-/// device, and the dock snaps within it again as orbs come and go. Its glass and Opacity are its own,
-/// following Appearance until set in Settings ▸ Appearance ▸ Orbs.
+/// The orbs stand in one line, a row or a column as Settings ▸ Appearance ▸ Orbs says (the owner,
+/// 2026-11-05: "horizontal or vertical, then honor that when adding/removing windows/sessions"): the
+/// dock grows and shrinks along it as orbs come and go, and past its longest it scrolls, an arrow at
+/// the end with more. Resized by hand, it goes back to fitting its orbs once the hand lets go. (From
+/// 2026-10-26 the orbs flowed into rows within the size the person gave it, which was kept; a window
+/// docked again then landed on a new row.) Its glass and Opacity are its own, following Appearance
+/// until set in Settings ▸ Appearance ▸ Orbs.
 public struct GlassOrbDockView: View {
     let model: GlassShellModel
     @State private var dock = GlassOrbDockModel.shared
@@ -323,8 +322,13 @@ public struct GlassOrbDockView: View {
     @State private var fitAsked = 0
     /// Counts sizes the dock did not ask for: the person's hand on its corner.
     @State private var resizes = 0
+    /// The size it last fitted itself to: where it opens next (`glassOrbDockOpensAtItsSize`).
     @AppStorage(GlassOrbDock.sizeKey, store: GlassUITestRun.settingsDefaults) private var keptSize = ""
     @AppStorage(GlassOrbDock.lookKey, store: GlassUITestRun.settingsDefaults) private var lookData = Data()
+    @AppStorage(GlassOrbDockOrientation.key, store: GlassUITestRun.settingsDefaults)
+    private var orientationSetting = GlassOrbDockOrientation.horizontal.rawValue
+    /// A row or a column, as Settings ▸ Appearance ▸ Orbs says.
+    private var orientation: GlassOrbDockOrientation { GlassOrbDockOrientation(rawValue: orientationSetting) ?? .horizontal }
     /// The orb held to be carried, and how far it has gone; gone when the hold ends, however it ends.
     @State private var held: HeldOrb?
     /// When a held orb was let go: the pinch that let it go is not a pinch on it.
@@ -346,11 +350,10 @@ public struct GlassOrbDockView: View {
     static let ringedWidth: CGFloat = 280
     static let plainWidth: CGFloat = 200
     static let height: CGFloat = 320
-    /// About six orbs with rings; past it, a second row.
+    /// A row's longest, about six orbs with rings; past it, it scrolls.
     static let widest: CGFloat = 1700
-    /// Three rows; past them it scrolls.
-    static let rows = 3
-    static let tallest: CGFloat = CGFloat(rows) * height
+    /// A column's longest, about four orbs; past it, it scrolls.
+    static let tallest: CGFloat = 1340
     /// The narrowest window visionOS makes.
     static let narrowest: CGFloat = GlassConnectionsWindowSize.narrowestWindow
     /// Between the dock's edge and its orbs.
@@ -380,9 +383,10 @@ public struct GlassOrbDockView: View {
         let cells = dock.order.arranged(terminals.map { DockCell.terminal(face(of: $0, open: open)) }
                                             + machines.map(DockCell.machine), id: \.id)
         let sizes = [Self.connectionsSize] + cells.map(Self.size(of:))
-        let fit = Self.fit(sizes, within: GlassConnectionsWindowSize.stored(keptSize))
-        ScrollView(.vertical) {
-            GlassOrbFlowLayout(gapAfterFirst: Self.connectionsGap) {
+        let orientation = orientation
+        let fit = Self.fit(sizes, orientation: orientation)
+        ScrollView(orientation.axis) {
+            GlassOrbLineLayout(orientation: orientation, gapAfterFirst: Self.connectionsGap) {
                 GlassConnectionsOrb(model: model, scale: Self.connectionsScale) {
                     comeBackToConnections()
                 } menu: {
@@ -415,37 +419,28 @@ public struct GlassOrbDockView: View {
         }
         .scrollPosition($scroll)
         .onScrollGeometryChange(for: GlassOrbDockRoom.self) { geometry in
-            GlassOrbDockRoom(offset: geometry.contentOffset.y, shown: geometry.containerSize.height,
-                             content: geometry.contentSize.height)
+            orientation.room(geometry)
         } action: { _, room in self.room = room }
         // An orb carried, not the dock.
         .scrollDisabled(held != nil)
         .scrollIndicators(.hidden)
         .frame(minWidth: Self.narrowest, maxWidth: .infinity, minHeight: Self.height, maxHeight: .infinity,
                alignment: .topLeading)
-        // More above or below: an arrow at that end, which a pinch scrolls a row; in front of the
-        // orbs, which stand a little in front of the dock and of each other.
-        .overlay(alignment: .top) {
-            if room.above > 1 { moreArrow(up: true).offset(z: Self.depth(of: cells.count)) }
+        // More along the line: an arrow at that end, which a pinch scrolls an orb that way; in front
+        // of the orbs, which stand a little in front of the dock and of each other.
+        .overlay(alignment: orientation.arrowAlignment(back: true)) {
+            if room.above > 1 { moreArrow(back: true).offset(z: Self.depth(of: cells.count)) }
         }
-        .overlay(alignment: .bottom) {
-            if room.below > 1 { moreArrow(up: false).offset(z: Self.depth(of: cells.count)) }
+        .overlay(alignment: orientation.arrowAlignment(back: false)) {
+            if room.below > 1 { moreArrow(back: false).offset(z: Self.depth(of: cells.count)) }
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { resized(to: $0) }
         .background { GlassWindowSizerView(sizer: sizer).accessibilityHidden(true) }
         // Orbs come and go, or Settings fits it to them again.
         .onChange(of: fit, initial: true) { _, fit in fitToOrbs(fit) }
-        // An orb docked where the dock doesn't reach: it grows to its row, or scrolls to it.
+        // An orb docked past what the dock shows, at its longest: scrolled to.
         .onChange(of: cells.map(\.id)) { old, new in
-            guard let id = new.last(where: { !old.contains($0) }), let index = new.firstIndex(of: id) else { return }
-            if let given = GlassConnectionsWindowSize.stored(keptSize) {
-                let grown = GlassOrbFlow.showing(index + 1, of: sizes, within: given, inset: Self.inset,
-                                                 gapAfterFirst: Self.connectionsGap, rows: Self.rows)
-                if grown != given {
-                    Self.logger.info("dock grown to \(Int(grown.height)) for \(id, privacy: .public)")
-                    keptSize = GlassConnectionsWindowSize.stored(grown)
-                }
-            }
+            guard let id = new.last(where: { !old.contains($0) }) else { return }
             arrived = id
         }
         .task(id: arrived) {
@@ -454,24 +449,26 @@ public struct GlassOrbDockView: View {
             try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled, let frame = frames[id] else { return }
             arrived = nil
-            if frame.minY - Self.inset < room.offset - 1 || frame.maxY + Self.inset > room.offset + room.shown + 1 {
-                withAnimation(.smooth) { scroll.scrollTo(y: min(frame.minY - Self.inset, room.content - room.shown)) }
+            let start = orientation.start(of: frame) - Self.inset, end = orientation.end(of: frame) + Self.inset
+            if start < room.offset - 1 || end > room.offset + room.shown + 1 {
+                let to = min(start, room.content - room.shown)
+                withAnimation(.smooth) { orientation == .horizontal ? scroll.scrollTo(x: to) : scroll.scrollTo(y: to) }
             }
         }
-        // Resized: once the hand has let go, the size given is kept and the dock snaps within it.
+        // Resized by hand: once the hand has let go, back to fitting its orbs. A size given was kept until
+        // 2026-11-05, and the orbs wrapped into it, so a window docked again could land on a new row (the
+        // owner: "it gets reinserted on a new row. That's not expected behavior"); the line's way is chosen
+        // in Settings instead.
         .task(id: resizes) {
             guard resizes > 0 else { return }
             repeat {
                 try? await Task.sleep(for: .seconds(Self.settle))
             } while !Task.isCancelled && sizer.isInteractivelyResizing
             guard !Task.isCancelled else { return }
-            let given = shape
-            keptSize = GlassConnectionsWindowSize.stored(given)
-            let snapped = Self.fit(sizes, within: given)
-            Self.logger.info("dock sized \(Int(given.width))x\(Int(given.height)), snapped to \(Int(snapped.width))x\(Int(snapped.height))")
-            fitToOrbs(snapped)
+            Self.logger.info("dock sized \(Int(shape.width))x\(Int(shape.height)) by hand, back to \(Int(fit.width))x\(Int(fit.height))")
+            fitToOrbs(fit)
         }
-        // A tall dock sends windows back beside it.
+        // A vertical dock sends windows back beside it.
         .onChange(of: isTall, initial: true) { _, tall in dock.isTall = tall }
         #if DEBUG
         // UI tests: `--demo-dock-resize 420x1100` stands for the person resizing the dock a few
@@ -594,28 +591,30 @@ public struct GlassOrbDockView: View {
     /// How far in front of the dock `steps` orbs stand: more than a ring's own depth apart.
     static func depth(of steps: Int) -> CGFloat { CGFloat(steps) * (GlassOrbRingLayout.liftSpan + 1) }
 
-    /// An arrow at the dock's end where there is more; a pinch scrolls a row that way.
-    private func moreArrow(up: Bool) -> some View {
-        Button {
-            withAnimation(.smooth) { scrollRow(up: up) }
+    /// An arrow at the dock's start (`back`) or end where there is more; a pinch scrolls an orb that way.
+    private func moreArrow(back: Bool) -> some View {
+        let arrow = orientation.moreArrow(back: back)
+        return Button {
+            withAnimation(.smooth) { scrollStep(back: back) }
         } label: {
-            Label(up ? "More Above" : "More Below", systemImage: up ? "chevron.up" : "chevron.down")
+            Label(arrow.title, systemImage: arrow.symbol)
                 .labelStyle(.iconOnly)
                 .font(.body.weight(.semibold))
-                .frame(width: 44)
+                .frame(width: orientation == .horizontal ? nil : 44, height: orientation == .horizontal ? 44 : nil)
         }
         .buttonBorderShape(.capsule)
         .controlSize(.small)
         .padding(6)
-        .accessibilityIdentifier(up ? "orb-dock-more-above" : "orb-dock-more-below")
+        .accessibilityIdentifier(arrow.id)
     }
 
-    /// To the next row's top, or the last before: rows meet the dock's edge as they do unscrolled.
-    private func scrollRow(up: Bool) {
-        let tops = Set(frames.values.map { ($0.minY - Self.inset).rounded() }).sorted()
+    /// To the next orb's start along the line, or the last before: orbs meet the dock's edge as they do unscrolled.
+    private func scrollStep(back: Bool) {
+        let starts = Set(frames.values.map { (orientation.start(of: $0) - Self.inset).rounded() }).sorted()
         let end = max(room.content - room.shown, 0)
-        let next = up ? tops.last { $0 < room.offset - 1 } ?? 0 : tops.first { $0 > room.offset + 1 } ?? end
-        scroll.scrollTo(y: min(max(next, 0), end))
+        let next = back ? starts.last { $0 < room.offset - 1 } ?? 0 : starts.first { $0 > room.offset + 1 } ?? end
+        let to = min(max(next, 0), end)
+        if orientation == .horizontal { scroll.scrollTo(x: to) } else { scroll.scrollTo(y: to) }
     }
 
     /// The room either side of an orb's middle within the dock, for its dots' names
@@ -627,8 +626,8 @@ public struct GlassOrbDockView: View {
 
     // MARK: Its shape
 
-    /// Taller than wide: windows come back beside it rather than above.
-    private var isTall: Bool { shape.height > shape.width }
+    /// A column: windows come back beside it rather than above.
+    private var isTall: Bool { orientation == .vertical }
 
     static var connectionsSize: CGSize { CGSize(width: GlassConnectionsOrb.windowSide * connectionsScale, height: height) }
 
@@ -636,15 +635,19 @@ public struct GlassOrbDockView: View {
         CGSize(width: cell.ringed ? ringedWidth : plainWidth, height: height)
     }
 
-    /// The dock's size around these orbs within `given`, the size the person gave it; without one, in
-    /// a row as wide as `widest` allows, wrapping up to `tallest`.
-    static func fit(_ sizes: [CGSize], within given: CGSize?) -> CGSize {
-        GlassOrbFlow.snapped(sizes, within: given ?? CGSize(width: widest, height: tallest + 2 * inset), inset: inset,
-                             gapAfterFirst: connectionsGap, minimum: CGSize(width: narrowest, height: height))
+    /// The dock's size around these orbs in a row or a column: all of them, or the whole orbs that fit in its longest.
+    static func fit(_ sizes: [CGSize], orientation: GlassOrbDockOrientation) -> CGSize {
+        var longest = orientation == .horizontal ? widest : tallest
+        #if DEBUG
+        if let demo = GlassOrbDockDemo.longest { longest = demo }
+        #endif
+        return GlassOrbLine.fitted(sizes, orientation, inset: inset, gapAfterFirst: connectionsGap, longest: longest,
+                                   minimum: CGSize(width: narrowest, height: height))
     }
 
-    /// The dock takes the size that fits its orbs.
+    /// The dock takes the size that fits its orbs, and opens at it next time.
     private func fitToOrbs(_ fit: CGSize) {
+        keptSize = GlassConnectionsWindowSize.stored(fit)
         fitting = fit
         fitAsked &+= 1
         let asked = fitAsked
@@ -793,7 +796,9 @@ public struct GlassOrbDockView: View {
             tabs: session.tabs.map { tab in
                 dot(for: tab, select: pinched { reopen([session], by: tab.activate) })
             },
-            showsButton: false, dockID: session.id, kind: Self.kind(of: session)
+            showsButton: false, dockID: session.id, kind: Self.kind(of: session),
+            // A terminal's bell rung while the window waits here (`GlassBell`).
+            rang: { session.hasUnseenBell }
         ) { session.snapshot?() ?? GlassOrbDockModel.shared.keptPicture(for: session.id) }
         let ringed = !face.ringTabs.isEmpty || open.contains { $0.openedFrom == session.id }
         return TerminalOrb(session: session, face: face, ringed: ringed)
@@ -1020,6 +1025,14 @@ enum GlassOrbDockDemo {
         guard arguments.contains("--ui-testing"), let index = arguments.firstIndex(of: "--demo-dock-resize"),
               arguments.indices.contains(index + 1) else { return nil }
         return GlassConnectionsWindowSize.stored(arguments[index + 1])
+    }
+
+    /// `--demo-dock-longest 700`: the dock's longest, short enough that two windows' orbs need scrolling to.
+    static var longest: CGFloat? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"), let index = arguments.firstIndex(of: "--demo-dock-longest"),
+              arguments.indices.contains(index + 1), let value = Double(arguments[index + 1]) else { return nil }
+        return CGFloat(value)
     }
 }
 #endif

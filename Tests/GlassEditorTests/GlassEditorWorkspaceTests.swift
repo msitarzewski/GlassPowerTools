@@ -216,6 +216,53 @@ struct GlassEditorWorkspaceTests {
         #expect(document.model.text == "amber green amber blue amber")
     }
 
+    /// TextEdit's Find items the editor lacked (2026-11-03: "all of the expected text editor functions ... like say
+    /// TextEdit"): Find and Replace… opens the bar with the keyboard in Replace; Use Selection for Find takes the selected
+    /// text, escaped for a pattern search; Jump to Selection reveals it; Replace replaces this match, selects the next,
+    /// and undoes as "Undo Replace".
+    @Test func textEditsFindItems() async throws {
+        let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let url = try write("red green red (blue) red", named: "colours.txt", in: root)
+        let workspace = makeWorkspace()
+        let opened = await workspace.open(url)
+        let document = try #require(opened)
+
+        workspace.presentFindAndReplace()
+        #expect(workspace.findIsPresented && workspace.replaceFocusRequest == 1)
+
+        // Use Selection for Find: "(blue)" as written, then escaped when the bar finds by pattern.
+        document.model.selectedRange = 14..<20
+        workspace.useSelectionForFind()
+        #expect(workspace.findQuery == "(blue)")
+        workspace.findUsesRegularExpression = true
+        workspace.useSelectionForFind()
+        #expect(workspace.findQuery == #"\(blue\)"#)
+        workspace.findUsesRegularExpression = false
+        // Nothing selected leaves the term as it was.
+        let term = workspace.findQuery
+        document.model.selectedRange = 3..<3
+        workspace.useSelectionForFind()
+        #expect(workspace.findQuery == term)
+
+        let reveals = document.model.revealRequest
+        document.model.selectedRange = 4..<9
+        workspace.jumpToSelection()
+        #expect(document.model.revealRequest == reveals + 1)
+        #expect(document.model.selectedRange == 4..<9)
+
+        // Replace: the selected match, then the next is selected.
+        workspace.findQuery = "red"
+        workspace.replacement = "amber"
+        workspace.findNext()
+        #expect(document.model.selectedRange == 10..<13)
+        #expect(workspace.replaceCurrent())
+        #expect(document.model.text == "red green amber (blue) red")
+        #expect(document.model.selectedRange == 23..<26, "the next red, after the one replaced")
+        #expect(document.model.newestUndoIntent == .replace)
+        #expect(document.model.undo())
+        #expect(document.model.text == "red green red (blue) red")
+    }
+
     /// ⌘F, ⌘G and ⇧⌘G in an editor window (2026-10-22: "Command F should always Find right?").
     /// A match is revealed, not only set, so the text view selects it and scrolls to it.
     @Test func findShowsTheBarAndFindAgainRevealsTheNextMatch() async throws {

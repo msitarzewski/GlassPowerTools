@@ -171,6 +171,8 @@ struct TerminalWindowView: View {
     #endif
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    /// The window shrunk into its orb, or on its way to the dock.
+    @Environment(\.glassWindowOutOfSight) private var windowOutOfSight
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.colorScheme) private var systemColorScheme
@@ -295,6 +297,15 @@ struct TerminalWindowView: View {
                     terminalHostModel.focus()
                 }
             }
+            #if !os(macOS)
+            // A bell rung out of sight stays on its tab, orb and card until the terminal is seen (2026-11-03).
+            // In sight: the tab in front, in a window on screen, not shrunk into its orb. A Mac's tab says so for
+            // all its panes (`MacWorkspaceView`), where this view's "active" is only the focused one of a split.
+            .onChange(of: bellInSight, initial: true) { _, inSight in
+                terminalHostModel.bellNotice.isInSight = inSight
+            }
+            .onDisappear { terminalHostModel.bellNotice.isInSight = false }
+            #endif
             .onChange(of: session.closeWindowNonce) { _, _ in
                 closeTerminalAfterCleanExit()
             }
@@ -305,9 +316,14 @@ struct TerminalWindowView: View {
                 handleTerminalDisappear()
             }
             #if os(visionOS)
+            // A hardware keyboard connected: no system keyboard floats by the terminal as it takes
+            // the keys, unless asked for in the Keys menu (`GlassSystemKeyboard`, 2026-11-05).
+            .onChange(of: GlassSystemKeyboard.shared.hidesSystemKeyboard, initial: true) { _, hides in
+                terminalHostModel.hidesSystemKeyboard = hides
+            }
             // This Window or Settings changing the environment while this window's Focus Mode is open.
             .onChange(of: focusEnvironmentID) { _, id in
-                if isImmersiveFocusActive { FocusEnvironmentStage.shared.environmentID = id }
+                if focusModeOpen { FocusEnvironmentStage.shared.environmentID = id }
             }
             // What Focus Mode is fetching or making, or why it can't show one, on the window that opened it.
             .overlay(alignment: .top) {
@@ -699,13 +715,21 @@ struct TerminalWindowView: View {
     }
 
     #if os(visionOS)
-    /// The environment this window's Focus Mode shows: its own, else Settings ▸ Terminal ▸ Focus Mode's.
-    private var focusEnvironmentID: String {
-        windowSettings[TerminalWindowSettings.focusEnvironment] ?? settingsManager.focusEnvironment
+    /// The environment Focus Mode shows: the app's, Settings ▸ Terminal ▸ Focus Mode's, which the moon's menu chooses
+    /// too (the owner, 2026-11-05: "It seems that they're attached to the window. It needs to be an app level switch").
+    /// A window could keep its own until then, so bringing one back from the dock changed what surrounded him.
+    private var focusEnvironmentID: String { settingsManager.focusEnvironment }
+
+    /// Whether Focus Mode is open, whichever window or tab opened it: the app has one space. Each
+    /// tab's view keeps its own `isImmersiveFocusActive`, so the moon of a tab that didn't open it
+    /// read Focus Mode as closed, offered no Fine Position, and couldn't close it (the owner,
+    /// 2026-11-05: "The fine tune option is not in my moon?").
+    private var focusModeOpen: Bool {
+        isImmersiveFocusActive || FocusEnvironmentStage.shared.isOpen
     }
 
     private func toggleImmersiveFocus() async {
-        if isImmersiveFocusActive {
+        if focusModeOpen {
             await dismissImmersiveSpace()
             isImmersiveFocusActive = false
         } else {
@@ -719,8 +743,8 @@ struct TerminalWindowView: View {
         isImmersiveFocusActive = (result == .opened)
     }
 
-    /// The moon's pinch-and-hold menu: the library, this window's environment checked. Choosing one
-    /// keeps it for the window and shows it. While Focus Mode is open, Fine Position too.
+    /// The moon's pinch-and-hold menu: the library, the app's environment checked. Choosing one makes it the app's and
+    /// shows it. While Focus Mode is open, Fine Position too.
     @ViewBuilder
     private var focusEnvironmentMenu: some View {
         Picker("Focus Environment", selection: Binding(get: { focusEnvironmentID }, set: chooseFocusEnvironment)) {
@@ -729,7 +753,7 @@ struct TerminalWindowView: View {
             }
         }
         .pickerStyle(.inline)
-        if isImmersiveFocusActive {
+        if focusModeOpen {
             Divider()
             Button("Fine Position…", systemImage: "dpad") {
                 openWindow(id: FocusEnvironmentNudgeView.windowID)
@@ -738,11 +762,10 @@ struct TerminalWindowView: View {
     }
 
     private func chooseFocusEnvironment(_ id: String) {
-        // Settings' own choice isn't kept as the window's: the window goes on following it.
-        windowSettingsBinding?.wrappedValue[TerminalWindowSettings.focusEnvironment] =
-            id == settingsManager.focusEnvironment ? nil : id
+        settingsManager.focusEnvironment = id
+        settingsManager.saveSettings()
         FocusEnvironmentStage.shared.environmentID = id
-        if !isImmersiveFocusActive { Task { await enterImmersiveFocus() } }
+        if !focusModeOpen { Task { await enterImmersiveFocus() } }
     }
     #endif
 
@@ -752,12 +775,11 @@ struct TerminalWindowView: View {
         // selection, size-class, and scene transitions. Session teardown is an
         // explicit close operation owned by closeTerminalSession or the parent
         // workspace; view disappearance is never lifecycle authority.
-        #if os(visionOS)
-        if isImmersiveFocusActive {
-            Task { await dismissImmersiveSpace() }
-            isImmersiveFocusActive = false
-        }
-        #endif
+        //
+        // Focus Mode too: it is the app's, not this view's, and stays open as windows go into the dock and come back
+        // (the owner, 2026-11-05: "I want that environment to persist between moving windows to and from the dock").
+        // It closed here until then. It closes from any moon, or on its own once no terminal is left
+        // (`FocusEnvironmentView`).
     }
 
     /// The bar holds the keyboard while it is open; closing it gives the terminal back. The bar
@@ -1435,6 +1457,13 @@ struct TerminalWindowView: View {
             })
     }
 
+    #if !os(macOS)
+    /// The terminal is in front of someone: its tab in front, its window on screen and not its orb.
+    private var bellInSight: Bool {
+        isTerminalActive && scenePhase == .active && !windowOutOfSight
+    }
+    #endif
+
     /// What this terminal draws and behaves with: its window's settings over the terminal
     /// settings (`\.glassWindowOverrides`, set at the window's root).
     private var profile: TerminalWindowProfile {
@@ -1933,13 +1962,13 @@ struct TerminalWindowView: View {
             Button {
                 Task { await toggleImmersiveFocus() }
             } label: {
-                Image(systemName: isImmersiveFocusActive ? "moon.fill" : "moon")
+                Image(systemName: focusModeOpen ? "moon.fill" : "moon")
             }
             // Pinch and hold: this window's environment, chosen and shown (2026-10-26).
             .contextMenu { focusEnvironmentMenu }
-            .accessibilityLabel(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
+            .accessibilityLabel(focusModeOpen ? "Exit Focus Mode" : "Focus Mode")
             .accessibilityIdentifier("terminal-focus-mode")
-            .help(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
+            .help(focusModeOpen ? "Exit Focus Mode" : "Focus Mode")
             #elseif os(macOS)
             Button {
                 toggleMacFocusMode()

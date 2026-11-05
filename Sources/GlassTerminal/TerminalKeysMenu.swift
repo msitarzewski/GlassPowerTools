@@ -10,10 +10,14 @@
 //
 
 import SwiftUI
+import GlassShell
 import GlassTerminalEmulator
 
 struct TerminalKeysMenu: View {
     let press: (SwiftTermAccessoryKey) -> Void
+    #if os(visionOS)
+    private var systemKeyboard: GlassSystemKeyboard { .shared }
+    #endif
 
     var body: some View {
         Menu {
@@ -31,6 +35,24 @@ struct TerminalKeysMenu: View {
                     Button("F\(number)") { press(.function(number)) }
                 }
             }
+            #if os(visionOS)
+            // With a hardware keyboard the system's is put away (`GlassSystemKeyboard`); here it comes
+            // back for dictation and emoji, and goes again (the owner, 2026-11-05: "The only tension
+            // I'm going to have is voice dictation and emoji selection").
+            if systemKeyboard.hardwareKeyboardConnected {
+                Divider()
+                if systemKeyboard.shownAnyway {
+                    Button("Hide Keyboard", systemImage: "keyboard.chevron.compact.down") {
+                        systemKeyboard.shownAnyway = false
+                    }
+                    .accessibilityIdentifier("terminal-keys-hide-keyboard")
+                } else {
+                    Button("Show Keyboard", systemImage: "keyboard") { systemKeyboard.shownAnyway = true }
+                        .accessibilityHint("The system keyboard, for dictation and emoji.")
+                        .accessibilityIdentifier("terminal-keys-show-keyboard")
+                }
+            }
+            #endif
         } label: {
             Label("Keys", systemImage: "keyboard.badge.ellipsis")
         }

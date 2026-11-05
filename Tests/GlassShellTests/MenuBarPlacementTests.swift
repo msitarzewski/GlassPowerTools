@@ -167,14 +167,31 @@ struct MenuBarPlacementTests {
     /// ⌘G is Find Next, the shell's (2026-10-08). It was Terminal Grid, which moved to ⌥⌘G, and
     /// Carousel moved from there to ⌥⇧⌘G. The editor wants ⌘G as much as the terminal, so the key
     /// belongs to no capability: a window says what Find Next does there with `\.glassFindItem`.
+    /// The editor window holds ⌘G and ⇧⌘G itself for an iPad or headset keyboard (2026-11-03), where the shell's menu
+    /// does not exist, and only there: inside `#if !os(macOS)`, as its ⌘S is.
     @Test func commandGHasASingleOwner() throws {
-        #expect(try owners(of: "g", modifiers: ["command"]) == ["GlassShellFindCommands.swift"],
+        #expect(try owners(of: "g", modifiers: ["command"]).sorted()
+                    == ["GlassEditorWorkspaceView.swift", "GlassShellFindCommands.swift"],
                 "⌘G is Find Next, the shell's Edit ▸ Find item; a window aims it by publishing \\.glassFindItem.")
+        #expect(try !editorDeclaresOnTheMac(#"keyboardShortcut("g", modifiers: .command)"#),
+                "the editor window's ⌘G reaches the Mac; it belongs inside #if !os(macOS)")
     }
 
     @Test func shiftCommandGHasASingleOwner() throws {
-        #expect(try owners(of: "g", modifiers: ["command", "shift"]) == ["GlassShellFindCommands.swift"],
+        #expect(try owners(of: "g", modifiers: ["command", "shift"]).sorted()
+                    == ["GlassEditorWorkspaceView.swift", "GlassShellFindCommands.swift"],
                 "⇧⌘G is Find Previous, the shell's Edit ▸ Find item.")
+        #expect(try !editorDeclaresOnTheMac(#"keyboardShortcut("g", modifiers: [.command, .shift])"#),
+                "the editor window's ⇧⌘G reaches the Mac; it belongs inside #if !os(macOS)")
+    }
+
+    /// Whether the editor window declares `marker` anywhere the Mac compiles.
+    private func editorDeclaresOnTheMac(_ marker: String) throws -> Bool {
+        for file in try swiftSources() where file.lastPathComponent == "GlassEditorWorkspaceView.swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            return declarations(of: marker, in: text).contains { !excludesTheMac($0) }
+        }
+        return false
     }
 
     /// The carousel on ⌥⇧⌘G went with the overview's first draft (D96, 2026-11-02): the key is free.

@@ -406,6 +406,9 @@ public final class SwiftTermHostModel: ObservableObject {
     /// Whether output is arriving, for what draws behind the terminal (D84): observed on its own,
     /// so only those views follow it, never the whole window as this model's published changes do.
     public let outputActivity = SwiftTermOutputActivity()
+    /// A bell rung while the terminal was out of sight, until it is in sight again: its tab, its orb and its card
+    /// show it (2026-11-03).
+    public let bellNotice = TerminalBellNotice()
 
     /// When this terminal last had input or output, for the library's time in use (2026-10-20):
     /// a minute counts when its sessions had either. Not published, as above.
@@ -532,6 +535,18 @@ public final class SwiftTermHostModel: ObservableObject {
         // Vision Pro, SwiftTerm's is.
         terminalView?.terminalAccessory?.press(key)
     }
+
+    #if os(visionOS)
+    /// Whether the terminal gives an empty keyboard in place of the system's when it takes the keys: while a
+    /// hardware keyboard is connected, so visionOS's small keyboard doesn't float by the window (the owner,
+    /// 2026-11-05: "hide the mini keyboard"). Set by the terminal's window from `GlassSystemKeyboard`.
+    public var hidesSystemKeyboard = false {
+        didSet {
+            guard hidesSystemKeyboard != oldValue else { return }
+            terminalView?.applySystemKeyboardChoice()
+        }
+    }
+    #endif
 
     /// The terminal's own view, found in the engine's.
     private var terminalView: ReviewingTerminalView? {
@@ -2310,7 +2325,11 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             fingerprintedGeometry = geometry
             fingerprints.forget()
         }
-        let atBottom = cellSize.map { bounds.maxY >= contentSize.height - $0.height / 2 } ?? false
+        // The live screen shown, not lines scrolled back to: the rows SwiftTerm names count from the
+        // live screen's top, and `getLine` and the drawing from the first line shown. They are the same
+        // rows only here. SwiftTerm's own reading, not the scroll view's offset, which rests elsewhere
+        // when the terminal has fewer rows than the view holds (`TerminalRepaintBand.rect`).
+        let atBottom = !canScroll || scrollPosition >= 1
         let wantsWhole = repaintsWhole
         repaintsWhole = false
         guard let rows, !wantsWhole, TerminalRepaintBand.isOn, let cell = cellSize else {
@@ -2318,8 +2337,10 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             if atBottom { fingerprints.record(screen, fingerprint: fingerprint) } else { fingerprints.forget() }
             return super.setNeedsDisplay(rect)
         }
+        // Where SwiftTerm draws the screen's first row (`TerminalRepaintBand.rect`).
+        let screenTop = CGFloat(terminal.buffer.yDisp) * cell.height
         #if DEBUG
-        Self.repaintLog.debug("repaint rows \(rows.start)-\(rows.end) of \(terminal.rows) bounds \(self.bounds.debugDescription, privacy: .public) content \(self.contentSize.height) cell \(cell.height) atBottom \(atBottom)")
+        Self.repaintLog.debug("repaint rows \(rows.start)-\(rows.end) of \(terminal.rows) bounds \(self.bounds.debugDescription, privacy: .public) content \(self.contentSize.height) cell \(cell.height) atBottom \(atBottom) screenTop \(screenTop) cursor at \(screenTop + CGFloat(terminal.getCursorLocation().y) * cell.height)")
         #endif
         guard atBottom else {
             TerminalRefreshCounts.shared.note(.wholeScrolledBack)
@@ -2338,12 +2359,32 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             return
         }
         guard let band = TerminalRepaintBand.rect(rows: (changed.lowerBound, changed.upperBound), screenRows: terminal.rows,
-                                                  cellHeight: cell.height, bounds: bounds), band != bounds else {
+                                                  cellHeight: cell.height, screenTop: screenTop, bounds: bounds),
+              band != bounds else {
             TerminalRefreshCounts.shared.note(.wholeAllRows)
             return super.setNeedsDisplay(rect)
         }
         TerminalRefreshCounts.shared.note(.rowRepaints)
+        // The case that hid typing until a resize (2026-11-03), counted for the headset's file.
+        if abs(screenTop - bounds.minY) >= cell.height { TerminalRefreshCounts.shared.note(.screenLower) }
+        #if DEBUG
+        Self.repaintLog.debug("band \(band.debugDescription, privacy: .public)")
+        #endif
         super.setNeedsDisplay(band)
+    }
+
+    /// Whether the system drew all of the terminal or only part of it, for the headset's file: a band
+    /// asked for is drawn alone only where the system keeps what was drawn before. The visionOS
+    /// simulator and the headset both drew the whole terminal each time (2026-11-03; on the headset
+    /// 288 draws, none in part). With the repaints asked for, it also tells whether a terminal drew
+    /// at all — the open question when typing stays unseen until a resize.
+    override func draw(_ layer: CALayer, in ctx: CGContext) {
+        let clip = ctx.boundingBoxOfClipPath
+        TerminalRefreshCounts.shared.note(clip.height < bounds.height - 0.5 ? .drawnInPart : .drawnWhole)
+        #if DEBUG
+        Self.repaintLog.debug("draw \(clip.debugDescription, privacy: .public) of \(self.bounds.debugDescription, privacy: .public)")
+        #endif
+        super.draw(layer, in: ctx)
     }
 
     #if DEBUG
@@ -2373,6 +2414,10 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     /// Holding the keyboard, or its window made the key one with it doing so: a tmux session it
     /// shows is sized to it (`SwiftTermHostModel.onTerminalFocused`, 2026-10-22).
     override func becomeFirstResponder() -> Bool {
+        #if os(visionOS)
+        // The keyboard that comes up with the keys: none of the system's while a hardware keyboard types.
+        applySystemKeyboardChoice()
+        #endif
         let became = super.becomeFirstResponder()
         #if os(visionOS)
         note("keyboard taken=\(became)")
@@ -2388,6 +2433,20 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         let resigned = super.resignFirstResponder()
         note("keyboard given up=\(resigned)")
         return resigned
+    }
+    #endif
+
+    #if os(visionOS)
+    /// An empty keyboard, given in place of the system's: the view keeps the keys and nothing comes up.
+    private lazy var noSystemKeyboard = UIView(frame: .zero)
+
+    /// Gives the system's keyboard or none, as the host model says, and swaps it at once while holding the keys.
+    func applySystemKeyboardChoice() {
+        let wanted: UIView? = hostModel()?.hidesSystemKeyboard == true ? noSystemKeyboard : nil
+        guard inputView !== wanted else { return }
+        inputView = wanted
+        note("system keyboard \(wanted == nil ? "shown" : "hidden") holding=\(isFirstResponder)")
+        if isFirstResponder { reloadInputViews() }
     }
     #endif
 
@@ -4208,7 +4267,11 @@ public struct SwiftTermHostView: UIViewRepresentable {
                 model?.requestExternalLink(link)
             }
         }
-        public func bell(source: TerminalView) { onBell() }
+        public func bell(source: TerminalView) {
+            // Kept with the terminal, for its tab, its orb and its card (`TerminalBellNotice`).
+            model?.bellNotice.ring()
+            onBell()
+        }
         public func clipboardCopy(source: TerminalView, content: Data) {
             // Backstop only: the engine's OSC 52 override denies requests
             // before SwiftTerm decodes content or reaches this delegate.
@@ -4895,7 +4958,11 @@ public struct SwiftTermHostView: NSViewRepresentable {
             model?.requestExternalLink(link)
         }
 
-        public func bell(source: TerminalView) { onBell() }
+        public func bell(source: TerminalView) {
+            // Kept with the terminal, for its tab, its orb and its card (`TerminalBellNotice`).
+            model?.bellNotice.ring()
+            onBell()
+        }
         public func clipboardCopy(source: TerminalView, content: Data) {
             // Backstop only: the engine's OSC 52 override denies requests
             // before SwiftTerm decodes content or reaches this delegate.
@@ -5346,6 +5413,7 @@ private final class MacLocalProcessDelegateProxy:
     }
 
     func bell(source: TerminalView) {
+        hostModel?.bellNotice.ring()
         onBell()
     }
 

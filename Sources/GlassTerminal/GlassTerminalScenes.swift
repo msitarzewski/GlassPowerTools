@@ -204,13 +204,28 @@ public struct GlassTerminalScenes: Scene {
             .clipShape(RoundedRectangle(cornerRadius: GlassWindowShape.spatialWindowCornerRadius, style: .continuous))
             .glassSpatialWindowGlass()
             .glassLayers(runtime.layers)
+            // The size it is left at is the next one's (the owner, 2026-11-05: "remember the
+            // user's preference for sizing"). Only the person resizes this window.
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                SFTPBrowserWindowSize.keep(size)
+            }
         }
         .windowStyle(.plain)
-        .defaultSize(width: 700, height: 500)
+        // **Wide enough for every column and the names** (the owner, 2026-11-05: "It should be
+        // wider, and allow the names of the files to be shown by default"): at 700 points the
+        // row's fixed columns left the names nothing, and every file read "…"; 1100 was then "a
+        // little too wide". Narrowed by hand, the row gives way (`SFTPFileRowLayout`), and the
+        // size it's left at is where the next one opens.
+        //
+        // **No `defaultSize`:** beside one, visionOS opened the window at it and ignored the
+        // placement's size (the visionOS 27.2 simulator, 2026-11-05: asked for 760 × 640, given
+        // 960 × 500), so the placement gives the first size too.
+        .defaultWindowPlacement { _, _ in WindowPlacement(size: SFTPBrowserWindowSize.opening()) }
         .restorationBehavior(.disabled)
         ImmersiveSpace(id: "focus-environment") {
             FocusEnvironmentView()
                 .environment(settingsManager)
+                .environment(sessionManager)
                 // Steps aside for Show All Windows around the person, and comes back after it.
                 .glassImmersiveSpacePresence("focus-environment")
         }

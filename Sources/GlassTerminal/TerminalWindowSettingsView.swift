@@ -301,23 +301,6 @@ struct TerminalOverridesSettingsView: View {
                 Text("While a terminal in this window prints, the grid brings it forward, and the window's orb pulses.")
             }
 
-            Section {
-                GlassWindowSettingRow(TerminalWindowSettings.focusEnvironment, overrides: $settings,
-                                      global: global.focusEnvironment, inheritsFrom: Source.allTerminals) { value in
-                    GlassSettingLabeled("Environment") {
-                        Picker("Environment", selection: value) {
-                            ForEach(focusEnvironments(including: value.wrappedValue), id: \.id) { choice in
-                                Text(choice.name).tag(choice.id)
-                            }
-                        }
-                        .accessibilityIdentifier("terminal-window-focus-environment")
-                    }
-                }
-            } header: {
-                Text("Focus Mode")
-            } footer: {
-                Text("What surrounds you when this window enters Focus Mode. To add your own, go to All Terminals ▸ Focus Mode.")
-            }
 
             if showsDebugging {
                 Section {
@@ -362,15 +345,6 @@ struct TerminalOverridesSettingsView: View {
         )
     }
 
-    #if os(visionOS)
-    /// The library's environments, and the window's own if it isn't on this device (yet).
-    private func focusEnvironments(including current: String) -> [(id: String, name: String)] {
-        let library = FocusEnvironmentLibrary.shared
-        let offered = library.environments.map { (id: $0.id, name: $0.name) }
-        guard !offered.contains(where: { $0.id == current }) else { return offered }
-        return offered + [(id: current, name: "\(library.name(ofID: current)) (not on this Vision Pro)")]
-    }
-    #endif
 
     /// All Terminals' four fonts, and the window's own if a theme or another device gave it another.
     private func fontFamilies(including current: String) -> [String] {

@@ -13,10 +13,17 @@ public enum EditIntent: Sendable, Hashable {
     case deleteForward
     /// Pasteboard insertion. Always its own unit.
     case paste
+    /// The selection cut to the pasteboard. Always its own unit ("Undo Cut"), never a backspace run's
+    /// (2026-11-03: untagged, a cut was inferred as a backspace and merged with the deletions beside it).
+    case cut
     /// Drag-and-drop insertion.
     case drop
     /// A find/replace-all pass. Always one unit, however many edits it contains.
     case replaceAll
+    /// One match replaced from the find bar ("Undo Replace"). Its own unit.
+    case replace
+    /// Make Upper Case, Make Lower Case or Capitalize on the selection ("Undo Change Case"). Its own unit.
+    case changeCase
     /// Indent, outdent, or reindent applied to a selection.
     case indentation
     /// A completion accepted from a provider. Always its own unit.
@@ -39,7 +46,7 @@ public enum EditIntent: Sendable, Hashable {
         switch self {
         case .typing, .deleteBackward:
             return false
-        case .deleteForward, .paste, .drop, .replaceAll,
+        case .deleteForward, .paste, .cut, .drop, .replaceAll, .replace, .changeCase,
              .indentation, .completion, .programmatic, .remoteReload:
             return true
         }

@@ -3,8 +3,8 @@
 //  Glass Power Tools — GlassShell
 //
 //  The orb dock's geometry, apart from drawing it, so it is tested without a headset (D88; the owner,
-//  2026-10-26). Orbs flow into rows as the dock's shape allows ("a responsive flex ... where the docked
-//  windows move to fit the shape of the dock"), and the dock snaps around them when resized; a carried
+//  2026-10-26). Orbs stand in one line, a row or a column as the person chooses (2026-11-05; until then they
+//  flowed into rows as the dock's shape allowed, and the dock snapped around them when resized); a carried
 //  orb lands on the one under it, in any direction; a dot's name opens toward the side with room ("When
 //  a docked window's tab is too close to the right to reliably show, it should show to the left instead
 //  and not get cropped"); and a window from a tall dock comes back beside it ("it should appear to the
@@ -14,91 +14,74 @@
 import CoreGraphics
 import Foundation
 
-/// Orbs in rows, as a flexbox wraps: each row from the leading edge, an orb that would cross the
-/// width starting the next.
-public enum GlassOrbFlow {
-    /// Frames for items of `sizes`, in order, in rows no wider than `width`. An item wider than
-    /// `width` has a row of its own; items stand on their row's middle. The first item is set apart by
-    /// `gapAfterFirst`, beside the next or above it. When every row holds one item, the dock is a
-    /// column, and they stand on one line down the middle of `width`.
-    public static func frames(of sizes: [CGSize], width: CGFloat, gapAfterFirst: CGFloat = 0) -> [CGRect] {
-        layout(of: sizes, width: width, gapAfterFirst: gapAfterFirst).frames
+/// Which way the dock lays out its orbs: a row, or a column (the owner, 2026-11-05: "We need to provide an orientation
+/// selection for the dock. horizontal or vertical, then honor that when adding/removing windows/sessions"). Until then
+/// the orbs wrapped into rows within whatever size the dock was left at: a dock once resized, or one whose own shrink
+/// was taken for the person's, put the next window docked on a new row. Now the dock is one line of orbs, which grows
+/// and shrinks along its way as orbs come and go and scrolls past its longest; a size given by hand isn't kept (his
+/// choices: scroll along it; fit the orbs; the Mac's dock and Vision Pro's alike). The same on both, this device's.
+public enum GlassOrbDockOrientation: String, CaseIterable, Sendable {
+    case horizontal
+    case vertical
+
+    public static let key = "com.glasspowertools.orbs.dockOrientation"
+
+    public var title: String {
+        switch self {
+        case .horizontal: "Horizontal"
+        case .vertical: "Vertical"
+        }
     }
 
-    /// The frames, and where each row ends below.
-    private static func layout(of sizes: [CGSize], width: CGFloat, gapAfterFirst: CGFloat) -> (frames: [CGRect], bottoms: [CGFloat]) {
-        guard !sizes.isEmpty else { return ([], []) }
-        var rows: [[Int]] = []
-        var row: [Int] = []
-        var x: CGFloat = 0
-        for (index, size) in sizes.enumerated() {
-            let gap = index == 1 && row == [0] ? gapAfterFirst : 0
-            if !row.isEmpty, x + gap + size.width > width {
-                rows.append(row)
-                row = []
-                x = 0
+    /// The setting in `defaults`; horizontal until chosen.
+    public static func current(in defaults: UserDefaults) -> Self {
+        defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? .horizontal
+    }
+}
+
+/// The dock's orbs in one line, Connections first and set apart: left to right in a row, each standing on the row's
+/// middle; top to bottom in a column, each on the column's middle.
+public enum GlassOrbLine {
+    /// Frames for items of `sizes`, in order, along `orientation`. The first is set apart by `gapAfterFirst`.
+    public static func frames(of sizes: [CGSize], _ orientation: GlassOrbDockOrientation,
+                              gapAfterFirst: CGFloat = 0) -> [CGRect] {
+        let thickness = sizes.map { orientation == .horizontal ? $0.height : $0.width }.max() ?? 0
+        var along: CGFloat = 0
+        return sizes.enumerated().map { index, size in
+            if index == 1 { along += gapAfterFirst }
+            defer { along += orientation == .horizontal ? size.width : size.height }
+            switch orientation {
+            case .horizontal:
+                return CGRect(x: along, y: (thickness - size.height) / 2, width: size.width, height: size.height)
+            case .vertical:
+                return CGRect(x: (thickness - size.width) / 2, y: along, width: size.width, height: size.height)
             }
-            x += (row.isEmpty ? 0 : gap) + size.width
-            row.append(index)
         }
-        rows.append(row)
-
-        let column = rows.count > 1 && rows.allSatisfy { $0.count == 1 } && width.isFinite
-        var frames = [CGRect](repeating: .zero, count: sizes.count)
-        var bottoms: [CGFloat] = []
-        var y: CGFloat = 0
-        for (rowIndex, row) in rows.enumerated() {
-            if rowIndex == 1, rows[0] == [0] { y += gapAfterFirst }
-            let height = row.map { sizes[$0].height }.max() ?? 0
-            var x: CGFloat = 0
-            for index in row {
-                let size = sizes[index]
-                if index == 1, row.first == 0 { x += gapAfterFirst }
-                let left = column ? (width - size.width) / 2 : x
-                frames[index] = CGRect(x: left, y: y + (height - size.height) / 2, width: size.width, height: size.height)
-                x += size.width
-            }
-            y += height
-            bottoms.append(y)
-        }
-        return (frames, bottoms)
     }
 
-    /// The dock's size around items of `sizes` within `bounds`, the size the person gave it (the
-    /// owner, 2026-10-27: "When we resize the dock, let's make sure it snaps to the shape of the
-    /// visible icons"; he chose the nearest whole rows): as wide as the widest row they make there;
-    /// as tall as every row when they fit, else as the whole rows nearest its height, at least one,
-    /// the rest scrolled to. `inset` is between the edge and the items; never under `minimum`.
-    /// Rounded up to whole points, so the same rows fit again in what it snaps to.
-    public static func snapped(_ sizes: [CGSize], within bounds: CGSize, inset: CGFloat, gapAfterFirst: CGFloat = 0,
-                               minimum: CGSize = .zero) -> CGSize {
-        let (frames, bottoms) = layout(of: sizes, width: max(bounds.width - 2 * inset, 0), gapAfterFirst: gapAfterFirst)
-        guard let left = frames.map(\.minX).min(), let right = frames.map(\.maxX).max(), let all = bottoms.last else {
-            return minimum
-        }
-        let wanted = bounds.height - 2 * inset
-        let height = wanted >= all ? all : bottoms.min { abs($0 - wanted) < abs($1 - wanted) } ?? all
-        return CGSize(width: max((right - left + 2 * inset).rounded(.up), minimum.width),
-                      height: max((height + 2 * inset).rounded(.up), minimum.height))
+    /// What the line of `sizes` takes up.
+    public static func size(of sizes: [CGSize], _ orientation: GlassOrbDockOrientation,
+                            gapAfterFirst: CGFloat = 0) -> CGSize {
+        let frames = frames(of: sizes, orientation, gapAfterFirst: gapAfterFirst)
+        return CGSize(width: frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
     }
 
-    /// `bounds` grown to show the item at `index` — an orb just docked, which a dock snapped to fewer
-    /// rows had hidden (the owner, 2026-10-27: "I just dropped a window in there and it didn't
-    /// display because the dock window shrunk") — when its row is one of the first `rows`; else
-    /// `bounds`, and the dock scrolls to it.
-    public static func showing(_ index: Int, of sizes: [CGSize], within bounds: CGSize, inset: CGFloat,
-                               gapAfterFirst: CGFloat = 0, rows: Int) -> CGSize {
-        let (frames, bottoms) = layout(of: sizes, width: max(bounds.width - 2 * inset, 0), gapAfterFirst: gapAfterFirst)
-        guard frames.indices.contains(index),
-              let row = bottoms.firstIndex(where: { $0 >= frames[index].maxY - 0.5 }), row < rows else { return bounds }
-        let shown = snapped(sizes, within: bounds, inset: inset, gapAfterFirst: gapAfterFirst).height - 2 * inset
-        guard bottoms[row] > shown + 0.5 else { return bounds }
-        return CGSize(width: bounds.width, height: bottoms[row] + 2 * inset)
-    }
-
-    /// What `frames` take up, from the origin.
-    public static func size(of frames: [CGRect]) -> CGSize {
-        CGSize(width: frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
+    /// The dock's size around the line: every orb, or the whole orbs that fit in `longest` along it (at least the first),
+    /// the rest scrolled to; one orb thick; `inset` between the edge and the orbs; never under `minimum`. Whole points,
+    /// rounded up, so the same orbs fit again in what it is given.
+    public static func fitted(_ sizes: [CGSize], _ orientation: GlassOrbDockOrientation, inset: CGFloat,
+                              gapAfterFirst: CGFloat = 0, longest: CGFloat = .greatestFiniteMagnitude,
+                              minimum: CGSize = .zero) -> CGSize {
+        let frames = frames(of: sizes, orientation, gapAfterFirst: gapAfterFirst)
+        guard !frames.isEmpty else { return minimum }
+        let ends = frames.map { orientation == .horizontal ? $0.maxX : $0.maxY }
+        let room = longest - 2 * inset
+        let length = ends.last { $0 <= room + 0.5 } ?? ends[0]
+        let thickness = frames.map { orientation == .horizontal ? $0.maxY : $0.maxX }.max() ?? 0
+        let size = orientation == .horizontal
+            ? CGSize(width: length, height: thickness) : CGSize(width: thickness, height: length)
+        return CGSize(width: max((size.width + 2 * inset).rounded(.up), minimum.width),
+                      height: max((size.height + 2 * inset).rounded(.up), minimum.height))
     }
 }
 

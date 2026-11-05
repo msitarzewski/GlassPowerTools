@@ -68,7 +68,6 @@ Anything about how a terminal window looks and behaves can be set for that windo
 - **Show previews** (**on Mac and Vision Pro**): **Never**, **Mouseover** or **Mouseover + Space**.
 - **Bell and Scrollback**: **Bell enabled**, **Visual bell**, **Keep scrollback during session** and **Max scrollback lines**.
 - **Activity** (**on Vision Pro**): **Auto-focus on activity**. While a terminal in this window prints, **Grid** brings it forward, and the window's orb pulses (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)). Until you change it here, it follows the saved Workgroup the window was opened from, and is otherwise on.
-- **Focus Mode** (**on Vision Pro**): **Environment**, what surrounds you when this window enters Focus Mode. The moon's pinch-and-hold menu chooses it too. To add your own, go to **All Terminals** ▸ **Focus Mode** (see [Focus Mode on Vision Pro](terminal-sessions.md#focus-mode-on-vision-pro)).
 
 Each setting follows **All Terminals** (or **Appearance**, or **Settings**) until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Every tab in the window changes at once.
 

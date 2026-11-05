@@ -30,7 +30,7 @@ To keep every display in one window instead, set **Display Windows** to **One Wi
 - Look at a point on the desktop and pinch to click there. Pinch and drag to drag.
 - Pinching is how you select in visionOS, so it does not zoom the desktop. To see more detail, make the window larger, or use **Local Scale** in **Desktop Settings** > **This Window**.
 - A connected keyboard types directly into the remote computer, and a connected trackpad or mouse points and clicks. To take the keyboard back from the desktop, press ⇧⌘Esc; the desktop has the keyboard again the next time you pinch it.
-- Without a keyboard, use **Keys** > **Type Text…** to send text, the rest of **Keys** for Escape, Tab, modifiers, navigation and function keys, and **Arrows** for the arrow keys. A connected keyboard's arrow keys go to the remote computer too, not to visionOS.
+- Without a keyboard, use **Keys** > **Type Text…** to send text, the rest of **Keys** for Escape, Tab, modifiers, navigation and function keys, and **Arrows** for the arrow keys. A connected keyboard's arrow keys go to the remote computer too, not to visionOS. With a keyboard connected, the small on-screen keyboard doesn't come up when you touch the remote screen; to dictate or pick an emoji, use **Keys** > **Type Text…**.
 
 ## Glass
 

@@ -66,6 +66,8 @@ struct FocusEnvironmentView: View {
     /// The world the environment is in, which moves as the person does, and what moves it.
     @State private var walking = FocusWalking()
     @Environment(SettingsManager.self) private var settings
+    @Environment(SessionManager.self) private var sessionManager
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
 
     private static let log = Logger(subsystem: "com.glasspowertools", category: "FocusEnvironments")
 
@@ -88,6 +90,11 @@ struct FocusEnvironmentView: View {
         .task { await walking.trackHead() }
         .onChange(of: stage.fit) { _, fit in walking.place(fit) }
         .onChange(of: settings.focusEnvironmentSound, initial: true) { _, level in walking.soundLevel = level }
+        // The app's, open whatever its windows do, until a moon closes it; once the last terminal has closed there is
+        // no moon left to, so it closes itself (2026-11-05). Not when it opens with none (Settings' Try Out).
+        .onChange(of: sessionManager.sessions.isEmpty) { _, none in
+            if none { Task { await dismissImmersiveSpace() } }
+        }
         .onAppear {
             library.start()
             stage.isOpen = true

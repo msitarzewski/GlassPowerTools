@@ -465,13 +465,23 @@ public struct DesktopSessionView: View {
     }
     #endif
 
+    /// Vision Pro with a hardware keyboard connected: the desktop takes the keys with no system keyboard
+    /// (`GlassSystemKeyboard`, 2026-11-05).
+    private var hidesSystemKeyboard: Bool {
+        #if os(visionOS)
+        GlassSystemKeyboard.shared.hidesSystemKeyboard
+        #else
+        false
+        #endif
+    }
+
     /// The remote screen and what is drawn over and around it.
     private var picture: some View {
         GeometryReader { geometry in
             ZStack {
                 ZStack {
                     DesktopMetalSurface(session: session, viewport: viewport, inputEnabled: remoteInputEnabled,
-                                        keyboardTools: keyboardTools)
+                                        keyboardTools: keyboardTools, hidesSystemKeyboard: hidesSystemKeyboard)
                     cursor(in: geometry.size)
                 }
                 #if os(visionOS)

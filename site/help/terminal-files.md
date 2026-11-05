@@ -20,6 +20,7 @@ The title shows the folder's name with its path beneath it. **Parent Directory**
 **On Vision Pro:** **Back** (‹), beside **Done**, returns to the folder you opened this one from (⌘[ with a keyboard). Choose the folder's name for a menu of the folders above it. The window's glass follows **Glass** in **Appearance**; with **Glass** and **Opacity** at 0% it is completely clear apart from its text and controls.
 
 - **On Vision Pro, iPad and iPhone:** tap a folder to open it. Use the disclosure arrow to show its contents in place.
+- **On Vision Pro:** each row shows the name, size, date modified and permissions, with **Edit**, **Get Info** and **Download** buttons on a file. In a narrow window, permissions are hidden first, then the three buttons move into a ⋯ menu on the row, then the date, so the names stay readable. A Files window opens at the size you last left one at.
 - **On Mac:** the list is a table with **Name**, **Size**, **Modified**, **Permissions** and **Actions**. Double-click a folder to open it. Select a folder and press → to expand it or ← to collapse it. Click a column header to sort.
 
 Type in **Filter files...** to narrow the current list. Press Return to search the server instead: it looks up to three folders deep from here and shows the first 50 matches.

@@ -198,14 +198,49 @@ public final class GlassTextView: NSTextView {
 
     // MARK: - Undo authority
 
-    /// No undo manager for this view.
+    /// The editor's own undo, as this view's undo manager (`GlassEditorUndoManager`, set by the engine).
     ///
-    /// `allowsUndo = false` stops `NSTextView` recording, and returning `nil`
-    /// here stops the responder chain handing it the window's manager for
-    /// ⌘Z — which would otherwise undo *the consumer's* last document action
-    /// while the editor had focus. Undo and redo arrive through
-    /// `GlassEditorAppKitEngine.undo()` / `redo()`.
-    public override var undoManager: UndoManager? { nil }
+    /// `allowsUndo = false` stops `NSTextView` recording into it, and the manager records nothing anyway: it answers
+    /// from `UndoCoordinator`, the one undo authority. Being this view's manager is what lets Edit ▸ Undo and ⌘Z reach
+    /// it — the window sends `undo:` to its first responder's manager, and validates and names the menu item from it
+    /// ("Undo Typing") — and never the window's own, which would undo *the consumer's* last document action while the
+    /// editor had focus. Until 2026-11-03 this returned nil, and ⌘Z did nothing in the editor.
+    var editorUndoManager: UndoManager?
+    public override var undoManager: UndoManager? { editorUndoManager }
+
+    // MARK: - Undo from the Edit menu and ⌘Z
+
+    // **AppKit's Edit ▸ Undo is the window's, unless the first responder answers it.** `NSWindow` handles `undo:` and
+    // `redo:` with its own undo manager and never asks the text view's (measured 2026-11-03, a probe and the tests):
+    // with these absent, the menu item stayed grey in the editor and ⌘Z did nothing, or undid the window's last
+    // action. Answered here, the editor is first in the chain while it has the keyboard, as TextEdit's text is.
+
+    @objc public func undo(_ sender: Any?) { editorUndoManager?.undo() }
+    @objc public func redo(_ sender: Any?) { editorUndoManager?.redo() }
+
+    public override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if let enabled = validateUndo(menuItem) { return enabled }
+        return super.validateMenuItem(menuItem)
+    }
+
+    public override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if let enabled = validateUndo(item) { return enabled }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    /// Undo and Redo enabled when there is something to undo or redo, titled with what it is ("Undo Typing").
+    private func validateUndo(_ item: any NSValidatedUserInterfaceItem) -> Bool? {
+        switch item.action {
+        case #selector(undo(_:)):
+            (item as? NSMenuItem)?.title = editorUndoManager?.undoMenuItemTitle ?? "Undo"
+            return editorUndoManager?.canUndo == true
+        case #selector(redo(_:)):
+            (item as? NSMenuItem)?.title = editorUndoManager?.redoMenuItemTitle ?? "Redo"
+            return editorUndoManager?.canRedo == true
+        default:
+            return nil
+        }
+    }
 
     // MARK: - Intent-bearing actions
 
@@ -217,6 +252,27 @@ public final class GlassTextView: NSTextView {
     public override func paste(_ sender: Any?) {
         pendingIntent = .paste
         super.paste(sender)
+    }
+
+    public override func cut(_ sender: Any?) {
+        pendingIntent = .cut
+        super.cut(sender)
+    }
+
+    // Edit ▸ Transformations: each its own step, "Undo Change Case".
+    public override func uppercaseWord(_ sender: Any?) {
+        pendingIntent = .changeCase
+        super.uppercaseWord(sender)
+    }
+
+    public override func lowercaseWord(_ sender: Any?) {
+        pendingIntent = .changeCase
+        super.lowercaseWord(sender)
+    }
+
+    public override func capitalizeWord(_ sender: Any?) {
+        pendingIntent = .changeCase
+        super.capitalizeWord(sender)
     }
 
     public override func pasteAsPlainText(_ sender: Any?) {

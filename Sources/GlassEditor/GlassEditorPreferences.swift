@@ -67,6 +67,8 @@ public final class GlassEditorPreferences {
         configuration.showsLineNumbers = showsLineNumbers
         configuration.wrapsLines = wrapsLines
         configuration.fontSize = fontSize
+        // The Editor's documents follow Edit ▸ Spelling and Grammar and Edit ▸ Substitutions (`GlassTextChecking`).
+        configuration.followsTextChecking = true
         return configuration
     }
 

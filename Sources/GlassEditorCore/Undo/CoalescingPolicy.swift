@@ -93,7 +93,7 @@ public enum CoalescingPolicy: Sendable {
             return next.edit.replacementRange.upperBound
                 == previous.edit.replacementRange.lowerBound
 
-        case .deleteForward, .paste, .drop, .replaceAll,
+        case .deleteForward, .paste, .cut, .drop, .replaceAll, .replace, .changeCase,
              .indentation, .completion, .programmatic, .remoteReload:
             return false
         }

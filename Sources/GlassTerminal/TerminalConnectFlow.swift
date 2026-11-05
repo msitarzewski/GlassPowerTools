@@ -328,6 +328,15 @@ struct TerminalConnectFlow: ViewModifier {
             session.demoOpensSettings = opensSettings
             session.feedTerminalData(output)
             presentTerminalWindow(for: session, windowSettings: windowSettings)
+            #if DEBUG
+            if let rows = Self.demoForeignGridRows {
+                // Once the window has its size: tmux's window at another device's, shorter.
+                Task { @MainActor [weak session] in
+                    try? await Task.sleep(for: .seconds(3))
+                    session?.demoForeignGrid(rows: rows)
+                }
+            }
+            #endif
             if !ticks.isEmpty {
                 // Held weakly, and never across the wait: the redraws stop when the terminal goes.
                 Task { @MainActor [weak session] in
@@ -385,6 +394,17 @@ struct TerminalConnectFlow: ViewModifier {
                     }
                 }
             }
+            #if DEBUG
+            if let ringing = Self.demoBellTabs {
+                // A bell from tabs behind the one in front, once each has been shown and so draws (2026-11-03).
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(ringing.after))
+                    for index in ringing.tabs where sessions.indices.contains(index) {
+                        sessions[index].feedTerminalData(Data([0x07]))
+                    }
+                }
+            }
+            #endif
             guard let first = sessions.first else { return }
             #if os(visionOS)
             let workgroupID = sessionManager.createWorkgroup(name: first.server.name, colorTag: first.server.colorTag,
@@ -1338,6 +1358,30 @@ struct TerminalConnectFlow: ViewModifier {
 }
 
 #if DEBUG
+extension TerminalConnectFlow {
+    /// `--demo-bell <tabs>[@<seconds>]` in a `--ui-testing` run: the demo window's tabs at these places (0 the first),
+    /// comma-separated, ring their bell that long after it opens (12 s if not said): the bell's notice on their tabs,
+    /// their orbs and their cards (2026-11-03).
+    static var demoBellTabs: (tabs: [Int], after: Double)? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"), let flag = arguments.firstIndex(of: "--demo-bell"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        let parts = arguments[flag + 1].split(separator: "@", maxSplits: 1)
+        let tabs = parts[0].split(separator: ",").compactMap { Int($0) }
+        guard !tabs.isEmpty else { return nil }
+        return (tabs, parts.count > 1 ? Double(parts[1]) ?? 12 : 12)
+    }
+
+    /// `--demo-foreign-grid <rows>` in a `--ui-testing` run: the demo terminal shows tmux's window
+    /// at another device's size, this many rows high (2026-11-03: typing unseen on the headset).
+    static var demoForeignGridRows: Int? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"), let flag = arguments.firstIndex(of: "--demo-foreign-grid"),
+              arguments.indices.contains(flag + 1), let rows = Int(arguments[flag + 1]), rows > 0 else { return nil }
+        return rows
+    }
+}
+
 /// The demo terminal's answer to the mouse wheel (screenshots and UI tests only): the SGR wheel
 /// reports a program with the mouse is sent, shown on the status line as tmux shows its scroll.
 @MainActor

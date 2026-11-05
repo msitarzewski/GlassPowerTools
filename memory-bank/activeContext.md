@@ -31,11 +31,79 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-03 — RESUME HERE: the Duo's desktop gets the top half's full width, below a band (0.4.591)
+## 2026-11-05 — RESUME HERE: the dock a row or a column; Focus Mode the app's (0.4.600)
+- His dock ask (choices: scroll along it, fit the orbs, both docks): `GlassOrbLine` replaces the wrapping flow on Vision
+  Pro and the Mac; Settings ▸ Appearance ▸ Orbs ▸ Dock; a hand resize springs back; a re-docked window goes back into
+  its row. His Focus ask: Focus Mode no longer closes as a terminal's view goes away (docking), closes itself after the
+  last terminal; one environment for the app (This Window's gone). Unit and 11 Vision UI tests pass (the Focus one fails
+  with the old closing); macOS VM checked. 0.4.600 on all three, read back. Uncommitted (0.4.592–0.4.600). Task note
+  `2026-11/2026-11-05_dock-orientation-focus-app.md`.
+
+## 2026-11-05 — earlier: no mini keyboard on Vision Pro with a hardware keyboard (0.4.599, on all three)
+- His "yes, hide the mini keyboard": `GlassSystemKeyboard`; terminals and remote desktops give an empty input view while
+  a hardware keyboard is connected; Keys ▸ Show/Hide Keyboard for dictation and emoji (desktop: Type Text…). Seen in
+  the simulator; Magic Keyboard typing on the headset unproven. Package tests 3,353. 0.4.599 read back on all three.
+  Task note `2026-11/2026-11-03_vision-keyboard-bar.md`.
+
+## 2026-11-05 — earlier: Files keeps its size; Fine Position in every moon (0.4.598, on all three)
+- His "remember the user's preference for sizing. It opens a little too wide now": `SFTPBrowserWindowSize`, the size a
+  Files window is left at opens the next, 960 × 500 first; `defaultSize` found to override the placement's size, so
+  removed. His "The fine tune option is not in my moon?": each terminal's view kept its own Focus Mode flag; every
+  moon now follows the app's one Focus Mode (UI test fails without, passes with). Package tests 3,350 pass. 0.4.598
+  installed and read back on the Mac (no new crash reports), iPhone and headset. Uncommitted. Task notes `2026-11-05_vision-files-rows.md`,
+  `2026-11-05_focus-moon-fine-position.md`.
+- Still waiting on him: the mini keyboard (hide while a hardware keyboard is connected?).
+
+## 2026-11-05 — earlier: Vision Pro Files shows the names (0.4.597, on all three)
+- His photo: the Files window from a terminal's folder button, every name "…". Now 1100 wide; `SFTPFileRowLayout` gives
+  way (permissions, then the buttons into a ⋯ menu, then the date); folders' and files' columns in line. Tested
+  (bites), checked in the visionOS simulator at 1100 and 760; package tests 3,347 pass. **0.4.597 installed and read
+  back on the Mac, iPhone and headset.** Uncommitted, with 0.4.592–0.4.596. Task note
+  `tasks/2026-11/2026-11-05_vision-files-rows.md`.
+
+## 2026-11-04 — earlier (before his reboot)
+- **Uncommitted in the tree:** 0.4.592 (Vision repaint band + draw counts), 0.4.593 (the bell notice), 0.4.594–0.4.596
+  (the Editor's undo, Edit menu, iPad/Vision keys). Nothing committed or pushed since 2147bcc5; each on his word.
+- **Installed:** 0.4.596 on all three, read back (iPhone and headset 2026-11-05); since then 0.4.597 (above). Release
+  builds ready in `~/Software/glass/tmp/dd-vision` and `dd-ios-dev`; install and read back when he says they're awake.
+- **Waiting on him:** (1) the keyboard question — build "hide the mini keyboard while a hardware keyboard is
+  connected" (an empty input view; probed in the visionOS simulator, unproven on the headset) for terminals and the
+  RDP desktop, plus a "has the keyboard" mark per window? Editor too? Task note
+  `tasks/2026-11/2026-11-03_vision-keyboard-bar.md`. (2) Headset tries of 0.4.596's editor keys (⌘G/⌘E/⌥⌘F),
+  Transformations, Settings ▸ Editor ▸ Spelling and Substitutions. (3) Offered, not asked: a "Shade" immersive dimmer
+  (`.preferredSurroundingsEffect(.dim(intensity:))`) for a bright room.
+- **Open:** Vision typing unseen until a resize — read the headset's file (`drawn whole`/`drawn in part`) next time.
+- The bell notice was seen working on the headset (his photo, "bad ass": a dock tab icon orange).
+
+## 2026-11-03 — earlier: the Editor first class like TextEdit (0.4.594 undo, 0.4.595 the Edit menu, 0.4.596 iPad/Vision)
+- Undo/redo on every platform; the Mac's Edit menu as TextEdit's (Find and Replace…, Use Selection for Find, Jump to
+  Selection, Paste and Match Style, Spelling and Grammar, Substitutions, Transformations, Speech); Replace in the find
+  bar. Tested (bite), checked in the VM. Then 0.4.596: iPad, iPhone and Vision Pro key commands (⌥⌘F, ⌘G, ⇧⌘G, ⌘E,
+  ⌘J, ⌥⌘L, text size), Transformations in the selection menu, Settings ▸ Editor ▸ Spelling and Substitutions; iPad
+  UI test with real keys passes (bites); the Vision runner can't send SwiftUI shortcuts, so the find keys are for the
+  headset. Mac on 0.4.596. Uncommitted. Task note `tasks/2026-11/2026-11-03_editor-undo.md`.
+
+## 2026-11-03 — earlier: a terminal's bell marked in orange until seen (0.4.593)
+- **His ask:** an indicator when a terminal rings its bell: orange icon for the tab when its window is in the dock,
+  orange glow under the tab when it's visible but not selected; exposé and coverflow my call (tiles glow beneath;
+  Vision Pro's carousel lights the tile's edge). Built on every platform, tested (bites), seen in the visionOS
+  simulator and the macOS VM. 0.4.593 building for Mac, iPhone, Vision Pro, to install. Uncommitted. Task note
+  `tasks/2026-11/2026-11-03_terminal-bell-notice.md`.
+
+## 2026-11-03 — earlier: Vision Pro typing unseen until a resize (open; 0.4.592 on the headset)
+- **His report:** typing in a restored terminal on Vision Pro doesn't show until the window is resized. A misplaced
+  repaint band was found and fixed (`TerminalRepaintBand.rect(screenTop:)`, tested, bites), but 0.4.592's counts show
+  the headset redraws the whole terminal for every band (288 draws, none in part), so it isn't the cause. His
+  "typing shows now" was on 0.4.591 by the file's times. **Open:** the next occurrence, read from the file
+  (`drawn whole`/`drawn in part` beside keys and line repaints). Uncommitted. Task note
+  `tasks/2026-11/2026-11-03_vision-typing-unseen.md`.
+
+## 2026-11-03 — earlier: the Duo's desktop gets the top half's full width, below a band (0.4.591)
 - **Latest:** his "the curve eating the top of the screen": his choice, a 40-pt band with small glass controls inset
   by `containerCornerInsets`, the remote screen full width below it. Built, tested (bites), the site picture taken
-  again; committed and pushed. 0.4.591 (with the band) installed on Vision Pro and read back; the iPhone was
-  unavailable to devicectl all afternoon (`~/Software/glass/tmp/install-591.sh`). The site waits for his staging.
+  again; committed and pushed (2147bcc5). 0.4.591 (with the band) installed and read back on Vision Pro and his
+  iPhone (an 18 Pro Max, renamed so today). **Site live** after he staged and provisioned it: all 111 files match the
+  build.
 - **His ask**, with a photo of another app: "How are they getting a full screen on the top for the desktop?"
   Answered (Sill read from source, Headroom from coverage): no status bar or bar over the picture, and the Mac's
   picture shaped to the half. His choice: "yes, do the bars first".

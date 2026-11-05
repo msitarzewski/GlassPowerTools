@@ -193,7 +193,7 @@ The dock closes by itself when no window is in it and Connections is open.
 - Pinch **Connections** to bring the library window back.
 - **Active**, **Show All Windows** and the library bring a docked window back too.
 
-A window comes back above the dock. When the dock is taller than it is wide, the window comes back beside it instead: in Focus Mode, on the side away from where you turned to look at the dock; elsewhere, on the side set in **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Windows From a Tall Dock**. visionOS doesn't let an app put a window back where it stood.
+A window comes back above a horizontal dock. From a vertical dock, the window comes back beside it instead: in Focus Mode, on the side away from where you turned to look at the dock; elsewhere, on the side set in **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Windows From a Vertical Dock**. visionOS doesn't let an app put a window back where it stood.
 
 ### Connect from the dock
 
@@ -209,9 +209,9 @@ Choose a machine to connect to it. A machine with several services lists them, f
 
 - **Move an orb:** pinch and hold it until it lifts, then move your hand. Let go over another orb to put it in that orb's place; over **Connections**, it goes first; past the last orb, last. Each orb keeps its place on this device, so a window that leaves the dock comes back to the same place.
 - **Scroll:** pinch and move at once, without holding.
-- **Resize:** drag the dock's corner. The orbs wrap into rows to fit its shape, or stand in a column when it is taller than it is wide, and once you let go the dock snaps around them. The size is kept on this device. Until you resize it, the dock fits its orbs in a row, wrapping onto up to three rows. **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Fit Dock to Its Orbs** goes back to that.
+- **Row or column:** **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Dock** makes it **Horizontal** (the starting setting) or **Vertical**. The dock grows and shrinks along it as windows come and go: a window you bring back and dock again goes back into the same row or column. If you resize the dock by hand, it goes back to fitting its orbs when you let go.
 
-When there is more in the dock than it shows, an arrow at its top or bottom says so; pinch the arrow to scroll a row. A window docked into a row the dock doesn't show makes the dock taller, up to three rows; past that, the dock scrolls to it.
+When there are more orbs than fit (about six in a row, four in a column), an arrow at the dock's end says so; pinch the arrow to scroll an orb that way. A window docked out of sight is scrolled to.
 
 ### After a relaunch
 
@@ -241,9 +241,9 @@ The dock goes away when no window is in it and Connections is out of it.
 ### Arrange the dock on Mac
 
 - **Move the dock:** drag any empty part of it, between or around the orbs.
-- **Where it grows:** from **Connections**, which stays where you put it. As orbs come, the dock reaches further to its right, and taller evenly above and below it when an orb has a ring of dots; a second row goes below. As orbs go, it shrinks back to Connections. Near the edge of the screen, the dock moves only as far as it must to stay on screen, and comes back once it's smaller.
+- **Where it grows:** from **Connections**, which stays where you put it. As orbs come, a horizontal dock reaches further to its right, and grows taller evenly above and below it when an orb has a ring of dots; a vertical dock reaches further down. As orbs go, it shrinks back to Connections. Near the edge of the screen, the dock moves only as far as it must to stay on screen, and comes back once it's smaller.
 - **Move an orb:** drag it onto another orb to put it in that orb's place. Dropped on **Connections**, it goes first; past the last orb, it goes last. Each orb keeps its place on this Mac.
-- **Resize:** drag an edge or a corner to choose how wide the dock is. The orbs wrap into rows to fit, or stand in a column when the dock is narrow, and once you let go the dock springs back to the height that shows every orb, however tall or short you dragged it. Only a dock taller than the screen scrolls, with an arrow at the end where there's more. Until you resize it, the dock fits its orbs in a row about seven orbs wide, wrapping onto more rows as they come; **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Fit Dock to Its Orbs** goes back to that.
+- **Row or column:** **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Dock** makes it **Horizontal** (the starting setting) or **Vertical**. A row scrolls past about seven orbs, a column past the screen's height, with an arrow at the end where there's more. Dragged to another size, the dock springs back to fit its orbs when you let go.
 - **Connect:** right-click **Connections** for **Favorites**, **Recent** and **Dock Settings…**, as on Vision Pro.
 
 Where the dock floats is a setting: above this app's windows, or above every window. See [Orbs on Mac](library-settings.md#orbs-on-mac).

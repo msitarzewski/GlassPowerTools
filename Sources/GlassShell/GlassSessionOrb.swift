@@ -327,6 +327,7 @@ struct GlassSessionOrbView: View {
             .clipShape(.circle)
             .glassBackgroundEffect(in: .circle)
             .overlay { if face.pulses { GlassSessionOrbPulse() } }
+            .overlay { if face.rimsBell { GlassSessionOrbBellRim() } }
             .contentShape(.hoverEffect, .circle)
             .hoverEffect(.highlight)
             .hoverEffect(GlassOrbGrowEffect())

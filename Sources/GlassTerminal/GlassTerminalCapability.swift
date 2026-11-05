@@ -1042,10 +1042,12 @@ public final class GlassTerminalCapability: GlassCapability {
                 let workgroup = manager.workgroup(for: workgroupID)
                 let look = TerminalLook.resolved(workgroup?.windowSettings ?? GlassWindowOverrides(),
                                                  settings: runtime.settingsManager)
+                // Drawn on an orb's ring, in the dock: orange where its bell rang out of sight (`GlassBell`).
                 return AnyView(TerminalSessionMark(session: session,
                                                    color: look.tintColor ?? workgroup?.colorTag.color ?? .secondary,
-                                                   size: side))
-            }
+                                                   size: side, showsBell: true))
+            },
+            bellRang: { session.terminalHostModel.bellNotice.isUnseen }
         )
     }
 

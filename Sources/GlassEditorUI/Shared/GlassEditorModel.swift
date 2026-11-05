@@ -317,6 +317,8 @@ public final class GlassEditorModel {
     public var canRedo: Bool { undoCoordinator.canRedo }
     /// The intent of the newest undoable unit — for menu titles ("Undo Paste").
     public var newestUndoIntent: EditIntent? { undoCoordinator.newestIntent }
+    /// The intent of the newest redoable unit — "Redo Typing".
+    public var newestRedoIntent: EditIntent? { undoCoordinator.newestRedoIntent }
 
     /// Reverses the newest undo unit.
     ///
@@ -521,7 +523,7 @@ public final class GlassEditorModel {
         guard let edit = try FindEngine.replaceNext(
             of: query, replacement: replacement, in: text, after: start, wrapping: wrapping
         ) else { return nil }
-        try apply(edit, intent: .replaceAll)
+        try apply(edit, intent: .replace)
         let lower = edit.replacementRange.lowerBound
         return lower..<(lower + edit.insertedLength)
     }

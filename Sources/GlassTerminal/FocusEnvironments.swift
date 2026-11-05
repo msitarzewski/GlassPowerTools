@@ -12,8 +12,8 @@
 //  2026-10-22: "iCloud"), so a file put there from a Mac's Finder, or added on one headset, is in the
 //  library everywhere. Without iCloud Drive they stay in this device's Application Support.
 //
-//  Settings ▸ Terminal ▸ Focus Mode chooses one for every window; This Window, and the moon's
-//  pinch-and-hold menu, for one window (`TerminalWindowSettings.focusEnvironment`). An environment is
+//  Settings ▸ Terminal ▸ Focus Mode, and the moon's pinch-and-hold menu, choose the one for the app (the owner,
+//  2026-11-05: "It needs to be an app level switch"; This Window could keep its own until then). An environment is
 //  named by an identifier that means the same on every device: `builtin.<name>`, or `file:<name>`
 //  for a file in the library's folder.
 //

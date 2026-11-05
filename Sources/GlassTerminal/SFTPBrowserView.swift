@@ -487,6 +487,10 @@ struct SFTPBrowserView: View {
     /// Insert Path brings the terminal's window forward (W14).
     @Environment(\.openWindow) private var openWindow
     #endif
+    #if os(visionOS)
+    /// The columns a row shows, from the list's width (`SFTPFileRowLayout`, 2026-11-05).
+    @State private var rowLayout = SFTPFileRowLayout.full
+    #endif
 
     @State private var sftpClient: SFTPClient?
     @State private var sessionLifetime: SFTPBrowserSessionLifetime?
@@ -1140,6 +1144,12 @@ struct SFTPBrowserView: View {
         }
         #if os(visionOS)
         .glassSpatialList()
+        // The list's width decides the rows' columns; the rows' own insets and the folders'
+        // disclosure chevron come off it first.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+            let layout = SFTPFileRowLayout.fitting(width: width - Self.spatialRowChrome)
+            if layout != rowLayout { rowLayout = layout }
+        }
         #else
         .listStyle(.plain)
         #endif
@@ -1730,8 +1740,16 @@ struct SFTPBrowserView: View {
                     .accessibilityLabel("Retry loading \(entry.filename): \(message)")
                 }
             } else {
+                #if os(visionOS)
+                // The headset's disclosure chevron is at a folder's trailing edge, so a file keeps
+                // that space there instead: names, sizes and dates in one column each (2026-11-05;
+                // the leading indent put the files' columns 32 points right of the folders').
+                outlineRowLabel(for: entry)
+                    .padding(.trailing, Self.spatialDisclosureWidth)
+                #else
                 outlineRowLabel(for: entry)
                     .padding(.leading, 18)
+                #endif
             }
         }
         .padding(.leading, CGFloat(entry.depth) * 18)
@@ -1821,23 +1839,31 @@ struct SFTPBrowserView: View {
             #if os(visionOS)
             // **The Mac's columns** (2026-09-28): the headset has the width, so size, modified and
             // permissions sit in fixed columns as they do in the Mac's table rather than stacked
-            // under the name.
+            // under the name. **The name comes first** (2026-11-05): the columns give way to keep it
+            // readable (`SFTPFileRowLayout`), and it truncates in the middle, as the Mac's does, so
+            // a name's extension stays.
             Text(entry.filename)
                 .font(.body)
                 .lineLimit(1)
+                .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
             Text(entry.attributes.size.flatMap { isDir ? nil : formattedFileSize($0) } ?? "—")
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .frame(width: 90, alignment: .trailing)
-            Text(entry.attributes.accessModificationTime.map { formattedDate($0.modificationTime) } ?? "—")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(width: 150, alignment: .leading)
-            Text(entry.attributes.permissions.map { formattedPermissions($0) } ?? "")
-                .font(.callout.monospaced())
-                .foregroundStyle(.tertiary)
-                .frame(width: 108, alignment: .leading)
+                .frame(width: SFTPFileRowLayout.size, alignment: .trailing)
+            if rowLayout.showsModified {
+                Text(entry.attributes.accessModificationTime.map { formattedDate($0.modificationTime) } ?? "—")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(width: SFTPFileRowLayout.modified, alignment: .leading)
+            }
+            if rowLayout.showsPermissions {
+                Text(entry.attributes.permissions.map { formattedPermissions($0) } ?? "")
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.tertiary)
+                    .frame(width: SFTPFileRowLayout.permissions, alignment: .leading)
+            }
             #else
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.filename)
@@ -1872,39 +1898,26 @@ struct SFTPBrowserView: View {
 
             // No chevron of our own: a folder row is a disclosure group, which draws one — ours
             // beside it read as "> >" on the headset (2026-09-28).
+            #if os(visionOS)
+            // The buttons' column, in every row: a folder's is empty, so its size and date stand
+            // under the files' rather than a column further along (2026-11-05).
+            Group {
+                if isDir {
+                    Color.clear
+                } else if rowLayout.actionsInMenu {
+                    fileActionsMenu(for: entry)
+                } else {
+                    HStack(spacing: SFTPFileRowLayout.spacing) { fileActionButtons(for: entry) }
+                }
+            }
+            .frame(width: rowLayout.actionsWidth)
+            #else
             if isDir {
                 EmptyView()
             } else {
-                Button {
-                    beginRemoteEdit(entry)
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Edit \(entry.filename)")
-
-                Button {
-                    showingFileInfo = entry
-                } label: {
-                    Image(systemName: "info.circle")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Info for \(entry.filename)")
-
-                Button {
-                    startDownload(entry)
-                } label: {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.body)
-                        .foregroundStyle(.blue)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Download \(entry.filename)")
+                fileActionButtons(for: entry)
             }
+            #endif
         }
         .contentShape(Rectangle())
 
@@ -1926,6 +1939,62 @@ struct SFTPBrowserView: View {
             #endif
         }
     }
+
+    /// A file's Edit, Get Info and Download, as buttons in its row.
+    @ViewBuilder
+    private func fileActionButtons(for entry: SFTPBrowserEntry) -> some View {
+        Button {
+            beginRemoteEdit(entry)
+        } label: {
+            Image(systemName: "pencil")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Edit \(entry.filename)")
+        .sftpRowActionWidth()
+
+        Button {
+            showingFileInfo = entry
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Info for \(entry.filename)")
+        .sftpRowActionWidth()
+
+        Button {
+            startDownload(entry)
+        } label: {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.body)
+                .foregroundStyle(.blue)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Download \(entry.filename)")
+        .sftpRowActionWidth()
+    }
+
+    #if os(visionOS)
+    /// A file's Edit, Get Info and Download in one ⋯ menu, when its row hasn't the width for the three buttons
+    /// (`SFTPFileRowLayout`; the owner, 2026-11-05: "put the 'Actions' under a drop down menu"). The same words as the
+    /// row's context menu.
+    private func fileActionsMenu(for entry: SFTPBrowserEntry) -> some View {
+        Menu {
+            Button("Edit", systemImage: "pencil") { beginRemoteEdit(entry) }
+            Button("Get Info", systemImage: "info.circle") { showingFileInfo = entry }
+            Button("Download", systemImage: "arrow.down.circle") { startDownload(entry) }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Actions for \(entry.filename)")
+    }
+    #endif
 
     @MainActor
     @discardableResult
@@ -2684,6 +2753,14 @@ struct SFTPBrowserView: View {
     // MARK: - Connection and Loading
 
     private func connectAndLoad() async {
+        #if DEBUG
+        // Screenshots and layout checks with no server (`--demo-files-listing`).
+        if let listing = Self.demoListing {
+            entries = listing
+            listingPath = currentPath
+            return
+        }
+        #endif
         if sftpClient != nil {
             await loadDirectory()
             return
@@ -6410,3 +6487,53 @@ extension SFTPBrowserView {
         return requested
     }
 }
+
+private extension View {
+    /// One of a file row's buttons, a fixed width on Vision Pro so the row's columns can be counted
+    /// (`SFTPFileRowLayout`). Unchanged elsewhere.
+    @ViewBuilder
+    func sftpRowActionWidth() -> some View {
+        #if os(visionOS)
+        frame(width: SFTPFileRowLayout.action)
+        #else
+        self
+        #endif
+    }
+}
+
+extension SFTPBrowserView {
+    /// A folder's disclosure chevron on the headset, at the row's trailing edge: its label is this much narrower than
+    /// its row (992 of 1024 points, measured in the visionOS 27.2 simulator, 2026-11-05).
+    static let spatialDisclosureWidth: CGFloat = 32
+    /// What a row's columns have less than the list: the plain list's margins (48: rows 1024 points wide in a
+    /// 1100-point list), the rows' insets (`glassSpatialListRow`, 16 and 12) and the chevron's space.
+    static let spatialRowChrome: CGFloat = 48 + 16 + 12 + spatialDisclosureWidth
+}
+
+#if DEBUG
+extension SFTPBrowserView {
+    /// A folder's listing for checking the rows without a server (`--demo-files-listing`): two folders and files
+    /// with short and long names. Invented names, no host's.
+    static var demoListing: [SFTPPathComponent]? {
+        guard ProcessInfo.processInfo.arguments.contains("--demo-files-listing") else { return nil }
+        let day: TimeInterval = 86_400
+        let now = Date(timeIntervalSince1970: 1_793_000_000)
+        func item(_ name: String, folder: Bool = false, size: UInt64 = 0, age: Double) -> SFTPPathComponent {
+            let time = now.addingTimeInterval(-age * day)
+            return SFTPPathComponent(
+                filename: name, longname: (folder ? "d" : "-") + "rw-r--r--",
+                attributes: SFTPFileAttributes(size: folder ? nil : size,
+                                               permissions: folder ? 0o040755 : 0o100644,
+                                               accessModificationTime: .init(accessTime: time, modificationTime: time)))
+        }
+        return [
+            item("help", folder: true, age: 2), item("static", folder: true, age: 16),
+            item("terminal-sessions.html", size: 12_288, age: 2),
+            item("editor-files-and-tabs.html", size: 13_312, age: 2),
+            item("editor-languages.html", size: 12_800, age: 2),
+            item("index.html", size: 9_216, age: 5),
+            item("release-notes-for-the-november-builds.md", size: 41_984, age: 1),
+        ]
+    }
+}
+#endif

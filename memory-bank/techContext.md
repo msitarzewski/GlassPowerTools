@@ -659,7 +659,8 @@ workgroups"; then "run btop or something for the terminal examples"):
 - **visionOS windows** (visionOS 27.2 simulator unless said):
   - `.windowResizability(.contentSize)` shows a person's resize and bounces it back; `.contentMinSize` keeps it.
   - `defaultWindowPlacement`'s `WindowPlacement(size:)` is honoured when the window opens (the dock reopened at
-    420 × 1100).
+    420 × 1100) — **unless the scene also has `defaultSize`**, which wins: the Files window, asked for 760 × 640 by its
+    placement, opened at its `defaultSize` 960 × 500 until that was removed (2026-11-05).
   - Two seconds into a launch, `dismissWindow()` called just after `openWindow` for another window left the window on
     screen, dimmed; waiting until the other window is on screen worked.
   - `.containerRelativeFrame` on a `ScrollView`'s content, the scroll axis flipping with the window's shape, kept the

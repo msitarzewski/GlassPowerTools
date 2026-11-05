@@ -120,14 +120,133 @@ struct AppKitEngineTests {
         #expect(engine.textView.textLayoutManager != nil)
     }
 
-    @Test("the text view draws no background of its own and has no undo manager")
+    @Test("the text view draws no background of its own, and records no undo of its own")
     func canvasAndUndoOwnership() {
         let engine = makeEngine("x")
         #expect(engine.textView.drawsBackground == false)
         #expect(engine.scrollView.drawsBackground == false)
-        // One undo authority: `UndoCoordinator`.
+        // One undo authority: `UndoCoordinator`. The view's manager answers from it and records nothing.
         #expect(engine.textView.allowsUndo == false)
-        #expect(engine.textView.undoManager == nil)
+        #expect(engine.textView.undoManager?.isUndoRegistrationEnabled == false)
+    }
+
+    // MARK: - Undo as the Mac offers it (2026-11-03: "UNDO! LOL. It must be first class.. like say TextEdit")
+
+    /// The editor in a window with its text the first responder, as the app shows it.
+    private func inWindow(_ engine: GlassEditorAppKitEngine) throws -> NSWindow {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let content = try #require(window.contentView)
+        engine.containerView.frame = content.bounds
+        content.addSubview(engine.containerView)
+        #expect(window.makeFirstResponder(engine.textView))
+        return window
+    }
+
+    /// Typed as a keystroke arrives: through the text view's own input, so through its delegate to the model.
+    private func type(_ text: String, in engine: GlassEditorAppKitEngine) {
+        engine.textView.insertText(text, replacementRange: engine.textView.selectedRange())
+    }
+
+    @Test("Edit ▸ Undo and ⌘Z undo typing, Redo brings it back, and the menu names it as TextEdit does")
+    func undoFromTheEditMenu() throws {
+        let engine = makeEngine("let x = 1")
+        let window = try inWindow(engine)
+        engine.textView.setSelectedRange(NSRange(location: 9, length: 0))
+        type("0", in: engine)
+        #expect(engine.text == "let x = 10")
+
+        // The Edit menu sends `undo:` to the first responder that answers it: the editor's text, before the window.
+        _ = window
+        #expect(firstToAnswer(Selector(("undo:")), from: engine.textView) === engine.textView)
+        // And before it is shown, that responder validates and titles it.
+        let undoItem = NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        #expect(engine.textView.validateMenuItem(undoItem), "Undo is enabled with something typed")
+        #expect(undoItem.title == "Undo Typing")
+
+        // What choosing it, or ⌘Z, sends: `undo:` up the responder chain from the text view.
+        #expect(engine.textView.tryToPerform(Selector(("undo:")), with: nil))
+        #expect(engine.text == "let x = 1")
+        #expect(engine.textView.string == "let x = 1")
+
+        let redoItem = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        #expect(engine.textView.validateMenuItem(redoItem))
+        #expect(redoItem.title == "Redo Typing")
+        #expect(engine.textView.tryToPerform(Selector(("redo:")), with: nil))
+        #expect(engine.textView.string == "let x = 10")
+
+        #expect(engine.textView.validateMenuItem(redoItem) == false, "nothing left to redo")
+    }
+
+    /// The first responder from `start` up the chain that answers `action`, as the menu finds its target.
+    private func firstToAnswer(_ action: Selector, from start: NSResponder) -> NSResponder? {
+        var responder: NSResponder? = start
+        while let current = responder {
+            if current.responds(to: action) { return current }
+            responder = current.nextResponder
+        }
+        return nil
+    }
+
+    @Test("with nothing typed, Undo is disabled, and never undoes something outside the editor")
+    func undoWithNothingToUndo() throws {
+        let engine = makeEngine("let x = 1")
+        let window = try inWindow(engine)
+        let undoItem = NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        #expect(engine.textView.validateMenuItem(undoItem) == false)
+        #expect(undoItem.title == "Undo", "titled \"\(undoItem.title)\"")
+        // Something the window could undo stays where it is while the editor has the keyboard.
+        var windowUndone = false
+        window.undoManager?.registerUndo(withTarget: window) { _ in windowUndone = true }
+        #expect(engine.textView.tryToPerform(Selector(("undo:")), with: nil))
+        #expect(!windowUndone, "the editor answered, not the window")
+        #expect(engine.textView.undoManager !== window.undoManager, "the editor's own, never the window's")
+    }
+
+    @Test("Spelling and Substitutions reach a document that follows them, and never one that doesn't (SQL)")
+    func textCheckingFollowsTheMenu() async throws {
+        let checking = GlassTextChecking.shared
+        let before = (checking.checksSpellingWhileTyping, checking.smartQuotes)
+        defer {
+            checking.checksSpellingWhileTyping = before.0
+            checking.smartQuotes = before.1
+        }
+        checking.checksSpellingWhileTyping = false
+        checking.smartQuotes = false
+        let editor = makeEngine("let name = \"x\"", configuration: GlassEditorConfiguration(followsTextChecking: true))
+        let sql = makeEngine("SELECT 'x';")
+        #expect(editor.textView.isAutomaticQuoteSubstitutionEnabled == false, "off until switched on")
+
+        checking.checksSpellingWhileTyping = true
+        checking.smartQuotes = true
+        await settle()
+        #expect(editor.textView.isContinuousSpellCheckingEnabled)
+        #expect(editor.textView.isAutomaticQuoteSubstitutionEnabled)
+        // The database's editors keep straight quotes and no spelling, whatever the menu says.
+        #expect(sql.textView.isContinuousSpellCheckingEnabled == false)
+        #expect(sql.textView.isAutomaticQuoteSubstitutionEnabled == false)
+
+        checking.smartQuotes = false
+        await settle()
+        #expect(editor.textView.isAutomaticQuoteSubstitutionEnabled == false)
+    }
+
+    @Test("a cut is its own undo step, named Cut: undone alone, not with the deletions beside it")
+    func cutIsItsOwnStep() throws {
+        let engine = makeEngine("alpha bravo")
+        _ = try inWindow(engine)
+        // A backspace, then a cut of "bravo" — as `cut(_:)` tags it, without touching the pasteboard here.
+        engine.textView.setSelectedRange(NSRange(location: 11, length: 0))
+        engine.textView.deleteBackward(nil)
+        #expect(engine.text == "alpha brav")
+        engine.textView.pendingIntent = .cut
+        engine.textView.setSelectedRange(NSRange(location: 6, length: 4))
+        engine.textView.insertText("", replacementRange: NSRange(location: 6, length: 4))
+        #expect(engine.text == "alpha ")
+        #expect(engine.textView.undoManager?.undoMenuItemTitle == "Undo Cut")
+        engine.textView.undoManager?.undo()
+        #expect(engine.text == "alpha brav", "the cut alone comes back")
+        #expect(engine.textView.undoManager?.undoMenuItemTitle == "Undo Typing")
     }
 
     @Test("code-editing defaults are set on both platforms' behalf")

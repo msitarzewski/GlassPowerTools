@@ -68,6 +68,15 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         scrollView.documentView = textView
         coordinator.textView = textView
 
+        // The editor's undo as the text view's undo manager: Edit ▸ Undo, ⌘Z and the system's own ways to undo reach
+        // the one undo authority through the responder chain (`GlassEditorUndoManager`, 2026-11-03).
+        textView.editorUndoManager = GlassEditorUndoManager(.init(
+            canUndo: { [weak self] in self?.canUndo ?? false },
+            canRedo: { [weak self] in self?.canRedo ?? false },
+            undo: { [weak self] in _ = self?.undo() },
+            redo: { [weak self] in _ = self?.redo() },
+            undoIntent: { [weak model] in model?.newestUndoIntent },
+            redoIntent: { [weak model] in model?.newestRedoIntent }))
         installViews()
         model.previewDrawer = { [weak self] width in self?.drawPreview(maxPixelWidth: width) }
         applyThemeToCanvas()
@@ -78,6 +87,8 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         observeModelRevision()
         observeModelAppearance()
         observeModelConfiguration()
+        applyTextChecking()
+        observeTextChecking()
         observeRevealRequests()
         observeLineChanges()
     }
@@ -157,6 +168,27 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
                 guard let self else { return }
                 self.repaintForAppearanceChange()
                 self.observeModelAppearance()
+            }
+        }
+    }
+
+    // MARK: - Spelling and substitutions (`GlassTextChecking`, 2026-11-03)
+
+    /// Edit ▸ Spelling and Grammar and Edit ▸ Substitutions, for a document that follows them (the Editor's; never the
+    /// database's SQL, where a smart quote breaks a query).
+    private func applyTextChecking() {
+        guard model.configuration.followsTextChecking else { return }
+        GlassTextChecking.shared.apply(to: textView)
+    }
+
+    private func observeTextChecking() {
+        withObservationTracking { [weak self] in
+            guard self?.model.configuration.followsTextChecking == true else { return }
+            _ = GlassTextChecking.shared.all
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.applyTextChecking()
+                self?.observeTextChecking()
             }
         }
     }

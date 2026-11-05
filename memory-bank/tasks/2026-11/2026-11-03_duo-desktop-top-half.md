@@ -111,3 +111,11 @@ is unverified on a real Mac.
   suite: five pass; the two keyboard-switch tests fail as before (the simulator's hardware keyboard).
 - The site's Duo picture taken again with the band (same new file name; the site wasn't deployed in between), and
   its words, the help and the release notes follow.
+
+## Shipped (same day)
+- Commits 829888b1 (D99, the bars, the site pictures) and 2147bcc5 (the band), pushed at his word.
+- Site: he staged and provisioned it; all 111 files match the build (curl and SHA-256), the home page served as of
+  18:07 UTC. The first staging (11:11) had carried the picture with the cut corners; the second carried the band.
+- 0.4.591 installed and read back on Vision Pro and his iPhone (one phone: he renamed it "iPhone 18 Pro Max", what
+  it is; it had been named "iPhone 17 Pro Max").
+

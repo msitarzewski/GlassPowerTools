@@ -153,6 +153,8 @@ public final class UndoCoordinator {
     /// The intent of the newest undoable unit, if any. Useful for UI menu titles
     /// ("Undo Typing", "Undo Paste").
     public var newestIntent: EditIntent? { undoStack.last?.intent }
+    /// The intent of the newest redoable unit, for "Redo Typing".
+    public var newestRedoIntent: EditIntent? { redoStack.last?.intent }
 
     /// Drops both stacks. Used when a document's identity changes underneath the
     /// editor and no recorded inverse would be meaningful.

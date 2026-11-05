@@ -724,6 +724,46 @@ public final class GlassEditorWorkspace {
         findNext(reverse: reverse)
     }
 
+    /// Bumped by each request to put the keyboard in the Replace field (⌥⌘F).
+    public private(set) var replaceFocusRequest = 0
+
+    /// ⌥⌘F, Edit ▸ Find ▸ Find and Replace…: the find bar, with the keyboard in its Replace field (2026-11-03).
+    public func presentFindAndReplace() {
+        findIsPresented = true
+        replaceFocusRequest &+= 1
+    }
+
+    /// ⌘E, Use Selection for Find: what is selected becomes what to find — as written, escaped when the bar finds by
+    /// pattern. Nothing selected leaves the term as it was, as TextEdit does.
+    public func useSelectionForFind() {
+        guard let document = selectedDocument, !document.model.selectedRange.isEmpty,
+              let selected = try? document.model.substring(in: document.model.selectedRange) else { return }
+        findQuery = findUsesRegularExpression ? NSRegularExpression.escapedPattern(for: selected) : selected
+    }
+
+    /// ⌘J, Jump to Selection: the selection scrolled into view.
+    public func jumpToSelection() {
+        guard let document = selectedDocument else { return }
+        document.model.reveal(document.model.selectedRange)
+    }
+
+    /// The find bar's Replace, TextEdit's Replace & Find: the match selected (else the next one) becomes the
+    /// replacement, as one undo step ("Undo Replace"), and the next match is selected.
+    @discardableResult
+    public func replaceCurrent() -> Bool {
+        guard let document = selectedDocument, !findQuery.isEmpty else { return false }
+        do {
+            guard let replaced = try document.model.replaceNext(
+                of: findQueryValue, with: replacement, after: document.model.selectedRange.lowerBound) else { return false }
+            document.model.reveal(replaced.upperBound..<replaced.upperBound)
+            findNext()
+            return true
+        } catch {
+            message = "Replace failed: \(error.localizedDescription)"
+            return false
+        }
+    }
+
     @discardableResult
     public func replaceAll() -> Int {
         guard let document = selectedDocument, !findQuery.isEmpty else { return 0 }

@@ -18,14 +18,25 @@ nonisolated enum TerminalRepaintBand {
 
     /// The band of the view holding screen rows `rows` (0 the top), a row wider each way for
     /// letters that reach past their own (descenders, tall Unicode), and down to the view's foot
-    /// from the last row, as SwiftTerm's Mac repaint does. `bounds` is the scroll view's, its top
-    /// the first screen row. Nil for rows outside the screen.
-    static func rect(rows: (start: Int, end: Int), screenRows: Int, cellHeight: CGFloat, bounds: CGRect) -> CGRect? {
+    /// from the last two rows, as SwiftTerm's Mac repaint does; within `bounds`, the scroll view's.
+    /// Nil for rows outside the screen, or a band wholly out of sight.
+    ///
+    /// **`screenTop` is where SwiftTerm draws the screen's first row**, not the view's top: it draws
+    /// each line of its buffer at that line's number times the cell height, so the screen starts at
+    /// its first shown line's (`yDisp`). The two agree only while the terminal's rows fill the view.
+    /// With fewer — tmux's window at another device's size (`showTmuxGrid`) — the view also shows
+    /// lines from before the screen, and the screen starts lower: in the visionOS simulator, 12 rows
+    /// in a view of 41 started 9 rows down, and a band measured from the view's top named rows 9
+    /// above the ones that changed (2026-11-03). Not seen on the headset: there the system draws the
+    /// whole terminal whatever band is asked for (0.4.592's counts, 288 draws, none in part), so
+    /// what the band saves is the repaints skipped, not the area drawn.
+    static func rect(rows: (start: Int, end: Int), screenRows: Int, cellHeight: CGFloat, screenTop: CGFloat,
+                     bounds: CGRect) -> CGRect? {
         guard screenRows > 0, cellHeight > 0, rows.start >= 0, rows.end >= rows.start, rows.end < screenRows else { return nil }
-        let top = bounds.minY + CGFloat(max(0, rows.start - 1)) * cellHeight
+        let top = max(bounds.minY, screenTop + CGFloat(rows.start - 1) * cellHeight)
         let bottom = rows.end >= screenRows - 2
             ? bounds.maxY
-            : min(bounds.maxY, bounds.minY + CGFloat(rows.end + 2) * cellHeight)
+            : min(bounds.maxY, screenTop + CGFloat(rows.end + 2) * cellHeight)
         guard bottom > top else { return nil }
         return CGRect(x: bounds.minX, y: top, width: bounds.width, height: bottom - top)
     }

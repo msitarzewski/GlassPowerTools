@@ -13,6 +13,8 @@ struct DesktopMetalSurface: NSViewRepresentable {
     var inputEnabled = true
     /// A Mac has its own keyboard: no bar above one.
     var keyboardTools: AnyView?
+    /// Vision Pro's: a Mac never shows a system keyboard.
+    var hidesSystemKeyboard = false
     func makeNSView(context: Context) -> DesktopMTKView { DesktopMTKView(session: session, inputEnabled: inputEnabled) }
     func updateNSView(_ view: DesktopMTKView, context: Context) { view.update(session, viewport: viewport, inputEnabled: inputEnabled) }
     static func dismantleNSView(_ view: DesktopMTKView, coordinator: ()) { view.shutdown() }
@@ -26,9 +28,15 @@ struct DesktopMetalSurface: UIViewRepresentable {
     var inputEnabled = true
     /// The window's tools, for the bar above the software keyboard (`DesktopKeyboardAccessory`).
     var keyboardTools: AnyView?
+    /// Vision Pro, a hardware keyboard connected: no system keyboard as the desktop takes the keys
+    /// (`GlassSystemKeyboard`). iPhone and iPad have theirs only when asked for (`wantsKeyboard`).
+    var hidesSystemKeyboard = false
     func makeUIView(context: Context) -> DesktopMTKView { DesktopMTKView(session: session, inputEnabled: inputEnabled) }
     func updateUIView(_ view: DesktopMTKView, context: Context) {
         view.keyboardTools = keyboardTools
+        #if os(visionOS)
+        view.hidesSystemKeyboard = hidesSystemKeyboard
+        #endif
         view.update(session, viewport: viewport, inputEnabled: inputEnabled)
     }
     static func dismantleUIView(_ view: DesktopMTKView, coordinator: ()) { view.shutdown() }
@@ -539,6 +547,20 @@ final class DesktopMTKView: MTKView {
     }
 
     fileprivate var hasArmedModifiers: Bool { session?.armedModifiers.isEmpty == false }
+
+    #if os(visionOS)
+    /// An empty keyboard in place of the system's, while a hardware keyboard is connected: a touch on the
+    /// desktop takes the keys and brought visionOS's small keyboard up by the window each time (the owner,
+    /// 2026-11-05: "hide the mini keyboard"). Dictation and emoji are in the Keys menu's Type Text….
+    private let noSystemKeyboard = UIView(frame: .zero)
+    var hidesSystemKeyboard = false {
+        didSet {
+            guard hidesSystemKeyboard != oldValue else { return }
+            if isFirstResponder { reloadInputViews() }
+        }
+    }
+    override var inputView: UIView? { hidesSystemKeyboard ? noSystemKeyboard : nil }
+    #endif
 
     #if os(iOS)
     override var inputView: UIView? { wantsSoftwareKeyboard ? nil : suppressedKeyboard }

@@ -244,13 +244,15 @@ struct GlassAllWindowsCard: View {
             .contentShape(.rect(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+        // Its terminal rang its bell out of sight: an orange glow beneath it, as beneath its tab (`GlassBell`).
+        .glassBellGlow(rang, cornerRadius: 10, spread: 14, outside: true)
         #if os(visionOS)
         .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 10, style: .continuous))
         .hoverEffect()
         #endif
         .accessibilityIdentifier("all-windows-card-\(session.id)")
         .accessibilityLabel(session.title)
-        .accessibilityValue(session.subtitle ?? "")
+        .accessibilityValue([rang ? GlassBell.accessibilityWord : nil, session.subtitle].compactMap { $0 }.joined(separator: ", "))
         .overlay(alignment: .topTrailing) {
             Button(role: .destructive, action: close) {
                 Image(systemName: "xmark.circle.fill")
@@ -267,6 +269,8 @@ struct GlassAllWindowsCard: View {
         // terminal's controls are over its theme (ce2dbf6), whatever the sheet around it is.
         .environment(\.colorScheme, backdrop?.colorScheme ?? colorScheme)
     }
+
+    private var rang: Bool { session.hasUnseenBell }
 
     /// Whether the picture is being taken again each second: on screen, in a window in front.
     private var refreshes: Bool {

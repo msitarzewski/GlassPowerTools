@@ -50,8 +50,8 @@ Each follows **Appearance** until you change it there, and only that window chan
 **Settings** ▸ **Appearance** ▸ **Orbs** decides where a window goes when you choose **Shrink to Orb**:
 
 - **Shrink to Orb**: **Where the Window Is** (the starting setting), and the window becomes an orb where it stands; or **Into the Dock**, and orbs, with Connections, gather in a dock. See [Gather orbs in a dock on Vision Pro](library-connect.md#gather-orbs-in-a-dock-on-vision-pro).
-- **Windows From a Tall Dock**, with **Into the Dock**: **On Its Left** or **On Its Right** (the starting setting), the side a window comes back on when the dock is taller than it is wide. In Focus Mode a window comes back on the side away from where you turned to look at the dock instead.
-- **Fit Dock to Its Orbs**, once you have resized the dock: the dock fits its orbs in a row again.
+- **Dock**, with **Into the Dock**: **Horizontal** (the starting setting), a row of orbs, or **Vertical**, a column. The dock grows and shrinks along it as windows come and go, and scrolls when there are more orbs than fit.
+- **Windows From a Vertical Dock**, with **Into the Dock**: **On Its Left** or **On Its Right** (the starting setting), the side a window comes back on from a vertical dock. In Focus Mode a window comes back on the side away from where you turned to look at the dock instead.
 
 With **Into the Dock**, a **Dock** section follows, with the dock's own **Opacity** and **Glass**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**. Set both to 0% for a clear dock.
 
@@ -62,7 +62,7 @@ These settings are kept on this device.
 **Settings** ▸ **Appearance** ▸ **Orbs** sets up the orb dock (see [Put windows in the orb dock on Mac](library-connect.md#put-windows-in-the-orb-dock-on-mac)):
 
 - **Dock Floats**: **Above This App’s Windows** (the starting setting), and the dock is hidden while another app is in front; or **Above All Windows**, and it stays over every window, whichever app is in front, on every desktop.
-- **Fit Dock to Its Orbs**, once you have resized the dock: the dock fits its orbs in a row again.
+- **Dock**: **Horizontal** (the starting setting), a row of orbs, or **Vertical**, a column. The dock grows and shrinks along it as windows come and go, and scrolls when there are more orbs than fit.
 
 A **Dock** section follows, with the dock's own **Opacity**, **Glass** and **Material**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**. The dock is Apple's Liquid Glass: **Glass** sets how much of it shows, **Material** Light to Heavy is the clear glass, dimmed a little more behind it as it gets heavier, and Max the frostier glass. macOS draws Liquid Glass clear only in the window you are working in, and the dock is never that window, so its glass looks frosted.
 

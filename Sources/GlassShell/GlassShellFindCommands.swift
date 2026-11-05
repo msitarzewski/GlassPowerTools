@@ -25,17 +25,29 @@ public struct GlassFindItemAction {
     private let find: () -> Void
     private let findNext: () -> Void
     private let findPrevious: () -> Void
+    /// TextEdit's other Find items (2026-11-03), where the window has them: the editor's text does, a terminal not.
+    let findAndReplace: (() -> Void)?
+    let useSelection: (() -> Void)?
+    let jumpToSelection: (() -> Void)?
 
     /// - Parameters:
     ///   - find: ⌘F — open the window's find bar and put the keyboard in it.
     ///   - findNext: ⌘G — the next match, opening the bar with the last term when it is closed.
     ///   - findPrevious: ⇧⌘G — the same, the other way.
+    ///   - findAndReplace: ⌥⌘F — the bar, with the keyboard in its Replace field.
+    ///   - useSelection: ⌘E — the selected text as what to find.
+    ///   - jumpToSelection: ⌘J — the selection scrolled into view.
     public init(isEnabled: Bool = true, find: @escaping () -> Void,
-                findNext: @escaping () -> Void, findPrevious: @escaping () -> Void) {
+                findNext: @escaping () -> Void, findPrevious: @escaping () -> Void,
+                findAndReplace: (() -> Void)? = nil, useSelection: (() -> Void)? = nil,
+                jumpToSelection: (() -> Void)? = nil) {
         self.isEnabled = isEnabled
         self.find = find
         self.findNext = findNext
         self.findPrevious = findPrevious
+        self.findAndReplace = findAndReplace
+        self.useSelection = useSelection
+        self.jumpToSelection = jumpToSelection
     }
 
     public func showFind() { find() }
@@ -68,12 +80,22 @@ public struct GlassShellFindCommands: Commands {
                 Button("Find…") { findItem?.showFind() }
                     .keyboardShortcut("f", modifiers: .command)
                     .disabled(findItem?.isEnabled != true)
+                Button("Find and Replace…") { findItem?.findAndReplace?() }
+                    .keyboardShortcut("f", modifiers: [.command, .option])
+                    .disabled(findItem?.isEnabled != true || findItem?.findAndReplace == nil)
                 Button("Find Next") { findItem?.next() }
                     .keyboardShortcut("g", modifiers: .command)
                     .disabled(findItem?.isEnabled != true)
                 Button("Find Previous") { findItem?.previous() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(findItem?.isEnabled != true)
+                Divider()
+                Button("Use Selection for Find") { findItem?.useSelection?() }
+                    .keyboardShortcut("e", modifiers: .command)
+                    .disabled(findItem?.isEnabled != true || findItem?.useSelection == nil)
+                Button("Jump to Selection") { findItem?.jumpToSelection?() }
+                    .keyboardShortcut("j", modifiers: .command)
+                    .disabled(findItem?.isEnabled != true || findItem?.jumpToSelection == nil)
             }
         }
     }

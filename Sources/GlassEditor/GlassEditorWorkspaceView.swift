@@ -63,6 +63,8 @@ public struct GlassEditorWorkspaceView: View {
     /// bar comes back when another document is chosen, and must not take the keyboard then.
     @FocusState private var findFieldIsFocused: Bool
     @State private var answeredFindFocusRequest = 0
+    @FocusState private var replaceFieldIsFocused: Bool
+    @State private var answeredReplaceFocusRequest = 0
     #if os(macOS)
     /// The file list has the keyboard when the window opens. Nothing did, so AppKit gave it to the
     /// first control, the sidebar button, and drew its focus ring there (the owner, 2026-10-29,
@@ -237,6 +239,9 @@ public struct GlassEditorWorkspaceView: View {
                 workspace.selection = document.id
                 requestClose(document)
             }))
+        #else
+        // The Mac's Edit ▸ Find and Text menu keys, here where the editor has no menu of its own (2026-11-03).
+        .background { EditorKeyCommands(workspace: workspace, goToLine: { goToLineText = ""; isGoingToLine = true }) }
         #endif
         // **The window's own settings, for everything in it** (W23): outermost, so the window's
         // glass (`GlassLayeredWindow`), its panels and its sheets all draw with them.
@@ -304,7 +309,10 @@ public struct GlassEditorWorkspaceView: View {
         GlassFindItemAction(isEnabled: workspace.selectedDocument?.isText ?? false,
                             find: { workspace.presentFind() },
                             findNext: { workspace.findAgain() },
-                            findPrevious: { workspace.findAgain(reverse: true) })
+                            findPrevious: { workspace.findAgain(reverse: true) },
+                            findAndReplace: { workspace.presentFindAndReplace() },
+                            useSelection: { workspace.useSelectionForFind() },
+                            jumpToSelection: { workspace.jumpToSelection() })
     }
     #endif
 
@@ -844,6 +852,11 @@ public struct GlassEditorWorkspaceView: View {
         }
     }
 
+    /// Replace, and say so when there was nothing to replace.
+    private func replaceAndFindNext() {
+        if !workspace.replaceCurrent() { workspace.message = "No matches." }
+    }
+
     private func findBar(_ document: GlassEditorDocument) -> some View {
         HStack(spacing: 8) {
             TextField("Find", text: $workspace.findQuery)
@@ -870,6 +883,20 @@ public struct GlassEditorWorkspaceView: View {
             Divider().frame(height: 18)
             TextField("Replace", text: $workspace.replacement)
                 .textFieldStyle(.roundedBorder)
+                .focused($replaceFieldIsFocused)
+                // Return replaces the match and moves on, as TextEdit's field does.
+                .onSubmit { replaceAndFindNext() }
+                // ⌥⌘F puts the keyboard here.
+                .task(id: workspace.replaceFocusRequest) {
+                    guard workspace.replaceFocusRequest != answeredReplaceFocusRequest else { return }
+                    answeredReplaceFocusRequest = workspace.replaceFocusRequest
+                    replaceFieldIsFocused = true
+                }
+                .accessibilityIdentifier("editor-replace-field")
+            // TextEdit's Replace & Find: this match, then the next (2026-11-03).
+            Button("Replace") { replaceAndFindNext() }
+                .disabled(workspace.findQuery.isEmpty)
+                .accessibilityIdentifier("editor-replace")
             Button("All") {
                 let count = workspace.replaceAll()
                 workspace.message = count == 0 ? "No matches." : "Replaced \(count) match\(count == 1 ? "" : "es")."
@@ -1642,6 +1669,52 @@ private struct MacEditorWindowBehaviour: ViewModifier {
             .focusedSceneValue(\.glassFindItem, findItem)
             .frame(minWidth: 820, minHeight: 520)
             .background { GlassEditorWindowFrameMemory(holder: windowHolder) }
+    }
+}
+#endif
+
+#if !os(macOS)
+/// The keys of the Mac's Edit ▸ Find and Text menus, on iPad, iPhone and Vision Pro with a keyboard (the owner,
+/// 2026-11-03: the Editor "first class.. like say TextEdit"; "go ahead with iPad and Vision Pro"). There is no editor
+/// menu here, so the window holds them: unseen buttons that a keyboard reaches, and that are listed when ⌘ is held.
+/// ⌘F stays the toolbar's Find button's, its one owner. A key held here is this window's alone, so the terminal's own
+/// ⌘+ and ⌘− in its windows are untouched.
+private struct EditorKeyCommands: View {
+    let workspace: GlassEditorWorkspace
+    let goToLine: () -> Void
+
+    var body: some View {
+        let hasText = workspace.selectedDocument?.isText == true
+        Group {
+            Button("Find and Replace") { workspace.presentFindAndReplace() }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+            Button("Find Next") { workspace.findAgain() }
+                .keyboardShortcut("g", modifiers: .command)
+            Button("Find Previous") { workspace.findAgain(reverse: true) }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+            Button("Use Selection for Find") { workspace.useSelectionForFind() }
+                .keyboardShortcut("e", modifiers: .command)
+            Button("Jump to Selection") { workspace.jumpToSelection() }
+                .keyboardShortcut("j", modifiers: .command)
+            Button("Go to Line") { goToLine() }
+                .keyboardShortcut("l", modifiers: [.command, .option])
+            // The size this window follows: its own when it keeps one (W23), else every window's — as the Mac's Text
+            // menu sets it.
+            Button("Increase Text Size") { workspace.adjustFontSize(by: 1) }
+                .keyboardShortcut("+", modifiers: .command)
+            Button("Increase Text Size") { workspace.adjustFontSize(by: 1) }
+                .keyboardShortcut("=", modifiers: .command)
+            Button("Decrease Text Size") { workspace.adjustFontSize(by: -1) }
+                .keyboardShortcut("-", modifiers: .command)
+            Button("Actual Size") { workspace.resetFontSize() }
+                .keyboardShortcut("0", modifiers: .command)
+        }
+        .disabled(!hasText)
+        .labelStyle(.titleOnly)
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 #endif

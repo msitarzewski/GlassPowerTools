@@ -358,6 +358,9 @@ struct MacTerminalExposeTabTile: View {
             }
             .shadow(color: .black.opacity(0.35), radius: hovering ? 14 : 8, y: 4)
             .contentShape(.rect(cornerRadius: 10))
+            // A terminal in the tab rang its bell out of sight: an orange glow beneath, as beneath its row in the
+            // sidebar — Show All Windows, a window's overview and its carousel alike (`GlassBell`, 2026-11-03).
+            .glassBellGlow(tab.bellUnseen, cornerRadius: 10, spread: 14, outside: true)
     }
 }
 

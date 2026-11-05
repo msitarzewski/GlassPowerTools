@@ -95,6 +95,9 @@ public struct GlassOpenSession: Identifiable {
     /// Its mark as its tab draws it, at a side: a terminal's coding agent in its colour, pulsing while
     /// it prints. The orb dock's dots (D88); `mark` is the plain picture where this is nil.
     public let icon: (@MainActor (_ side: CGFloat) -> AnyView)?
+    /// Its terminal rang its bell out of sight and has not been seen since (`GlassBell`, 2026-11-03): its card glows
+    /// beneath, its window's orb shows it. A window's own is any of its tabs'. Nil for a session with no bell.
+    public let bellRang: (@MainActor () -> Bool)?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -107,7 +110,8 @@ public struct GlassOpenSession: Identifiable {
                 unsavedChanges: (@MainActor () -> String?)? = nil,
                 backdrop: (@MainActor () -> GlassSessionBackdrop?)? = nil,
                 lastActivity: (@MainActor () -> Date?)? = nil, openedFrom: String? = nil,
-                icon: (@MainActor (_ side: CGFloat) -> AnyView)? = nil) {
+                icon: (@MainActor (_ side: CGFloat) -> AnyView)? = nil,
+                bellRang: (@MainActor () -> Bool)? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -128,6 +132,12 @@ public struct GlassOpenSession: Identifiable {
         self.lastActivity = lastActivity
         self.openedFrom = openedFrom
         self.icon = icon
+        self.bellRang = bellRang
+    }
+
+    /// Whether it, or any of its tabs, has a bell unseen.
+    @MainActor public var hasUnseenBell: Bool {
+        bellRang?() == true || tabs.contains { $0.bellRang?() == true }
     }
 
     /// Ends it, or hands it to `ask` when ending it would lose something (`unsavedChanges`).

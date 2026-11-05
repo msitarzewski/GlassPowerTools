@@ -860,6 +860,59 @@ struct GlassEditorCommands: Commands {
             }
             .disabled(runtime.preferences.recents.isEmpty)
         }
+        // TextEdit's Edit menu, the rest of it (the owner, 2026-11-03: "all of the expected text editor functions ...
+        // like say TextEdit"). Each sends AppKit's own action to the text that has the keyboard, as TextEdit's items
+        // do — the document, or the find bar's field — and is there while an editor window is in front. Not SwiftUI's
+        // `TextEditingCommands`: its Find group fights the shell's for ⌘F and ⌘G (`GlassShellFindCommands`).
+        CommandGroup(after: .pasteboard) {
+            // A plain-text document pastes plain text anyway; the key is the one hands know.
+            Button("Paste and Match Style") { send(#selector(NSTextView.pasteAsPlainText(_:))) }
+                .keyboardShortcut("v", modifiers: [.command, .option, .shift])
+                .disabled(actions == nil)
+        }
+        CommandGroup(after: .textEditing) {
+            let checking = GlassTextChecking.shared
+            Menu("Spelling and Grammar") {
+                Button("Show Spelling and Grammar") { send(#selector(NSText.showGuessPanel(_:))) }
+                    .keyboardShortcut(":", modifiers: .command)
+                Button("Check Document Now") { send(#selector(NSText.checkSpelling(_:))) }
+                    .keyboardShortcut(";", modifiers: .command)
+                Divider()
+                // Off until switched on: a code editor's identifiers are not words (`GlassTextChecking`).
+                Toggle("Check Spelling While Typing", isOn: Binding(
+                    get: { checking.checksSpellingWhileTyping }, set: { checking.checksSpellingWhileTyping = $0 }))
+                Toggle("Check Grammar With Spelling", isOn: Binding(
+                    get: { checking.checksGrammarWithSpelling }, set: { checking.checksGrammarWithSpelling = $0 }))
+                Toggle("Correct Spelling Automatically", isOn: Binding(
+                    get: { checking.correctsSpellingAutomatically }, set: { checking.correctsSpellingAutomatically = $0 }))
+            }
+            .disabled(actions == nil)
+            Menu("Substitutions") {
+                Button("Show Substitutions") { send(#selector(NSTextView.orderFrontSubstitutionsPanel(_:))) }
+                Divider()
+                Toggle("Smart Copy/Paste", isOn: Binding(
+                    get: { checking.smartCopyPaste }, set: { checking.smartCopyPaste = $0 }))
+                Toggle("Smart Quotes", isOn: Binding(get: { checking.smartQuotes }, set: { checking.smartQuotes = $0 }))
+                Toggle("Smart Dashes", isOn: Binding(get: { checking.smartDashes }, set: { checking.smartDashes = $0 }))
+                Toggle("Smart Links", isOn: Binding(get: { checking.smartLinks }, set: { checking.smartLinks = $0 }))
+                Toggle("Data Detectors", isOn: Binding(
+                    get: { checking.dataDetectors }, set: { checking.dataDetectors = $0 }))
+                Toggle("Text Replacement", isOn: Binding(
+                    get: { checking.textReplacement }, set: { checking.textReplacement = $0 }))
+            }
+            .disabled(actions == nil)
+            Menu("Transformations") {
+                Button("Make Upper Case") { send(#selector(NSResponder.uppercaseWord(_:))) }
+                Button("Make Lower Case") { send(#selector(NSResponder.lowercaseWord(_:))) }
+                Button("Capitalize") { send(#selector(NSResponder.capitalizeWord(_:))) }
+            }
+            .disabled(actions == nil)
+            Menu("Speech") {
+                Button("Start Speaking") { send(#selector(NSTextView.startSpeaking(_:))) }
+                Button("Stop Speaking") { send(#selector(NSTextView.stopSpeaking(_:))) }
+            }
+            .disabled(actions == nil)
+        }
         // No Save here: ⌘S is the shell's one File ▸ Save, and an editor window publishes
         // `\.glassSaveItem` so that there it saves the document in front. It was "Save Document"
         // on ⌥⌘S, which left ⌘S — the key everyone presses — beeping in an editor (2026-09-25).
@@ -930,6 +983,11 @@ struct GlassEditorCommands: Commands {
 }
 
 private extension GlassEditorCommands {
+    /// An Edit menu action, to the first responder that answers it: the text with the keyboard.
+    func send(_ action: Selector) {
+        NSApp.sendAction(action, to: nil, from: nil)
+    }
+
     /// Brings forward, or opens, each window an open named — the one in front included, which is
     /// where files go.
     func show(_ windows: [UUID]) {

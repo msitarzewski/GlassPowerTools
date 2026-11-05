@@ -155,16 +155,16 @@ final class GlassOrbRelaunchUITests: XCTestCase {
 
     // MARK: The dock's shape
 
-    /// The owner, 2026-10-26: "could we make it responsive? A user could then make it vertical with
-    /// simply resizing it so." Resized taller than wide (`--demo-dock-resize`, as the runner can't
-    /// drag a corner), the dock stands its orbs in a column, and opens at that size next time.
-    func testTheDockResizedTallStandsInAColumnAndKeepsItsSize() {
-        let terminalIntoTheDock = Self.dockOn + ["--demo-open", "terminal", "--demo-session-orb"]
-        launch(terminalIntoTheDock + ["--demo-dock-resize", "420x1100"])
+    /// The owner, 2026-11-05: "an orientation selection for the dock. horizontal or vertical" (until then a dock
+    /// resized taller than wide stood its orbs in a column and kept that size). Vertical, the dock stands its orbs in a
+    /// column from the first, after a relaunch too.
+    func testAVerticalDockStandsInAColumn() {
+        let terminalIntoTheDock = Self.dockOn + ["--demo-open", "terminal", "--demo-session-orb",
+                                                 "-com.glasspowertools.orbs.dockOrientation", "vertical"]
+        launch(terminalIntoTheDock)
         XCTAssertTrue(orbInDock.waitForExistence(timeout: 60), "the terminal did not go into the dock")
         let column = expectation(for: NSPredicate(format: "value == %@", "tall"), evaluatedWith: dock)
-        XCTAssertEqual(XCTWaiter().wait(for: [column], timeout: 20), .completed,
-                       "resized taller than wide, the dock is a \(dock.value ?? "nothing")")
+        XCTAssertEqual(XCTWaiter().wait(for: [column], timeout: 20), .completed, "vertical, the dock is \(dock.value ?? "nothing")")
         assertStacked()
         // For the capture from outside.
         sleep(6)
@@ -172,7 +172,7 @@ final class GlassOrbRelaunchUITests: XCTestCase {
         launch(terminalIntoTheDock)
         XCTAssertTrue(orbInDock.waitForExistence(timeout: 60), "the terminal did not go into the dock")
         sleep(3)
-        XCTAssertEqual(dock.value as? String, "tall", "the dock did not open at the size it was given")
+        XCTAssertEqual(dock.value as? String, "tall", "relaunched, the dock is not a column")
         assertStacked()
     }
 

@@ -191,10 +191,9 @@ struct GlassMacOrbDockTests {
         let ringed = GlassMacOrbDockView.size(ring: 4)
         let plain = GlassMacOrbDockView.size(ring: 0)
         let sizes = [GlassMacOrbDockView.connectionsSize, ringed, plain, ringed]
-        let dock = GlassMacOrbDockView.fit(sizes, within: nil)
+        let dock = GlassMacOrbDockView.fit(sizes)
         let inset = GlassMacOrbDockView.inset
-        let frames = GlassOrbFlow.frames(of: sizes, width: dock.width - 2 * inset,
-                                         gapAfterFirst: GlassMacOrbDockView.connectionsGap)
+        let frames = GlassOrbLine.frames(of: sizes, .horizontal, gapAfterFirst: GlassMacOrbDockView.connectionsGap)
         let ring = GlassMacSessionOrbView.ringRadius + GlassMacSessionOrbView.dotDiameter / 2
         let connections = GlassOrbMetrics.orbDiameter * GlassMacOrbDockView.connectionsScale / 2
         let left = inset + frames[0].midX - connections
@@ -210,63 +209,66 @@ struct GlassMacOrbDockTests {
         #expect(pair.width == plain.width && pair.height == ringed.height, "\(pair)")
     }
 
-    @Test("The dock grows from Connections: it stays put as orbs come and go, the dock reaching right of it, rows below it")
+    @Test("The dock grows from Connections: it stays put as orbs come and go, a row reaching right of it, a column below it")
     func growsFromConnections() {
         // The owner, 2026-11-02: "Let's tweak the Mac dock to grow from the Active orb out... it should act as
-        // the root position." Measured to what is drawn: Connections' circle, as the dock lays it out.
+        // the root position"; 2026-11-05: horizontal or vertical. Measured to what is drawn: Connections' circle, as
+        // the dock lays it out.
         let inset = GlassMacOrbDockView.inset
         let connections = GlassMacOrbDockView.connectionsSize
         let ringed = GlassMacOrbDockView.size(ring: 4)
         let plain = GlassMacOrbDockView.size(ring: 0)
         let root = CGPoint(x: 400, y: 300)
-        func placed(_ orbs: [CGSize]) -> (frame: CGRect, drawn: CGPoint) {
-            let size = GlassMacOrbDockView.fit(orbs, within: nil)
-            let frame = GlassOrbDockPanel.frame(of: size, placing: GlassMacOrbDockView.root(of: orbs, width: size.width), at: root)
-            let laid = GlassOrbFlow.frames(of: orbs, width: size.width - 2 * inset,
-                                           gapAfterFirst: GlassMacOrbDockView.connectionsGap)[0]
-            return (frame, CGPoint(x: frame.minX + inset + laid.midX, y: frame.maxY - inset - laid.midY))
+        for orientation in GlassOrbDockOrientation.allCases {
+            func placed(_ orbs: [CGSize]) -> (frame: CGRect, drawn: CGPoint) {
+                let size = GlassMacOrbDockView.fit(orbs, orientation: orientation)
+                let frame = GlassOrbDockPanel.frame(of: size, placing: GlassMacOrbDockView.root(of: orbs, orientation: orientation),
+                                                    at: root)
+                let laid = GlassOrbLine.frames(of: orbs, orientation, gapAfterFirst: GlassMacOrbDockView.connectionsGap)[0]
+                return (frame, CGPoint(x: frame.minX + inset + laid.midX, y: frame.maxY - inset - laid.midY))
+            }
+            var lengths: [CGFloat] = []
+            for orbs in [[connections], [connections, plain], [connections, plain, ringed],
+                         [connections, ringed, ringed, plain], [connections, ringed], [connections]] {
+                let (frame, drawn) = placed(orbs)
+                #expect(abs(drawn.x - root.x) < 0.5 && abs(drawn.y - root.y) < 0.5,
+                        "\(orientation): Connections moved to \(drawn) with \(orbs.count) orbs")
+                switch orientation {
+                case .horizontal:
+                    #expect(abs(frame.midY - root.y) < 0.5, "a taller ring grows evenly above and below Connections: \(frame)")
+                    lengths.append(frame.width)
+                case .vertical:
+                    #expect(abs(frame.midX - root.x) < 0.5, "a wider ring grows evenly either side of Connections: \(frame)")
+                    lengths.append(frame.height)
+                }
+            }
+            #expect(lengths[2] > lengths[1] && lengths[1] > lengths[0], "\(orientation): each orb reaches further: \(lengths)")
+            #expect(lengths[5] == lengths[0], "\(orientation): back to Connections alone")
         }
-        let alone = placed([connections])
-        var widths: [CGFloat] = []
-        for orbs in [[connections], [connections, plain], [connections, plain, ringed], [connections, ringed, ringed, plain],
-                     [connections, ringed], [connections]] {
-            let (frame, drawn) = placed(orbs)
-            #expect(abs(drawn.x - root.x) < 0.5 && abs(drawn.y - root.y) < 0.5, "Connections moved to \(drawn) with \(orbs.count) orbs")
-            #expect(abs(frame.minX - alone.frame.minX) < 0.5, "the dock's left edge moved, to \(frame.minX)")
-            #expect(abs(frame.midY - root.y) < 0.5, "a taller row grows evenly above and below Connections: \(frame)")
-            widths.append(frame.width)
-        }
-        #expect(widths[2] > widths[1] && widths[1] > widths[0], "each orb reaches further right: \(widths)")
-        // Past the widest row: a second, below Connections' row, which stays where it was.
-        let wrapped = placed([connections] + Array(repeating: ringed, count: 12))
-        let oneRow = placed([connections, ringed])
-        #expect(wrapped.frame.height > oneRow.frame.height * 1.5, "\(wrapped.frame)")
-        #expect(abs(wrapped.frame.maxY - oneRow.frame.maxY) < 0.5 && abs(wrapped.frame.minX - oneRow.frame.minX) < 0.5)
-        #expect(abs(wrapped.drawn.x - root.x) < 0.5 && abs(wrapped.drawn.y - root.y) < 0.5)
+        // Past the widest row: no second row; the dock stops at its longest and scrolls, Connections where it was.
+        let many = [connections] + Array(repeating: ringed, count: 12)
+        let size = GlassMacOrbDockView.fit(many)
+        #expect(size.width <= GlassMacOrbDockView.widest, "\(size)")
+        #expect(size.height == GlassMacOrbDockView.fit([connections, ringed]).height, "one row: \(size)")
     }
 
-    @Test("Resized, the dock takes the shape that shows every orb: as wide as made, as tall as its rows, no taller than the screen")
-    func showsEveryOrb() {
-        // The owner, 2026-11-02, of a column of two orbs in a dock three times their height: "it should also
-        // spring back to the shape that shows all of the orbs".
+    @Test("A vertical dock is a column of every orb, whatever size it was dragged to; past the screen's room, the whole orbs that fit")
+    func columnFitsItsOrbs() {
+        // The owner, 2026-11-02, of a column of two orbs in a dock three times their height: "it should also spring
+        // back to the shape that shows all of the orbs"; 2026-11-05: a size given isn't kept.
         let inset = GlassMacOrbDockView.inset
         let gap = GlassMacOrbDockView.connectionsGap
         let ringed = GlassMacOrbDockView.size(ring: 5)
         let orbs = [GlassMacOrbDockView.connectionsSize, ringed]
-        func bottoms(_ orbs: [CGSize], width: CGFloat) -> [CGFloat] {
-            Set(GlassOrbFlow.frames(of: orbs, width: width - 2 * inset, gapAfterFirst: gap).map { ($0.maxY + 2 * inset).rounded(.up) }).sorted()
-        }
-        let narrow = ringed.width + 2 * inset
-        let tall = GlassMacOrbDockView.fit(orbs, within: CGSize(width: narrow, height: 900))
-        #expect(bottoms(orbs, width: tall.width).count == 2, "a column: \(tall)")
-        #expect(tall.height == bottoms(orbs, width: tall.width).last, "as tall as both rows, not as dragged: \(tall)")
-        let short = GlassMacOrbDockView.fit(orbs, within: CGSize(width: narrow, height: 60))
-        #expect(short == tall, "made shorter than its rows, still every orb: \(short)")
-        // A column past the screen's height: the whole rows that fit in it, the rest scrolled to.
+        let column = GlassMacOrbDockView.fit(orbs, orientation: .vertical)
+        let ends = GlassOrbLine.frames(of: orbs, .vertical, gapAfterFirst: gap).map { ($0.maxY + 2 * inset).rounded(.up) }
+        #expect(column.height == ends.last, "as tall as both orbs: \(column)")
+        #expect(column.width == (max(GlassMacOrbDockView.connectionsSize.width, ringed.width) + 2 * inset).rounded(.up),
+                "one orb wide: \(column)")
         let many = [GlassMacOrbDockView.connectionsSize] + Array(repeating: ringed, count: 10)
-        let capped = GlassMacOrbDockView.fit(many, within: CGSize(width: narrow, height: 300), tallest: 700)
-        #expect(capped.height <= 700 && capped.height > 700 - ringed.height, "\(capped)")
-        #expect(bottoms(many, width: capped.width).contains(capped.height), "whole rows: \(capped)")
+        let capped = GlassMacOrbDockView.fit(many, orientation: .vertical, tallest: 700)
+        let manyEnds = GlassOrbLine.frames(of: many, .vertical, gapAfterFirst: gap).map { ($0.maxY + 2 * inset).rounded(.up) }
+        #expect(capped.height <= 700 && manyEnds.contains(capped.height), "whole orbs in the room: \(capped)")
     }
 
     @Test("Databases, desktops and editors stand on their machine's orb; terminal windows on their own")
