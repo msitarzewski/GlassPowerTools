@@ -170,7 +170,7 @@ A terminal, remote desktop, database or editor window can shrink into a small gl
 
 A terminal window's terminals sit around its orb as glass dots, up to 12, each showing what its row in the sidebar shows: the coding agent running in it, in the agent's colour, or a terminal, pulsing while it prints. Look at a dot to see that terminal's picture in the orb and its name beside the dot; you can look across to the name to read it. Pinch the dot, or the name, to bring the window back with that terminal in front.
 
-When the window has **Auto-focus on activity** on, the orb pulses while a terminal in it prints, and shows the terminal that printed last. See [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings).
+When the window has **Auto-focus on activity** on, drops fall into the orb while a terminal in it prints: rings of ripples spread across its picture. The orb shows the terminal that printed last. See [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings). With **Reduce Motion** or **Low Power Mode** on, the orb stays still and its rim glows instead.
 
 A terminal window standing as its orb when the app quits stands as its orb again after a relaunch.
 
@@ -180,7 +180,8 @@ Orbs can gather in one place instead of standing where their windows were: a doc
 
 With it on:
 
-- **Shrink to Orb** closes the window into the dock: it gathers into a drop that lands there as its orb. Its session keeps running: terminals stay connected, and so do databases and desktops.
+- **Shrink to Orb** closes the window into the dock: it gathers into a drop that lands there as its orb, squashing and wobbling like jelly until it settles. Its session keeps running: terminals stay connected, and so do databases and desktops.
+- The orbs already in the dock slide over to make room, and the landing goes along them as a wave of wobble, smaller in each one further on. A window leaving does the same as the gap closes, and so does an orb you move to another place.
 - The library window, left alone, goes into the dock too, instead of shrinking where it is.
 - **Connections** is first in the dock, a little larger than the rest. Each terminal window has an orb of its own, with its terminals as dots around it. Databases, remote desktops and editors are gathered by machine: one orb for each machine with any of them open, docked or not, with a dot for each. An editor opened from a terminal in the dock is a dot on that terminal's orb.
 - Look at a dot to see its name beside it.
@@ -209,7 +210,7 @@ Choose a machine to connect to it. A machine with several services lists them, f
 
 - **Move an orb:** pinch and hold it until it lifts, then move your hand. Let go over another orb to put it in that orb's place; over **Connections**, it goes first; past the last orb, last. Each orb keeps its place on this device, so a window that leaves the dock comes back to the same place.
 - **Scroll:** pinch and move at once, without holding.
-- **Row or column:** **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Dock** makes it **Horizontal** (the starting setting) or **Vertical**. The dock grows and shrinks along it as windows come and go: a window you bring back and dock again goes back into the same row or column. If you resize the dock by hand, it goes back to fitting its orbs when you let go.
+- **Row or column:** **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Dock** makes it **Horizontal** (the starting setting) or **Vertical**. The dock grows and shrinks along it as windows come and go: a window you bring back and dock again goes back into the same row or column. Past about six orbs in a row, or four in a column, it scrolls, with an arrow at the end where there's more. **Resize the dock** longer to show more orbs, or shorter to show fewer: when you let go, it keeps that length as its longest, to the nearest whole orb, and goes back to one orb thick. Fewer orbs than fit, and it's shorter; more, and it scrolls. A row and a column each keep their own.
 
 When there are more orbs than fit (about six in a row, four in a column), an arrow at the dock's end says so; pinch the arrow to scroll an orb that way. A window docked out of sight is scrolled to.
 
@@ -223,7 +224,8 @@ Connections, left in the dock, goes back into it once the terminals that came ba
 
 A window can go into the orb dock with its sessions still running, and come back with one click. The dock is a strip of Apple's Liquid Glass, with orbs of the same glass, that floats over your windows, no bigger than its orbs, as the dock does on Vision Pro: each orb shows its window's live picture, and its terminals' coding agents in their colours.
 
-- Choose **Shrink to Orb** in the window's toolbar, beside **Show All Windows**. The window fades out and its orb lands in the dock. The window isn't closed: terminals stay connected, and so do databases and desktops.
+- Choose **Shrink to Orb** in the window's toolbar, beside **Show All Windows**. The window fades out and its orb lands in the dock, squashing and wobbling like jelly, while the dock's glass stretches a little past its new size and springs back; the other orbs feel the landing in turn. The window isn't closed: terminals stay connected, and so do databases and desktops.
+- While a terminal in the window prints, drops fall into its orb, as on Vision Pro: rings of ripples spread across its picture. A window opened from a saved Workgroup does this when the Workgroup has **Auto-focus on activity** on. With **Reduce Motion** or **Low Power Mode** on, the orbs stay still and a busy orb's rim glows instead.
 - ⌘M still minimizes a window to the Mac's Dock, as in any app.
 - **Shrink to Orb** in the Connections window's toolbar puts Connections in the dock too. **Connections** is always first in the dock, a little larger than the rest, as on Vision Pro: the app's icon in a drop of glass, with ⚡ and the number of open sessions on its rim.
 - Each terminal window has an orb of its own showing the tab in front, with its tabs as dots around it. Each dot shows what the tab's row in the sidebar shows: the coding agent running in it, in the agent's colour, or a terminal, pulsing while it prints.
@@ -243,7 +245,7 @@ The dock goes away when no window is in it and Connections is out of it.
 - **Move the dock:** drag any empty part of it, between or around the orbs.
 - **Where it grows:** from **Connections**, which stays where you put it. As orbs come, a horizontal dock reaches further to its right, and grows taller evenly above and below it when an orb has a ring of dots; a vertical dock reaches further down. As orbs go, it shrinks back to Connections. Near the edge of the screen, the dock moves only as far as it must to stay on screen, and comes back once it's smaller.
 - **Move an orb:** drag it onto another orb to put it in that orb's place. Dropped on **Connections**, it goes first; past the last orb, it goes last. Each orb keeps its place on this Mac.
-- **Row or column:** **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Dock** makes it **Horizontal** (the starting setting) or **Vertical**. A row scrolls past about seven orbs, a column past the screen's height, with an arrow at the end where there's more. Dragged to another size, the dock springs back to fit its orbs when you let go.
+- **Row or column:** **Settings** ▸ **Appearance** ▸ **Orbs** ▸ **Dock** makes it **Horizontal** (the starting setting) or **Vertical**. A row scrolls past about seven orbs, a column past the screen's height, with an arrow at the end where there's more. **Drag the dock's edge** to make it longer or shorter: when you let go, it keeps that length as its longest, to the nearest whole orb, and springs back to one orb thick. A row and a column each keep their own.
 - **Connect:** right-click **Connections** for **Favorites**, **Recent** and **Dock Settings…**, as on Vision Pro.
 
 Where the dock floats is a setting: above this app's windows, or above every window. See [Orbs on Mac](library-settings.md#orbs-on-mac).

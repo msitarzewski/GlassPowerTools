@@ -193,14 +193,22 @@ public struct GlassSessionOrbButton: View {
 }
 
 /// A sphere's light on the orb's face: brighter toward the upper left, falling away to the rim, with
-/// a small highlight and a rim catching the light, over the picture seen through the glass.
+/// a small highlight and a rim catching the light, over the picture seen through the glass. Its rim is
+/// the drop's (`GlassOrbLiquidRim`): laid out at `diameter`, it draws past it as the drop bulges.
 struct GlassOrbSphereShading: View {
     let diameter: CGFloat
+    var drop: GlassDropletDeformation = .round
 
     var body: some View {
+        // The system's own circle where the glass keeps it (`GlassOrbLiquid.shapesGlass`): any other shape broke up on
+        // the headset.
+        let shaped = GlassOrbLiquid.shapesGlass
+        let rim = shaped ? AnyShape(GlassDropletShape(drop: drop, radius: diameter / 2)) : AnyShape(Circle())
+        let room = shaped ? (diameter * (1 + 2 * GlassOrbLiquid.margin)).rounded(.up) : diameter
         ZStack {
             RadialGradient(colors: [.white.opacity(0.32), .white.opacity(0)],
-                           center: UnitPoint(x: 0.32, y: 0.26), startRadius: 0, endRadius: diameter * 0.55)
+                           center: .center, startRadius: 0, endRadius: diameter * 0.55)
+                .offset(x: -diameter * 0.18, y: -diameter * 0.24)
             RadialGradient(colors: [.clear, .clear, .black.opacity(0.38)],
                            center: .center, startRadius: 0, endRadius: diameter * 0.52)
             Ellipse()
@@ -209,18 +217,26 @@ struct GlassOrbSphereShading: View {
                 .rotationEffect(.degrees(-30))
                 .blur(radius: 5)
                 .offset(x: -diameter * 0.18, y: -diameter * 0.24)
-            Circle()
-                .strokeBorder(LinearGradient(colors: [.white.opacity(0.7), .white.opacity(0.08), .white.opacity(0.3)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)
+            Group {
+                if shaped {
+                    GlassDropletShape(drop: drop, radius: diameter / 2).strokeBorder(Self.rimLight, lineWidth: 1.5)
+                } else {
+                    Circle().strokeBorder(Self.rimLight, lineWidth: 1.5)
+                }
+            }
         }
-        .frame(width: diameter, height: diameter)
+        .frame(width: room, height: room)
         // Cut to the sphere here: the orb's own clip did not hold its corners in on the headset (the
         // gradients' square showed around the orb in the visionOS 27.2 simulator).
         .compositingGroup()
-        .clipShape(.circle)
+        .clipShape(rim)
+        .frame(width: diameter, height: diameter)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
+
+    private static let rimLight = LinearGradient(colors: [.white.opacity(0.7), .white.opacity(0.08), .white.opacity(0.3)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing)
 }
 
 
@@ -236,17 +252,25 @@ struct GlassSessionOrbBellRim: View {
     }
 }
 
+/// A busy orb with Reduce Motion or Low Power Mode on: its rim glowing and fading, again and again, as nothing may move.
+/// Otherwise drops fall into its picture (`GlassOrbLiquidWarp`), and this draws nothing. It was a white ring going out
+/// from the rim until 2026-11-05 (the owner: "not cheesy animations").
 struct GlassSessionOrbPulse: View {
+    @Environment(\.glassOrbLiquid) private var liquid
+
     var body: some View {
-        Circle()
-            .strokeBorder(.white.opacity(0.75), lineWidth: 3)
-            .phaseAnimator([0.0, 1.0]) { ring, phase in
-                ring.scaleEffect(1 + 0.22 * phase).opacity(1 - phase)
-            } animation: { phase in
-                phase == 1 ? .easeOut(duration: 1.3) : .linear(duration: 0)
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        if liquid.still {
+            Circle()
+                .strokeBorder(.white.opacity(0.75), lineWidth: 3)
+                .shadow(color: .white.opacity(0.6), radius: 6)
+                .phaseAnimator([0.15, 1.0]) { ring, phase in
+                    ring.opacity(phase)
+                } animation: { _ in
+                    .easeInOut(duration: 1.1)
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }
 

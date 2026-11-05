@@ -36,10 +36,11 @@ struct TerminalKeysMenu: View {
                 }
             }
             #if os(visionOS)
-            // With a hardware keyboard the system's is put away (`GlassSystemKeyboard`); here it comes
-            // back for dictation and emoji, and goes again (the owner, 2026-11-05: "The only tension
-            // I'm going to have is voice dictation and emoji selection").
-            if systemKeyboard.hardwareKeyboardConnected {
+            // With a hardware keyboard, or Settings' Only When Asked, the system's is held back
+            // (`GlassSystemKeyboard`); here it comes, for dictation and emoji or for typing, and goes
+            // again (the owner, 2026-11-05: "The only tension I'm going to have is voice dictation and
+            // emoji selection"; "can we hide this keyboard until i reques it?").
+            if systemKeyboard.holdsBack {
                 Divider()
                 if systemKeyboard.shownAnyway {
                     Button("Hide Keyboard", systemImage: "keyboard.chevron.compact.down") {
@@ -48,7 +49,7 @@ struct TerminalKeysMenu: View {
                     .accessibilityIdentifier("terminal-keys-hide-keyboard")
                 } else {
                     Button("Show Keyboard", systemImage: "keyboard") { systemKeyboard.shownAnyway = true }
-                        .accessibilityHint("The system keyboard, for dictation and emoji.")
+                        .accessibilityHint("The system keyboard, for typing, dictation and emoji.")
                         .accessibilityIdentifier("terminal-keys-show-keyboard")
                 }
             }

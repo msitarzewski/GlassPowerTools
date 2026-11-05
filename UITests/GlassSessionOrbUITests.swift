@@ -160,6 +160,15 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertTrue(connections.waitForExistence(timeout: 10), "no Connections orb in the dock")
         // The landing, and the resize asked for four seconds after the dock opened.
         sleep(size == nil ? 3 : 7)
+        // At its start. The two windows dock a moment apart, and when the dock opens between them the second is an
+        // orb docked out of sight, which the dock scrolls to (as it should); when it opens after both, nothing
+        // scrolls. Each then began scrolled or not by that race (2026-11-05: the quick-drag test started with
+        // Connections at -246, the two dockings 44 ms apart in the app's log, and failed).
+        let above = element("orb-dock-more-above")
+        for _ in 0..<3 where above.exists {
+            above.tap()
+            sleep(1)
+        }
         return (dock, orbs, connections)
     }
 
@@ -196,16 +205,22 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertEqual(orbs.allElementsBoundByIndex.map(\.label), names, "a quick drag carried an orb")
     }
 
-    /// Resized by hand to 600x900 (a hand on its corner, which the runner can't drag), the dock goes back to fitting
-    /// its orbs in its row once the hand lets go (2026-11-05: a size given isn't kept; it had snapped within it, and a
-    /// window docked again landed on a new row).
-    func testAResizedDockGoesBackToFittingItsOrbs() {
-        let (dock, orbs, connections) = dockTwoTerminals(resizedTo: "600x900")
+    /// Resized by hand to 500x900 (a hand on its corner, which the runner can't drag): the length along its row is the
+    /// dock's longest from now on, to whole orbs, and its height goes back to one orb's (the owner, 2026-11-05: "if it
+    /// will fit one more and i rezize to ftt, that should be the new max width"). 500 holds Connections and one orb,
+    /// whole; the other is past the end, with an arrow to it.
+    func testAResizedDockKeepsItsLengthInWholeOrbs() {
+        let (dock, orbs, connections) = dockTwoTerminals(resizedTo: "500x900")
         let back = expectation(for: NSPredicate { _, _ in dock.frame.height < 400 }, evaluatedWith: nil)
         _ = XCTWaiter().wait(for: [back], timeout: 15)
-        let size = dock.frame.size
-        XCTAssertEqual(size.height, 320 + 2 * 16, accuracy: 2, "the dock is not one row of orbs tall: \(size)")
-        XCTAssertGreaterThan(size.width, 600 + 10, "the dock kept the width it was given, not its orbs': \(size)")
+        let frame = dock.frame
+        XCTAssertEqual(frame.height, 320 + 2 * 16, accuracy: 2, "the dock is not one row of orbs tall: \(frame.size)")
+        let row = orbs.allElementsBoundByIndex.map(\.frame).sorted { $0.minX < $1.minX }
+        XCTAssertEqual(row.count, 2)
+        XCTAssertTrue(row[0].minX >= frame.minX && row[0].maxX <= frame.maxX, "the first orb isn't whole in it: \(row[0]) \(frame)")
+        XCTAssertGreaterThan(row[1].midX, frame.maxX, "the second orb isn't past its end: \(row[1]) \(frame)")
+        XCTAssertLessThan(frame.width, 600, "it kept its orbs' length, not the hand's: \(frame.size)")
+        XCTAssertTrue(element("orb-dock-more-right").waitForExistence(timeout: 5), "no arrow to the orb past its end")
         let lead = connections.frame
         XCTAssertTrue(orbs.allElementsBoundByIndex.allSatisfy { abs($0.frame.midY - lead.midY) < lead.height / 2 },
                       "the orbs are not in Connections' row")

@@ -31,7 +31,22 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-05 — RESUME HERE: the dock a row or a column; Focus Mode the app's (0.4.600)
+## 2026-11-05 — RESUME HERE: the dock keeps a hand's length; On-Screen Keyboard (0.4.603)
+- 0.4.602 (Vision Pro, installed): the drop-shaped glass broke into white shards on the headset after a scroll (his
+  pictures); visionOS keeps the system's circle of glass, the whole orb stretched to the drop's oval.
+- 0.4.603: Settings ▸ Terminal ▸ On-Screen Keyboard (Automatic / Only When Asked; he chose a setting); the dock keeps
+  the length a hand gives it as its longest, to whole orbs, on both docks. Unit tests bitten; Vision UI tests running;
+  then the Mac in the VM, then builds and installs. Task note `2026-11/2026-11-05_dock-length-keyboard.md`.
+
+## 2026-11-05 — earlier: the orbs as liquid (0.4.601)
+- His "actual liquid effects with metal ... a snap to wobble jelly feel" (choices: Metal shaders with Apple's glass,
+  drops falling into a busy orb, a wave through the row). Drops' physics in `GlassOrbJelly` (tested, each check seen
+  failing); a SwiftUI layer shader for the ripples; the glass in the drop's shape; the Mac dock's panel springs.
+  Filmed in the Vision simulator and the macOS VM; liquid costs about 3–5 % of a core in the VM. Package 3,364.
+  0.4.592–0.4.600 committed at his word (`5ebfd0be`, not pushed); 0.4.601 uncommitted. Task note
+  `2026-11/2026-11-05_liquid-orbs.md`.
+
+## 2026-11-05 — earlier: the dock a row or a column; Focus Mode the app's (0.4.600)
 - His dock ask (choices: scroll along it, fit the orbs, both docks): `GlassOrbLine` replaces the wrapping flow on Vision
   Pro and the Mac; Settings ▸ Appearance ▸ Orbs ▸ Dock; a hand resize springs back; a re-docked window goes back into
   its row. His Focus ask: Focus Mode no longer closes as a terminal's view goes away (docking), closes itself after the

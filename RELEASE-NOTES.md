@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.589 (3 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.603 (5 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.589)
+## What it holds (0.4.603)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -55,6 +55,7 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   chosen with a preview of each, for every terminal or one window.
 - On Vision Pro, Focus Mode surrounds you with a built-in environment or your own 3D room or 360°
   photo, which you can walk about in, with a room's own motion, clocks and sounds.
+- A terminal that rings its bell while you're not looking stays marked in orange until you go to it.
 
 ### Databases
 - MySQL, PostgreSQL and SQLite: browse, filter and edit rows with a review before every write,
@@ -75,7 +76,8 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 ### Editor
 - Files on this device or on a server, projects with a file tree, syntax highlighting, and previews
   for Markdown (with Mermaid diagrams), HTML, SVG and CSV. Images, PDFs, video, audio and 3D models
-  open as themselves. On the Mac it can be your default text editor.
+  open as themselves. On the Mac it can be your default text editor. Undo and redo, Find and Replace,
+  Transformations and the spelling switches TextEdit has, with the same keys on iPad, iPhone and Vision Pro.
 - Git, on this Mac or on a server over the project's SSH connection: Source Control with a diff
   viewer (unified or side by side, changed words highlighted, 3 or 10 lines of context or the whole
   file, whitespace ignored), staging a file, a hunk or chosen lines, discarding, commit and amend,
@@ -89,7 +91,8 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   a Machine, Open With and the Dock menu.
 - Light, Dark or System for the whole app on the Mac, iPhone and iPad; window opacity and glass
   everywhere; and session windows that shrink into an orb: on the Mac into a dock of Liquid Glass, and on
-  Vision Pro where they stand or into one dock.
+  Vision Pro where they stand or into one dock. The dock is a row or a column, as long as you make it; its
+  orbs are drops of liquid that wobble as windows land and leave, with drops falling into a busy one.
 
 ### Known limits
 - The Mac app runs outside App Sandbox (a terminal cannot work inside it), so it will be distributed
@@ -100,6 +103,37 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.603 (5 November 2026)
+- **0.4.603 is the Mac's seventh release**, through Sparkle, with everything since 0.4.589 below; TestFlight build
+  603 for iPhone, iPad and Vision Pro.
+- **The dock keeps the length you give it**, on Vision Pro and the Mac. It scrolled past a longest of its own (about
+  six orbs in a row on Vision Pro, seven on the Mac), and a hand's resize sprang back. Now resize it longer to show one
+  more orb, or shorter to show fewer: when you let go it keeps that length as its longest, to the nearest whole orb,
+  and goes back to one orb thick. It still fits its orbs within it, shorter with fewer, scrolling past it with more. A
+  row and a column each keep their own.
+- **On Vision Pro, Settings ▸ Terminal ▸ On-Screen Keyboard**: **Automatic**, as before, or **Only When Asked**, where
+  the system keyboard no longer comes up under a terminal you pinch, connected keyboard or not, until **Keys** >
+  **Show Keyboard**; **Hide Keyboard** puts it away. The headset hadn't reported a connected keyboard, so the whole
+  keyboard came up under every terminal.
+
+### 0.4.602 (5 November 2026, Vision Pro)
+- **The orbs' glass is whole again on Vision Pro.** In 0.4.601 each orb's glass took the drop's shape, and on the
+  headset it broke into white shards after a scroll of the dock, on every orb, in a row or a column. The glass is the
+  system's own circle again; the whole orb squashes and stretches as it lands and as the wave passes, and the ripples
+  stay in its picture. The Mac, where the glass held, keeps the drop's shape.
+
+### 0.4.601 (5 November 2026)
+- **The orbs are drops of liquid**, on Vision Pro and the Mac. A window landing in the dock squashes as it lands and
+  wobbles like jelly until it settles, and the orbs beside it feel it in turn, a wave of wobble along the row or
+  column that is smaller in each orb further on; one leaving does the same as the gap closes. The others slide over
+  with a spring. On the Mac the dock's glass stretches a little past its new size and springs back. The wobble is a
+  drop's own: an oval, three lobes, four, each ringing faster and dying sooner than the last, the drop keeping its
+  size. On the Mac, Apple's glass takes the drop's shape, so it goes on bending what lies behind it as it wobbles.
+- **A busy orb has drops falling into it** where its window asks for activity to show: rings of ripples spread across
+  its picture, bending it as water does, with light catching the rings; on the Mac the rim trembles as each reaches it.
+  This replaces the white ring that went out from the orb. Drawn by a Metal shader, and only while something moves.
+  With **Reduce Motion** or **Low Power Mode** on, the orbs stay round and a busy orb's rim glows instead.
 
 ### 0.4.600 (5 November 2026)
 - **The orb dock is a row or a column**, on Vision Pro and the Mac: **Settings** ▸ **Appearance** ▸ **Orbs** ▸

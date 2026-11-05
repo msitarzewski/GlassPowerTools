@@ -617,6 +617,7 @@ struct TerminalSettingsView: View {
             #endif
 
             #if os(visionOS)
+            TerminalOnScreenKeyboardSection()
             // Focus Mode's surroundings (2026-10-26), for every window; This Window for one.
             FocusEnvironmentLibrarySection(chosen: $settings.focusEnvironment,
                                            opensImmersed: $settings.focusOpensImmersed,
@@ -1962,3 +1963,28 @@ private struct TrustedHostKeysSection: View {
         }
     }
 }
+
+#if os(visionOS)
+/// When the system keyboard comes up for a terminal or a remote desktop (the owner, 2026-11-05: "can we hide this
+/// keyboard until i reques it?", as a setting): Automatic, or Only When Asked, from Keys ▸ Show Keyboard.
+private struct TerminalOnScreenKeyboardSection: View {
+    @Bindable private var keyboard = GlassSystemKeyboard.shared
+
+    var body: some View {
+        Section {
+            Picker("Show", selection: $keyboard.choice) {
+                ForEach(GlassOnScreenKeyboard.allCases, id: \.self) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            }
+            .accessibilityIdentifier("terminal-settings-on-screen-keyboard")
+        } header: {
+            Text("On-Screen Keyboard")
+        } footer: {
+            Text("Automatic: the keyboard comes up when you pinch a terminal or a remote desktop, unless a keyboard is connected. Only When Asked: it comes up only from Keys > Show Keyboard in a terminal, and Keys > Hide Keyboard puts it away; in a remote desktop, Keys > Type Text…. Kept on this Vision Pro.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+#endif

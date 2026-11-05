@@ -606,21 +606,65 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
             placings -= 1
             return
         }
-        // Alongside the orbs' own animations, not before them: set with `animate`, the frame held everything
-        // else until it had finished, so an orb landing in the dock as it grew stood still, then jumped (the
-        // owner, 2026-11-02: "The animations seem pretty low framerate"). Its moves along the way are the dock's
-        // until it has finished.
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Self.fitDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrame(frame, display: true)
-        } completionHandler: { [weak self] in
-            MainActor.assumeIsolated { self?.placings -= 1 }
-        }
+        // A spring, stepped with the display: the glass overshoots its new size a little and settles, as jelly does
+        // (the owner, 2026-11-05: "Like a snap to wobble jelly feel?"); until then an ease of 0.28 seconds. Alongside
+        // the orbs' own animations, not before them: set with `animate`, the frame held everything else until it had
+        // finished, so an orb landing in the dock as it grew stood still, then jumped (the owner, 2026-11-02: "The
+        // animations seem pretty low framerate"). Its moves along the way are the dock's until it has finished.
+        spring(panel, to: size, placing: offset, at: root)
     }
 
-    /// How long the dock takes to grow or shrink to its orbs.
-    static let fitDuration: TimeInterval = 0.28
+    /// The dock growing or shrinking to its orbs: quick, past its new size a little and back.
+    static let fitSpring = Spring(duration: 0.5, bounce: 0.45)
+    /// How long the dock takes to grow or shrink to its orbs: by then within a fifth of a point of still (SwiftUI's own
+    /// settling waits 1.3 seconds for less than any screen shows, and the dock's moves aren't the person's till then).
+    static let fitDuration: TimeInterval = 0.9
+
+    /// The dock's size `elapsed` into springing from `from` to `to`.
+    static func springSize(from: CGSize, to: CGSize, elapsed: TimeInterval) -> CGSize {
+        guard elapsed < fitDuration else { return to }
+        let width = fitSpring.value(target: Double(to.width - from.width), time: elapsed)
+        let height = fitSpring.value(target: Double(to.height - from.height), time: elapsed)
+        return CGSize(width: (from.width + width).rounded(), height: (from.height + height).rounded())
+    }
+
+    /// The spring under way: from what size to what, Connections where, and since when.
+    private var springing: (from: CGSize, to: CGSize, offset: CGPoint, root: CGPoint, start: CFTimeInterval)?
+    private var springLink: CADisplayLink?
+
+    private func spring(_ panel: NSPanel, to size: CGSize, placing offset: CGPoint, at root: CGPoint) {
+        // A spring under way gives way to this one, from where it has got to.
+        if springLink != nil { placings -= 1 }
+        springLink?.invalidate()
+        springing = (panel.frame.size, size, offset, root, CACurrentMediaTime())
+        guard let link = panel.contentView?.displayLink(target: self, selector: #selector(stepSpring(_:))) else {
+            springing = nil
+            springLink = nil
+            panel.setFrame(Self.inside(Self.frame(of: size, placing: offset, at: root), on: Self.screen(at: root) ?? panel.screen),
+                           display: true)
+            placings -= 1
+            return
+        }
+        springLink = link
+        link.add(to: .main, forMode: .common)
+    }
+
+    @objc private func stepSpring(_ link: CADisplayLink) {
+        guard let panel, let springing else {
+            link.invalidate()
+            return
+        }
+        let elapsed = CACurrentMediaTime() - springing.start
+        let size = Self.springSize(from: springing.from, to: springing.to, elapsed: elapsed)
+        let frame = Self.inside(Self.frame(of: size, placing: springing.offset, at: springing.root),
+                                on: Self.screen(at: springing.root) ?? panel.screen)
+        if frame != panel.frame { panel.setFrame(frame, display: true) }
+        guard elapsed >= Self.fitDuration else { return }
+        link.invalidate()
+        springLink = nil
+        self.springing = nil
+        placings -= 1
+    }
 
     /// The dock's frame of `size` with Connections' middle, `offset` from its top left, at `root`.
     static func frame(of size: CGSize, placing offset: CGPoint, at root: CGPoint) -> CGRect {
@@ -666,13 +710,22 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
     public func windowDidEndLiveResize(_ notification: Notification) {
         guard let panel, !placing else { return }
         if let fitted, abs(panel.frame.width - fitted.width) < 2, abs(panel.frame.height - fitted.height) < 2 { return }
-        // An edge dragged: Connections where it shows now, and back to the shape that shows its orbs in its row or
-        // column. The size dragged to isn't kept (the owner, 2026-11-05: a kept size put a window docked again on a
-        // new row); the way the line goes is chosen in Settings. Asked again even when the same as before: dragged
-        // taller than its orbs, nothing would change and it would stay as dragged (2026-11-02).
+        // An edge dragged: Connections where it shows now; the length dragged to along the line is the dock's longest
+        // from now on, to the nearest whole orb (the owner, 2026-11-05: "if it will fit one more and i rezize to ftt,
+        // that should be the new max width"); its thickness goes back to one orb's. The whole size dragged to was
+        // once kept, and a window docked again wrapped onto a new row. Asked again even when the same as before:
+        // dragged taller than its orbs, nothing would change and it would stay as dragged (2026-11-02).
         keepRoot(connectionsPoint(of: panel))
         fitted = nil
-        wanted = (GlassMacOrbDockView.fit(shown, orientation: orientation, tallest: tallest), shown)
+        let content = panel.contentRect(forFrameRect: panel.frame).size
+        let room = (panel.screen ?? NSScreen.main)?.visibleFrame.size ?? content
+        let longest = GlassOrbDockLongest.fromHand(
+            orientation == .horizontal ? content.width : content.height, sizes: shown, orientation,
+            inset: GlassMacOrbDockView.inset, gapAfterFirst: GlassMacOrbDockView.connectionsGap,
+            largest: orientation == .horizontal ? room.width : room.height)
+        GlassOrbDockLongest.keep(longest, orientation, in: GlassUITestRun.settingsDefaults)
+        GlassOrbDock.logger.info("dock dragged to \(Int(content.width))x\(Int(content.height)): longest \(Int(longest))")
+        wanted = (GlassMacOrbDockView.fit(shown, orientation: orientation, tallest: tallest, longest: longest), shown)
         DispatchQueue.main.async { [weak self] in self?.applyWanted() }
     }
 
@@ -795,11 +848,21 @@ struct GlassMacOrbDockView: View {
     @State private var roomSettled = true
     /// An orb just docked, scrolled into sight once it has its place.
     @State private var arrived: String?
+    /// The pushes each orb has had as windows dock and leave: a wave of wobble along the line.
+    @State private var jelly = GlassOrbJellyField()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(GlassOrbDock.lookKey, store: GlassUITestRun.settingsDefaults) private var lookData = Data()
     @AppStorage(GlassOrbDockOrientation.key, store: GlassUITestRun.settingsDefaults)
     private var orientationSetting = GlassOrbDockOrientation.horizontal.rawValue
     /// A row or a column, as Settings ▸ Appearance ▸ Orbs says (the owner, 2026-11-05).
     private var orientation: GlassOrbDockOrientation { GlassOrbDockOrientation(rawValue: orientationSetting) ?? .horizontal }
+    /// The longest a drag left a row and a column at (`GlassOrbDockLongest`); 0 until one has.
+    @AppStorage(GlassOrbDockLongest.key(.horizontal), store: GlassUITestRun.settingsDefaults) private var keptRow = 0.0
+    @AppStorage(GlassOrbDockLongest.key(.vertical), store: GlassUITestRun.settingsDefaults) private var keptColumn = 0.0
+    private var keptLongest: CGFloat? {
+        let kept = orientation == .horizontal ? keptRow : keptColumn
+        return kept > 0 ? CGFloat(kept) : nil
+    }
 
     /// Around each orb's farthest dot, so neighbours' dots stand apart. With `inset`, the dock's edge is
     /// the same distance from the orbs on every side (the owner, 2026-11-02: "Seems like this takes up a
@@ -825,7 +888,8 @@ struct GlassMacOrbDockView: View {
     }
     /// A whole ring's height: a row's tallest.
     static var ringedHeight: CGFloat { size(ring: 4).height }
-    /// A row's longest, about seven orbs with rings; past it, it scrolls. A column's is the screen's room.
+    /// A row's longest until a drag sets one, about seven orbs with rings; past it, it scrolls. A column's is the
+    /// screen's room.
     static let widest: CGFloat = 1100
     static var narrowest: CGFloat { connectionsSize.width + 2 * inset }
     static var lowest: CGFloat { connectionsSize.height + 2 * inset }
@@ -848,7 +912,7 @@ struct GlassMacOrbDockView: View {
         let cells = cells(open: open)
         let sizes = [Self.connectionsSize] + cells.map(Self.size(of:))
         let orientation = orientation
-        let fit = Self.fit(sizes, orientation: orientation, tallest: GlassOrbDockPanel.shared.tallest)
+        let fit = Self.fit(sizes, orientation: orientation, tallest: GlassOrbDockPanel.shared.tallest, longest: keptLongest)
         return VStack(spacing: 0) {
             ScrollView(orientation.axis) {
             // Each drop's glass on its own, not drawn together in a `GlassEffectContainer`: there, what isn't glass
@@ -862,13 +926,17 @@ struct GlassMacOrbDockView: View {
                     connectionsMenu
                 }
                 .frame(width: Self.connectionsSize.width, height: Self.connectionsSize.height)
+                .environment(\.glassOrbKicks, jelly.kicks(for: Self.connectionsCell))
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.row)) } action: {
                     frames[Self.connectionsCell] = $0
                 }
                 ForEach(cells) { cell in
                     movable(cell, among: cells)
+                        .environment(\.glassOrbKicks, jelly.kicks(for: cell.id))
                 }
             }
+            // The rest slide over to make room or close a gap, with a spring's snap.
+            .animation(reduceMotion ? nil : GlassOrbJellyMotion.slide, value: cells.map(\.id))
             .padding(Self.inset)
             // Any empty part of the dock moves it; the orbs are carried, not the dock.
             .background { GlassOrbDockMover().accessibilityHidden(true) }
@@ -900,10 +968,15 @@ struct GlassMacOrbDockView: View {
             GlassOrbDockPanel.shared.fit(to: fitted.size, orbs: fitted.orbs)
         }
         .onChange(of: pointed) { _, pointed in name(pointed) }
+        // Orbs there as the dock opens land in it, as they fall into it (`GlassOrbDropArrival`).
+        .onAppear {
+            jelly.changed(from: [Self.connectionsCell], to: [Self.connectionsCell] + cells.map(\.id), along: orientation)
+        }
         .onDisappear { GlassOrbDockPanel.shared.hideName() }
         // An orb docked past what the dock shows at its longest: scrolled to.
         .onChange(of: cells.map(\.id)) { old, new in
             GlassOrbDock.logger.info("dock holds \(new.joined(separator: ","), privacy: .public)")
+            jelly.changed(from: [Self.connectionsCell] + old, to: [Self.connectionsCell] + new, along: orientation)
             guard let id = new.last(where: { !old.contains($0) }) else { return }
             arrived = id
         }
@@ -1161,10 +1234,11 @@ struct GlassMacOrbDockView: View {
     /// vertical, honoured as orbs come and go): every orb, or the whole orbs that fit in a row `widest` long or a
     /// column `tallest` long (the screen's room), the rest scrolled to.
     static func fit(_ sizes: [CGSize], orientation: GlassOrbDockOrientation = .horizontal,
-                    tallest: CGFloat = .greatestFiniteMagnitude) -> CGSize {
-        GlassOrbLine.fitted(sizes, orientation, inset: inset, gapAfterFirst: connectionsGap,
-                            longest: orientation == .horizontal ? widest : tallest,
-                            minimum: CGSize(width: narrowest, height: lowest))
+                    tallest: CGFloat = .greatestFiniteMagnitude, longest kept: CGFloat? = nil) -> CGSize {
+        let own = orientation == .horizontal ? widest : tallest
+        return GlassOrbLine.fitted(sizes, orientation, inset: inset, gapAfterFirst: connectionsGap,
+                                   longest: orientation == .horizontal ? kept ?? own : min(kept ?? own, tallest),
+                                   minimum: CGSize(width: narrowest, height: lowest))
     }
 
     /// Connections' middle, from the top left of a dock around orbs of `sizes` (Connections first), as the dock lays
@@ -1335,18 +1409,21 @@ struct GlassMacSessionOrbView: View {
                 if let backdrop = face.backdrop { backdrop }
                 picture((shownTab?.picture()).flatMap { $0 } ?? face.picture(), symbolName: shownTab?.symbolName ?? face.symbolName,
                         diameter: inner)
-                GlassOrbSphereShading(diameter: inner)
             }
             .frame(width: inner, height: inner)
             .clipShape(.circle)
+            // Stretched with the drop's rim and rippled while busy (`GlassOrbLiquid`).
+            .modifier(GlassOrbLiquidWarp(diameter: inner))
             .frame(width: diameter, height: diameter)
-            .glassEffect(glass.glass.interactive(), in: .circle)
-            .overlay { if face.pulses { GlassSessionOrbPulse() } }
+            // The sphere's light, the cut and the glass in the drop's shape, wobbling with it.
+            .modifier(GlassOrbLiquidRim(diameter: diameter, inner: inner, glass: glass.glass.interactive()))
+            .overlay { if busy { GlassSessionOrbPulse() } }
             .overlay { if face.rimsBell { GlassSessionOrbBellRim() } }
             .scaleEffect(overOrb ? 1.06 : 1)
             .contentShape(.circle)
         }
         .buttonStyle(GlassMacOrbPressStyle())
+        .modifier(GlassOrbLiquidSource(busy: busy))
         .onHover { inside in
             overOrb = inside
             point("orb", inside ? face.title : nil, .zero)
@@ -1354,6 +1431,15 @@ struct GlassMacSessionOrbView: View {
         .accessibilityLabel(face.title)
         .accessibilityHint("Brings the window back")
         .accessibilityIdentifier("session-orb")
+    }
+
+    /// Busy: its session prints, where its window asked to show that.
+    private var busy: Bool {
+        #if DEBUG
+        face.pulses || GlassOrbLiquid.demoBusy
+        #else
+        face.pulses
+        #endif
     }
 
     private func dot(_ tab: GlassSessionOrbTab, at place: CGPoint) -> some View {
@@ -1491,11 +1577,13 @@ struct GlassMacConnectionsOrb<Items: View>: View {
                 .scaledToFit()
                 .padding(diameter * 0.17)
                 .frame(width: diameter, height: diameter)
-                .glassEffect(glass.glass.interactive(), in: .circle)
+                // A drop of glass that wobbles with the rest of the line (`GlassOrbJellyField`).
+                .modifier(GlassOrbLiquidRim(diameter: diameter, shading: false, clips: false, glass: glass.glass.interactive()))
                 .scaleEffect(over ? 1.06 : 1)
                 .contentShape(.circle)
         }
         .buttonStyle(GlassMacOrbPressStyle())
+        .modifier(GlassOrbLiquidSource())
         // Over the circle, after it grows, so it is never clipped by it.
         .overlay(alignment: .bottom) {
             if count > 0 {

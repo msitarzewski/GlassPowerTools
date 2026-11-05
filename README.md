@@ -21,7 +21,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPLv3-c8102e" alt="Licence: GPLv3"></a>
   <img src="https://img.shields.io/badge/runs%20on-Vision%20Pro%20%7C%20Mac%20%7C%20iPad%20%7C%20iPhone-555" alt="Runs on Vision Pro, Mac, iPad and iPhone">
-  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.589-2e7d32" alt="Mac: 0.4.589"></a>
+  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.603-2e7d32" alt="Mac: 0.4.603"></a>
   <a href="https://github.com/sponsors/msitarzewski"><img src="https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
@@ -299,13 +299,13 @@ claims on the website were checked against the code and its test records.
 
 ## Status
 
-The Mac app is at 0.4.589 (its first release was 0.4.491): download it from
+The Mac app is at 0.4.603 (its first release was 0.4.491): download it from
 [glasspowertools.com](https://glasspowertools.com) or this repository's
 [releases](https://github.com/msitarzewski/GlassPowerTools/releases). It is signed with a Developer ID,
 notarized by Apple, and updates itself through Sparkle. It cannot be in the Mac App Store, because a
-terminal cannot work inside App Sandbox. The iPhone and iPad app is in a TestFlight beta by invitation:
+terminal cannot work inside App Sandbox. The iPhone, iPad and Vision Pro app is in a TestFlight beta by invitation:
 [request access](mailto:msitarzewski@gmail.com?subject=Glass%20Power%20Tools%20beta&body=The%20email%20of%20my%20Apple%20Account%2C%20for%20the%20TestFlight%20invitation%3A%0D%0A%0D%0AMy%20devices%20(iPhone%2C%20iPad%2C%20Vision%20Pro)%3A%0D%0A) with the email of your Apple Account, and the invitation comes from TestFlight.
-The Vision Pro app follows once Apple's beta review passes. Both come to the App Store as 1.0. What each
+It comes to the App Store as 1.0. What each
 build holds is in
 [RELEASE-NOTES.md](RELEASE-NOTES.md).
 

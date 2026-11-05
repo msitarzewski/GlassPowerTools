@@ -45,12 +45,15 @@ struct GlassOrbDropDeparture: ViewModifier {
     }
 }
 
-/// An orb landing in the dock: falling in stretched, squashing where it lands, wobbling round, and
-/// a ripple going out from it. Played once, as it appears: by a trigger, since `repeating: false`
-/// does not play the keyframes once but holds them at their start, which left every orb up in the
-/// air and clear (the visionOS simulator, 2026-10-25).
+/// An orb landing in the dock: falling in, stretched as a drop falls, and round again as it touches down, where its
+/// drop takes the landing (`GlassOrbJellyField`): squashed, wobbling round as a drop of jelly does, the wobble going on
+/// along the line. Until 2026-11-05 the whole cell squashed and wobbled by keyframes, with a white ring going out from
+/// it (the owner: "not cheesy animations"). Played once, as it appears: by a trigger, since `repeating: false` does not
+/// play the keyframes once but holds them at their start, which left every orb up in the air and clear (the visionOS
+/// simulator, 2026-10-25). Nothing falls with Reduce Motion.
 struct GlassOrbDropArrival: ViewModifier {
     @State private var landed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Where the orb touches down in its cell: the bottom of the orb (the ring's layout sets the orb
     /// `GlassOrbMetrics.orbRaise` above the cell's middle).
@@ -63,58 +66,41 @@ struct GlassOrbDropArrival: ViewModifier {
         var scaleX: CGFloat = 1
         var scaleY: CGFloat = 1
         var opacity: Double = 1
-        var ripple: CGFloat = 1
-        var rippleOpacity: Double = 0
     }
 
     func body(content: Content) -> some View {
-        content.keyframeAnimator(initialValue: Landing(), trigger: landed) { orb, landing in
-            orb
-                .scaleEffect(x: landing.scaleX, y: landing.scaleY, anchor: Self.contact)
-                .offset(y: landing.y)
-                .opacity(landing.opacity)
-                .background {
-                    Circle()
-                        .strokeBorder(.white.opacity(0.8), lineWidth: 2)
-                        .frame(width: GlassOrbMetrics.orbDiameter, height: GlassOrbMetrics.orbDiameter)
-                        .scaleEffect(landing.ripple)
-                        .opacity(landing.rippleOpacity)
-                        .offset(y: -GlassOrbMetrics.orbRaise)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
+        if reduceMotion {
+            content
+        } else {
+            content.keyframeAnimator(initialValue: Landing(), trigger: landed) { orb, landing in
+                orb
+                    .scaleEffect(x: landing.scaleX, y: landing.scaleY, anchor: Self.contact)
+                    .offset(y: landing.y)
+                    .opacity(landing.opacity)
+            } keyframes: { _ in
+                // The fall ends as the drop's landing begins (`GlassOrbJelly.landingDelay`).
+                let fall = GlassOrbJelly.landingDelay
+                KeyframeTrack(\.y) {
+                    MoveKeyframe(-GlassOrbMetrics.fall)
+                    CubicKeyframe(0, duration: fall)
                 }
-        } keyframes: { _ in
-            KeyframeTrack(\.y) {
-                MoveKeyframe(-GlassOrbMetrics.fall)
-                CubicKeyframe(0, duration: 0.28)
+                KeyframeTrack(\.opacity) {
+                    MoveKeyframe(0)
+                    LinearKeyframe(1, duration: 0.12)
+                }
+                KeyframeTrack(\.scaleY) {
+                    MoveKeyframe(1.12)
+                    LinearKeyframe(1.12, duration: fall - 0.05)
+                    CubicKeyframe(1, duration: 0.05)
+                }
+                KeyframeTrack(\.scaleX) {
+                    MoveKeyframe(0.9)
+                    LinearKeyframe(0.9, duration: fall - 0.05)
+                    CubicKeyframe(1, duration: 0.05)
+                }
             }
-            KeyframeTrack(\.opacity) {
-                MoveKeyframe(0)
-                LinearKeyframe(1, duration: 0.12)
-            }
-            KeyframeTrack(\.scaleY) {
-                MoveKeyframe(1.18)
-                LinearKeyframe(1.18, duration: 0.24)
-                CubicKeyframe(0.78, duration: 0.07)
-                SpringKeyframe(1, duration: 0.6, spring: .bouncy(duration: 0.5, extraBounce: 0.25))
-            }
-            KeyframeTrack(\.scaleX) {
-                MoveKeyframe(0.86)
-                LinearKeyframe(0.86, duration: 0.24)
-                CubicKeyframe(1.2, duration: 0.07)
-                SpringKeyframe(1, duration: 0.6, spring: .bouncy(duration: 0.5, extraBounce: 0.25))
-            }
-            KeyframeTrack(\.ripple) {
-                LinearKeyframe(1, duration: 0.3)
-                CubicKeyframe(2.4, duration: 0.9)
-            }
-            KeyframeTrack(\.rippleOpacity) {
-                LinearKeyframe(0, duration: 0.29)
-                LinearKeyframe(0.7, duration: 0.03)
-                CubicKeyframe(0, duration: 0.85)
-            }
+            .onAppear { landed = true }
         }
-        .onAppear { landed = true }
     }
 }
 #endif

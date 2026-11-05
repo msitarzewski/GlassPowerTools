@@ -22,6 +22,37 @@ struct GlassOrbDockGeometryTests {
                 == CGSize(width: 1024, height: 320))
     }
 
+    @Test("a dock dragged longer or shorter keeps that longest, to the nearest whole orb; past every orb, the length")
+    func longestFromHand() {
+        // The owner, 2026-11-05: "if it will fit one more and i rezize to ftt, that should be the new max width".
+        // Ends with the insets: Connections 272, then 576, 856, 1136, 1336.
+        let sizes = [connections, ringed, ringed, ringed, plain]
+        func hand(_ length: CGFloat, _ orientation: GlassOrbDockOrientation = .horizontal) -> CGFloat {
+            GlassOrbDockLongest.fromHand(length, sizes: sizes, orientation, inset: 16, gapAfterFirst: 24, largest: 4000)
+        }
+        #expect(hand(900) == 856, "less than half the next orb shown: it goes")
+        #expect(hand(1000) == 1136, "more than half shown: that orb whole, the one more")
+        #expect(hand(1500) == 1500, "past every orb: room for orbs to come")
+        #expect(hand(100) == 272, "never less than Connections")
+        #expect(hand(9000) == 4000, "never more than the largest")
+        #expect(GlassOrbLine.fitted(sizes, .horizontal, inset: 16, gapAfterFirst: 24, longest: hand(1000)).width == 1136,
+                "the dock then shows just those orbs")
+        let column = sizes.map { CGSize(width: $0.height, height: $0.width) }
+        #expect(GlassOrbDockLongest.fromHand(1000, sizes: column, .vertical, inset: 16, gapAfterFirst: 24,
+                                             largest: 4000) == 1136, "a column the same, down it")
+    }
+
+    @Test("a row's longest and a column's are kept apart")
+    func longestKeptApart() {
+        let name = "GlassOrbDockLongest-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(GlassOrbDockLongest.kept(.horizontal, in: defaults) == nil, "the dock's own until set")
+        GlassOrbDockLongest.keep(1136, .horizontal, in: defaults)
+        #expect(GlassOrbDockLongest.kept(.horizontal, in: defaults) == 1136)
+        #expect(GlassOrbDockLongest.kept(.vertical, in: defaults) == nil)
+    }
+
     @Test("a column: each orb below the last, on one line down the middle, Connections set apart above")
     func column() {
         let frames = GlassOrbLine.frames(of: [connections, ringed, plain], .vertical, gapAfterFirst: 24)

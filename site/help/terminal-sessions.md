@@ -261,6 +261,8 @@ Folders can't be dropped; drop the files inside them.
 
 **With a keyboard connected to Vision Pro**, the small on-screen keyboard (suggestions and the dictation microphone) no longer comes up when you type in a terminal. To dictate or pick an emoji, choose **Keys** > **Show Keyboard**; **Keys** > **Hide Keyboard** puts it away again. It also goes away when you disconnect the keyboard, after which the on-screen keyboard comes up as usual.
 
+**To keep the on-screen keyboard away with no keyboard connected too**, set **Settings** ▸ **Terminal** ▸ **On-Screen Keyboard** to **Only When Asked**. Pinching a terminal then gives it your typing without bringing up the keyboard; **Keys** > **Show Keyboard** brings it up, and **Keys** > **Hide Keyboard** puts it away.
+
 ## Snippets
 
 Choose **Snippets** from the tools menu and pick one. Its command runs at once. To create snippets, see [Terminal settings, themes and snippets](terminal-settings.md).

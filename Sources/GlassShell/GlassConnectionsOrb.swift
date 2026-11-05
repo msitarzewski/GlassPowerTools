@@ -109,6 +109,8 @@ public struct GlassConnectionsOrb: View {
                             .transition(.opacity)
                     }
                 }
+                // Wobbles with the rest of the dock's line (`GlassOrbJellyField`): its round glass stretched, not shaped.
+                .modifier(GlassOrbLiquidSquash())
             Text("Connections")
                 .font(.callout.weight(.medium))
                 .padding(.horizontal, 14)
@@ -119,6 +121,7 @@ public struct GlassConnectionsOrb: View {
         }
         // Looking at either part lights both.
         .hoverEffectGroup()
+        .modifier(GlassOrbLiquidSource())
     }
 
     #if DEBUG

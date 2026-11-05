@@ -329,6 +329,13 @@ public struct GlassOrbDockView: View {
     private var orientationSetting = GlassOrbDockOrientation.horizontal.rawValue
     /// A row or a column, as Settings ▸ Appearance ▸ Orbs says.
     private var orientation: GlassOrbDockOrientation { GlassOrbDockOrientation(rawValue: orientationSetting) ?? .horizontal }
+    /// The longest a hand left a row and a column at (`GlassOrbDockLongest`); 0 until it has.
+    @AppStorage(GlassOrbDockLongest.key(.horizontal), store: GlassUITestRun.settingsDefaults) private var keptRow = 0.0
+    @AppStorage(GlassOrbDockLongest.key(.vertical), store: GlassUITestRun.settingsDefaults) private var keptColumn = 0.0
+    private var keptLongest: CGFloat? {
+        let kept = orientation == .horizontal ? keptRow : keptColumn
+        return kept > 0 ? CGFloat(kept) : nil
+    }
     /// The orb held to be carried, and how far it has gone; gone when the hold ends, however it ends.
     @State private var held: HeldOrb?
     /// When a held orb was let go: the pinch that let it go is not a pinch on it.
@@ -343,6 +350,9 @@ public struct GlassOrbDockView: View {
     @State private var room = GlassOrbDockRoom()
     /// An orb just docked, scrolled into sight once it has its place.
     @State private var arrived: String?
+    /// The pushes each orb has had as windows dock and leave: a wave of wobble along the line.
+    @State private var jelly = GlassOrbJellyField()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -350,10 +360,12 @@ public struct GlassOrbDockView: View {
     static let ringedWidth: CGFloat = 280
     static let plainWidth: CGFloat = 200
     static let height: CGFloat = 320
-    /// A row's longest, about six orbs with rings; past it, it scrolls.
+    /// A row's longest until the person sets one by hand, about six orbs with rings; past it, it scrolls.
     static let widest: CGFloat = 1700
-    /// A column's longest, about four orbs; past it, it scrolls.
+    /// A column's longest until the person sets one, about four orbs; past it, it scrolls.
     static let tallest: CGFloat = 1340
+    /// The longest a hand can set.
+    static let largest: CGFloat = 4000
     /// The narrowest window visionOS makes.
     static let narrowest: CGFloat = GlassConnectionsWindowSize.narrowestWindow
     /// Between the dock's edge and its orbs.
@@ -384,7 +396,7 @@ public struct GlassOrbDockView: View {
                                             + machines.map(DockCell.machine), id: \.id)
         let sizes = [Self.connectionsSize] + cells.map(Self.size(of:))
         let orientation = orientation
-        let fit = Self.fit(sizes, orientation: orientation)
+        let fit = Self.fit(sizes, orientation: orientation, longest: keptLongest)
         ScrollView(orientation.axis) {
             GlassOrbLineLayout(orientation: orientation, gapAfterFirst: Self.connectionsGap) {
                 GlassConnectionsOrb(model: model, scale: Self.connectionsScale) {
@@ -393,6 +405,7 @@ public struct GlassOrbDockView: View {
                     connectionsMenu
                 }
                 .frame(height: Self.height)
+                .environment(\.glassOrbKicks, jelly.kicks(for: Self.connectionsID))
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.row)) } action: {
                     frames[Self.connectionsID] = $0
                 }
@@ -401,9 +414,12 @@ public struct GlassOrbDockView: View {
                 // the left and the one to the right opened"). More than a ring's own depth apart.
                 ForEach(Array(cells.enumerated()), id: \.element.id) { index, cell in
                     movable(dockCell(cell), id: cell.id, among: cells)
+                        .environment(\.glassOrbKicks, jelly.kicks(for: cell.id))
                         .offset(z: Self.depth(of: cells.count - 1 - index))
                 }
             }
+            // The rest slide over to make room or close a gap, with a spring's snap.
+            .animation(reduceMotion ? nil : GlassOrbJellyMotion.slide, value: cells.map(\.id))
             // Clear of the dock's edge, now it may have a glass of its own.
             .padding(Self.inset)
             // Holding an orb carries it (`movable`).
@@ -440,9 +456,12 @@ public struct GlassOrbDockView: View {
         .onChange(of: fit, initial: true) { _, fit in fitToOrbs(fit) }
         // An orb docked past what the dock shows, at its longest: scrolled to.
         .onChange(of: cells.map(\.id)) { old, new in
+            jelly.changed(from: [Self.connectionsID] + old, to: [Self.connectionsID] + new, along: orientation)
             guard let id = new.last(where: { !old.contains($0) }) else { return }
             arrived = id
         }
+        // Orbs there as the dock opens land in it, as they fall into it (`GlassOrbDropArrival`).
+        .onAppear { jelly.changed(from: [Self.connectionsID], to: [Self.connectionsID] + cells.map(\.id), along: orientation) }
         .task(id: arrived) {
             guard let id = arrived else { return }
             // Its place, and the dock's new size.
@@ -455,17 +474,23 @@ public struct GlassOrbDockView: View {
                 withAnimation(.smooth) { orientation == .horizontal ? scroll.scrollTo(x: to) : scroll.scrollTo(y: to) }
             }
         }
-        // Resized by hand: once the hand has let go, back to fitting its orbs. A size given was kept until
-        // 2026-11-05, and the orbs wrapped into it, so a window docked again could land on a new row (the
-        // owner: "it gets reinserted on a new row. That's not expected behavior"); the line's way is chosen
-        // in Settings instead.
+        // Resized by hand: once the hand has let go, its length along the line is the dock's longest from now on,
+        // to the nearest whole orb, and the dock fits its orbs within it (the owner, 2026-11-05: "if it will fit one
+        // more and i rezize to ftt, that should be the new max width"); its thickness goes back to one orb's. The
+        // size given was kept whole until 2026-11-05, and the orbs wrapped into it, so a window docked again could
+        // land on a new row ("it gets reinserted on a new row"); then nothing of it was kept, until this.
         .task(id: resizes) {
             guard resizes > 0 else { return }
             repeat {
                 try? await Task.sleep(for: .seconds(Self.settle))
             } while !Task.isCancelled && sizer.isInteractivelyResizing
             guard !Task.isCancelled else { return }
-            Self.logger.info("dock sized \(Int(shape.width))x\(Int(shape.height)) by hand, back to \(Int(fit.width))x\(Int(fit.height))")
+            let length = orientation == .horizontal ? shape.width : shape.height
+            let longest = GlassOrbDockLongest.fromHand(length, sizes: sizes, orientation, inset: Self.inset,
+                                                       gapAfterFirst: Self.connectionsGap, largest: Self.largest)
+            GlassOrbDockLongest.keep(longest, orientation, in: GlassUITestRun.settingsDefaults)
+            let fit = Self.fit(sizes, orientation: orientation, longest: longest)
+            Self.logger.info("dock sized \(Int(shape.width))x\(Int(shape.height)) by hand: longest \(Int(longest)), \(Int(fit.width))x\(Int(fit.height))")
             fitToOrbs(fit)
         }
         // A vertical dock sends windows back beside it.
@@ -635,9 +660,10 @@ public struct GlassOrbDockView: View {
         CGSize(width: cell.ringed ? ringedWidth : plainWidth, height: height)
     }
 
-    /// The dock's size around these orbs in a row or a column: all of them, or the whole orbs that fit in its longest.
-    static func fit(_ sizes: [CGSize], orientation: GlassOrbDockOrientation) -> CGSize {
-        var longest = orientation == .horizontal ? widest : tallest
+    /// The dock's size around these orbs in a row or a column: all of them, or the whole orbs that fit in its longest,
+    /// the person's (`kept`) or the dock's own.
+    static func fit(_ sizes: [CGSize], orientation: GlassOrbDockOrientation, longest kept: CGFloat? = nil) -> CGSize {
+        var longest = kept ?? (orientation == .horizontal ? widest : tallest)
         #if DEBUG
         if let demo = GlassOrbDockDemo.longest { longest = demo }
         #endif

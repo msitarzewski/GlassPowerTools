@@ -268,8 +268,9 @@ let package = Package(
                 "GlassWidgetData",
                 .product(name: "Sparkle", package: "Sparkle", condition: .when(platforms: [.macOS])),
             ],
-            // Settings ▸ About ▸ Acknowledgements, from `Tools/Licenses/generate-acknowledgements.py`.
-            resources: [.copy("Resources/Acknowledgements.json")]
+            // Settings ▸ About ▸ Acknowledgements, from `Tools/Licenses/generate-acknowledgements.py`; the orbs'
+            // liquid shader (`GlassOrbLiquid.swift`).
+            resources: [.copy("Resources/Acknowledgements.json"), .process("Resources/GlassOrbLiquid.metal")]
         ),
         // The SSH engine: no UI, no shell dependency. Consumed by the terminal, database,
         // desktop and editor capabilities through its public API.

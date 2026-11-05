@@ -85,6 +85,47 @@ public enum GlassOrbLine {
     }
 }
 
+/// The dock's longest along its line, as the person's hand last left it (the owner, 2026-11-05: "we are artificially
+/// constraining the dock size. if it will fit one more and i rezize to ftt, that should be the new max width"). Until
+/// then each dock has a longest of its own, past which it scrolls; a dock dragged longer shows the orbs that now fit and
+/// keeps that longest, and one dragged shorter keeps a shorter one. The dock still fits its orbs within it, one orb
+/// thick: fewer orbs, shorter. A row's and a column's are kept apart, on this device.
+public enum GlassOrbDockLongest {
+    public static func key(_ orientation: GlassOrbDockOrientation) -> String {
+        "com.glasspowertools.orbs.dockLongest." + orientation.rawValue
+    }
+
+    /// The longest kept for `orientation`, if the person has set one.
+    public static func kept(_ orientation: GlassOrbDockOrientation, in defaults: UserDefaults) -> CGFloat? {
+        let value = defaults.double(forKey: key(orientation))
+        return value > 0 ? CGFloat(value) : nil
+    }
+
+    public static func keep(_ longest: CGFloat, _ orientation: GlassOrbDockOrientation, in defaults: UserDefaults) {
+        defaults.set(Double(longest), forKey: key(orientation))
+    }
+
+    /// The longest a hand leaves the dock at, `length` along its line: up to the end of the orb nearest where it let go,
+    /// so an orb more than half shown is shown whole and one less than half goes; past every orb, the length itself,
+    /// room for orbs still to come. Never less than the first's, nor more than `largest`.
+    public static func fromHand(_ length: CGFloat, sizes: [CGSize], _ orientation: GlassOrbDockOrientation,
+                                inset: CGFloat, gapAfterFirst: CGFloat, largest: CGFloat) -> CGFloat {
+        let ends = GlassOrbLine.frames(of: sizes, orientation, gapAfterFirst: gapAfterFirst)
+            .map { (orientation == .horizontal ? $0.maxX : $0.maxY) + 2 * inset }
+        guard let first = ends.first, let last = ends.last else { return min(length, largest) }
+        let starts = [first] + ends.dropLast()
+        let longest: CGFloat
+        if length >= last {
+            longest = length
+        } else if let shown = ends.indices.last(where: { length >= (starts[$0] + ends[$0]) / 2 }) {
+            longest = ends[shown]
+        } else {
+            longest = first
+        }
+        return min(max(longest, first), largest).rounded(.up)
+    }
+}
+
 public extension GlassOrbDockOrder {
     /// Where an orb carried to `point` lands among orbs at `frames` (the carried one among them): on
     /// the one under it; before them all over `before` (Connections) or ahead of the first; after

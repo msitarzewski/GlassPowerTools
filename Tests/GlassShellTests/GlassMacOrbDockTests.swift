@@ -209,6 +209,41 @@ struct GlassMacOrbDockTests {
         #expect(pair.width == plain.width && pair.height == ringed.height, "\(pair)")
     }
 
+    @Test("A row dragged longer shows one more orb and keeps that longest; a column's stays within the screen")
+    func longestDragged() {
+        let connections = GlassMacOrbDockView.connectionsSize, ringed = GlassMacOrbDockView.size(ring: 4)
+        let many = [connections] + Array(repeating: ringed, count: 12)
+        let own = GlassMacOrbDockView.fit(many)
+        let longer = GlassOrbDockLongest.fromHand(own.width + ringed.width * 0.7, sizes: many, .horizontal,
+                                                  inset: GlassMacOrbDockView.inset,
+                                                  gapAfterFirst: GlassMacOrbDockView.connectionsGap, largest: 3000)
+        let fit = GlassMacOrbDockView.fit(many, longest: longer)
+        #expect(fit.width == own.width + ringed.width, "one orb more, whole: \(own.width) to \(fit.width)")
+        #expect(fit.height == own.height, "still one orb thick")
+        #expect(GlassMacOrbDockView.fit([connections, ringed], longest: longer).width < own.width, "fewer orbs, shorter")
+        let column = GlassMacOrbDockView.fit(many, orientation: .vertical, tallest: 700, longest: 2000)
+        #expect(column.height <= 700, "a column's kept longest stays within the screen: \(column)")
+    }
+
+    @Test("The dock springs to its orbs: past its new size a little and back, ending exactly at the fit")
+    func springsToItsOrbs() {
+        // The owner, 2026-11-05: "Like a snap to wobble jelly feel?"; until then an ease that never passed the fit.
+        let from = CGSize(width: 107, height: 125), to = CGSize(width: 183, height: 125)
+        let steps = stride(from: 0.0, through: GlassOrbDockPanel.fitDuration, by: 1.0 / 120).map {
+            GlassOrbDockPanel.springSize(from: from, to: to, elapsed: $0)
+        }
+        #expect(steps.first == from, "from where it was")
+        #expect(steps.map(\.width).max()! > to.width + 4, "growing, past the fit a little: \(steps.map(\.width).max()!)")
+        #expect(steps.map(\.width).max()! < to.width + 30, "a little, not a lot")
+        #expect(Set(steps.map(\.height)) == [125], "only the way it grows")
+        #expect(GlassOrbDockPanel.springSize(from: from, to: to, elapsed: GlassOrbDockPanel.fitDuration) == to, "exactly at the fit")
+        let shrinking = stride(from: 0.0, through: GlassOrbDockPanel.fitDuration, by: 1.0 / 120).map {
+            GlassOrbDockPanel.springSize(from: to, to: from, elapsed: $0).width
+        }
+        #expect(shrinking.min()! < from.width, "shrinking, past it the other way")
+        #expect(GlassOrbDockPanel.fitDuration < 1.2, "settled within a moment")
+    }
+
     @Test("The dock grows from Connections: it stays put as orbs come and go, a row reaching right of it, a column below it")
     func growsFromConnections() {
         // The owner, 2026-11-02: "Let's tweak the Mac dock to grow from the Active orb out... it should act as

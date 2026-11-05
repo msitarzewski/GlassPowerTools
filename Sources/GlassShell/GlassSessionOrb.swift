@@ -305,8 +305,11 @@ struct GlassSessionOrbView: View {
         Button(action: grow) {
             TimelineView(.animation(minimumInterval: 1, paused: scenePhase != .active)) { _ in
                 ZStack {
+                    // Stretched with the drop's rim and rippled while busy; cut round first, so only the
+                    // picture is pulled about.
                     picture(face.picture(), symbolName: face.symbolName)
                         .clipShape(.circle)
+                        .modifier(GlassOrbLiquidWarp(diameter: GlassConnectionsOrb.diameter))
                     // A tab's own picture, shown while its dot is looked at: the system shows it,
                     // as it is never told where a person looks. Each cut to the circle before its
                     // effect: drawn by the system on its own, it is not inside the orb's clip.
@@ -323,10 +326,9 @@ struct GlassSessionOrbView: View {
                 }
             }
             .frame(width: GlassConnectionsOrb.diameter, height: GlassConnectionsOrb.diameter)
-            .overlay { GlassOrbSphereShading(diameter: GlassConnectionsOrb.diameter) }
-            .clipShape(.circle)
-            .glassBackgroundEffect(in: .circle)
-            .overlay { if face.pulses { GlassSessionOrbPulse() } }
+            // The sphere's light, the cut and the glass in the drop's shape, wobbling with it.
+            .modifier(GlassOrbLiquidRim(diameter: GlassConnectionsOrb.diameter))
+            .overlay { if busy { GlassSessionOrbPulse() } }
             .overlay { if face.rimsBell { GlassSessionOrbBellRim() } }
             .contentShape(.hoverEffect, .circle)
             .hoverEffect(.highlight)
@@ -334,10 +336,22 @@ struct GlassSessionOrbView: View {
         }
         .buttonStyle(GlassSessionOrbPressStyle())
         .hoverEffectGroup(orbLook)
+        // A drop: busy, drops fall into it; in the dock, the dock's pushes wobble it; shrunk where its window
+        // stood, it lands there.
+        .modifier(GlassOrbLiquidSource(busy: busy, landsOnAppear: !expandsDots))
         .accessibilityActivationPoint(.center)
         .accessibilityLabel(face.title)
         .accessibilityHint("Brings the window back")
         .accessibilityIdentifier("session-orb")
+    }
+
+    /// Busy: its session prints, where its window asked to show that.
+    private var busy: Bool {
+        #if DEBUG
+        face.pulses || GlassOrbLiquid.demoBusy
+        #else
+        face.pulses
+        #endif
     }
 
     /// A tab comes to the front as the window grows back on it; a service opens on its own.

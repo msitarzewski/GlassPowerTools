@@ -17,10 +17,32 @@
 //  keyboard anyway (`shownAnyway`: Show Keyboard in a terminal's Keys menu) until they put it away again or the
 //  hardware keyboard goes.
 //
+//  Or never on its own (`GlassOnScreenKeyboard.onlyWhenAsked`, Settings ▸ Terminal ▸ On-Screen Keyboard): the owner's
+//  headset reported no hardware keyboard, and the whole keyboard came up under every terminal he typed in (2026-11-05:
+//  "can we hide this keyboard until i reques it?"; he chose a setting, so someone new with no keyboard still gets one).
+//
 
 import Foundation
 import Observation
 import GameController
+import GlassLayers
+
+/// When the system keyboard comes up on Vision Pro for a terminal or a remote desktop that takes the keys.
+public enum GlassOnScreenKeyboard: String, CaseIterable, Sendable {
+    /// As a pinch asks for it, unless a hardware keyboard is connected.
+    case automatic
+    /// Only when asked for (Keys ▸ Show Keyboard).
+    case onlyWhenAsked
+
+    public static let key = "com.glasspowertools.terminal.onScreenKeyboard"
+
+    public var title: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .onlyWhenAsked: "Only When Asked"
+        }
+    }
+}
 
 @MainActor
 @Observable
@@ -33,12 +55,24 @@ public final class GlassSystemKeyboard {
     /// The person asked for the system keyboard anyway, for dictation or emoji. Not kept between launches.
     public var shownAnyway = false
 
+    /// Settings ▸ Terminal ▸ On-Screen Keyboard, kept on this device.
+    public var choice: GlassOnScreenKeyboard {
+        didSet { defaults.set(choice.rawValue, forKey: GlassOnScreenKeyboard.key) }
+    }
+
+    /// The system keyboard is held back until asked for: a hardware keyboard is connected, or the setting says so.
+    public var holdsBack: Bool { hardwareKeyboardConnected || choice == .onlyWhenAsked }
+
     /// Whether a view that takes the keys gives an empty keyboard in place of the system's.
-    public var hidesSystemKeyboard: Bool { hardwareKeyboardConnected && !shownAnyway }
+    public var hidesSystemKeyboard: Bool { holdsBack && !shownAnyway }
 
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private let defaults: UserDefaults
 
-    init(connected: Bool = GCKeyboard.coalesced != nil, center: NotificationCenter = .default) {
+    init(connected: Bool = GCKeyboard.coalesced != nil, center: NotificationCenter = .default,
+         defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
+        self.defaults = defaults
+        choice = defaults.string(forKey: GlassOnScreenKeyboard.key).flatMap(GlassOnScreenKeyboard.init(rawValue:)) ?? .automatic
         hardwareKeyboardConnected = connected
         observers = [
             center.addObserver(forName: .GCKeyboardDidConnect, object: nil, queue: .main) { [weak self] _ in
