@@ -5914,6 +5914,28 @@ struct glas_shTests {
     }
 
     #if canImport(UIKit)
+    /// A window to put a view under test in, in the app's window scene when there is one. These
+    /// tests run in a package's test process, with no app and so no scene (2026-11-06: until then
+    /// they asked for one and never ran). The window is then one of its own: its views still get a
+    /// window, its traits and layout, which is what these tests look at, though it is on no display.
+    /// `frame` nil is the scene's whole bounds, or an iPhone's without one.
+    private static func testWindow(frame: CGRect? = nil) -> UIWindow {
+        if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
+            let window = UIWindow(windowScene: scene)
+            window.frame = frame ?? scene.effectiveGeometry.coordinateSpace.bounds
+            return window
+        }
+        // Deprecated in favour of a scene's window, which a test process cannot have.
+        return UIWindow(frame: frame ?? CGRect(x: 0, y: 0, width: 402, height: 874))
+    }
+
+    /// Whether this process has an app's window scene. A package's test process has none, and on
+    /// Vision Pro a view with an ornament in a window of its own stops the process: visionOS asserts
+    /// that an ornament has a scene (`builder.identifier`, 2026-11-06).
+    nonisolated static func hasWindowScene() async -> Bool {
+        await MainActor.run { UIApplication.shared.connectedScenes.contains { $0 is UIWindowScene } }
+    }
+
     #if os(iOS)
     @Test @MainActor func iOSTerminalWorkgroupPresentationRemainsResponsive() async throws {
         let manager = SessionManager(loadImmediately: false)
@@ -5929,9 +5951,7 @@ struct glas_shTests {
         let root = VisionTerminalWorkgroupView(workgroupID: group)
             .environment(manager).environment(settings).environment(router)
         let controller = UIHostingController(rootView: root)
-        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let window = UIWindow(windowScene: scene)
-        window.frame = scene.coordinateSpace.bounds
+        let window = Self.testWindow()
         window.rootViewController = controller
         window.makeKeyAndVisible()
         defer {
@@ -5990,7 +6010,9 @@ struct glas_shTests {
         #expect(VisionTerminalStatus.color(for: .disconnected) == Color.secondary)
     }
 
-    @Test @MainActor func visionWorkgroupRepeatedPresentationTransitionsRetainTerminals() async throws {
+    @Test(.enabled("the workgroup's ornaments need an app's window scene; a package's test process has none",
+                   { await glas_shTests.hasWindowScene() }))
+    @MainActor func visionWorkgroupRepeatedPresentationTransitionsRetainTerminals() async throws {
         for sessionCount in [1, 3] {
             try await verifyVisionWorkgroupTransitions(sessionCount: sessionCount)
         }
@@ -6018,9 +6040,7 @@ struct glas_shTests {
         let controller = UIHostingController(rootView: root)
         controller.loadViewIfNeeded()
         controller.view.frame = CGRect(x: 0, y: 0, width: 1200, height: 800)
-        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let window = UIWindow(windowScene: scene)
-        window.frame = controller.view.frame
+        let window = Self.testWindow(frame: controller.view.frame)
         window.rootViewController = controller
         window.makeKeyAndVisible()
         defer {
@@ -6064,6 +6084,20 @@ struct glas_shTests {
     }
 
     @Test @MainActor func visionPreviewIsBoundedReadOnlyAndPreservesGeometry() async throws {
+        try await verifyVisionPreview(checksPixels: false)
+    }
+
+    /// The picture is the window's drawing as composited (`drawHierarchy`), which needs the window
+    /// on a display, so in a scene. Without one, Metal's drawing is in nothing a test can read
+    /// (2026-11-06). The real app's dock showed a terminal's picture alike with Metal and Core
+    /// Graphics on the visionOS simulator that day.
+    @Test(.enabled("the picture is the window as composited, which needs an app's window scene",
+                   { await glas_shTests.hasWindowScene() }))
+    @MainActor func visionPreviewShowsTheTerminalsDrawing() async throws {
+        try await verifyVisionPreview(checksPixels: true)
+    }
+
+    private func verifyVisionPreview(checksPixels: Bool) async throws {
         let model = SwiftTermHostModel()
         var sentBytes = 0
         var resizeEvents = 0
@@ -6079,9 +6113,7 @@ struct glas_shTests {
         let controller = UIHostingController(rootView: host.opacity(0))
         controller.loadViewIfNeeded()
         controller.view.frame = CGRect(x: 0, y: 0, width: 1000, height: 700)
-        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let window = UIWindow(windowScene: scene)
-        window.frame = controller.view.frame
+        let window = Self.testWindow(frame: controller.view.frame)
         window.rootViewController = controller
         window.isHidden = false
         defer { window.isHidden = true }
@@ -6096,7 +6128,14 @@ struct glas_shTests {
         }
         let before = resizeEvents
         let text = model.getVisibleText()
-        let image = try #require(model.previewImage(maxPixelWidth: 400))
+        // The picture drawn last, and the next drawn just after, outside any SwiftUI update
+        // (`previewImage`, 0.4.537): the first ask has none yet.
+        var drawn = model.previewImage(maxPixelWidth: 400)
+        for _ in 0..<20 where drawn == nil {
+            await Task.yield()
+            drawn = model.previewImage(maxPixelWidth: 400)
+        }
+        let image = try #require(drawn)
         #expect(image.size.width <= 400)
         #expect(image.size.height <= 640)
         #expect(image.scale == 1)
@@ -6104,6 +6143,7 @@ struct glas_shTests {
         #expect(resizeEvents == before)
         #expect(sentBytes == 0)
         #expect(!model.allowsFocusOwnership)
+        guard checksPixels else { return }
         let pixels = try #require(image.cgImage?.dataProvider?.data)
         let bytes = try #require(CFDataGetBytePtr(pixels))
         let count = CFDataGetLength(pixels)
@@ -6144,11 +6184,7 @@ struct glas_shTests {
         let controller = UIHostingController(rootView: hostView)
         controller.loadViewIfNeeded()
         controller.view.frame = CGRect(x: 0, y: 0, width: 800, height: 600)
-        let windowScene = try #require(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: windowScene)
-        window.frame = controller.view.frame
+        let window = Self.testWindow(frame: controller.view.frame)
         window.rootViewController = controller
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
@@ -6389,11 +6425,7 @@ struct glas_shTests {
         #expect(detachedDiagnostics.rendererBackingIsClear == nil)
         #expect(detachedDiagnostics.failureDescription == nil)
 
-        let windowScene = try #require(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: windowScene)
-        window.frame = controller.view.frame
+        let window = Self.testWindow(frame: controller.view.frame)
         window.rootViewController = controller
         window.isHidden = false
         defer { window.isHidden = true }
@@ -6405,11 +6437,9 @@ struct glas_shTests {
 
         let attachedDiagnostics = model.rendererDiagnostics
         #expect(attachedDiagnostics.isWindowAttached)
-        #if os(visionOS)
-        #expect(attachedDiagnostics.backend == .coreGraphics)
-        #expect(attachedDiagnostics.failureDescription == nil)
-        #expect(attachedDiagnostics.rendererBackingIsClear == nil)
-        #elseif canImport(MetalKit)
+        // Vision Pro draws with Metal too (D101). Its Core Graphics glyph check went with that:
+        // a layer rendered into an image leaves Metal's drawing out.
+        #if canImport(MetalKit)
         #expect(attachedDiagnostics.backend == .metal)
         #expect(attachedDiagnostics.failureDescription == nil)
         #expect(attachedDiagnostics.rendererBackingIsClear == true)
@@ -6420,77 +6450,6 @@ struct glas_shTests {
         #endif
         #expect(attachedDiagnostics.hostBackingIsClear == true)
         #expect(attachedDiagnostics.preservesTransparentBacking == true)
-
-        #if os(visionOS)
-        model.ingest(data: Data("MMMMMMMM\u{1B}[31mGGGGGGGG\u{1B}[0m".utf8), nonce: 1)
-        for _ in 0..<20 where !(model.getVisibleText().last?.contains("MMMMMMMMGGGGGGGG") ?? false) {
-            controller.view.layoutIfNeeded()
-            await Task.yield()
-        }
-        #expect(model.getVisibleText().last?.contains("MMMMMMMMGGGGGGGG") == true)
-
-        let rootView = try #require(controller.view)
-        var pendingViews = [rootView]
-        var terminalView: UIView?
-        while let view = pendingViews.popLast() {
-            if view.isAccessibilityElement, view.accessibilityLabel == "Terminal" {
-                terminalView = view
-                break
-            }
-            pendingViews.append(contentsOf: view.subviews)
-        }
-
-        let renderedView = try #require(terminalView)
-        renderedView.setNeedsDisplay()
-        renderedView.layoutIfNeeded()
-        await Task.yield()
-
-        let format = UIGraphicsImageRendererFormat()
-        format.opaque = false
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(bounds: renderedView.bounds, format: format)
-        let image = renderer.image { rendererContext in
-            renderedView.layer.render(in: rendererContext.cgContext)
-        }
-
-        let cgImage = try #require(image.cgImage)
-        let pixelData = try #require(cgImage.dataProvider?.data)
-        let bytes = try #require(CFDataGetBytePtr(pixelData))
-        #expect(cgImage.bitsPerPixel == 32)
-
-        var magentaPixelCount = 0
-        var greenPixelCount = 0
-        var transparentPixelCount = 0
-        var minimumMagentaX = cgImage.width
-        var maximumMagentaX = 0
-        for y in 0..<cgImage.height {
-            for x in 0..<cgImage.width {
-                let offset = (y * cgImage.bytesPerRow) + (x * 4)
-                let firstColor = bytes[offset]
-                let green = bytes[offset + 1]
-                let thirdColor = bytes[offset + 2]
-                let alpha = bytes[offset + 3]
-                if alpha < 8 {
-                    transparentPixelCount += 1
-                }
-                // Magenta is symmetric in RGBA and BGRA, so this remains valid
-                // for either UIKit byte ordering.
-                if firstColor > 191, green < 64, thirdColor > 191, alpha > 64 {
-                    magentaPixelCount += 1
-                    minimumMagentaX = min(minimumMagentaX, x)
-                    maximumMagentaX = max(maximumMagentaX, x)
-                }
-                if firstColor < 64, green > 191, thirdColor < 64, alpha > 64 {
-                    greenPixelCount += 1
-                }
-            }
-        }
-
-        #expect(magentaPixelCount > 100)
-        #expect(greenPixelCount > 100)
-        #expect(maximumMagentaX - minimumMagentaX > 56)
-        #expect(transparentPixelCount > 100)
-        #endif
     }
 
     @Test func terminalITermFileReferenceRetainsOnlyBoundedMetadata() throws {
@@ -6570,11 +6529,7 @@ struct glas_shTests {
         controller.loadViewIfNeeded()
         controller.view.frame = CGRect(x: 0, y: 0, width: 800, height: 600)
 
-        let windowScene = try #require(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: windowScene)
-        window.frame = controller.view.frame
+        let window = Self.testWindow(frame: controller.view.frame)
         window.rootViewController = controller
         window.makeKeyAndVisible()
         defer { window.isHidden = true }

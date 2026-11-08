@@ -29,6 +29,14 @@ struct MacLocalTerminalPaneView: View {
     var agent: () -> TerminalAgent? = { nil }
 
     @Environment(SettingsManager.self) private var settingsManager
+    /// The library's machines, for type-ahead's `ssh` and `scp` (D102); absent where a pane is shown alone.
+    @Environment(SessionManager.self) private var sessionManager: SessionManager?
+
+    /// The library's machines, for type-ahead's `ssh` and `scp` names; none without a session manager.
+    private var librarySource: (@MainActor () -> [ServerConfiguration])? {
+        guard let serverManager = sessionManager?.serverManager else { return nil }
+        return { serverManager.servers }
+    }
     /// Present whenever this pane is inside the app's workspace scene. Used only to answer the
     /// shell when it asked for this local shell by name (D8); nil in previews and tests.
     @Environment(GlassTerminalRuntime.self) private var terminalRuntime: GlassTerminalRuntime?
@@ -238,8 +246,25 @@ struct MacLocalTerminalPaneView: View {
         .onAppear {
             aiAssistant.checkAvailability()
             hostModel.pasteRewrite = TerminalWrappedPaste.rewrite(settings: settingsManager)
+            // A picture alone on the clipboard goes where a dropped one goes: its path typed (2026-11-06).
+            hostModel.pasteFiles = { [weak hostModel] in
+                guard let hostModel else { return false }
+                return MacTerminalPastedPicture.paste(into: hostModel)
+            }
             hostModel.setFocusOwnershipAllowed(isFocused)
             if isFocused { processState.focus() }
+            // Type-ahead (D102): this Mac's own history, the snippets and the rest. The folder is the shell's
+            // report (OSC 7, which the shell integration sends, through tmux too), else the process's own.
+            let settingsManager = settingsManager
+            let controller = TerminalTypeAheadController.attach(
+                to: hostModel,
+                machine: TerminalCommandHistory.thisMac,
+                folder: { [weak hostModel, runtime] in
+                    TerminalTypeAheadController.folderPath(hostModel?.currentDirectory) ?? runtime.currentWorkingDirectory
+                },
+                snippets: { settingsManager.snippets })
+            controller.addThisMacSources(servers: librarySource)
+            controller.offerForCurrentLine()
         }
         .onChange(of: localProcessStatusText, initial: true) { _, status in
             onProcessStatusChange(status)
@@ -793,7 +818,8 @@ enum MacLocalTerminalConfiguration {
             ?? "/bin/zsh"
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let currentDirectory = expandedPath(directory) ?? home
-        let processEnvironment = environment(from: ProcessInfo.processInfo.environment)
+        let processEnvironment = environment(from: ProcessInfo.processInfo.environment,
+                                             shell: requestedShell ?? fallbackShell)
         // A folder gone by the time the process starts — deleted since this pane opened there
         // (W37: a new terminal opens where the one in front was), or on a volume since unmounted —
         // starts it at Home rather than leaving a pane that cannot start, or a tmux session it
@@ -811,9 +837,12 @@ enum MacLocalTerminalConfiguration {
             // A control-mode client where this Mac's tmux can have one (D83); a tmux a caller names —
             // a test's — attaches the ordinary way.
             let control = !named && MacLocalTmux.supportsControlMode(tmux)
+            // The session's own environment (the shell integration's), for when this makes the session.
+            let sessionEnvironment = MacLocalTmux.takesSessionEnvironment(tmux) ? launch.sessionEnvironment : []
             return SwiftTermLocalProcessConfiguration(
                 executable: tmux,
-                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory, control: control)
+                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory, control: control,
+                                                  sessionEnvironment: sessionEnvironment)
                     + launch.command,
                 environment: launch.environment,
                 currentDirectory: launch.directory,
@@ -834,10 +863,16 @@ enum MacLocalTerminalConfiguration {
     /// tmux runs the login shell itself; a shell someone chose is the session's command, which tmux
     /// uses only when it creates the session — so the claim that creates it passes the same.
     static func tmuxLaunch(shell: String?, directory: String?) -> MacLocalTmux.Launch {
-        MacLocalTmux.Launch(
+        // tmux runs the login shell itself when none is chosen: that shell is the one integrated.
+        let loginShell = getpwuid(getuid()).flatMap { entry in entry.pointee.pw_shell.map { String(cString: $0) } }
+        // Its integration goes to the session, not the server (`TerminalLocalShellIntegration.tmuxEnvironment`).
+        let split = TerminalLocalShellIntegration.tmuxEnvironment(
+            environment(from: ProcessInfo.processInfo.environment, shell: expandedPath(shell) ?? loginShell))
+        return MacLocalTmux.Launch(
             directory: expandedPath(directory) ?? FileManager.default.homeDirectoryForCurrentUser.path,
             command: expandedPath(shell).map { [$0, "-l"] } ?? [],
-            environment: environment(from: ProcessInfo.processInfo.environment)
+            environment: split.rest,
+            sessionEnvironment: split.session
         )
     }
 
@@ -845,8 +880,10 @@ enum MacLocalTerminalConfiguration {
     /// SSH_AUTH_SOCK for the ssh agent, TMPDIR for the private temporary folder, and the rest —
     /// with this terminal's identity in place of whatever terminal or debugger launched the app.
     /// SwiftTerm's default passed only TERM, COLORTERM, LANG, LOGNAME, USER and HOME (2026-10-07).
+    /// For zsh, the shell integration's too (`TerminalLocalShellIntegration`, D102).
     static func environment(from inherited: [String: String],
-                            version: String? = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
+                            version: String? = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                            shell: String? = nil)
         -> [String] {
         var environment = inherited.filter { name, _ in
             !inheritedTerminalNames.contains(name) && !inheritedPrefixes.contains { name.hasPrefix($0) }
@@ -858,6 +895,7 @@ enum MacLocalTerminalConfiguration {
         if environment["LANG"] == nil, environment["LC_ALL"] == nil {
             environment["LANG"] = "en_US.UTF-8"
         }
+        environment = TerminalLocalShellIntegration.environment(environment, shellPath: shell)
         return environment.filter { !$0.key.isEmpty && !$0.key.contains("=") }
             .map { "\($0.key)=\($0.value)" }.sorted()
     }

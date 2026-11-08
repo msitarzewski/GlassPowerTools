@@ -66,9 +66,9 @@ xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools \
 
 Use `generic/platform=iOS` or `generic/platform=visionOS` for the other platforms.
 
-SwiftTerm carries a build-tool plugin that runs `git` on SwiftTerm's own checkout to record its
-version in a generated file (it reaches no network). Xcode asks once to trust it (**Trust & Enable**);
-`xcodebuild` needs `-skipPackagePluginValidation`. `swift build` runs it without asking.
+No package runs a build-tool plugin. SwiftTerm's, which ran `git` to record its version, is left
+out of our copy (`Packages/SwiftTerm/PATCHES.md`, D101), so Xcode no longer asks to trust one;
+`-skipPackagePluginValidation` is harmless and kept in the commands here.
 
 The scheme's build pre-action runs `Tools/Mermaid/update-mermaid.sh`, which asks the npm registry for
 the latest Mermaid (used by the editor's Markdown preview), verifies the download's checksum, and
@@ -241,13 +241,15 @@ this checkout:
 
 ```sh
 python3 Tools/Packages/check-updates.py                     # newer releases, notes, what to review
-python3 Tools/Packages/check-updates.py --test swiftterm    # tests and app builds against the newest
+python3 Tools/Packages/check-updates.py --test swift-nio    # tests and app builds against the newest
 python3 Tools/Packages/check-updates.py --test newer        # the same for every direct dependency
 sh Tools/Packages/install-weekly-check.sh                   # run it every Monday (--remove to stop)
 ```
 
 The report flags what a person should look at before taking a release: a new build-tool plugin,
 binary target, unsafe flag or dependency in its manifest, a changed licence, a new major version.
+It also lists the vendored copies in `Packages/` (SwiftTerm among them) with any newer releases;
+those are taken by hand, as each copy's `PATCHES.md` says, so `--test` does not apply to them.
 `--test` works in a temporary worktree holding this checkout's committed and uncommitted state, runs
 every test target and builds the app for macOS, iOS and visionOS; `--platforms none` skips the app
 builds. Device behaviour still needs a person on each device.

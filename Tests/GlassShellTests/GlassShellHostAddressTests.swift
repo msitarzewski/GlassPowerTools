@@ -133,8 +133,9 @@ struct GlassShellHostAddressTests {
         #expect(model.knownAddress(for: try #require(model.host(torn.id))) == nil)
     }
 
-    @Test("Records that carry the same address are one host; a disagreement is surfaced, then settled by one edit")
-    func addressGroupsAndDisagreementIsSettled() async throws {
+    /// An address groups nothing since D100 (2026-11-05): two names at one address are two machines.
+    @Test("Records named apart at one address stay two hosts; a name's disagreement is surfaced, then settled by one edit")
+    func addressGroupsNothingAndDisagreementIsSettled() async throws {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         let sibling = HostCatalogStore(fileURL: root.appendingPathComponent("group/GlassHostCatalog/hosts.json"))
@@ -153,14 +154,11 @@ struct GlassShellHostAddressTests {
                                  createdAt: Date(timeIntervalSince1970: 4), updatedAt: Date(timeIntervalSince1970: 4))
         for record in [a, b, loop1, loop2, c1, c2] { try await sibling.upsert(record) }
         await model.load()
-        #expect(model.catalogHosts.count == 4, "same address groups; loopback never does; same name groups")
-        let grouped = try #require(model.host(a.id))
-        // Two records that agree on the address are one record after load, not a lasting group
-        // (2026-09-21); `b` is folded into `a`, and `b.id` still resolves to it.
-        #expect(grouped.members.map(\.id) == [b.id] && grouped.address == "198.51.100.199" && grouped.addresses == ["198.51.100.199"],
-                "the most recently updated member survives the fold")
-        #expect(grouped.services.count == 2)
-        #expect(model.host(a.id)?.id == b.id)
+        #expect(model.catalogHosts.count == 5, "an address groups nothing, loopback or not; the same name groups")
+        let terminalBox = try #require(model.host(a.id)), desktopBox = try #require(model.host(b.id))
+        #expect(terminalBox.id == a.id && desktopBox.id == b.id, "neither folded into the other")
+        #expect(terminalBox.services.map(\.kind) == [.ssh] && desktopBox.services.map(\.kind) == [.rdp])
+        #expect(try await sibling.snapshot().filter { $0.address == "198.51.100.199" }.count == 2)
 
         let drift = try #require(model.host(c1.id))
         #expect(drift.addresses == ["198.51.100.111", "198.51.100.112"] && drift.address == "198.51.100.111", "canonical first; both surfaced")

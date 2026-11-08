@@ -364,6 +364,9 @@ class TerminalSession: Identifiable, Hashable {
     /// Screenshots only (App/GlassDemoMode.swift): Settings ▸ This Window opens over this
     /// terminal's window as it first appears, once.
     @ObservationIgnored var demoOpensSettings = false
+    /// Screenshots only: the commands a demo's transcript runs are kept here, in memory, never in the device's
+    /// own history (each demo is a new made-up machine).
+    @ObservationIgnored var demoTypeAheadHistory: TerminalCommandHistory?
     #endif
     /// The terminal emulator belongs to the live session rather than any one
     /// presentation. Adaptive tab/sidebar changes may reconstruct views, but

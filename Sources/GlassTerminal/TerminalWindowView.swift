@@ -228,6 +228,12 @@ struct TerminalWindowView: View {
                     return TerminalRemoteDrops.shared.receive(pasted: UIPasteboard.general.itemProviders, on: session,
                                                               insert: TerminalRemoteDrops.typeIntoTerminal(of: session))
                 }
+                #else
+                // And on a Mac's SSH pane, a picture alone on the clipboard (2026-11-06).
+                terminalHostModel.pasteFiles = { [weak session] in
+                    guard let session else { return false }
+                    return MacTerminalPastedPicture.paste(on: session)
+                }
                 #endif
                 guard let onTerminalContextChange else { return }
                 terminalHostModel.onTerminalTitleChange = { [weak terminalHostModel] title in
@@ -793,7 +799,46 @@ struct TerminalWindowView: View {
     private func configureFind() {
         let session = session
         find.configure(model: terminalHostModel) { [weak session] in session?.tmuxFindTarget }
+        configureTypeAhead()
     }
+
+    /// Type-ahead (D102): this terminal's suggestions, from its machine's history, the snippets and the rest.
+    private func configureTypeAhead() {
+        let session = session
+        let model = terminalHostModel
+        let settingsManager = settingsManager
+        let serverManager = sessionManager.serverManager
+        #if DEBUG
+        let history = session.demoTypeAheadHistory ?? .shared
+        #else
+        let history = TerminalCommandHistory.shared
+        #endif
+        let controller = TerminalTypeAheadController.attach(
+            to: model,
+            machine: session.server.id.uuidString,
+            folder: { [weak session, weak model] in
+                session?.tmuxPane?.directory ?? TerminalTypeAheadController.folderPath(model?.currentDirectory)
+            },
+            snippets: { settingsManager.snippets },
+            history: history)
+        // The server's folder and programs over this terminal's own connection.
+        let holder = TerminalSFTPClientHolder { [weak session] in
+            guard let session else { throw SSHError.notConnected }
+            return try await TerminalRemoteDrops.openClient(for: session)
+        }
+        controller.addServerSources(servers: { serverManager.servers }, reader: TerminalRemoteFolderReader(holder: holder))
+        controller.offerForCurrentLine()
+    }
+
+    #if os(visionOS)
+    /// Type-ahead's chips stand under the window's toolbar ornament: this far below the window's bottom edge.
+    private static let typeAheadOrnamentClearance: CGFloat = 64
+
+    /// The terminal in front, with type-ahead on and something to offer.
+    private var typeAheadChipsShown: Bool {
+        isTerminalActive && terminalHostModel.offersTypeAheadChips && !terminalHostModel.typeAheadChoices.isEmpty
+    }
+    #endif
 
     /// The folder this shell reported over OSC 7, when it is a path.
     private var reportedFolder: String? {
@@ -1039,6 +1084,22 @@ struct TerminalWindowView: View {
                 TerminalDiagramMarks(model: terminalHostModel, draw: terminalRuntime?.diagramView)
             }
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
+            // Type-ahead's commands (D102), never over the terminal's text (the owner's choice, 2026-11-06); the Mac
+            // draws its grey text in the terminal. iPhone and iPad: a row above the keyboard's bar while it's up.
+            #if os(iOS)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                TerminalTypeAheadChipRow(model: terminalHostModel)
+            }
+            #elseif os(visionOS)
+            // Vision Pro: an ornament under the window's toolbar, for the terminal in front.
+            .ornament(visibility: typeAheadChipsShown ? .visible : .hidden,
+                      attachmentAnchor: .scene(.bottom), contentAlignment: .top) {
+                TerminalTypeAheadChips(model: terminalHostModel)
+                    .frame(maxWidth: 720)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, Self.typeAheadOrnamentClearance)
+            }
+            #endif
             .padding(.horizontal, terminalCanvasHorizontalPadding)
             .padding(.vertical, terminalCanvasPadding)
         }

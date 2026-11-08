@@ -46,5 +46,8 @@ HEIC to JPEG, escaped paths typed as a paste. A paste now uses that pipeline ins
   proved with a photo dropped from Photos.
 
 ## Open
-- A Mac SSH pane still pastes text only.
+- ~~A Mac SSH pane still pastes text only.~~ Closed 2026-11-06: both Mac panes take a picture alone on the
+  clipboard as a drop (`MacTerminalPastedPicture`; `tasks/2026-11/2026-11-06_type-ahead.md`, Progress). On the
+  Mac, text beside a picture stays text (Excel, Numbers and Word copy both); iPhone, iPad and Vision Pro still
+  prefer the picture (`isPastedFile`).
 - Copied rich text whose items include a picture would paste the picture: no case seen.

@@ -52,19 +52,23 @@ struct TmuxControlClientTests {
             .map { $0 + "\r\n" }.joined()
     }
 
+    /// tmux's answers to the start, in the order it was sent: the size, the pausing, the clear kept out
+    /// of history (20), then the pane and window asked for.
+    private func startReplies() -> String { reply(1) + reply(2) + reply(20) + reply(3, ["%3 @1 4242"]) }
+
     /// Attached and drawn: tmux started, the pane asked for and read.
     private func attached(screen: [String] = ["$ "], state: String = "0,0,0,2,0,0,23,1,0,0,0,1,0,0,0,0,0,0,80,24,0")
     -> Exchange {
         var exchange = Exchange()
         exchange.receive("Last login: today\r\n\u{1B}P1000p%begin 1 1 0\r\n%end 1 1 0\r\n%session-changed $1 alpha\r\n")
         _ = exchange.takeSent()
-        exchange.receive(reply(1) + reply(2) + reply(3, ["%3 @1"]))
+        exchange.receive(startReplies())
         _ = exchange.takeSent()
         exchange.receive(reply(4) + reply(5, screen) + reply(6, screen) + reply(7) + reply(8, [state]) + reply(9))
         return exchange
     }
 
-    @Test("the shell's bytes are drawn until tmux starts; then it is sized, told to pause, and asked for the pane")
+    @Test("the shell's bytes are drawn until tmux starts; then it is sized, told to pause and to keep clears out of history, and asked for the pane")
     func start() {
         var exchange = Exchange()
         exchange.receive("Last login: today\r\n$ exec tmux -CC new-session\r\n\u{1B}P10")
@@ -72,7 +76,8 @@ struct TmuxControlClientTests {
         exchange.receive("00p%begin 1700000000 278 0\r\n%end 1700000000 278 0\r\n")
         #expect(exchange.client.phase == .starting)
         #expect(exchange.takeSent() == ["refresh-client -C 80,24", "refresh-client -f pause-after=30",
-                                        "display-message -p '#{pane_id} #{window_id}'"],
+                                        "set-option -wq scroll-on-clear off",
+                                        "display-message -p '#{pane_id} #{window_id} #{pane_pid}'"],
                 "once the attach is answered, and nothing typed before it")
         exchange.receive("%session-changed $1 alpha\r\n")
         #expect(exchange.takeSent().isEmpty, "asked once")
@@ -83,7 +88,7 @@ struct TmuxControlClientTests {
         var exchange = Exchange()
         exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n")
         _ = exchange.takeSent()
-        exchange.receive(reply(1) + reply(2) + reply(3, ["%3 @1"]))
+        exchange.receive(startReplies())
         let restore = exchange.takeSent()
         #expect(restore.count == 1, "one line, so no output falls between its commands")
         #expect(restore.first?.hasPrefix("capture-pane -p -e -q -J -S -500 -E -1 -t %3 ; ") == true)
@@ -110,7 +115,7 @@ struct TmuxControlClientTests {
     @Test("with no history, the capture's one line isn't drawn twice")
     func noHistory() {
         var exchange = Exchange()
-        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + reply(1) + reply(2) + reply(3, ["%3 @1"]))
+        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + startReplies())
         exchange.receive(reply(4, ["$ "]) + reply(5, ["$ "]) + reply(6, ["$ "]) + reply(7)
                          + reply(8, ["0,0,0,2,0,0,23,1,0,0,0,1,0,0,0,0,0,0,80,24,0"]) + reply(9))
         #expect(exchange.takeDrawn().components(separatedBy: "$ ").count == 2)
@@ -131,7 +136,7 @@ struct TmuxControlClientTests {
     @Test("an error part-way along a line: the rest of it never answers, and the pane is drawn with what came")
     func errorMidLine() {
         var exchange = Exchange()
-        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + reply(1) + reply(2) + reply(3, ["%3 @1"]))
+        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + startReplies())
         // The history capture fails: tmux runs nothing more of that line.
         exchange.receive(reply(4, ["parse error"], error: true))
         #expect(exchange.client.phase == .live, "drawn with what there was")
@@ -145,7 +150,7 @@ struct TmuxControlClientTests {
         var exchange = Exchange()
         exchange.type("ls\r")
         #expect(exchange.takeSent().isEmpty, "not typed at the shell tmux is replacing")
-        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + reply(1) + reply(2) + reply(3, ["%3 @1"]))
+        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + startReplies())
         _ = exchange.takeSent()
         exchange.receive(reply(4) + reply(5, ["$ "]) + reply(6, ["$ "]) + reply(7)
                          + reply(8, ["0,0,0,2,0,0,23,1,0,0,0,1,0,0,0,0,0,0,80,24,0"]) + reply(9))
@@ -268,7 +273,29 @@ struct TmuxControlClientTests {
         exchange.receive("%session-changed $1 alpha\r\n")
         #expect(exchange.takeSent().isEmpty, "its own claim's switch: the pane isn't read again")
         exchange.receive("%session-changed $2 bravo\r\n")
-        #expect(exchange.takeSent().first?.hasPrefix("display-message") == true, "another session: asked for its pane")
+        #expect(exchange.takeSent() == ["set-option -wq scroll-on-clear off", "display-message -p '#{pane_id} #{window_id} #{pane_pid}'"],
+                "another session: its window keeps clears out of history too, and its pane is asked for")
+    }
+
+    /// Type-ahead in a tab in tmux asks whether the pane's shell is what reads its keys (2026-11-06), from the
+    /// process tmux started in it.
+    @Test("the pane's process comes with the pane, and follows another session's; none is known from an answer without one")
+    func panePID() {
+        var exchange = attached()
+        #expect(exchange.client.panePID == 4242)
+        _ = exchange.takeSent()
+        exchange.receive("%session-changed $2 bravo\r\n")
+        _ = exchange.takeSent()
+        exchange.receive(reply(30) + reply(31, ["%5 @2 777"]))
+        #expect(exchange.client.pane == "%5")
+        #expect(exchange.client.panePID == 777)
+
+        var older = Exchange()
+        older.receive("\u{1B}P1000p%begin 1 1 0\r\n%end 1 1 0\r\n%session-changed $1 alpha\r\n")
+        _ = older.takeSent()
+        older.receive(reply(1) + reply(2) + reply(20) + reply(3, ["%3 @1"]))
+        #expect(older.client.pane == "%3")
+        #expect(older.client.panePID == nil)
     }
 
     /// tmux 3.8 writes the session's id first, as recorded on 2026-10-29 (`%session-renamed $0 renamed`);

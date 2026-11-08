@@ -147,7 +147,7 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 | B-Q25 | The "SFTP interface ideas to make editing shine" — never written down | 09-10 | decisions header |
 | B-Q26 | The absorbed packages' folders and repositories: keep, archive or redirect (they still read as live packages) | 09-13 | — |
 | B-Q27 | The pre-publication scrub: still wanted, given fc7653e/47b7df8/107f1be stay and 6425ac5, ca2e62b are in history | 10-12 | activeContext |
-| B-Q28 | The weekly check's SwiftTerm v1.99 (Ghostty-based IO): follow it, or stay on 1.20 | 10-12 | B-H9 |
+| B-Q28 | The weekly check's SwiftTerm v1.99 (a port of Ghostty's IO design, not libghostty): follow it, or stay on 1.20. 1.99.2 tested 11-05: our code doesn't build against its API, a large port (`2026-11/2026-11-05_swiftterm-199-test.md`) | 10-12 | B-H9 |
 
 ## 2. The owner's release steps
 
@@ -245,7 +245,7 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 - **B-F10** Large-history performance: bounded ring storage, optional disk history, a renderer audit per
   platform (Vision Pro is on Core Graphics), a shared benchmark matrix ("BBEdit-like").
 - **B-F11** Terminal conformance corpus (vttest, ncurses, Vim, reflow, graphemes, RTL, OSC 8/52/133, mouse).
-- **B-F12** Engine evaluation: SwiftTerm against libghostty — now concrete, SwiftTerm v1.99 is Ghostty-based (B-Q28).
+- **B-F12** Engine evaluation: SwiftTerm against libghostty. SwiftTerm v1.99 ports Ghostty's IO design; it does not link libghostty (B-Q28, 2026-11-05 test).
 - **B-F13** D44 stage 2: "open the same set here" on another device, databases included.
 - **B-F14** Network/Tailscale as a library panel (the owner's pass-2 list, 09-13).
 - **B-F15** A swipe switcher for iPhone workgroups ("swipe later"); Zellij as a second multiplexer (low).

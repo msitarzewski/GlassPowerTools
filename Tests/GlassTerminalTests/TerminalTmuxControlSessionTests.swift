@@ -46,9 +46,10 @@ struct TerminalTmuxControlSessionTests {
 
         session.feedTerminalData(Data("\u{1B}P1000p%session-changed $1 work\r\n".utf8))
         await session.waitUntilTerminalWritesComplete()
-        #expect(writes.take().hasPrefix("refresh-client -C 120,40\nrefresh-client -f pause-after=30\ndisplay-message -p"), "the session's own size")
+        #expect(writes.take().hasPrefix("refresh-client -C 120,40\nrefresh-client -f pause-after=30\nset-option -wq scroll-on-clear off\ndisplay-message -p"),
+                "the session's own size")
 
-        session.feedTerminalData(Data((reply(1) + reply(2) + reply(3, ["%3 @1"])).utf8))
+        session.feedTerminalData(Data((reply(1) + reply(2) + reply(20) + reply(3, ["%3 @1"])).utf8))
         await session.waitUntilTerminalWritesComplete()
         #expect(writes.take().hasPrefix("capture-pane"))
         session.feedTerminalData(Data((reply(4) + reply(5, ["$ "]) + reply(6, ["$ "]) + reply(7)

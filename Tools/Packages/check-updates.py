@@ -10,7 +10,8 @@ XTVERSION for weeks before anyone noticed (2026-10-07). This closes that gap wit
       For every pin: the newest release, whether Package.swift already allows it, and for a newer
       one on GitHub, its release notes, the commits since our pin, and changes worth a person's
       look before taking it — a new build-tool plugin, binary target, unsafe flag or dependency in
-      its manifest, or a changed licence file.
+      its manifest, or a changed licence file. Then the vendored copies in Packages/ (SwiftTerm
+      among them since D101): the release each one is, and the newer releases.
 
   check-updates.py --test NAME[@VERSION] [--test ...]
       In a temporary worktree (this checkout's committed state plus its uncommitted changes), moves
@@ -209,6 +210,71 @@ def survey(root):
     return entries
 
 
+def tag_commits(url):
+    """Release tags on the remote with the commit each names, as {tag: commit}; None if unreachable."""
+    status, output = run(["git", "ls-remote", "--tags", url])
+    if status != 0:
+        return None
+    commits = {}
+    for line in output.splitlines():
+        commit, _, ref = line.partition("\t")
+        tag = ref.split("refs/tags/")[-1]
+        # An annotated tag's own line comes first; its peeled line (^{}) names the commit.
+        if tag.endswith("^{}"):
+            commits[tag[:-3]] = commit
+        else:
+            commits.setdefault(tag, commit)
+    return {tag: commit for tag, commit in commits.items() if version_tuple(tag)}
+
+
+def vendored_survey(root):
+    """Vendored copies (Tools/Licenses/components.json entries with `vendored`, `source` and
+    `revision`): the release our copy is, and the newer ones. They are no pins, so `survey` never
+    sees them, and SwiftTerm became one (D101)."""
+    with open(os.path.join(root, "Tools", "Licenses", "components.json"), encoding="utf-8") as handle:
+        components = json.load(handle)["components"]
+    entries = []
+    for component in components:
+        if not all(key in component for key in ("vendored", "source", "revision")):
+            continue
+        entry = {"name": component["name"], "path": component["vendored"], "newer": [], "notes": []}
+        commits = tag_commits(component["source"])
+        if commits is None:
+            entry["notes"].append("could not reach the remote")
+            entries.append(entry)
+            continue
+        ours = sorted((tag for tag, commit in commits.items() if commit == component["revision"]),
+                      key=version_tuple, reverse=True)
+        releases = sorted(commits, key=version_tuple, reverse=True)
+        if ours:
+            entry["version"] = ours[0]
+            entry["newer"] = [tag for tag in releases if version_tuple(tag) > version_tuple(ours[0])]
+        else:
+            entry["notes"].append("our copy is an untagged commit (%s)" % component["revision"][:12])
+            if releases:
+                entry["notes"].append("newest release: %s" % releases[0])
+        entries.append(entry)
+    return entries
+
+
+def vendored_markdown(entries):
+    if not entries:
+        return []
+    lines = ["## Vendored copies", "",
+             "Copied into Packages/ with local changes (each one's PATCHES.md); taking a newer release "
+             "is done by hand there, so `--test` does not apply.", ""]
+    for entry in entries:
+        if entry["newer"]:
+            lines.append("- **%s** (%s) %s → %s; releases since ours: %s" % (
+                entry["name"], entry["path"], entry["version"], entry["newer"][0], ", ".join(entry["newer"][:12])))
+        elif "version" in entry:
+            lines.append("- %s (%s) %s: the newest release" % (entry["name"], entry["path"], entry["version"]))
+        else:
+            lines.append("- %s (%s): %s" % (entry["name"], entry["path"], "; ".join(entry["notes"])))
+    lines.append("")
+    return lines
+
+
 def allowed(requirement, newest, current):
     """Whether Package.swift already allows `newest` (so `swift package update` would take it)."""
     new, old = version_tuple(newest), version_tuple(current)
@@ -372,7 +438,8 @@ def main():
         options.report = os.path.join(options.report, "dependency-check-%s.md" % datetime.date.today().isoformat())
 
     entries = survey(ROOT)
-    lines = survey_markdown(entries)
+    vendored = vendored_survey(ROOT)
+    lines = survey_markdown(entries) + vendored_markdown(vendored)
     results = []
     if options.test:
         platforms = [] if options.platforms == "none" else options.platforms.split(",")
@@ -395,7 +462,8 @@ def main():
         os.makedirs(os.path.dirname(os.path.abspath(options.report)), exist_ok=True)
         with open(options.report, "w", encoding="utf-8") as handle:
             handle.write(report)
-    behind = [entry["name"] for entry in entries if entry["newer"] and entry["direct"]]
+    behind = [entry["name"] for entry in entries if entry["newer"] and entry["direct"]] \
+        + [entry["name"] for entry in vendored if entry["newer"]]
     failed = [result["name"] for result in results if not result.get("passed")]
     if options.notify:
         if failed:

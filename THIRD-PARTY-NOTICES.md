@@ -19,6 +19,7 @@ Code carried in-tree, each with its licence file intact.
 | **Citadel** | `orlandos-nl/Citadel` @ `ae8562f895de06ccb86fdb1cbb65fd99c8976e12` (0.12.1 and later `main`) | MIT, © 2022 Orlandos. `Packages/Citadel/LICENSE`. Local changes in `Packages/Citadel/PATCHES.md`. Its `CCitadelBcrypt` target is OpenBSD code: `blf.c` (Niels Provos, BSD-4-Clause — *"This product includes software developed by Niels Provos."*), `bcrypt.c` (ISC) and `bcrypt-kdf.c` (derived from `bcrypt_pbkdf.c`, © 2013 Ted Unangst, ISC; its notice, missing from Citadel's copy, is restored). |
 | **swift-nio-ssh** | Citadel's fork of `apple/swift-nio-ssh`: `Wellz26/swift-nio-ssh` 0.3.7, `6acaa1ae7afb7fe9d07d06cda159e7fecea32500` | Apache-2.0. `Packages/swift-nio-ssh/LICENSE.txt`; neither Apple's repository nor the fork ships a NOTICE file. Local changes in `Packages/swift-nio-ssh/PATCHES.md`, and each modified file says so. |
 | **RDPKit** | `steelbrain/RDPKit` 0.3.1, `2032fdbc9a300e6b78065abbaf8ed1acca14f938` | MIT, © 2026 Steelbrain. `Packages/RDPKit/LICENSE`. Local changes in `Packages/RDPKit/GLASSDT-PATCHES.md`; what it implements, and its limits, in `Packages/RDPKit/CAPABILITY-LEDGER.md`. Upstream's `Examples/` were not carried (its README still describes them). |
+| **SwiftTerm** | `migueldeicaza/SwiftTerm` 1.20.0, `5d14406844143538cd8f8851d2d8a67c1fe443e5` | MIT, © 2019–2026 Miguel de Icaza, with the xterm.js authors' notices. `Packages/SwiftTerm/LICENSE`. Local changes in `Packages/SwiftTerm/PATCHES.md` (D101). |
 | **Mermaid** (`mermaid.min.js`) | npm `mermaid`, kept at the registry's latest by `Tools/Mermaid/update-mermaid.sh`, which the scheme runs before every build and which checks the tarball against the registry's sha512 (D35). The version is in `Sources/GlassEditor/Resources/Mermaid/VERSION` | MIT, © 2014–2022 Knut Sveidqvist; `LICENSE` beside it comes from the same tarball. The file is compiled from Mermaid **and about 115 packages it depends on**; their licences are listed in `Documentation/ThirdPartyLicenses/mermaid/bundled-packages.json` and in the app. At 12.0.0: MIT, ISC, BSD-3-Clause, Apache-2.0, the Unlicense, **EPL-2.0** (elkjs, the Eclipse Layout Kernel) and DOMPurify's *MPL-2.0 or Apache-2.0*, taken as Apache-2.0. The updater refuses a new Mermaid that brings a licence of a kind not yet reviewed. Loaded only into the editor's Markdown preview, with no network access (D35). |
 | **Tree-sitter grammars** | ten of the sixteen; see the next section | MIT. |
 
@@ -77,7 +78,6 @@ Exact revisions are in `Package.resolved`. Each package's licence and NOTICE fil
 | swift-cmark (cmark-gfm) | BSD-2-Clause, with MIT-licensed parts, in its `COPYING` | — |
 | postgres-nio | MIT | yes |
 | mysql-nio | MIT | — |
-| SwiftTerm | MIT | — |
 | Sparkle (macOS only, the Mac app's updater) | MIT, with the notices of the code it includes in its `LICENSE` | — |
 | BigInt | MIT | — |
 | SwiftTreeSitter | BSD-3-Clause | — |

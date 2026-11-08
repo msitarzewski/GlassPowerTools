@@ -309,6 +309,10 @@ final class GlassTerminalUITests: XCTestCase {
     private func detailShowsAddress(_ value: String, timeout: TimeInterval = 10) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
+            // visionOS's Save Password alert can come after `dismissSystemPasswordPrompt` has looked,
+            // and while it shows, the app's tree is the alert alone (2026-11-05).
+            let notNow = app.buttons["Not Now"].firstMatch
+            if notNow.exists { notNow.tap() }
             if app.staticTexts[value].firstMatch.exists { return true }
             let row = element("host-detail-address")
             if row.exists, (row.label + " " + ((row.value as? String) ?? "")).contains(value) { return true }
@@ -515,6 +519,8 @@ final class GlassTerminalUITests: XCTestCase {
             #if os(visionOS)
             if picker.buttons[title].waitForExistence(timeout: 2) { return picker.buttons[title] }
             if picker.cells[title].waitForExistence(timeout: 2) { return picker.cells[title] }
+            // Or the row's title alone carries the name (seen 2026-11-05, visionOS 27.2 simulator).
+            if picker.staticTexts[title].waitForExistence(timeout: 2) { return picker.staticTexts[title] }
             if app.buttons[title].firstMatch.waitForExistence(timeout: 2) { return app.buttons[title].firstMatch }
             #endif
             #if os(macOS)
@@ -537,9 +543,10 @@ final class GlassTerminalUITests: XCTestCase {
         snap("00-settings-terminal-page")
         #if os(macOS)
         app.typeKey("w", modifierFlags: .command)
-        #else
+        #elseif os(iOS)
         press("settings-done")
         #endif
+        // visionOS: Settings is a window of its own, with no Done; it closes as a window does.
     }
 
     #if os(macOS)
@@ -657,8 +664,11 @@ final class GlassTerminalUITests: XCTestCase {
         let advanced = element("setup-advanced-ssh")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5), "Advanced disclosure")
         expandDisclosure(advanced)
-        if !element("edit-server-port").waitForExistence(timeout: 5) { dumpTree("advanced-not-expanded") }
-        XCTAssertTrue(element("edit-server-port").exists, "port lives under Advanced")
+        // Advanced's rows start at the sheet's fold on visionOS, and a row below it is not built
+        // until scrolled to (`reveal`).
+        let port = reveal("edit-server-port")
+        if !port.exists { dumpTree("advanced-not-expanded") }
+        XCTAssertTrue(port.exists, "port lives under Advanced")
         snap("22-edit-terminal-advanced")
         press("host-editor-cancel")
         XCTAssertTrue(element("edit-server-username").waitForNonExistence(timeout: 10))

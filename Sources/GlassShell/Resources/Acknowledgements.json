@@ -419,6 +419,7 @@
    "id": "swiftterm",
    "license": "MIT",
    "name": "SwiftTerm",
+   "note": "Vendored with the changes listed in Packages/SwiftTerm/PATCHES.md.",
    "revision": "5d14406844143538cd8f8851d2d8a67c1fe443e5",
    "source": "https://github.com/migueldeicaza/SwiftTerm",
    "texts": [

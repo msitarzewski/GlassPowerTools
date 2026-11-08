@@ -913,6 +913,9 @@ dies with the view. Hoisting it onto `DatabaseSessionManager` is the fix and is 
 
 ## D32 — Records that agree on an address are one record, automatically — Implemented 2026-09-21
 
+**Narrowed by D100 (2026-11-05):** a group is now records of one name only; an address or alias shared by two
+names joins nothing, so the fold below applies to same-name duplicates.
+
 **Context.** Three devices each set the Linux server up before they had heard of each other's record. The
 catalog merges by record id, so eleven records for one machine accumulated; the library grouped
 them into one row and its detail showed the union of their services — two Terminals, two
@@ -2169,4 +2172,76 @@ neighbour's reach plus 4% of a tile (twice that drew it over 60% of the window),
 its terminal's own canvas, opacity, tint and frost, as the old grid's cards did. **Found on the way:** the iPhone's
 title ran under the bar's buttons with a long name (before this too); three buttons on the right left it about 70
 points, so Terminal View went left and the title keeps to the room between the sides.
+
+## D100 — A machine is the name it was given; a shared address joins nothing — Implemented 2026-11-05 (0.4.604)
+
+**Context.** His "this should be in all connections, not in a machine", with a screenshot of one machine's detail
+listing another's terminal. He had added a second machine at the address of one already in the library (two sites
+on one server) three times in four minutes; each time the library grouped it with the other by address (D32's
+grouping: same name, a shared alias, or the same address) and the fold deleted its record and moved its terminal
+onto the other machine, on every device.
+
+**Decided.** Records are one machine only when their normalised names are equal (`GlassShellHostGrouping.group`).
+A shared address or alias joins nothing. The alias rule served the source apps, which published the address as the
+alias; they are obsolete and their records were folded long ago. Same-name records still group, still surface an
+address they disagree on, and still fold when they agree (D32's own case: two devices setting up one machine).
+
+**Not changed:** D27's adoption (`adoptService`): a server from the terminal's own form or an `ssh_config` import
+still joins the machine that has its address. Its test pins that on purpose; asked him.
+
+**Consequence accepted.** One machine set up on two devices under two names stays two rows until one is removed.
+His live library (9 machines) groups identically under both rules, so nothing already there changes. The folds
+already made are not undone: the machine eaten has to be added again, once every device has 0.4.604, or a device
+still on the old rule folds it again at its next sync.
+
+## D101 — SwiftTerm vendored with Vision Pro's scale fixed; Vision Pro draws with Metal — Implemented 2026-11-05 (0.4.605)
+
+**Context.** The SwiftTerm test app (`tasks/2026-11/2026-11-05_swiftterm-199-test.md`) found that SwiftTerm's
+`backingScaleFactor()` returns 1.0 on visionOS, in 1.20 and 1.99.2 alike. 1.20's Metal renderer sizes its drawable
+from it, so on the headset it drew at half resolution and was scaled up: his "like a jpg vs png" of 2026-10-29,
+when Metal was turned off there (0.4.553). With the scale fixed, Metal is full size and as sharp as Core Graphics in
+the simulator, at about 60% of Core Graphics' CPU for typing and scrolling. Offered three options (patch 1.20
+now; port to 1.99 now; change nothing until 2.0); he chose the first: "go with option 1".
+
+**Decided.** SwiftTerm 1.20.0 is vendored in `Packages/SwiftTerm` (SwiftPM cannot patch a fetched dependency), with
+two changes recorded in its `PATCHES.md`: S1, `backingScaleFactor()` returns the view's display scale on visionOS
+(2 before it has a window); S2, no build-tool plugin (it would have stamped the app's own commit into XTVERSION),
+`SwiftTermBuildInfo.swift` written by hand for v1.20.0, marked modified. Vision Pro draws terminals with Metal by
+default; Settings ▸ Terminal ▸ Diagnostics ▸ Draw with Metal stays, under a new key
+(`terminal.drawsWithMetalAtFullScale`), so a switch turned off against the blurry renderer doesn't keep Metal off.
+`check-updates.py` lists vendored copies and their newer releases, so SwiftTerm's still show weekly.
+
+**Not changed.** iOS and macOS drawing (S1 is visionOS only). The port to 1.99 waits for SwiftTerm 2.0. Reporting
+S1 upstream is a public action, waiting on his word.
+
+**Consequence accepted.** We carry SwiftTerm's source (4.5 MB) and take its releases by hand. The Core Graphics
+row-band repaint (0.4.553) no longer runs on the headset unless Metal is switched off or falls back. Whether Metal
+reads as well as Core Graphics through the lenses is his to judge on the headset.
+
+## D102 — Type-ahead in terminals, from history and seven other sources — Approved 2026-11-06, in progress
+
+**Context.** He asked whether terminals could offer type-ahead from session history and what else to draw on. The
+app records no commands and has never known where a command line starts; SwiftTerm already decodes shell
+integration's prompt marks (OSC 133) but nothing sends them. Recommended: shell integration, a per-machine command
+record, servers' own history, snippets, then the library, the folder, common tools' data, words on screen and the
+on-device AI. His answer: "write up the plan, then begin the build of all of it."
+
+**Decided.** As planned in `tasks/2026-11/2026-11-06_type-ahead.md`: grey text with → and ⌥→ on the Mac, chips on
+iPhone, iPad and Vision Pro. The line is known from OSC 133/633 where a shell sends them, else from the keys typed,
+counted only when the screen echoes them. Shell integration installs itself for this Mac's zsh terminals and is
+offered, never silent, on servers. History stays on the device (per machine, protected, no iCloud), never holds
+what wasn't echoed as typed input, and filters commands that look like they carry secrets. SwiftTerm's OSC 133
+handler is made public so the app can listen and still let SwiftTerm mark the cells (patch S3).
+
+**Open (his to change).** The privacy defaults above, the AI suggestion off by default, and no history sync.
+
+**Amended 2026-11-06, his "No surprises for users".** The keys-typed fallback counts only where the shell is known to
+be reading them (this Mac's own terminal asks the system): an SSH terminal without integration offers and keeps
+nothing, as a line typed into Claude Code or mysql can't be told from one at a prompt. Server start-up files are only
+appended to, and removed with the Files editor's verified save.
+
+**Approved 2026-11-06, where the chips go.** Drawn over the terminal's text, they covered the line being typed once
+the screen was full. Asked (three choices with pictures), he chose "Keyboard bar / ornament": on iPhone and iPad a
+row above the keyboard's bar, like QuickType, standing while the keyboard is up (the terminal one row shorter while
+typing); on Vision Pro an ornament under the window's toolbar, for the terminal in front.
 

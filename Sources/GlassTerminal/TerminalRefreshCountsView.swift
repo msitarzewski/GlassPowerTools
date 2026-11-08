@@ -49,7 +49,8 @@ struct TerminalRefreshCountsView: View {
 /// The switches, in Settings ▸ Terminal.
 struct TerminalRefreshCountsSection: View {
     @AppStorage(TerminalRefreshCountsView.shownKey) private var shown = false
-    @AppStorage(SwiftTermRendererPreference.visionMetalKey) private var drawsWithMetal = false
+    @AppStorage(SwiftTermRendererPreference.visionMetalKey)
+    private var drawsWithMetal = SwiftTermRendererPreference.visionDrawsWithMetal
     @AppStorage("terminal.repaintsChangedRows") private var repaintsChangedRows = true
 
     var body: some View {

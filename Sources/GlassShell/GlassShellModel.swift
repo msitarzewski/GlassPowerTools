@@ -1084,7 +1084,7 @@ public final class GlassShellModel: GlassServiceStore {
     /// The member whose SSH service a borrowed forward runs through.
     ///
     /// **A host is a group, not a machine.** `GlassShellHostGrouping.group` joins records whose
-    /// normalised display names match, which is one of three ways in and does not require the
+    /// normalised display names match, the only way in (D100), and does not require the
     /// addresses to agree — `GlassShellHost` says so itself, keeping `addresses` plural and taking
     /// `address` as the first. Two records both called "db" on different machines are one row.
     ///
@@ -1827,6 +1827,8 @@ public final class GlassShellModel: GlassServiceStore {
 
     private func consolidate(_ host: GlassShellHost) async throws {
         guard host.isConsolidated, !host.isLocal else { return }
+        // A group is records of one name (D100): an address another machine shares never brings a
+        // record here, so a machine the user named apart is never folded into it.
         // **Only a group that agrees about the address is one machine.** Two records named "db"
         // at two addresses are two machines that share a name, and the design surfaces that
         // disagreement for the user to settle with one edit rather than guessing. Merging them

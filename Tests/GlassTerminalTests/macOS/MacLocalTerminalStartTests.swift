@@ -307,6 +307,29 @@ struct MacLocalTerminalStartTests {
         #expect(MacLocalTmux.claim(["glass-1", "glass-2"], launch: launch, tmux: "tmux") { _, _, _ in nil } == nil)
     }
 
+    /// The shell integration reached no shell in tmux (2026-11-06): tmux gives a new session's shell its server's
+    /// environment, not its client's. So the session is given it itself, before its command, and the server never is.
+    @Test("this Mac's claim gives the session its own environment (-e, before its command); the server's run has none of it")
+    func claimGivesSessionEnvironment() {
+        let launch = MacLocalTmux.Launch(directory: "/tmp", command: ["/bin/zsh", "-l"],
+                                         environment: ["HOME=/Users/ann", "TERM=xterm-256color"],
+                                         sessionEnvironment: ["GLASS_USER_ZDOTDIR=/Users/ann/zsh", "ZDOTDIR=/tmp/startup"])
+        var runs: [(arguments: [String], environment: [String: String])] = []
+        let answer = MacLocalTmux.claim(["glass-1"], launch: launch, tmux: "tmux") { _, arguments, environment in
+            runs.append((arguments, environment))
+            return ""
+        }
+        #expect(answer == "created glass-1\n")
+        #expect(runs.map(\.arguments) == [["-u", "new-session", "-d", "-s", "glass-1", "-c", "/tmp",
+                                           "-e", "GLASS_USER_ZDOTDIR=/Users/ann/zsh", "-e", "ZDOTDIR=/tmp/startup",
+                                           "/bin/zsh", "-l"]])
+        #expect(runs.first?.environment == ["HOME": "/Users/ann", "TERM": "xterm-256color"])
+
+        #expect(MacLocalTmux.arguments(session: "glass-1", directory: "/tmp", control: true,
+                                       sessionEnvironment: ["ZDOTDIR=/tmp/startup"])
+                == ["-u", "-C", "new-session", "-A", "-s", "glass-1", "-c", "/tmp", "-e", "ZDOTDIR=/tmp/startup"])
+    }
+
     @Test("the launch keeps a folder's exact name: a space at the end, quotes, accents as written; a typed setting's stray spaces still go")
     func exactFolder() throws {
         let (base, folder) = try scratchFolder()

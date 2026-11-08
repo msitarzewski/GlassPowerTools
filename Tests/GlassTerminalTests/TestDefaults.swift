@@ -55,7 +55,12 @@ nonisolated enum TestDefaults {
     }
 
     private static var preferencesDirectory: URL {
+        #if os(macOS)
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences", isDirectory: true)
+        #else
+        // A simulator's test process keeps its preferences in its own container's home.
+        URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Preferences", isDirectory: true)
+        #endif
     }
 
     static func removeAll() {

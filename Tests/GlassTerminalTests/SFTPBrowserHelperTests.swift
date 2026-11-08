@@ -35,6 +35,8 @@ import GlassEditorCore
         #expect(SFTPBrowserEntry.topLevelSelection([child, similarPrefix]).map(\.id)
             == ["/one/config", "/one-more/config"])
     }
+    #if os(macOS)
+    // The browser's sortable table, and so its row and sort types, exist on the Mac only.
     @Test func sftpTableSortsEveryDataColumnAndKeepsDirectoriesFirst() {
         func tableEntry(
             _ name: String,
@@ -121,6 +123,7 @@ import GlassEditorCore
                 == ["older-public", "newer-private", "unknown"]
         )
     }
+    #endif
     @Test func sftpDownloadReadBatchStopsBeforeEOFAndRejectsOversizedData() throws {
         let requests = SFTPBrowserView.downloadReadWindow(
             from: 0,

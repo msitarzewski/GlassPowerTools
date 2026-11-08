@@ -11,18 +11,29 @@ import GlasSecretStore
 @testable import GlassTerminal
 
 @Suite struct SSHPrivateKeyImportTests {
+    /// Where `ssh-keygen` can make this suite's keys, files from an outside maker: on the Mac. A
+    /// simulator runs its tests on the Mac too, but ssh-keygen started from one cannot look up its
+    /// own user and stops ("No user exists for uid 501", 2026-11-06).
+    nonisolated static let makesKeys: Bool = {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }()
+
     /// A key `ssh-keygen` makes, waited for off the main actor (`LiveProcess.runDetached`).
     private func makeKey(passphrase: String, comment: String) async throws -> URL {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-key-import-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let path = directory.appendingPathComponent("id_ed25519").path
         let made = await LiveProcess.runDetached("/usr/bin/ssh-keygen", ["-q", "-t", "ed25519", "-N", passphrase, "-C", comment, "-f", path],
-                                                 environment: ["PATH": "/usr/bin:/bin"])
-        try #require(made.status == 0)
+                                                 environment: ["PATH": "/usr/bin:/bin"], includingErrors: true)
+        try #require(made.status == 0, "ssh-keygen: \(made.output)")
         return URL(fileURLWithPath: path)
     }
 
-    @Test func unencryptedKeyIsClassifiedWithItsComment() async throws {
+    @Test(.enabled(if: SSHPrivateKeyImportTests.makesKeys, "ssh-keygen makes the key, and runs on the Mac only")) func unencryptedKeyIsClassifiedWithItsComment() async throws {
         let url = try await makeKey(passphrase: "", comment: "fixture@test")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let (text, inspection) = try SSHPrivateKeyImport.read(from: url)
@@ -33,7 +44,7 @@ import GlasSecretStore
         #expect(SSHPrivateKeyImport.suggestedName(comment: inspection.comment, fileURL: url) == "fixture@test")
     }
 
-    @Test func passphraseProtectedKeyIsDetectedWithoutDecrypting() async throws {
+    @Test(.enabled(if: SSHPrivateKeyImportTests.makesKeys, "ssh-keygen makes the key, and runs on the Mac only")) func passphraseProtectedKeyIsDetectedWithoutDecrypting() async throws {
         let url = try await makeKey(passphrase: "correct horse", comment: "locked@test")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let (_, inspection) = try SSHPrivateKeyImport.read(from: url)
@@ -56,7 +67,7 @@ import GlasSecretStore
         #expect(throws: SSHPrivateKeyImportError.unreadable) { try SSHPrivateKeyImport.read(from: directory.appendingPathComponent("missing")) }
     }
 
-    @Test @MainActor func chosenKeyLandsInTheCatalogThroughAddSSHKey() async throws {
+    @Test(.enabled(if: SSHPrivateKeyImportTests.makesKeys, "ssh-keygen makes the key, and runs on the Mac only")) @MainActor func chosenKeyLandsInTheCatalogThroughAddSSHKey() async throws {
         let url = try await makeKey(passphrase: "", comment: "catalog@test")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let (text, _) = try SSHPrivateKeyImport.read(from: url)

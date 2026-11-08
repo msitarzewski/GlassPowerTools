@@ -68,6 +68,8 @@ enum MacLocalTmux {
             claim: { candidates, launch, tmux in
                 // The server under launchd, so no app's Force Quit can end it (`MacTmuxService`).
                 MacTmuxService.ensureDefaultServer(tmux: tmux, environment: launch.environmentVariables)
+                var launch = launch
+                if !MacLocalTmux.takesSessionEnvironment(tmux) { launch.sessionEnvironment = [] }
                 return MacLocalTmux.claim(candidates, launch: launch, tmux: tmux)
             },
             setGivenName: { session, name, tmux in
@@ -100,6 +102,14 @@ enum MacLocalTmux {
         var command: [String]
         /// `NAME=value`, as a process is given them.
         var environment: [String]
+        /// `NAME=value` for the session itself (`new-session -e`, tmux 3.2): the shell integration's
+        /// (D102). tmux gives a new session's shell its server's environment, not the client's, so
+        /// these reach a shell in tmux only this way; and kept out of `environment`, so a server
+        /// started with it doesn't hand them to sessions started from another terminal.
+        var sessionEnvironment: [String] = []
+
+        /// `sessionEnvironment` as `new-session`'s options.
+        nonisolated var sessionEnvironmentOptions: [String] { sessionEnvironment.flatMap { ["-e", $0] } }
 
         nonisolated var environmentVariables: [String: String] {
             Dictionary(environment.compactMap { entry -> (String, String)? in
@@ -184,7 +194,8 @@ enum MacLocalTmux {
         let tmuxArguments = ["-u"] + serverArguments
         let environment = launch.environmentVariables
         for name in candidates.prefix(TerminalTmux.claimLimit) {
-            let create = tmuxArguments + ["new-session", "-d", "-s", name, "-c", launch.directory] + launch.command
+            let create = tmuxArguments + ["new-session", "-d", "-s", name, "-c", launch.directory]
+                + launch.sessionEnvironmentOptions + launch.command
             if run(tmux, create, environment) != nil { return "created \(name)\n" }
             guard run(tmux, tmuxArguments + ["has-session", "-t", "=" + name], environment) != nil else {
                 logger.error("This Mac's tmux would not make session \(name, privacy: .public), and has none by that name")
@@ -378,16 +389,30 @@ enum MacLocalTmux {
     /// As a control-mode client (`-C` on pipes, D83: `TmuxControlPipe`) tmux hands the pane's every
     /// byte to the terminal, which draws it itself, so the terminal's features don't pass through tmux
     /// and `-T` has nothing to say.
-    nonisolated static func arguments(session: String, directory: String, control: Bool = false) -> [String] {
-        control ? ["-u", "-C", "new-session", "-A", "-s", session, "-c", directory]
-            : ["-u", "-T", "sync,RGB", "new-session", "-A", "-s", session, "-c", directory]
+    ///
+    /// `sessionEnvironment` (`Launch.sessionEnvironmentOptions`) applies only when this makes the session;
+    /// tmux ignores it when attaching to one that exists.
+    nonisolated static func arguments(session: String, directory: String, control: Bool = false,
+                                      sessionEnvironment: [String] = []) -> [String] {
+        (control ? ["-u", "-C", "new-session", "-A", "-s", session, "-c", directory]
+            : ["-u", "-T", "sync,RGB", "new-session", "-A", "-s", session, "-c", directory])
+            + sessionEnvironment.flatMap { ["-e", $0] }
     }
 
     /// Whether this Mac's tmux can have a control-mode client (3.2 or later): asked once a run, for
     /// each tmux, and only while the setting allows control mode.
     nonisolated static func supportsControlMode(_ tmux: String) -> Bool {
         guard TerminalTmux.controlModeEnabled else { return false }
-        return controlModeSupport.withLock { known in
+        return isAtLeast32(tmux)
+    }
+
+    /// Whether this Mac's tmux takes `new-session -e` (3.2 or later: "Add -e flag for new-session to set
+    /// environment variables", tmux's CHANGES from 3.1c to 3.2), whatever the control-mode setting.
+    nonisolated static func takesSessionEnvironment(_ tmux: String) -> Bool { isAtLeast32(tmux) }
+
+    /// `tmux -V` 3.2 or later, asked once a run for each tmux.
+    private nonisolated static func isAtLeast32(_ tmux: String) -> Bool {
+        controlModeSupport.withLock { known in
             if let answer = known[tmux] { return answer }
             let answer = TmuxControlClient.supports(version: run(tmux, ["-V"]) ?? "")
             known[tmux] = answer

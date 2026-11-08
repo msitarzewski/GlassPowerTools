@@ -25,6 +25,7 @@
 
 #if !canImport(UIKit) && canImport(AppKit)
 import AppKit
+import UniformTypeIdentifiers
 import SwiftTerm
 
 @MainActor
@@ -247,10 +248,13 @@ enum MacTerminalContextMenu {
         pasteboard.setString(text, forType: .string)
     }
 
-    /// Whether Paste has text to paste. Asks only which types are there: reading the text itself
-    /// would show the system's paste-permission prompt before anyone chose Paste.
+    /// Whether Paste has text, or a picture, to paste (a picture goes where a dropped one goes, 2026-11-06). Asks
+    /// only which types are there: reading the text itself would show the system's paste-permission prompt before
+    /// anyone chose Paste.
     private static func pasteboardHasText() -> Bool {
-        NSPasteboard.general.types?.contains(.string) ?? false
+        let types = NSPasteboard.general.types ?? []
+        return types.contains(.string)
+            || types.contains { UTType($0.rawValue)?.conforms(to: .image) == true }
     }
 
     private static func item(_ title: String, symbol: String? = nil, enabled: Bool = true,

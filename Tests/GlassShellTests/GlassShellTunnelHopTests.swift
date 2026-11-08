@@ -5,7 +5,7 @@
 //  Which machine a borrowed SSH forward actually runs through.
 //
 //  **A host in this product is a group, not a machine.** `GlassShellHostGrouping.group` joins
-//  records whose normalised display names match — one of three ways in, and it does not require
+//  records whose normalised display names match — the only way in (D100), and it does not require
 //  their addresses to agree. `GlassShellHost` is candid about it: `addresses` is plural and
 //  `address` is simply the first. Two records both called "db" on different machines are one row,
 //  which is exactly what the three source apps produced.

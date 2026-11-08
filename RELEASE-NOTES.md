@@ -104,6 +104,50 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.609 (7 November 2026)
+- **Typed paths complete.** `cd ~/Software/gl` offers the folders in `~/Software` that start with `gl` as you type,
+  and so do full paths (`/usr/lo…`) and paths from the folder you're in (`src/li…`). After `cd` only folders are
+  offered, each with its slash, so the next level follows at once; other commands are offered files too. In a
+  terminal on a server the names come over its SFTP connection. A hidden name waits until its dot is typed, as in
+  zsh, so `cd ` no longer offers `.git/` first.
+
+### 0.4.608 (7 November 2026)
+- **Suggestions in a Mac tab in tmux.** A local tab in tmux offers suggestions as a tab outside tmux does: the shell
+  integration reaches a new tmux session (tmux 3.2 or later), and the app tells the shell's own prompt from a program
+  running in the pane, so nothing is offered over that program's input.
+- **The programs on the machine.** A command's first word, and the word after `|`, `;`, `&&`, `sudo` and the like, is
+  completed from the programs in the machine's usual program folders and the shell's own commands. A tool the app
+  knows comes before the rest, and a command you've run comes before both. **Settings** ▸ **Suggestions** ▸
+  **Programs on the machine** turns it off.
+
+### 0.4.607 (6 November 2026)
+- **Type-ahead in terminals.** At a shell prompt the terminal offers the rest of the command: grey text after the
+  cursor on the Mac (→ at the end of the line takes it all, ⌥→ one word); up to three chips above the keyboard bar on
+  iPhone and iPad, and in an ornament on Vision Pro, a tap typing the rest. Suggestions come from what you've run on
+  that machine, your snippets, the folder you're in (branches, package scripts, make and just targets, file names) and
+  common tools' commands and options. Nothing is offered in a full-screen program such as vim or less, at a password
+  prompt, or when the line can't be read with confidence, and a command carrying a password or token is never kept.
+  **Settings** ▸ **Suggestions** turns each source on or off, forgets a machine's history, imports a server's shell
+  history, and installs or removes the shell integration on your machines. When zsh-autosuggestions or fish draws
+  its own grey text, the app's stands aside. The chips were checked in the iPhone and Vision Pro simulators.
+- **Resizing a tab in tmux no longer fills it with copies of the prompt.** zsh redraws its prompt by clearing the
+  screen, and tmux kept each cleared screen in the history, where a growing window brought the copies back down.
+- **Scale Text works in a Mac tab in tmux.** It did nothing there.
+- **⌘V pastes a picture into a Mac terminal**, as dropping it does: a screenshot or a copied image is saved to the
+  drop folder (on the server, for an SSH terminal) and its path typed. It pasted nothing. Text copied beside a
+  picture still pastes as text.
+
+### 0.4.605 and 0.4.606 (5 November 2026)
+- **Vision Pro draws terminals with Metal, sharp at the headset's scale.** SwiftTerm drew at one pixel a point on
+  visionOS. The app now carries its own copy of SwiftTerm 1.20.0 with that fixed (each change listed in
+  `Packages/SwiftTerm/PATCHES.md`), and Metal drawing is the default on Vision Pro. Checked in the Vision Pro
+  simulator.
+
+### 0.4.604 (5 November 2026)
+- **A machine is the name you gave it.** Two machines at one address, such as two sites on one server, stay two
+  machines. They were folded into one on every device, the newer one's terminals and files moved onto the other and
+  the newer one deleted.
+
 ### 0.4.603 (5 November 2026)
 - **0.4.603 is the Mac's seventh release**, through Sparkle, with everything since 0.4.589 below; TestFlight build
   603 for iPhone, iPad and Vision Pro.

@@ -30,6 +30,9 @@ struct TerminalCapabilityProbeTests {
     func identity() {
         let reply = Probe().ask("\u{1b}[>0q")
         #expect(reply.hasPrefix("^[P>|SwiftTerm") && reply.hasSuffix("^[\\"), "reply was \(reply)")
+        // The release our copy is (Packages/SwiftTerm, S2): its build-info plugin, left out, would
+        // have stamped the app's own commit and branch here.
+        #expect(reply.hasPrefix("^[P>|SwiftTerm 1.20.0+v1.20.0-modified"), "reply was \(reply)")
     }
 
     @Test("synchronized output (DEC 2026) is reported as supported, and as set while a frame is open")

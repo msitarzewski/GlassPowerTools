@@ -201,8 +201,14 @@ struct WorkgroupMacTerminalsTests {
 
             settings.thisMacServerID = { bravo }
             #expect(!settings.recordWorkgroupMac(workgroupID: preset.id, index: 0, session: "glass-3"), "the pane is another terminal now")
+            #if os(macOS)
             #expect(settings.recordWorkgroupMac(workgroupID: preset.id, index: 0, session: "glass-7"))
             #expect(settings.layoutPresets.first?.sessionIntents.map(\.macServerID) == [bravo, otherMac])
+            #else
+            // Only a Mac runs a local terminal, so only a Mac claims one (`upsertLayoutPreset`).
+            #expect(!settings.recordWorkgroupMac(workgroupID: preset.id, index: 0, session: "glass-7"), "not a Mac")
+            #expect(settings.layoutPresets.first?.sessionIntents.map(\.macServerID) == [nil, otherMac])
+            #endif
             #expect(!settings.recordWorkgroupMac(workgroupID: preset.id, index: 1, session: "glass-8"), "another Mac's")
 
             #if os(macOS)

@@ -28,7 +28,11 @@ enum LiveProcess {
         defer { posix_spawnattr_destroy(&attributes) }
         // As the app's own spawns: none of the test process's descriptors, and signals unblocked
         // whatever thread runs this (`GlassSpawn`) — `runDetached` runs it off the main one.
+        #if os(macOS)
         GlassSpawn.prepare(&attributes)
+        #else
+        prepareAsGlassSpawnDoes(&attributes)
+        #endif
         let argv = ([executable] + arguments).map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
         let envp = environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
@@ -54,6 +58,22 @@ enum LiveProcess {
                                         includingErrors: Bool = false) async -> (output: String, status: Int32) {
         await offMainActor { run(executable, arguments, environment: environment, includingErrors: includingErrors) }
     }
+
+    #if !os(macOS)
+    /// `GlassSpawn.prepare`'s attributes. The app starts programs on the Mac only, so `GlassSpawn`
+    /// is the Mac's; a simulator runs these tests on the Mac too, and starts the Mac's programs.
+    private nonisolated static func prepareAsGlassSpawnDoes(_ attributes: inout posix_spawnattr_t?) {
+        var unblocked = sigset_t()
+        sigemptyset(&unblocked)
+        var defaults = sigset_t()
+        sigfillset(&defaults)
+        sigdelset(&defaults, SIGKILL)
+        sigdelset(&defaults, SIGSTOP)
+        posix_spawnattr_setsigmask(&attributes, &unblocked)
+        posix_spawnattr_setsigdefault(&attributes, &defaults)
+        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF))
+    }
+    #endif
 }
 
 /// Blocking work — a program run, a wait on something outside the process — done off the caller's

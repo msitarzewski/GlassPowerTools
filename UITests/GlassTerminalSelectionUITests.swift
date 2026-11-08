@@ -138,17 +138,21 @@ final class GlassTerminalSelectionUITests: XCTestCase {
 
     /// Apple's text: pinch and drag either end of a selection to change it, with no hold first. It
     /// scrolled, and the scroll took the selection away.
+    /// The runner presses the terminal's middle whichever letter lies there, so the demo's words are
+    /// four letters at most: a drag from any of them starts within reach of an end. A middle letter
+    /// of a longer word is out of reach of both, as SwiftTerm's own drag has it.
     func testDraggingAnEndOfTheSelectionMovesIt() {
-        launch("terminal-tmux")
+        launch("terminal-tmux-short")
         middle.doubleTap()
         XCTAssertTrue(selected.waitForExistence(timeout: 5), "a double pinch selected nothing")
-        XCTAssertEqual(selectedCount, 6, "the word \"screen\"")
+        let before = selectedCount ?? 0
+        XCTAssertTrue((1...4).contains(before), "a word of the demo's, or the space after one: \(before) characters")
         sleep(1)
         middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 160, dy: 0)))
         sleep(1)
         let count = selectedCount ?? 0
-        if count <= 6 { attachTree("after dragging the selection's end") }
-        XCTAssertGreaterThan(count, 6, "dragging the selection's end did not move it")
+        if count <= before { attachTree("after dragging the selection's end") }
+        XCTAssertGreaterThan(count, before, "dragging the selection's end did not move it")
     }
 
     /// A hold whose hand moves a little before it counts: the drag tmux is sent when it has the mouse

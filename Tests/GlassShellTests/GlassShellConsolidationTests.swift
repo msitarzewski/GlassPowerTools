@@ -73,16 +73,29 @@ struct GlassShellConsolidationTests {
                 "the older record's service now lives on the survivor")
     }
 
-    @Test("A shared alias groups records whose names differ")
-    func aliasOverlapGroups() async throws {
+    /// D100 (2026-11-05): a machine added at an address another machine has was folded into it
+    /// within a minute — its record deleted, its terminal moved onto the other machine — three
+    /// times in four minutes. Two names are two machines, whatever they share.
+    @Test("Two machines named apart stay two, at one address and with one alias")
+    func sharedAddressAndAliasStayApart() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        try await sibling.upsert(try record("Alpha Foxtrot", aliases: ["198.51.100.5"], kinds: [.ssh], createdAt: t0))
-        try await sibling.upsert(try record("bravo-desktop", aliases: ["198.51.100.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
+        let first = try HostProfile(displayName: "alpha", address: "198.51.100.5", aliases: ["shared"],
+                                    services: [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")],
+                                    createdAt: t0, updatedAt: t0)
+        let second = try HostProfile(displayName: "bravo", address: "198.51.100.5", aliases: ["shared", "198.51.100.5"],
+                                     services: [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")],
+                                     createdAt: t0.addingTimeInterval(60), updatedAt: t0.addingTimeInterval(60))
+        try await sibling.upsert(first)
+        try await sibling.upsert(second)
+
         await model.load()
-        #expect(model.catalogHosts.count == 1)
-        #expect(model.catalogHosts.first?.services.count == 2)
-        #expect(model.catalogHosts.first?.aliases == ["198.51.100.5"])
+
+        #expect(model.catalogHosts.map(\.displayName) == ["alpha", "bravo"])
+        #expect(model.catalogHosts.allSatisfy { !$0.isConsolidated && $0.services.count == 1 })
+        let stored = try await sibling.snapshot()
+        #expect(Set(stored.map(\.id)) == [first.id, second.id], "neither record folded into the other")
+        #expect(stored.first { $0.id == second.id }?.services == second.services, "bravo keeps its own terminal")
     }
 
     @Test("Unrelated names stay separate, and loopback aliases never group")

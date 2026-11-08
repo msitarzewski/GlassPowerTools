@@ -114,6 +114,13 @@ struct ShownTerminalsReconnectTests {
         slot.tmuxSessionName = "glass-3"
         slot.isWorkgroupSlot = true
         slot.state = .error("The connection stopped answering")
+        #if os(iOS)
+        // iPhone and iPad show one terminal of a window at a time, and a slot connects as it is
+        // shown (`connectShownSlot`, W4b): choosing it shows it, and nothing is asked here.
+        #expect(TerminalWorkgroupOpening.slotsConnectWhenShown)
+        GlassTerminalCapability.reconnectIfDropped(slot, runtime: runtime)
+        #expect(runtime.takeRequests().isEmpty, "a slot here connects as it is shown")
+        #else
         #expect(!TerminalWorkgroupOpening.slotsConnectWhenShown, "this platform shows every terminal of a window")
 
         GlassTerminalCapability.reconnectIfDropped(slot, runtime: runtime)
@@ -125,5 +132,6 @@ struct ShownTerminalsReconnectTests {
         slot.handleCleanRemoteExit()
         GlassTerminalCapability.reconnectIfDropped(slot, runtime: runtime)
         #expect(runtime.takeRequests().isEmpty, "one whose shell ended is not brought back")
+        #endif
     }
 }

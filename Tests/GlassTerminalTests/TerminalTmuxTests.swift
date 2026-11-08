@@ -141,7 +141,9 @@ struct TerminalTmuxTests {
     /// The command as the host's `sh` runs it: tmux's history moves, and leaves at the bottom.
     @Test("the scroll command works through sh against a real tmux", .enabled(if: TerminalTmuxTests.tmux != nil))
     func scrollingLive() async throws {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tmux-scroll-\(UUID().uuidString.prefix(8))")
+        // Short, as `listingLive`'s: a socket path has a length limit (104), and a simulator's
+        // temporary folder made this one 139 characters.
+        let folder = URL(fileURLWithPath: "/tmp/gpt-scroll-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         // A private tmux server: TMUX_TMPDIR moves its default socket. Run off the main actor (`offMainActor`).
@@ -157,6 +159,13 @@ struct TerminalTmuxTests {
         #expect(await sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode} #{scroll_position}'") == "1 5\n")
         _ = await sh(TerminalTmux.scrollCommand(name: "glass-7", lines: -9))
         #expect(await sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode}'") == "0\n", "past the bottom: out of copy mode")
+    }
+
+    /// A command a test counts as asking the host about its sessions: not `tmux -V`, which control
+    /// mode asks (D83), and not the read of the session's name and folder that an iPhone, iPad or
+    /// Vision Pro makes once attached (`readsTmuxPane`; a Mac's tabs ask tmux themselves).
+    static func asksTheHost(_ command: String) -> Bool {
+        command != TerminalTmux.versionCommand && !command.contains(TerminalTmux.paneMarker)
     }
 
     /// Until a private server's pane shows `text` as a line of its own, up to 30 s.
@@ -198,7 +207,8 @@ struct TerminalTmuxTests {
     @Test("the history command reads every line of a real tmux session, wrapped lines joined",
           .enabled(if: TerminalTmuxTests.tmux != nil))
     func historyLive() async throws {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tmux-history-\(UUID().uuidString.prefix(8))")
+        // Short: a socket path has a length limit (`scrollingLive`).
+        let folder = URL(fileURLWithPath: "/tmp/gpt-history-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
@@ -299,9 +309,9 @@ struct TerminalTmuxTests {
         let writes = Writes()
         let session = TerminalSession(server: server(tmux: true), terminalWriteSink: { writes.receive($0) })
         var asked = 0
-        // `tmux -V`, for control mode (D83), is asked as well; not counted here.
+        // `tmux -V` and the session's own read are asked as well; not counted here (`asksTheHost`).
         session.tmuxCommandRunner = { command in
-            if command != TerminalTmux.versionCommand { asked += 1 }
+            if Self.asksTheHost(command) { asked += 1 }
             throw SSHError.notConnected
         }
         session.state = .connected
@@ -317,7 +327,7 @@ struct TerminalTmuxTests {
         let writes = Writes()
         var asked = 0, versions = 0
         let session = session(server(tmux: true), writes: writes, listing: "", commands: { command in
-            if command == TerminalTmux.versionCommand { versions += 1 } else { asked += 1 }
+            if command == TerminalTmux.versionCommand { versions += 1 } else if Self.asksTheHost(command) { asked += 1 }
         })
         session.state = .connected
         await session.waitForTmuxAttach()
@@ -514,7 +524,7 @@ struct TerminalTmuxTests {
         active.state = .connected
         await active.waitForTmuxAttach()
         await active.waitUntilTerminalWritesComplete()
-        #expect(asked.filter { $0 != TerminalTmux.versionCommand }.isEmpty, "Active's choice is not claimed")
+        #expect(asked.filter(Self.asksTheHost).isEmpty, "Active's choice is not claimed")
         #expect(writes.lines == [attach, attach], "the attach line alone, then again on reconnecting")
         #expect(!active.hasPendingStartupCommand)
 

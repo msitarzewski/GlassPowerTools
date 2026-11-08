@@ -26,19 +26,24 @@ public enum SwiftTermRendererPreference: Equatable, Sendable {
 
     public static var platformDefault: Self {
         #if os(visionOS)
-        // Core Graphics: tried with Metal on the headset (2026-10-29, 0.4.552), the owner: "The
-        // text is far less legible and the refreshes more obvious! Its like a jpg vs png". SwiftTerm
-        // 1.20 presents with Metal there (it counts the frames, and falls back by itself when they
-        // stop), so Settings ▸ Terminal ▸ Diagnostics ▸ Draw with Metal stays, off, for comparing.
-        let drawsWithMetal = UserDefaults.standard.object(forKey: visionMetalKey) as? Bool ?? false
+        // Metal (D101, 2026-11-05), as on every other device. Tried on the headset on 2026-10-29
+        // (0.4.552), the owner: "The text is far less legible and the refreshes more obvious! Its
+        // like a jpg vs png" — SwiftTerm drew at half the headset's resolution there
+        // (`backingScaleFactor` 1.0), fixed in our copy (Packages/SwiftTerm, S1). SwiftTerm counts
+        // Metal's frames and falls back to Core Graphics by itself when they stop. Settings ▸
+        // Terminal ▸ Diagnostics ▸ Draw with Metal still switches it, for comparing.
+        let drawsWithMetal = UserDefaults.standard.object(forKey: visionMetalKey) as? Bool ?? visionDrawsWithMetal
         return drawsWithMetal ? .metal : .coreGraphics
         #else
         .metal
         #endif
     }
 
-    /// Vision Pro's switch for Metal (`platformDefault`).
-    public static let visionMetalKey = "terminal.drawsWithMetal"
+    /// Vision Pro's switch for Metal (`platformDefault`). A new key with D101: the old one,
+    /// `terminal.drawsWithMetal`, may hold "off" from the half-resolution Metal of 2026-10-29.
+    public static let visionMetalKey = "terminal.drawsWithMetalAtFullScale"
+    /// The switch's default on Vision Pro.
+    public static let visionDrawsWithMetal = true
     /// Posted when that switch changes: terminals on screen draw the new way at once.
     public static let changedNotification = Notification.Name("GlassTerminal.rendererPreferenceChanged")
 }
@@ -655,6 +660,7 @@ public final class SwiftTermHostModel: ObservableObject {
         retainedRemoteEngine = engine
         terminalEngine = engine
         rendererDelegateOwner = delegateOwner
+        followPrompt(of: engine)
         #if os(iOS)
         installKeyboardTools()
         #endif
@@ -672,8 +678,87 @@ public final class SwiftTermHostModel: ObservableObject {
     /// Local PTY renderers retain their engine through
     /// `SwiftTermLocalProcessRuntime`; keep this non-owning attachment so the
     /// established explicit local-process teardown remains authoritative.
+    // MARK: - Type-ahead (D102)
+
+    /// The line typed at the prompt changed, or can no longer be read: the terminal capability works out what to
+    /// offer (`setTypeAhead`). `tasks/2026-11/2026-11-06_type-ahead.md`.
+    public var onTypeAheadLine: ((TerminalTypedLine?) -> Void)?
+    /// A command the shell ran: shell integration's mark, or Enter on a line the screen confirmed.
+    public var onTerminalCommandRun: ((TerminalRanCommand) -> Void)?
+    /// That command's exit status, where the shell gives one.
+    public var onTerminalCommandFinished: ((Int?) -> Void)?
+    /// The line as last read.
+    public private(set) var typeAheadLine: TerminalTypedLine?
+    /// What is offered: the grey text's command, and the chips' (most likely first).
+    @Published public private(set) var typeAheadSuggestion: TerminalTypeAheadSuggestion?
+    @Published public private(set) var typeAheadChoices: [String] = []
+    /// Draw the best suggestion in grey after the cursor, and let → and ⌥→ take it (the Mac). Where it is off,
+    /// the chips offer the suggestions.
+    public var drawsTypeAheadGhost = false { didSet { drawTypeAheadGhost() } }
+    /// Type-ahead is on, and offers its commands as chips (iPhone, iPad and Vision Pro): their row stands above the
+    /// keyboard's bar for as long as the keyboard is up, so the terminal's size doesn't change with each line.
+    @Published public var offersTypeAheadChips = false
+    /// Whether this terminal's shell marks its prompts (shell integration).
+    public var hasShellIntegration: Bool { terminalEngine?.promptTracker.hasShellIntegration ?? false }
+    /// Whatever decides this terminal's suggestions, kept for as long as the terminal is.
+    public var typeAheadOwner: AnyObject?
+    private var typeAheadGhostShown = false
+
+    /// What to offer for the line now; nil and none clears it.
+    public func setTypeAhead(_ suggestion: TerminalTypeAheadSuggestion?, choices: [String]) {
+        if typeAheadSuggestion != suggestion { typeAheadSuggestion = suggestion }
+        if typeAheadChoices != choices { typeAheadChoices = choices }
+        drawTypeAheadGhost()
+    }
+
+    /// A chip: types the rest of `command` after what's typed.
+    public func takeTypeAheadChoice(_ command: String) {
+        guard let line = typeAheadLine, line.cursorAtEnd, command.hasPrefix(line.text),
+              command.count > line.text.count else { return }
+        typeText(String(command.dropFirst(line.text.count)))
+    }
+
+    /// Types `text` as the keyboard would, the line typed following it (a chip; the live tests' keys).
+    func typeText(_ text: String) {
+        terminalEngine?.typeText(text)
+    }
+
+    private func typeAheadScreenChanged() {
+        let line = terminalEngine?.promptTracker.currentLine()
+        if line != typeAheadLine {
+            typeAheadLine = line
+            onTypeAheadLine?(line)
+        }
+        drawTypeAheadGhost()
+    }
+
+    /// The grey text, where the line ends at the cursor and the shell draws no suggestion of its own.
+    private func drawTypeAheadGhost() {
+        let line = typeAheadLine
+        let suffix = drawsTypeAheadGhost && line?.cursorAtEnd == true && line?.othersSuggestion == false
+            ? typeAheadSuggestion?.suffix : nil
+        typeAheadGhostShown = suffix?.isEmpty == false
+        terminalEngine?.showTypeAheadGhost(suffix, columnsLeft: line?.columnsLeft ?? 0)
+    }
+
+    /// The keys about to go to the shell, or what they take: → or ⌃E the grey suggestion's rest, ⌥→ its next
+    /// word, while it shows. Either way the line typed is followed (`TerminalPromptTracker.noteSent`).
+    func typeAheadOutgoing(_ bytes: [UInt8]) -> [UInt8] {
+        var out = bytes
+        if typeAheadGhostShown, let suffix = typeAheadSuggestion?.suffix,
+           let replacement = TerminalTypeAheadKeys.replacement(for: bytes, suffix: suffix) {
+            out = Array(replacement.utf8)
+            // Hidden until the shell has echoed what was taken and the line is read again.
+            typeAheadGhostShown = false
+            terminalEngine?.showTypeAheadGhost(nil, columnsLeft: 0)
+        }
+        terminalEngine?.promptTracker.noteSent(out)
+        return out
+    }
+
     fileprivate func attach(_ engine: any TerminalEngine) {
         terminalEngine = engine
+        followPrompt(of: engine)
         #if canImport(UIKit)
         engine.onLeavingWindow = { [weak self] in self?.rememberPreview() }
         #endif
@@ -684,6 +769,15 @@ public final class SwiftTermHostModel: ObservableObject {
         publishRendererDiagnosticsIfChanged(engine.rendererDiagnostics)
         schedulePendingFlush()
         focus()
+    }
+
+    /// Type-ahead hears the shell through whichever engine draws this terminal: an SSH one (iPhone, iPad, Vision
+    /// Pro, a Mac's SSH pane) attaches with its delegate's owner, a Mac's own shell without. Wired in the second
+    /// alone at first, so no SSH terminal ever offered anything (2026-11-06, found in the Vision Pro simulator).
+    private func followPrompt(of engine: any TerminalEngine) {
+        engine.promptTracker.onCommandRun = { [weak self] in self?.onTerminalCommandRun?($0) }
+        engine.promptTracker.onCommandFinished = { [weak self] in self?.onTerminalCommandFinished?($0) }
+        engine.onOutputRead = { [weak self] in self?.typeAheadScreenChanged() }
     }
 
     /// Explicit terminal-close authority releases the renderer and its complete
@@ -1663,6 +1757,15 @@ private protocol TerminalEngine: AnyObject {
     /// The grid to show a tmux pane at (`TmuxControlAction.showGrid`): another client's while it
     /// has the window, the space past it dotted; the terminal's own frame either way.
     func showTmuxGrid(columns: Int, rows: Int, own: Bool)
+    /// Type-ahead (D102): the shell's prompt, followed as output is read. Made with the terminal, before
+    /// any output, so the first prompt's marks are seen.
+    var promptTracker: TerminalPromptTracker { get }
+    /// After each chunk of output has been read.
+    var onOutputRead: (() -> Void)? { get set }
+    /// The grey text after the cursor; nil hides it.
+    func showTypeAheadGhost(_ text: String?, columnsLeft: Int)
+    /// Types `text` as if keyed: a suggestion's chip.
+    func typeText(_ text: String)
 }
 
 public enum SwiftTermHardwareKeyPolicy {
@@ -2712,7 +2815,11 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer === endDrag {
             guard selection.active, let start = dragStartCell(endDrag) else { return false }
-            return Self.isNear(start, selection.end) || Self.isNear(start, selection.start)
+            let near = Self.isNear(start, selection.end) || Self.isNear(start, selection.start)
+            if !near {
+                note("end drag refused row=\(start.row) col=\(start.col) selection=\(selection.start.row),\(selection.start.col)-\(selection.end.row),\(selection.end.col)")
+            }
+            return near
         }
         if gestureRecognizer === pointerDrag { return true }
         return super.gestureRecognizerShouldBegin(gestureRecognizer)
@@ -3470,6 +3577,8 @@ private final class SwiftTermEngine: TerminalEngine {
     private var configuredTheme: SwiftTermTheme?
     private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
+    let promptTracker: TerminalPromptTracker
+    var onOutputRead: (() -> Void)?
 
     init(
         delegate: TerminalViewDelegate,
@@ -3517,6 +3626,7 @@ private final class SwiftTermEngine: TerminalEngine {
         self.onPasteData = onPasteData
         self.onRendererDiagnostics = onRendererDiagnostics
         self.onOSC52Decision = onOSC52Decision
+        self.promptTracker = TerminalPromptTracker(terminal: terminalView.getTerminal())
         terminalView.onWindowAttachmentChanged = { [weak self] in
             self?.activateRendererIfAttached()
         }
@@ -3564,7 +3674,35 @@ private final class SwiftTermEngine: TerminalEngine {
         if status.state != lastMetalStatus?.state {
             TerminalSelectionDiagnostics.record?("renderer metal \(status.state) after \(status.presentedFrameCount) frames")
         }
+        #if DEBUG
+        markMetalDrawingForUITests()
+        #endif
     }
+
+    #if DEBUG
+    /// For `GlassTerminalMetalUITests`, which can't see how sharp the text is: the pixels a point
+    /// of the terminal gets in the frame Metal last drew, as `terminal-drawing-metal-<scale>`. 2 on
+    /// Vision Pro; SwiftTerm 1.20 as released drew at 1 (Packages/SwiftTerm, S1). Only under
+    /// `--ui-testing-mark-metal`, on an element of its own beside the terminal: the terminal's own
+    /// identifier is `GlassTerminalSelectionUITests`' selection mark.
+    private func markMetalDrawingForUITests() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"), arguments.contains("--ui-testing-mark-metal"),
+              let metal = terminalView.subviews.lazy.compactMap({ $0 as? MTKView }).first,
+              metal.bounds.width > 0, metal.drawableSize.width > 0 else { return }
+        let scale = (metal.drawableSize.width / metal.bounds.width * 100).rounded() / 100
+        metalDrawingMark.accessibilityIdentifier = "terminal-drawing-metal-\(scale)"
+    }
+
+    private lazy var metalDrawingMark: UIView = {
+        let mark = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        mark.isUserInteractionEnabled = false
+        mark.isAccessibilityElement = true
+        mark.accessibilityLabel = "Metal drawing"
+        containerView.addSubview(mark)
+        return mark
+    }()
+    #endif
     #endif
 
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
@@ -3641,6 +3779,19 @@ private final class SwiftTermEngine: TerminalEngine {
             duration: start.duration(to: performanceClock.now)
         )
         refreshAccessibilityValue()
+        onOutputRead?()
+    }
+
+    func showTypeAheadGhost(_ text: String?, columnsLeft: Int) {
+        terminalView.showTypeAheadGhost(text, columnsLeft: columnsLeft)
+    }
+
+    func typeText(_ text: String) {
+        let bytes = Array(text.utf8)
+        guard !bytes.isEmpty else { return }
+        promptTracker.noteSent(bytes)
+        recordInput(byteCount: bytes.count)
+        onPasteData(Data(bytes))
     }
 
     func recordInput(byteCount: Int) {
@@ -3701,6 +3852,8 @@ private final class SwiftTermEngine: TerminalEngine {
     func reapplyFindHit() { findTracker.reapply(in: terminalView) }
     func commitPaste(_ text: String, bracketed: Bool) {
         let data = SwiftTermPastePolicy.framedData(for: text, bracketed: bracketed)
+        // Never a key that takes a suggestion: a paste goes as pasted, and the line typed follows it (D102).
+        promptTracker.noteSent(Array(data))
         recordInput(byteCount: data.count)
         onPasteData(data)
     }
@@ -4242,12 +4395,16 @@ public struct SwiftTermHostView: UIViewRepresentable {
 
         public func send(source: TerminalView, data: ArraySlice<UInt8>) {
             // An answer to the program's query: tmux has answered it already (control mode, D83).
-            if let model, model.isTmuxControlClient, model.retainedRenderer()?.isFeedingOutput == true { return }
-            model?.retainedRenderer()?.recordInput(byteCount: data.count)
+            let answering = model?.retainedRenderer()?.isFeedingOutput == true
+            if let model, model.isTmuxControlClient, answering { return }
+            // A key that takes the grey suggestion types the suggestion instead (D102); either way the line typed
+            // is followed. An answer to a program's query, read with its output, is no key.
+            let bytes = answering ? Array(data) : (model?.typeAheadOutgoing(Array(data)) ?? Array(data))
+            model?.retainedRenderer()?.recordInput(byteCount: bytes.count)
             #if os(visionOS)
             if let model { TerminalRefreshCounts.shared.noteKeySent(to: ObjectIdentifier(model)) }
             #endif
-            onSendData(Data(data))
+            onSendData(Data(bytes))
         }
 
         public func scrolled(source: TerminalView, position: Double) {
@@ -4339,6 +4496,15 @@ private protocol TerminalEngine: AnyObject {
     /// The grid to show a tmux pane at (`TmuxControlAction.showGrid`): another client's while it
     /// has the window, the space past it dotted; the terminal's own frame either way.
     func showTmuxGrid(columns: Int, rows: Int, own: Bool)
+    /// Type-ahead (D102): the shell's prompt, followed as output is read. Made with the terminal, before
+    /// any output, so the first prompt's marks are seen.
+    var promptTracker: TerminalPromptTracker { get }
+    /// After each chunk of output has been read.
+    var onOutputRead: (() -> Void)? { get set }
+    /// The grey text after the cursor; nil hides it.
+    func showTypeAheadGhost(_ text: String?, columnsLeft: Int)
+    /// Types `text` as if keyed: a suggestion's chip.
+    func typeText(_ text: String)
 }
 
 @MainActor
@@ -4479,6 +4645,9 @@ private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHo
     }
 
     override func paste(_ sender: Any) {
+        // A picture alone on the clipboard goes where a dropped one goes (the terminal capability's `pasteFiles`,
+        // 2026-11-06): ⌘V read text alone, and a screenshot pasted nothing.
+        if hostModelProvider()?.pasteFiles?() == true { return }
         guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
         onPasteRequest?(text, getTerminal().bracketedPasteMode)
     }
@@ -4519,6 +4688,8 @@ private final class MacSwiftTermEngine: TerminalEngine {
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
     private var scrollWatcher: MacAlternateScreenScrollWatcher?
     private var pathPreviewer: MacTerminalPathPreviewer?
+    let promptTracker: TerminalPromptTracker
+    var onOutputRead: (() -> Void)?
 
     init(
         delegate: TerminalViewDelegate,
@@ -4531,6 +4702,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
         hostModel: @escaping () -> SwiftTermHostModel? = { nil }
     ) {
         terminalView = ReviewingMacTerminalView(frame: .zero)
+        promptTracker = TerminalPromptTracker(terminal: terminalView.getTerminal())
         scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
         terminalView.fullHistoryProvider = fullHistory
         terminalView.hostModelProvider = hostModel
@@ -4608,6 +4780,19 @@ private final class MacSwiftTermEngine: TerminalEngine {
             duration: start.duration(to: performanceClock.now)
         )
         refreshAccessibilityViewport()
+        onOutputRead?()
+    }
+
+    func showTypeAheadGhost(_ text: String?, columnsLeft: Int) {
+        terminalView.showTypeAheadGhost(text, columnsLeft: columnsLeft)
+    }
+
+    func typeText(_ text: String) {
+        let bytes = Array(text.utf8)
+        guard !bytes.isEmpty else { return }
+        promptTracker.noteSent(bytes)
+        recordInput(byteCount: bytes.count)
+        onPasteData(Data(bytes))
     }
 
     func recordInput(byteCount: Int) {
@@ -4653,6 +4838,8 @@ private final class MacSwiftTermEngine: TerminalEngine {
 
     func commitPaste(_ text: String, bracketed: Bool) {
         let data = SwiftTermPastePolicy.framedData(for: text, bracketed: bracketed)
+        // Never a key that takes a suggestion: a paste goes as pasted, and the line typed follows it (D102).
+        promptTracker.noteSent(Array(data))
         recordInput(byteCount: data.count)
         onPasteData(data)
     }
@@ -4935,12 +5122,16 @@ public struct SwiftTermHostView: NSViewRepresentable {
 
         public func send(source: TerminalView, data: ArraySlice<UInt8>) {
             // An answer to the program's query: tmux has answered it already (control mode, D83).
-            if let model, model.isTmuxControlClient, model.retainedRenderer()?.isFeedingOutput == true { return }
-            model?.retainedRenderer()?.recordInput(byteCount: data.count)
+            let answering = model?.retainedRenderer()?.isFeedingOutput == true
+            if let model, model.isTmuxControlClient, answering { return }
+            // A key that takes the grey suggestion types the suggestion instead (D102); either way the line typed
+            // is followed. An answer to a program's query, read with its output, is no key.
+            let bytes = answering ? Array(data) : (model?.typeAheadOutgoing(Array(data)) ?? Array(data))
+            model?.retainedRenderer()?.recordInput(byteCount: bytes.count)
             #if os(visionOS)
             if let model { TerminalRefreshCounts.shared.noteKeySent(to: ObjectIdentifier(model)) }
             #endif
-            onSendData(Data(data))
+            onSendData(Data(bytes))
         }
 
         public func scrolled(source: TerminalView, position: Double) {
@@ -5248,6 +5439,9 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
     }
 
     override func paste(_ sender: Any) {
+        // A picture alone on the clipboard goes where a dropped one goes (the terminal capability's `pasteFiles`,
+        // 2026-11-06): ⌘V read text alone, and a screenshot pasted nothing.
+        if hostModelProvider()?.pasteFiles?() == true { return }
         guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
         onPasteRequest?(text, getTerminal().bracketedPasteMode)
     }
@@ -5383,6 +5577,11 @@ private final class MacLocalProcessDelegateProxy:
         if let view = terminalView, let actions = view.tmuxControl?.resize(columns: newCols, rows: newRows) {
             for case .transport(let bytes) in actions { view.writeToTmux(bytes) }
         }
+        // And the pane is told here: `LocalProcessTerminalView` reports a size only while its own
+        // process runs, and tmux on pipes isn't it. A tab in tmux never said its size, so Scale Text,
+        // which waits for one, never took hold: the button lit and the window resized the grid as if
+        // it were off (2026-11-06, someone using the Mac release). A recording's size came from it too.
+        if terminalView?.tmuxControl != nil { onResize(newCols, newRows) }
     }
 
     func setTerminalTitle(source: TerminalView, title: String) {
@@ -5527,6 +5726,8 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
     private var scrollWatcher: MacAlternateScreenScrollWatcher?
     private var pathPreviewer: MacTerminalPathPreviewer?
+    let promptTracker: TerminalPromptTracker
+    var onOutputRead: (() -> Void)?
 
     init(
         hostModel: SwiftTermHostModel,
@@ -5562,17 +5763,21 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         self.onProcessTerminated = onProcessTerminated
         self.onRendererDiagnostics = onRendererDiagnostics
         self.onOSC52Decision = onOSC52Decision
+        self.promptTracker = TerminalPromptTracker(terminal: terminalView.getTerminal())
 
         delegateProxy.terminalView = terminalView
         delegateProxy.engine = self
+        promptTracker.shellIsInForeground = { [weak self] in self?.shellIsInForeground ?? false }
         terminalView.terminalDelegate = delegateProxy
         terminalView.processDelegate = delegateProxy
         terminalView.onPasteRequest = onPasteRequest
+        // Each chunk of output, the shell's own or tmux's (`receiveTmuxBytes`).
         terminalView.onProcessOutput = { [weak self] bytes, duration in
             self?.recordProcessOutput(bytes, duration: duration)
             self?.reapplyFindHit()
             self?.scheduleWorkingDirectoryCheck()
             self?.delegateProxy.hostModel?.noteOutputActivity()
+            self?.onOutputRead?()
         }
         scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView) { [weak self] in
             self?.delegateProxy.hostModel?.onAlternateScreenScroll
@@ -5750,6 +5955,9 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         pipe.onExit = { [weak self] status in self?.controlPipeExited(status: status) }
         controlPipe = pipe
         delegateProxy.hostModel?.isTmuxControlClient = true
+        // A pane laid out in its window before tmux started (its view starts the process after the
+        // first layout) has its size already: said now, or Scale Text waited for the first resize.
+        if terminalView.window != nil { delegateProxy.onResize(terminal.cols, terminal.rows) }
         didReportTermination = false
         processState.beganRunning(currentDirectory: configuration.currentDirectory)
         launchedShell = configuration.executable
@@ -5781,6 +5989,15 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
             duration: start.duration(to: clock.now)
         )
         refreshAccessibilityViewport()
+        onOutputRead?()
+    }
+
+    func showTypeAheadGhost(_ text: String?, columnsLeft: Int) {
+        terminalView.showTypeAheadGhost(text, columnsLeft: columnsLeft)
+    }
+
+    func typeText(_ text: String) {
+        sendUserInput(ArraySlice(text.utf8))
     }
 
     func recordInput(byteCount: Int) {
@@ -5788,10 +6005,14 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         delegateProxy.hostModel?.noteInputActivity()
     }
 
-    func sendUserInput(_ bytes: ArraySlice<UInt8>) {
-        guard isProcessRunning, !bytes.isEmpty else { return }
+    func sendUserInput(_ incoming: ArraySlice<UInt8>) {
+        guard isProcessRunning, !incoming.isEmpty else { return }
         // An answer to the program's query, while tmux's drawing is read: tmux has answered it.
         if terminalView.tmuxControl != nil, terminalView.isFeedingControlOutput { return }
+        // A key that takes the grey suggestion types the suggestion instead (D102); either way the line typed is
+        // followed. An answer to a program's query, read with its output, is no key.
+        let bytes: ArraySlice<UInt8> = terminalView.isFeeding ? incoming
+            : ArraySlice(delegateProxy.hostModel?.typeAheadOutgoing(Array(incoming)) ?? Array(incoming))
         recordInput(byteCount: bytes.count)
         emitBounded(Data(bytes), to: onInputData)
         claimTmuxWindow()
@@ -5889,6 +6110,38 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         terminalView.terminate()
         reportProcessTermination(exitCode: nil)
         Self.reapTerminatedProcess(processID)
+    }
+
+    /// The shell this terminal started is the program reading its keys: nothing it started runs in front of it
+    /// (type-ahead, `TerminalPromptTracker.shellIsInForeground`). In tmux, the shell tmux started in the pane, which
+    /// is a process of this Mac's (`shellReadsItsTerminal`).
+    var shellIsInForeground: Bool {
+        if controlPipe != nil {
+            // A tab in tmux, as every one of the owner's is (2026-11-06): asked "Never for tmux", none of them was
+            // offered anything until its shell marked a prompt, and a shell running in tmux from before then
+            // never would. The first prompt's marks also come before the tab attaches, and a re-read pane has none.
+            guard let pid = terminalView.tmuxControl?.panePID else { return false }
+            return Self.shellReadsItsTerminal(pid)
+        }
+        guard let shell = launchedShell,
+              Self.shellNames.contains(URL(fileURLWithPath: shell).lastPathComponent),
+              let process = terminalView.process, process.running, process.shellPid > 0, process.childfd >= 0
+        else { return false }
+        return tcgetpgrp(process.childfd) == process.shellPid
+    }
+
+    private static let shellNames: Set<String> = ["zsh", "bash", "fish", "sh", "dash", "ksh", "mksh", "tcsh", "csh"]
+
+    /// Whether `pid` is a shell whose terminal's foreground process group is its own: nothing it runs is in front of
+    /// it, so it reads the terminal's keys. From the process table (`e_tpgid`, as `ps -o tpgid` shows it), so it
+    /// answers for a terminal that isn't this app's own, such as a tmux pane's.
+    static func shellReadsItsTerminal(_ pid: pid_t) -> Bool {
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        guard pid > 0, proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return false }
+        let name = withUnsafeBytes(of: info.pbi_comm) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        guard shellNames.contains(name), info.e_tpgid > 0 else { return false }
+        return info.e_tpgid == info.pbi_pgid
     }
 
     var hasActiveChildProcesses: Bool? {

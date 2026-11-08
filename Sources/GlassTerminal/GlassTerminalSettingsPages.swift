@@ -33,5 +33,9 @@ public enum GlassTerminalSettingsPages {
         GlassTerminalSettingsPage(id: "terminal.snippets", title: "Snippets", systemImage: "text.badge.star") { runtime in
             AnyView(SnippetsSettingsView().environment(runtime.settingsManager).environment(runtime.sessionManager))
         },
+        // Type-ahead (D102).
+        GlassTerminalSettingsPage(id: "terminal.suggestions", title: "Suggestions", systemImage: "text.cursor") { runtime in
+            AnyView(TerminalTypeAheadSettingsView().environment(runtime.settingsManager).environment(runtime.sessionManager))
+        },
     ]
 }

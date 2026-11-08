@@ -31,7 +31,56 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-05 — RESUME HERE: 0.4.603 shipped (Mac release, TestFlight 603)
+## 2026-11-05, later — RESUME HERE: 0.4.604 (D100) and 0.4.605 (D101), uncommitted
+- **D100** (0.4.604, on all three devices): a machine is the name it was given; a shared address no longer folds two
+  machines into one (`tasks/2026-11/2026-11-05_machine-is-its-name.md`). His repair steps and the D27 question are
+  with him.
+- **SwiftTerm test app** (`2026-11-05_swiftterm-199-test.md`): SwiftTerm draws Vision Pro at 1 pixel a point. He
+  asked for options from the simulator rather than a headset run, then chose option 1.
+- **D101** (0.4.605; 0.4.606 on all three devices): SwiftTerm 1.20.0 vendored with the scale fixed; Vision Pro draws with Metal
+  (`2026-11-05_vision-metal-full-scale.md`). Validation and installs in that note.
+- **2026-11-06, his "fixed that." (fix that):** `GlassTerminalTests` builds and passes on the visionOS (738) and iOS
+  (737) simulators, as well as the Mac (1,110). Changes are to tests only; the reasons are in the D101 note's last
+  section. Two Vision Pro tests skip without an app's window scene; whether to add an app-hosted test target is his
+  call.
+- **2026-11-06, a user's screen full of zsh prompts after resizing a local tmux tab** (his "resising the window did
+  that!"): zsh's resize redraw clears from the top-left corner, and tmux's `scroll-on-clear` copied the prompt into
+  the session's history each time; a re-read put the copies in the tab's scrollback and a growing window brought them
+  down. Fixed in `TmuxControlClient` (`set-option -wq scroll-on-clear off` on the window it follows), proven in the
+  macOS 26 VM with tmux 3.7c, a biting live test, Mac `GlassTerminalTests` 1,111 passing.
+  `tasks/2026-11/2026-11-06_tmux-resize-prompt-copies.md`. Also there: **Scale Text did nothing in a local tab in
+  tmux** (the same user; he reproduced it on 0.4.606): the pane waits for a size report SwiftTerm sends only for its
+  own process. Fixed in `MacLocalProcessDelegateProxy.sizeChanged`; not related to D101 (evidence in the note). One
+  defect found and not fixed: a fast drag's race with tmux's answers. **0.4.607 (both fixes and type-ahead)
+  installed on the Mac and iPhone at his word, 2026-11-06 22:22**; the headset stays on 0.4.606. His reply on
+  Scale: "It used to work with tmux just fine": an independent read of the history was asked for.
+- **2026-11-06, IN PROGRESS: type-ahead in terminals (D102),** his "write up the plan, then begin the build of all of
+  it". Plan and order of work: `tasks/2026-11/2026-11-06_type-ahead.md` (its Progress section is the checkpoint).
+  Helper agents own only their new files (history parsers and secret filter; shell integration scripts and
+  installers; common tools' data); this session owns the rest and the memory bank.
+- **His "No surprises for users (like not being able to paste an image into the terminal)"** (2026-11-06):
+  another program's input is never offered over or kept (the typed-keys fallback needs this Mac's foreground check);
+  fish 4's marks; server start-up files only appended to, removed with the editor's verified save, links kept;
+  ⌘V of a picture on the Mac goes where a drop goes (it never did anything; an independent search of every ref
+  agrees). Mac `GlassTerminalTests` 1,224 passing in 15.5 s after two heavy suites came off the main actor. Live
+  against the test VM: install, removal, appended lines and a linked `.bashrc`; the test VM's `.bashrc` checked unchanged.
+  The two macOS VMs stopped. **Found by the real app on the Vision Pro simulator:** no SSH terminal ever offered
+  anything (type-ahead wired into the local engine's attach only); fixed and tested. Chips moved off the terminal's
+  text by his choice: above the keyboard bar on iPhone/iPad, an ornament on Vision Pro (D102 amended). Mac 1,226,
+  iPhone sim 832, Vision Pro sim 832, all passing.
+- **Committed at his word ("Let's commit here", 2026-11-08), not pushed:** 0.4.604–0.4.609 in one commit on `main`,
+  with release notes for each build; scanned first (the test VM's name taken out of the new lines). 0.4.607 installed
+  on the Mac and iPhone at his word (2026-11-06); **0.4.608** (type-ahead in
+  tabs in tmux, programs on PATH) on both 2026-11-07 00:03, then **0.4.609** (typed paths completed) at 00:41, read
+  back on both; the headset stays on 0.4.606. **His word on 0.4.609 (2026-11-07):** "Looks friggin amazing now";
+  Scale Text still works in tmux. Push and
+  the upstream SwiftTerm issue each wait on his word. Open for him: the accept key (→ as built, or Tab).
+- **2026-11-07, his Mac ran out of memory** (swap near full; other apps' processes, not this one, about 1 GB) and the
+  app beach-balled from 13:15 until he force quit it; no hang report was written. A hang watcher now runs on his Mac
+  (outside the repo, at his ask) and samples the app if its main thread stops answering; its reports sit in the
+  working-files folder.
+
+## 2026-11-05 — 0.4.603 shipped (Mac release, TestFlight 603)
 - **His word:** "go ahead, ship it". Committed `af5257e5` (0.4.601–0.4.603) and pushed; `release-mac.sh 0.4.603 603`
   (Xcode 27.2): notarized and stapled; GitHub release v0.4.603 (Latest) with dmg, zip and checksums, downloads
   byte-identical to the build; the feed entry committed `9a648f14` and pushed. README, site status lines (Vision Pro in

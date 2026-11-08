@@ -59,6 +59,9 @@ public struct TmuxControlClient: Sendable {
     public private(set) var phase: Phase = .shell
     /// The pane drawn, as tmux names it (`%3`), once known.
     public private(set) var pane: String?
+    /// The process the pane runs (`#{pane_pid}`: the shell tmux started in it), once known. On this Mac it is a
+    /// process of this Mac's, which says whether the shell is what reads the pane's keys (type-ahead, D102).
+    public private(set) var panePID: Int32?
     private var window: String?
     private(set) var columns: Int
     private(set) var rows: Int
@@ -261,6 +264,7 @@ public struct TmuxControlClient: Sendable {
             guard let pane = parts.first, pane.hasPrefix("%") else { return [] }
             self.pane = String(pane)
             window = parts.count > 1 ? String(parts[1]) : nil
+            panePID = parts.count > 2 ? Int32(parts[2]).flatMap { $0 > 0 ? $0 : nil } : nil
             return readPane()
         case .restore(let part):
             restore.record(part, lines: lines)
@@ -293,13 +297,23 @@ public struct TmuxControlClient: Sendable {
 
     /// Sized to this terminal, never to a placeholder (iTerm2 once shrank people's windows so), told
     /// to pause rather than fall far behind, and asked which pane to draw.
+    ///
+    /// **A clear stays out of tmux's history** (2026-11-06): each step of a window's resize left
+    /// another copy of zsh's prompt in the session, until a re-read screen was full of them. zsh
+    /// redraws its prompt on a resize as a return, a clear to the screen's end and the prompt; on the
+    /// top row that clear is the whole screen, and tmux (`scroll-on-clear`, on unless set off, 3.3
+    /// and later) first scrolls the screen into history. Measured on tmux 3.7c and 3.8, both ways of
+    /// resizing: one copy per resize, none with it off. This terminal never keeps a cleared screen
+    /// (SwiftTerm's erase-in-display only erases), so tmux's history then matches the one shown. For
+    /// the window this client follows, as each is asked for; `-q`, as tmux 3.2 has no such option.
     private mutating func askForPane() -> [TmuxControlAction] {
         var actions: [TmuxControlAction] = []
         if phase == .starting {
             actions += send("refresh-client -C \(columns),\(rows)", as: .ignored)
             actions += send("refresh-client -f pause-after=30", as: .ignored)
         }
-        actions += send("display-message -p '#{pane_id} #{window_id}'", as: .paneAndWindow)
+        actions += send("set-option -wq scroll-on-clear off", as: .ignored)
+        actions += send("display-message -p '#{pane_id} #{window_id} #{pane_pid}'", as: .paneAndWindow)
         return actions
     }
 

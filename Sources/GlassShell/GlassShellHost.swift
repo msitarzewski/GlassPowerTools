@@ -127,10 +127,17 @@ public struct GlassShellHost: Identifiable, Hashable, Sendable {
     }
 }
 
-/// The grouping rule. Two records are the same machine when their normalised display names are
-/// equal, when they share an alias (the source apps published the address as the alias), or when
-/// they carry the same address. Loopback addresses never group: many distinct local services
-/// legitimately carry them.
+/// The grouping rule: **two records are the same machine when their normalised display names are
+/// equal**, and nothing else joins them. The name is what the user gave the machine; two devices
+/// that set one machine up each wrote a record of that name (D32), and those fold into one.
+///
+/// A shared address or alias no longer joins records (D100, 2026-11-05). Two connections the user
+/// named apart — two sites on one server, two accounts behind one address — are two machines: with
+/// the address joining them, a machine added at another machine's address was folded into it
+/// already there within a minute, three times in four minutes, its terminal moved onto the other
+/// machine and its record deleted on every device. The alias rule was for the source apps, which
+/// published the address as the alias; they are obsolete (2026-09-13) and their records folded long
+/// since.
 public enum GlassShellHostGrouping {
     public static func normalizedName(_ name: String) -> String {
         var value = name.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping.lowercased()
@@ -138,40 +145,16 @@ public enum GlassShellHostGrouping {
         return value
     }
 
-    /// `nil` for values that must not link records: empty, or loopback.
-    public static func normalizedAlias(_ alias: String) -> String? {
-        let value = normalizedName(alias)
-        guard !value.isEmpty, !Self.loopback.contains(value) else { return nil }
-        return value
-    }
-
-    private static let loopback: Set<String> = ["localhost", "127.0.0.1", "::1", "0.0.0.0"]
-
     /// Groups live records into hosts; deleted records are ignored by the caller (the catalog
     /// snapshot already excludes them). Output is sorted like the catalog: by name, then id.
     public static func group(_ records: [HostProfile]) -> [GlassShellHost] {
         guard !records.isEmpty else { return [] }
-        var parent = Array(records.indices)
-        func find(_ i: Int) -> Int {
-            var i = i
-            while parent[i] != i { parent[i] = parent[parent[i]]; i = parent[i] }
-            return i
-        }
-        func join(_ a: Int, _ b: Int) { let ra = find(a), rb = find(b); if ra != rb { parent[max(ra, rb)] = min(ra, rb) } }
-
-        var byName: [String: Int] = [:]
-        var byAlias: [String: Int] = [:]
-        for (index, record) in records.enumerated() {
+        var groups: [String: [HostProfile]] = [:]
+        for record in records {
+            // A record with no name is its own machine: nothing says it is another.
             let name = normalizedName(record.displayName)
-            if !name.isEmpty {
-                if let first = byName[name] { join(first, index) } else { byName[name] = index }
-            }
-            for alias in (record.aliases + [record.address].compactMap { $0 }).compactMap(normalizedAlias) {
-                if let first = byAlias[alias] { join(first, index) } else { byAlias[alias] = index }
-            }
+            groups[name.isEmpty ? "\u{0}" + record.id.rawValue.uuidString : name, default: []].append(record)
         }
-        var groups: [Int: [HostProfile]] = [:]
-        for (index, record) in records.enumerated() { groups[find(index), default: []].append(record) }
         return groups.values.map(GlassShellHost.init(members:)).sorted {
             // As Finder sorts: "bravo" before "Zulu", "web2" before "web10".
             let order = $0.displayName.localizedStandardCompare($1.displayName)

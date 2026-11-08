@@ -112,7 +112,7 @@ def main():
     components, seen_pins = [], set()
     for entry in manifest["components"]:
         component = {k: entry[k] for k in ("id", "name", "group", "license") }
-        for key in ("note", "source", "revision"):
+        for key in ("note", "source", "revision", "version"):
             if key in entry:
                 component[key] = entry[key]
         if "pin" in entry:

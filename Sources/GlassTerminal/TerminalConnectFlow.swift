@@ -326,6 +326,7 @@ struct TerminalConnectFlow: ViewModifier {
             sessionManager.registerSession(session)
             session.state = .connected
             session.demoOpensSettings = opensSettings
+            session.demoTypeAheadHistory = TerminalCommandHistory(folder: nil)
             session.feedTerminalData(output)
             presentTerminalWindow(for: session, windowSettings: windowSettings)
             #if DEBUG

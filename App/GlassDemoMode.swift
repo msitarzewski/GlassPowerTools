@@ -184,6 +184,18 @@ enum GlassDemoMode {
             }
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8), windowSettings: demoLook,
                                        ticks: ticks, every: .milliseconds(200))
+        case "terminal-typeahead":
+            // Type-ahead's chips (D102, 2026-11-06): three commands run at a shell that marks its prompts, then
+            // "git st" typed at the next. What they ran is kept in the demo's own memory, never the device's.
+            func ran(_ command: String, _ output: String) -> String {
+                "\u{1B}]133;A\u{07}~/shop $ \u{1B}]133;B\u{07}\(command)\r\n\u{1B}]633;E;\(command)\u{07}"
+                    + "\u{1B}]133;C\u{07}\(output)\r\n\u{1B}]133;D;0\u{07}"
+            }
+            let transcript = ran("git status", "On branch main\r\nnothing to commit, working tree clean")
+                + ran("git stash list", "stash@{0}: WIP on main: 3f2c1a9 Menu prices")
+                + ran("git switch main", "Already on 'main'")
+                + "\u{1B}]133;A\u{07}~/shop $ \u{1B}]133;B\u{07}git st"
+            terminal.requestDemoReplay(name: "alpha", output: Data(transcript.utf8), windowSettings: demoLook)
         case "terminal-diagram":
             // A Mermaid diagram a coding agent printed as text, with its mark (2026-10-21).
             terminal.requestDemoReplay(name: "alpha", output: Data(diagramTranscript.utf8), windowSettings: demoLook)
@@ -240,11 +252,16 @@ enum GlassDemoMode {
                 : "/var/log/shop/" + String(repeating: "jobs-worker-", count: 6) + "out.log"
             let rows = Array(repeating: "", count: 14) + Array(repeating: link, count: 12)
             terminal.requestDemoReplay(name: "alpha", output: Data(rows.joined(separator: "\r\n").utf8))
-        case "terminal-tmux":
+        case "terminal-tmux", "terminal-tmux-short":
             // 2026-10-15: tmux as SwiftTerm sees it — the alternate screen, the mouse asked for, and
             // a status line redrawn every 0.4 s — over words to select (the owner: "selecting text is
             // still broken wholly in the terminal in visionOS with tmux").
-            let words = String(repeating: "select these words on the screen ", count: 4)
+            // `-short`: no word longer than four letters, so a drag from any cell of the word selected,
+            // or the space after it, starts within reach of one of its ends (three columns, SwiftTerm's
+            // rule). Which letter lies at the terminal's middle changes with the cell size; on
+            // 2026-11-05 it became the fourth of six, out of reach of both.
+            let phrase = surface == "terminal-tmux-short" ? "drag ends of this text with care " : "select these words on the screen "
+            let words = String(repeating: phrase, count: 4)
             let screen = "\u{1B}[?1049h\u{1B}[?1000h\u{1B}[?1002h\u{1B}[?1006h\u{1B}[H\u{1B}[2J"
                 + Array(repeating: words, count: 60).joined(separator: "\r\n")
             let status = "\u{1B}7\u{1B}[999;1H\u{1B}[7m[0] 0:zsh*  \u{1B}[0m\u{1B}8"
