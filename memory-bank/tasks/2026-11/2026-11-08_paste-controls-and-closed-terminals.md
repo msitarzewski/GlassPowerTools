@@ -43,7 +43,9 @@ install on the Mac and iPhone; no commit or push without his word.
 - 0.4.610 installed and read back on the Mac and iPhone, no new crash reports. Committed at his word ("commit",
   2026-11-08) as `383a5379`, not pushed.
 - Vision Pro, at his "push the latest to vision": 0.4.610 built (Release, `build-visionOS-610.log` in the working
-  files, BUILD SUCCEEDED, Info.plist 0.4.610). The headset was unavailable; the installer waits for it.
+  files, BUILD SUCCEEDED, Info.plist 0.4.610). The headset was unavailable for two hours of waiting; installed at
+  his "vision is up" (22:59) and read back as 0.4.610. No Glass Power Tools crash reports on the headset; the
+  newest memory reports name donotdisturbd and iconservicesagent, and the newest jetsam event ended agentstored.
 
 ## Docs (his "all related docs and help updated", 2026-11-08)
 - Help, `site/help/terminal-sessions.md`: Paste says a paste is text and control characters are left out, pointing

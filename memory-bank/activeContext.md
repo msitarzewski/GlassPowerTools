@@ -87,7 +87,8 @@ use the disposable test VM only).
   simulators 845 each, all passing. `tasks/2026-11/2026-11-08_paste-controls-and-closed-terminals.md`.
   Installed and read back on the Mac and iPhone. **Committed at his word ("commit", 2026-11-08) as `383a5379`, not
   pushed.** Then his "push the latest to vision": 0.4.610 built for Vision Pro (Release); the headset was
-  unavailable, so `install-headset-when-awake.zsh 610` waits for it (up to an hour) and reads the version back.
+  unavailable for two hours, then installed at his "vision is up" (2026-11-08 22:59) and read back as 0.4.610. No
+  Glass Power Tools crash reports on it; the newest memory and jetsam reports name other processes.
   Then his "get everything committed, the memory bank updated, and all related docs and help": the help's Paste
   (control characters left out) and Drop (`$'…'` names) in `site/help/terminal-sessions.md`, SECURITY.md, D103,
   D102's status, progress rows for 0.4.604–0.4.610 (and 0.4.593–0.4.600 marked released), patterns, techContext's
