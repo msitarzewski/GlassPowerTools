@@ -55,7 +55,10 @@ enum TerminalDroppedPaths {
     /// A path as a shell reads it back unchanged. Letters, digits and `_./-+,:@%^=` stand as they
     /// are; anything else is backslash-escaped, as Terminal.app writes a dropped path. A control
     /// character — a newline in a file name — cannot be backslash-escaped, so that path is written
-    /// in `$'…'` form instead, which bash, zsh and fish all read.
+    /// in `$'…'` form instead, which bash, zsh and fish all read. There any other control or format character is
+    /// written as its UTF-8 bytes, `\xHH` each: it had been `\x` and its whole value, so a right-to-left override
+    /// (U+202E) came out as `\x202e`, a space and "2e", and a C1 control as one byte that is not its UTF-8
+    /// (2026-11-08). `\u` would do in zsh and a newer bash, but macOS's bash 3.2 has no `\u`.
     nonisolated static func escaped(_ path: String) -> String {
         if path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
             var body = ""
@@ -68,7 +71,7 @@ enum TerminalDroppedPaths {
                 case "\r": body += "\\r"
                 default:
                     if CharacterSet.controlCharacters.contains(scalar) {
-                        body += String(format: "\\x%02x", scalar.value)
+                        for byte in String(scalar).utf8 { body += String(format: "\\x%02x", byte) }
                     } else {
                         body.unicodeScalars.append(scalar)
                     }

@@ -1052,11 +1052,22 @@ public final class SwiftTermHostModel: ObservableObject {
         guard let request = pendingPasteReview else { return }
         pendingPasteReview = nil
         guard let approvedText,
-              SwiftTermPastePolicy.isAllowed(approvedText) else { return }
-        terminalEngine?.commitPaste(approvedText, bracketed: request.bracketedPasteMode)
+              SwiftTermPastePolicy.isAllowed(approvedText),
+              let engine = terminalEngine else { return }
+        commitPaste(approvedText, bracketed: request.bracketedPasteMode, to: engine)
     }
 
     private static let pasteLogger = os.Logger(subsystem: "sh.glas", category: "terminal-paste")
+
+    /// Sends a paste or drop, and says in the log how many control characters it left out
+    /// (`SwiftTermPastePolicy.isSent`), so a paste that came out short can be told from one that arrived short.
+    private func commitPaste(_ text: String, bracketed: Bool, to engine: any TerminalEngine) {
+        let leftOut = SwiftTermPastePolicy.leftOutCount(text)
+        if leftOut > 0 {
+            Self.pasteLogger.notice("event=paste-controls-left-out count=\(leftOut, privacy: .public)")
+        }
+        engine.commitPaste(text, bracketed: bracketed)
+    }
 
     /// What became of text dropped on a terminal.
     public enum DroppedTextOutcome: Equatable, Sendable {
@@ -1103,7 +1114,7 @@ public final class SwiftTermHostModel: ObservableObject {
            SwiftTermPastePolicy.isAllowed(rewritten) {
             guard let engine = terminalEngine else { return .noTerminal }
             Self.pasteLogger.notice("event=paste-joined bytes=\(text.utf8.count, privacy: .public)")
-            engine.commitPaste(rewritten, bracketed: bracketed)
+            commitPaste(rewritten, bracketed: bracketed, to: engine)
             return .typed
         }
         if let review = SwiftTermPastePolicy.reviewRequest(for: text, bracketed: bracketed) {
@@ -1111,7 +1122,7 @@ public final class SwiftTermHostModel: ObservableObject {
             return .awaitingReview
         } else if SwiftTermPastePolicy.isAllowed(text) {
             guard let engine = terminalEngine else { return .noTerminal }
-            engine.commitPaste(text, bracketed: bracketed)
+            commitPaste(text, bracketed: bracketed, to: engine)
             return .typed
         }
         return .refused
@@ -1575,12 +1586,32 @@ public enum SwiftTermPastePolicy {
         )
     }
 
+    /// Whether a paste sends `scalar`. A paste is text, never keys (2026-11-08): a pasted `ESC [ 201 ~` ended
+    /// bracketed paste early and what followed ran as typed, and a Ctrl-O in a one-line paste, bash's
+    /// operate-and-get-next, ran the line without a review. Every C0 control but tab, newline and return is left
+    /// out, and DEL and the C1 controls (U+0080–U+009F, among them the one-character CSI), bracketed or not:
+    /// xterm's default (`allowPasteControls` false).
+    static func isSent(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x09, 0x0A, 0x0D: true
+        case 0x00...0x1F, 0x7F...0x9F: false
+        default: true
+        }
+    }
+
+    /// How many of `text`'s characters a paste leaves out, for the log.
+    public static func leftOutCount(_ text: String) -> Int {
+        text.unicodeScalars.reduce(0) { $0 + (isSent($1) ? 0 : 1) }
+    }
+
     public static func framedData(for text: String, bracketed: Bool) -> Data {
         var data = Data()
         if bracketed {
             data.append(bracketedPasteStart)
         }
-        data.append(Data(text.utf8))
+        var sent = String.UnicodeScalarView()
+        sent.append(contentsOf: text.unicodeScalars.lazy.filter(isSent))
+        data.append(Data(String(sent).utf8))
         if bracketed {
             data.append(bracketedPasteEnd)
         }
@@ -3651,6 +3682,18 @@ private final class SwiftTermEngine: TerminalEngine {
     }
 
     private var scrollWatcher: UIKitAlternateScreenScrollWatcher?
+
+    /// A closed terminal lets its view go (2026-11-08). SwiftTerm's view runs a display link whose target is the
+    /// view, and a link holds its target until it is invalidated, which only `updateUiClosed()` does. Nothing called
+    /// it, so every terminal closed on iPhone, iPad or Vision Pro kept its view, its `Terminal` and its scrollback
+    /// until the app quit. The engine owns the view, and goes when the model drops it on close
+    /// (`releaseRenderer`) or the model itself goes (`TerminalViewLifetimeTests`).
+    isolated deinit {
+        terminalView.updateUiClosed()
+        #if os(visionOS)
+        for observer in rendererObservers { NotificationCenter.default.removeObserver(observer) }
+        #endif
+    }
 
     #if os(visionOS)
     private var rendererObservers: [NSObjectProtocol] = []

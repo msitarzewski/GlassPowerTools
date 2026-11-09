@@ -5855,6 +5855,24 @@ struct glas_shTests {
         #expect(SwiftTermPastePolicy.framedData(for: "one", bracketed: false) == Data("one".utf8))
     }
 
+    /// A paste is text, never keys (2026-11-08). A pasted `ESC [ 201 ~` ended bracketed paste early, so the
+    /// rest ran as typed; a Ctrl-O in a one-line paste, bash's operate-and-get-next, ran the line with no review.
+    /// Control characters are left out of every paste, bracketed or not, as xterm leaves them out by default
+    /// (`allowPasteControls`): tab, newline and return stay.
+    @Test func terminalPasteLeavesOutControlCharacters() {
+        let hostile = "echo safe\u{1B}[201~\nrm -rf ~\u{0F}\u{03}\u{7F}\u{9B}201~\u{00}\u{07}"
+        let framed = SwiftTermPastePolicy.framedData(for: hostile, bracketed: true)
+        #expect(framed == Data("\u{1B}[200~echo safe[201~\nrm -rf ~201~\u{1B}[201~".utf8))
+        #expect(framed.filter { $0 == 0x1B }.count == 2, "only the paste's own start and end markers")
+        #expect(SwiftTermPastePolicy.framedData(for: "ls\u{0F}", bracketed: false) == Data("ls".utf8))
+        #expect(SwiftTermPastePolicy.framedData(for: "a\tb\r\nc\nd\re", bracketed: false)
+            == Data("a\tb\r\nc\nd\re".utf8))
+        #expect(SwiftTermPastePolicy.framedData(for: "café 日本 → \u{200B}é", bracketed: false)
+            == Data("café 日本 → \u{200B}é".utf8))
+        #expect(SwiftTermPastePolicy.leftOutCount("echo safe\u{1B}[201~\u{9B}\n") == 2)
+        #expect(SwiftTermPastePolicy.leftOutCount("plain\ttext\r\n") == 0)
+    }
+
     @Test func terminalPastePolicyRejectsOversizedPayloadWithoutRetainingContent() throws {
         let text = String(repeating: "x", count: SwiftTermPastePolicy.maximumPayloadBytes + 1)
         let request = try #require(SwiftTermPastePolicy.reviewRequest(for: text, bracketed: false))

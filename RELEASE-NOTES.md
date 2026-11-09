@@ -104,6 +104,16 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.610 (8 November 2026)
+- **A paste is text, never keys.** Control characters are left out of everything you paste or drop into a
+  terminal, as xterm does: only tab, newline and return go through. Text copied from a web page could hide the
+  sequence that ends a paste, and whatever followed it then ran as if typed; a hidden Ctrl-O in a single line
+  could run it in bash without the paste review.
+- **Closed terminals free their memory on iPhone, iPad and Vision Pro.** Each terminal you closed had kept its
+  screen and its whole scrollback until the app quit.
+- **Dropped files with unusual names.** A file whose name holds an invisible formatting character, such as a
+  right-to-left mark, is typed so the shell reads back its real name.
+
 ### 0.4.609 (7 November 2026)
 - **Typed paths complete.** `cd ~/Software/gl` offers the folders in `~/Software` that start with `gl` as you type,
   and so do full paths (`/usr/lo…`) and paths from the folder you're in (`src/li…`). After `cd` only folders are

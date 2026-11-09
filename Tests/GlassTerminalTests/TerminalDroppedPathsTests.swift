@@ -15,6 +15,9 @@ struct TerminalDroppedPathsTests {
         #expect(TerminalDroppedPaths.escaped("/tmp/it's $HOME & `x`;") == #"/tmp/it\'s\ \$HOME\ \&\ \`x\`\;"#)
         #expect(TerminalDroppedPaths.escaped("/tmp/café/日本.txt") == "/tmp/café/日本.txt")
         #expect(TerminalDroppedPaths.escaped("/tmp/two\nlines") == #"$'/tmp/two\nlines'"#)
+        // Any other control or format character as its UTF-8 bytes, which bash's and zsh's `\x` read as bytes.
+        #expect(TerminalDroppedPaths.escaped("/tmp/a\u{202E}b") == #"$'/tmp/a\xe2\x80\xaeb'"#)
+        #expect(TerminalDroppedPaths.escaped("/tmp/a\u{07}b") == #"$'/tmp/a\x07b'"#)
     }
 
     @Test("several files: one line, space separated, a space after, never a newline")
@@ -29,7 +32,11 @@ struct TerminalDroppedPathsTests {
     @Test("a shell reads every escaped path back unchanged")
     func shellRoundTrip() async throws {
         for path in ["/tmp/My Pictures/a (1).png", "/tmp/it's $HOME & `x`;", "/tmp/[brackets]{x}*?#~!",
-                     "/tmp/café/日本.txt", "/tmp/two\nlines\tand tab", "/tmp/back\\slash"] {
+                     "/tmp/café/日本.txt", "/tmp/two\nlines\tand tab", "/tmp/back\\slash",
+                     // 2026-11-08: a format character (a right-to-left override, a zero-width space) or a C1
+                     // control was written as `\x` and its whole value: `\x202e` read as a space and "2e".
+                     "/tmp/right\u{202E}left.txt", "/tmp/zero\u{200B}width", "/tmp/c1\u{85}next",
+                     "/tmp/bell\u{07}ab", "/tmp/delete\u{7F}"] {
             let escaped = TerminalDroppedPaths.escaped(path)
             for shell in ["/bin/zsh", "/bin/bash"] {
                 // Off the main actor: `Process.waitUntilExit` ran the main run loop while it waited,
