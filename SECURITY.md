@@ -57,6 +57,10 @@ this repository's `PATCHES.md` files record what is changed locally.
   VNC password) protect the password, not the session. If a Mac can't be reached in its own
   revision, the app says so and Reconnect connects unencrypted. Use VNC without a Mac account on a
   network you trust.
+- **Pasting into a terminal** sends text only. Control characters are left out, as xterm leaves
+  them out, so text copied from a web page can't end the paste early and have the rest run as typed,
+  or press a key such as Control-O that runs the line. Text of more than one line, or longer than
+  4,096 bytes, is shown for review before it is sent.
 
 ## The Mac app is not sandboxed
 

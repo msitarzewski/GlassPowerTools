@@ -121,6 +121,30 @@ source applications are obsolete and no longer compile.
 | [The headset's stalls](tasks/2026-10/2026-10-29_headset-stalls.md) | Half-second keystrokes on the headset: the Terminal Themes folder read on the main thread |
 | [Workgroups across machines (D91), and the rest of the app for more than one Mac](tasks/2026-10/2026-10-30_workgroup-machines.md) | Mac terminals belong to their Mac; SSH key records kept across devices; the sweep's other findings |
 | [The site's pictures: Git, the dock, SQL](tasks/2026-10/2026-10-30_site-pictures-git-dock.md) | Demo surfaces for Git in the editor and the orb dock; Vision Pro pictures and pages; the Mac's wait on the VM |
+| [November's index](tasks/2026-11/README.md) | Each November task in order, with its builds, his words and its state |
+| [Databases and desktops in Workgroups](tasks/2026-11/2026-11-01_workgroup-services.md) | D94: a workgroup opens a machine's database and desktop services as well as its terminals |
+| [Finder Quick Actions](tasks/2026-11/2026-11-01_finder-quick-actions.md) | New Glass Power Tools Window Here turned on, Tab Here added beside it (0.4.575) |
+| [Vision Pro: a window's terminals come back when it is shown](tasks/2026-11/2026-11-01_terminals-back-when-shown.md) | Down terminals reconnect as their window is shown; Active reconnects relaunched windows' terminals (0.4.576) |
+| [The orb dock on the Mac](tasks/2026-11/2026-11-02_mac-orb-dock.md) | D95: Shrink to Orb hides a window into a floating dock of orbs, Connections first |
+| [A window's overview as Show All Windows](tasks/2026-11/2026-11-02_window-overview.md) | D96 and D97: the overview inside the window, the carousel as an album view on the Mac |
+| [The Mac's orb dock in Liquid Glass](tasks/2026-11/2026-11-02_liquid-dock.md) | D98: Apple's glass slab and drops; Liquid Glass is clear only in the key window |
+| [Overview and carousel on iPhone, iPad and Vision Pro](tasks/2026-11/2026-11-03_overview-everywhere.md) | D99: a Terminal View button on iPhone and iPad, real depth on Vision Pro |
+| [iPhone Duo stood like a laptop](tasks/2026-11/2026-11-03_duo-desktop-top-half.md) | The remote desktop takes the whole top half; the bars below the fold |
+| [Vision Pro: typing unseen until a resize](tasks/2026-11/2026-11-03_vision-typing-unseen.md) | The repaint band measured from the wrong top, fixed and counted; not the cause, still open |
+| [A bell rung out of sight](tasks/2026-11/2026-11-03_terminal-bell-notice.md) | The tab marked in orange in the dock, on orbs, in rows and tiles until seen (0.4.593) |
+| [Undo and the Edit menu in the Editor](tasks/2026-11/2026-11-03_editor-undo.md) | ⌘Z reaches the Editor's one undo; the Mac's Edit menu as TextEdit's; iPad and Vision Pro keys (0.4.594–0.4.596) |
+| [Vision Pro: the keyboard's window and the mini keyboard](tasks/2026-11/2026-11-03_vision-keyboard-bar.md) | No API names the window typed into; the mini keyboard hidden while a hardware keyboard is connected (0.4.599) |
+| [Vision Pro: the Files window shows the names](tasks/2026-11/2026-11-05_vision-files-rows.md) | 1100 wide; the row gives way, columns in line (0.4.597) |
+| [Vision Pro: Fine Position in every moon](tasks/2026-11/2026-11-05_focus-moon-fine-position.md) | Every moon follows the app's one Focus Mode; Files keeps its size (0.4.598) |
+| [The dock a row or a column; Focus Mode the app's](tasks/2026-11/2026-11-05_dock-orientation-focus-app.md) | `GlassOrbLine` on both docks; one environment for the app (0.4.600) |
+| [The orbs as liquid](tasks/2026-11/2026-11-05_liquid-orbs.md) | Drop physics, a ripple shader, Apple's glass in the drop's shape (0.4.601) |
+| [The dock keeps its length; the keyboard only when asked](tasks/2026-11/2026-11-05_dock-length-keyboard.md) | The On-Screen Keyboard setting; Vision Pro's glass the system's circle again (0.4.602–0.4.603, shipped) |
+| [SwiftTerm 1.99.2 tested](tasks/2026-11/2026-11-05_swiftterm-199-test.md) | Doesn't build against our code; the test app found Vision Pro drawn at one pixel a point |
+| [A machine is its name](tasks/2026-11/2026-11-05_machine-is-its-name.md) | D100: records group by name only; a shared address or alias joins nothing (0.4.604) |
+| [Vision Pro draws with Metal at its own scale](tasks/2026-11/2026-11-05_vision-metal-full-scale.md) | D101: SwiftTerm 1.20.0 vendored with its patches; `GlassTerminalTests` on the iPhone and Vision Pro simulators |
+| [A resize leaves a copy of zsh's prompt in tmux](tasks/2026-11/2026-11-06_tmux-resize-prompt-copies.md) | tmux's `scroll-on-clear` off for the followed window; Scale Text in a local tab in tmux |
+| [Type-ahead in terminals](tasks/2026-11/2026-11-06_type-ahead.md) | D102: the plan, its sources, the line from shell integration or echoed keys, chips and grey text (0.4.607–0.4.609) |
+| [A paste is text; a closed terminal is freed](tasks/2026-11/2026-11-08_paste-controls-and-closed-terminals.md) | D103: control characters left out of pastes; SwiftTerm's display link released; dropped names' format characters (0.4.610) |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

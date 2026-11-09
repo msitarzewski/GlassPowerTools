@@ -527,6 +527,14 @@ Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages>
 - Vision Pro: `requestGeometryUpdate(.Vision(size:resizingRestrictions: .uniform))` holds a window to its shape;
   SwiftUI has no aspect lock for a window.
 
+**A UIKit terminal view's lifetime** (`tasks/2026-11/2026-11-08_paste-controls-and-closed-terminals.md`, SwiftTerm
+1.20.0 vendored): SwiftTerm's iOS and visionOS `TerminalView` makes a `CADisplayLink` with itself as the target in
+`setupDisplayUpdates` (`Packages/SwiftTerm/Sources/SwiftTerm/iOS/iOSTerminalView.swift`). A display link holds its
+target until it is invalidated, and only `updateUiClosed()` does that, so a view dropped without it keeps itself,
+its `Terminal` and the scrollback for the life of the process. `SwiftTermEngine`'s `isolated deinit` calls it
+(0.4.610); `TerminalViewLifetimeTests` holds a weak reference to prove the view goes. The Mac's view has no display
+link.
+
 **Vision Pro** (D74 and the headset terminal; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`):
 - An app is never told where a person looks. Every look effect is a system hover effect; effects in one
   `HoverEffectGroup` show together, and a member left at the default `.activatesGroup` starts the group.

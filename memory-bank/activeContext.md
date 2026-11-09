@@ -85,8 +85,13 @@ use the disposable test VM only).
   (SwiftTerm's display link held each view, its `Terminal` and scrollback), and types a dropped file's format or C1
   characters as UTF-8 bytes. Each test seen failing first; `GlassTerminalTests` Mac 1,243, iPhone and Vision Pro
   simulators 845 each, all passing. `tasks/2026-11/2026-11-08_paste-controls-and-closed-terminals.md`.
-  Installed and read back on the Mac and iPhone; the headset stays on 0.4.606. **Committed at his word ("commit",
-  2026-11-08), not pushed.**
+  Installed and read back on the Mac and iPhone. **Committed at his word ("commit", 2026-11-08) as `383a5379`, not
+  pushed.** Then his "push the latest to vision": 0.4.610 built for Vision Pro (Release); the headset was
+  unavailable, so `install-headset-when-awake.zsh 610` waits for it (up to an hour) and reads the version back.
+  Then his "get everything committed, the memory bank updated, and all related docs and help": the help's Paste
+  (control characters left out) and Drop (`$'…'` names) in `site/help/terminal-sessions.md`, SECURITY.md, D103,
+  D102's status, progress rows for 0.4.604–0.4.610 (and 0.4.593–0.4.600 marked released), patterns, techContext's
+  display-link fact, the toc's November rows. The site built locally; deploying it waits on his word.
 
 ## 2026-11-05 — 0.4.603 shipped (Mac release, TestFlight 603)
 - **His word:** "go ahead, ship it". Committed `af5257e5` (0.4.601–0.4.603) and pushed; `release-mac.sh 0.4.603 603`

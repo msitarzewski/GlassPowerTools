@@ -2218,7 +2218,7 @@ S1 upstream is a public action, waiting on his word.
 row-band repaint (0.4.553) no longer runs on the headset unless Metal is switched off or falls back. Whether Metal
 reads as well as Core Graphics through the lenses is his to judge on the headset.
 
-## D102 — Type-ahead in terminals, from history and seven other sources — Approved 2026-11-06, in progress
+## D102 — Type-ahead in terminals, from history and seven other sources — Approved 2026-11-06; implemented 2026-11-06 to 2026-11-07 (0.4.607–0.4.609; committed `6c7a03aa` at his word, 2026-11-08)
 
 **Context.** He asked whether terminals could offer type-ahead from session history and what else to draw on. The
 app records no commands and has never known where a command line starts; SwiftTerm already decodes shell
@@ -2244,4 +2244,25 @@ appended to, and removed with the Files editor's verified save.
 the screen was full. Asked (three choices with pictures), he chose "Keyboard bar / ornament": on iPhone and iPad a
 row above the keyboard's bar, like QuickType, standing while the keyboard is up (the terminal one row shorter while
 typing); on Vision Pro an ornament under the window's toolbar, for the terminal in front.
+
+## D103 — A paste is text: control characters are left out — Approved 2026-11-08; implemented 2026-11-08 (0.4.610; committed `383a5379`)
+
+**Context.** A review of another terminal's published source (kept outside this repository, at his word) showed
+that our paste passed control characters straight through, on every platform. A pasted `ESC [ 201 ~` ended
+bracketed paste early and the rest ran as typed. A Ctrl-O in a one-line paste, which skips the review, ran the
+line in bash (operate-and-get-next). Proposed: "strip control characters, except tab and line endings, before
+sending"; his answer: "yes".
+
+**Decided.** `SwiftTermPastePolicy.framedData` (`Sources/GlassTerminalEmulator/SwiftTermHostView.swift`), which
+every paste and drop passes through (each engine's `commitPaste`), leaves out every C0 control but tab, LF and CR,
+plus DEL and C1 (U+0080–U+009F), whether the program asked for bracketed paste or not. This is xterm's default
+(`allowPasteControls` false: other C0 controls are suppressed); Alacritty strips only ESC and ETX, and only in
+bracketed paste. The host model logs how many it left out (`terminal-paste`, `event=paste-controls-left-out`).
+
+**Not changed.** Snippets and commands the app sends are not pastes and are not filtered; a control key is sent by
+pressing it. Unicode text, zero-width and format characters included, is pasted as it is. The paste review's
+thresholds (one short line sent at once) are as they were.
+
+**Consequence accepted.** A paste can no longer carry a key on purpose, such as an Escape for vi or a Ctrl-C: the
+character is dropped and the rest is sent. Nothing says so on screen; the log line counts them.
 

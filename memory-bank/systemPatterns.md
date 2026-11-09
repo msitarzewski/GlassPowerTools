@@ -270,6 +270,13 @@ test fails without the push.
 - **A drop or paste is never turned away in silence (2026-10-16).** The newest paste or drop takes a pending
   review's place, `insertDroppedText` reports what became of the text, and the Mac pane logs each step
   (`sh.glas` / `terminal-drop`) and beeps when nothing was typed (`Tests/GlassTerminalTests/TerminalDropTypingTests.swift`).
+- **A paste is text (D103, 2026-11-08).** Pasted and dropped text becomes bytes in one place,
+  `SwiftTermPastePolicy.framedData`, reached through each engine's `commitPaste`; it leaves out control characters
+  and frames bracketed paste. A new way to send pasted text goes through `commitPaste` (the host model's
+  `commitPaste` helper logs what was left out), never through `send`, which is for keys.
+- **Whoever owns a UIKit `TerminalView` calls `updateUiClosed()` when it lets the view go** (2026-11-08): SwiftTerm's
+  display link holds the view until then (`techContext.md`, A UIKit terminal view's lifetime). `SwiftTermEngine` does
+  it in its `isolated deinit`.
 
 ## What a person removes, and what closing loses (D79, D80, 2026-10-17)
 

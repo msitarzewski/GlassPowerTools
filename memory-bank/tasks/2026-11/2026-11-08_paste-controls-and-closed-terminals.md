@@ -40,5 +40,15 @@ install on the Mac and iPhone; no commit or push without his word.
 - `GlassTerminalTests` in full: Mac 1,243 passing (`swift test`, in a build folder of its own); visionOS simulator 845 and iOS
   simulator 845 passing (scheme `TerminalTests`).
 - Not measured: how much memory a closed terminal held on a device.
-- 0.4.610 installed and read back on the Mac and iPhone, no new crash reports; the headset stays on 0.4.606.
-  Committed at his word ("commit", 2026-11-08), not pushed.
+- 0.4.610 installed and read back on the Mac and iPhone, no new crash reports. Committed at his word ("commit",
+  2026-11-08) as `383a5379`, not pushed.
+- Vision Pro, at his "push the latest to vision": 0.4.610 built (Release, `build-visionOS-610.log` in the working
+  files, BUILD SUCCEEDED, Info.plist 0.4.610). The headset was unavailable; the installer waits for it.
+
+## Docs (his "all related docs and help updated", 2026-11-08)
+- Help, `site/help/terminal-sessions.md`: Paste says a paste is text and control characters are left out, pointing
+  to the keyboard bar for Escape and Control; Drop files says how a name with a line break, a control character or
+  an invisible formatting mark is typed. The site built locally (its link check passed); not deployed.
+- `SECURITY.md` (Connections): pasting into a terminal sends text only. `RELEASE-NOTES.md` has 0.4.610.
+- Memory bank: D103, `systemPatterns.md` (one place for paste bytes; whoever owns a UIKit `TerminalView` calls
+  `updateUiClosed()`), `techContext.md` (the display link), `progress.md`.
