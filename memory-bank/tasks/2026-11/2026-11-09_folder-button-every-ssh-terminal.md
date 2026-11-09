@@ -72,4 +72,5 @@ push without his word.
 
 ## Shipped (2026-11-09)
 - Committed `abc2cd91` and pushed; released in 0.4.612: the Mac's eighth release (GitHub v0.4.612, notarized,
-  downloads byte-identical to the build, feed entry), TestFlight 612 for iOS and visionOS in beta review.
+  downloads byte-identical to the build, feed entry `32a10dd1`), TestFlight 612 for iOS and visionOS in beta review.
+  The site live (he staged and provisioned it): 111 files match the build by hash.
