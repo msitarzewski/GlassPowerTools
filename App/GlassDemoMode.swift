@@ -314,10 +314,11 @@ enum GlassDemoMode {
                                      firstDraw: GlassDemoBtop.screen(rows:columns:))
         case "terminal-tabs", "terminal-grid":
             // W31: one window with two terminals as its tabs, shown in tabs and in the grid, for
-            // checking that one bottom bar shows. The shell reports its folder (OSC 7), so Open
-            // Folder Here is in the bar as it is on a real shell.
+            // checking that one bottom bar shows. The shell reports its folder (OSC 7) as shells
+            // do, a `file://` URL, so Open Folder Here opens it as on a real shell. (It reported a
+            // bare path, which no shell sends, and so hid that the bar read only that: 2026-11-09.)
             terminal.requestDemoTabs(names: ["alpha", "bravo"],
-                                     output: Data(("\u{1B}]7;/home/ann/shop\u{07}" + terminalTranscript).utf8),
+                                     output: Data(("\u{1B}]7;file://alpha/home/ann/shop\u{07}" + terminalTranscript).utf8),
                                      grid: surface == "terminal-grid", windowSettings: demoLook)
         case "connections-host":
             // The Connections window at its first size with a machine's details showing (W29).

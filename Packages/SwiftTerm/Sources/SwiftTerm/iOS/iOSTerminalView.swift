@@ -1923,7 +1923,13 @@ open class TerminalView: UIScrollView, UITextInputTraits, UIKeyInput, UIScrollVi
         // true through the entire coast, so it fails to exclude momentum. It also
         // covers layout/system-driven offset changes (startup sizing, rotation,
         // keyboard insets, buffer shrink), which are never a manual scroll.
-        guard isTracking else {
+        //
+        // Glass Power Tools (S4, PATCHES.md): the coast after a manual scroll
+        // carries the frozen row with it. Without this the row stayed where the
+        // hand let go, and the next output put the view back there: with output
+        // all the time, every flick that stopped short of the bottom was undone.
+        // A coast while following the bottom still never freezes the view.
+        guard isTracking || (userScrolling && isDecelerating) else {
             return
         }
 

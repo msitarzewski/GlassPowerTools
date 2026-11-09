@@ -21,12 +21,9 @@ extension TerminalSession {
     func locate(_ path: String) async -> (path: String, isDirectory: Bool)? {
         var directory: String?
         if TerminalWatchFile.isRelative(path) {
-            directory = TerminalRepository.path(fromReported: await workingDirectory(reported: terminalHostModel.currentDirectory))
+            directory = await workingDirectory(reported: terminalHostModel.currentDirectory)
         }
-        var home = tmuxPane?.home
-        if path.hasPrefix("~"), home == nil {
-            home = (try? await runTmuxCommand("printf '%s' \"$HOME\""))?.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        let home = path.hasPrefix("~") ? await homeFolder() : nil
         guard let absolute = TerminalPathResolution.absolute(path, directory: directory, home: home) else {
             let reason = path.hasPrefix("~") ? "no-home" : path.hasPrefix("$") ? "variable" : "no-folder"
             Logger.pathPreview.notice("event=locate result=\(reason, privacy: .public) tmux=\(self.survivesClose, privacy: .public)")

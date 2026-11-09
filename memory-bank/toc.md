@@ -145,6 +145,8 @@ source applications are obsolete and no longer compile.
 | [A resize leaves a copy of zsh's prompt in tmux](tasks/2026-11/2026-11-06_tmux-resize-prompt-copies.md) | tmux's `scroll-on-clear` off for the followed window; Scale Text in a local tab in tmux |
 | [Type-ahead in terminals](tasks/2026-11/2026-11-06_type-ahead.md) | D102: the plan, its sources, the line from shell integration or echoed keys, chips and grey text (0.4.607–0.4.609) |
 | [A paste is text; a closed terminal is freed](tasks/2026-11/2026-11-08_paste-controls-and-closed-terminals.md) | D103: control characters left out of pastes; SwiftTerm's display link released; dropped names' format characters (0.4.610) |
+| [A flick's coast was undone by the next output](tasks/2026-11/2026-11-08_flick-coast-snaps-back.md) | SwiftTerm S4: a coast keeps its place while output arrives on iPhone, iPad and Vision Pro (0.4.611) |
+| [The folder button on every SSH terminal](tasks/2026-11/2026-11-09_folder-button-every-ssh-terminal.md) | Open Folder Here always there; the folder from tmux, OSC 7's URL or the prompt's title, else home; the help brought current for the 0.4.612 release |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

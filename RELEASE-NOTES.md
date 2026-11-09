@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.603 (5 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.612 (9 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.603)
+## What it holds (0.4.612)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -41,6 +41,10 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - Windows with tabs and splits, named by what runs in them (repository and branch included), themes,
   workgroups, a window's own look and settings, find, paste review, snippets and recording. Windows
   and their tabs come back after a relaunch on every device.
+- Suggestions as you type at a shell prompt: grey text on the Mac, a row of choices above the keyboard on
+  iPhone and iPad and under the window on Vision Pro. They come from the commands you've run on that machine,
+  your snippets and library, the folder you're in (paths complete as you type them), common tools and the
+  machine's programs. What you run is kept on the device, never synced, never what looks like a password.
 - Terminals that scale as well as resize: Scale Text keeps the rows and columns and scales the text,
   and ⌘+, ⌘− and ⌘0 size the window. Text up to
   28 points; on iPhone, iPad and Vision Pro it can follow the system's text size.
@@ -103,6 +107,20 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.612 (9 November 2026)
+- **0.4.612 is the Mac's eighth release**, through Sparkle, with everything since 0.4.603 below; TestFlight build
+  612 for iPhone, iPad and Vision Pro.
+- **Every SSH terminal has its folder button.** Open Folder Here showed only on terminals kept in tmux: it
+  took the folder a shell reports in a form no shell uses, and bash on most Linux servers reports none at all. It
+  is there on every SSH terminal now, and opens the folder the shell reports, or else the one its prompt names in
+  the title (as Ubuntu's, Debian's, Fedora's and Arch's do), even while a program such as Codex has the title.
+  A shell that names no folder opens Files at home.
+
+### 0.4.611 (8 November 2026)
+- **Scrolling a busy terminal stays where you leave it, on iPhone, iPad and Vision Pro.** In a terminal printing all
+  the time, such as one with a coding agent at work, a flick's coast was undone by the next output: the view jumped
+  back to where your finger or hand let go, so the latest lines were out of reach unless you dragged the whole way.
 
 ### 0.4.610 (8 November 2026)
 - **A paste is text, never keys.** Control characters are left out of everything you paste or drop into a

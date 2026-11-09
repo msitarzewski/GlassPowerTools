@@ -840,22 +840,26 @@ struct TerminalWindowView: View {
     }
     #endif
 
-    /// The folder this shell reported over OSC 7, when it is a path.
+    /// The folder this shell reported over OSC 7 (`file://host/path`), as a path.
     private var reportedFolder: String? {
-        terminalHostModel.currentDirectory.flatMap { $0.hasPrefix("/") ? $0 : nil }
+        TerminalRepository.path(fromReported: terminalHostModel.currentDirectory)
     }
 
-    /// Whether this shell's folder can be found: reported over OSC 7, or asked of tmux.
-    private var canOpenWorkingFolder: Bool {
-        reportedFolder != nil || session.survivesClose
+    /// Opens the folder this shell is in, in Files (`TerminalSession.workingDirectory`: asked of
+    /// tmux in tmux; else reported over OSC 7 or named by the prompt's title). Files starts at
+    /// home when the shell doesn't say.
+    private func openWorkingFolderInFiles() {
+        let reported = terminalHostModel.currentDirectory
+        Task { openFolderHere(await session.workingDirectory(reported: reported)) }
     }
 
-    /// Finds the folder this shell is in — in tmux, asked of tmux, since what was reported goes
-    /// stale — and hands it to `open`.
-    private func withWorkingFolder(_ open: @escaping @MainActor (String) -> Void) {
-        let reported = reportedFolder
+    /// The same folder in the editor, and home when the shell doesn't say, as Files does.
+    private func openWorkingFolder(in open: @escaping @MainActor (String) -> Void) {
+        let reported = terminalHostModel.currentDirectory
         Task {
-            if let directory = await session.workingDirectory(reported: reported) { open(directory) }
+            var folder = await session.workingDirectory(reported: reported)
+            if folder == nil { folder = await session.homeFolder() }
+            if let folder { open(folder) }
         }
     }
 
@@ -879,19 +883,16 @@ struct TerminalWindowView: View {
     /// option on pinch and hold on the folder icon").
     @ViewBuilder
     private var workingFolderActions: some View {
-        Button("Open in Files", systemImage: "folder") { withWorkingFolder(openFolderHere) }
+        Button("Open in Files", systemImage: "folder") { openWorkingFolderInFiles() }
         if let openFolderInEditor {
             Button("Open in Editor", systemImage: "chevron.left.forwardslash.chevron.right") {
-                withWorkingFolder(openFolderInEditor)
+                openWorkingFolder(in: openFolderInEditor)
             }
         }
     }
 
-    /// Opens this session's current directory in the file browser.
-    ///
-    /// A remote shell's directory arrives over OSC 7, so it is only known once the shell has
-    /// reported one — which is why the control appears with it rather than sitting disabled.
-    private func openFolderHere(_ directory: String) {
+    /// Opens `directory` in the file browser; nil opens it at home.
+    private func openFolderHere(_ directory: String?) {
         #if os(macOS) || os(visionOS)
         openWindow(id: "sftp", value: SFTPBrowserContext(sessionID: session.id, initialPath: directory))
         #else
@@ -1994,29 +1995,32 @@ struct TerminalWindowView: View {
             //
             // "Open Folder Here" is not that tool returning. Files browses *a machine*; this opens
             // the directory **this shell is standing in**, which is a property of the session and
-            // of nothing else. The remote shell reports it over OSC 7 — the same value the AI
-            // assistant already uses — so the local and remote halves of the idea behave the same:
-            // Finder for a local shell, SFTP for a remote one, both arriving where the user is.
-            // In tmux the reported directory is stale, so the button is always there and the
-            // directory is asked of tmux when it is pressed.
-            if canOpenWorkingFolder {
-                Button {
-                    withWorkingFolder(openFolderHere)
-                } label: {
-                    // Words in iPhone's and iPad's Tools menu: an icon's spoken label isn't drawn
-                    // there (the owner, 2026-10-21).
-                    toolLabel("Open Folder Here", image: "folder", inMenu: inMenu)
-                }
-                #if !os(macOS)
-                // Pinch and hold: the same folder in the editor instead. Not on a Mac, whose
-                // toolbar never shows a `.contextMenu` (2026-10-20): there it is the Session
-                // menu's Open Folder in Editor.
-                .contextMenu { workingFolderActions }
-                #endif
-                .accessibilityLabel("Open Folder Here")
-                .accessibilityIdentifier("terminal-open-folder-here")
-                .help(session.survivesClose ? "Open this shell's folder over SFTP" : "Open \(reportedFolder ?? "") over SFTP")
+            // of nothing else, found when the button is pressed (`TerminalSession.workingDirectory`):
+            // asked of tmux in tmux, where what the shell reported is stale; else what the shell
+            // reported over OSC 7 — the value the AI assistant uses too — or the folder its
+            // prompt's title names, which is all bash on most Linux servers gives.
+            //
+            // **It is always there** (the owner, 2026-11-09, on an SSH tab to an Ubuntu server:
+            // "Where is my folder icon for this connection!?"). It used to appear only once a
+            // folder had been reported, and read only a bare path, which no shell sends: outside
+            // tmux it never appeared at all. A shell that says nothing opens Files at home.
+            Button {
+                openWorkingFolderInFiles()
+            } label: {
+                // Words in iPhone's and iPad's Tools menu: an icon's spoken label isn't drawn
+                // there (the owner, 2026-10-21).
+                toolLabel("Open Folder Here", image: "folder", inMenu: inMenu)
             }
+            #if !os(macOS)
+            // Pinch and hold: the same folder in the editor instead. Not on a Mac, whose
+            // toolbar never shows a `.contextMenu` (2026-10-20): there it is the Session
+            // menu's Open Folder in Editor.
+            .contextMenu { workingFolderActions }
+            #endif
+            .accessibilityLabel("Open Folder Here")
+            .accessibilityIdentifier("terminal-open-folder-here")
+            .help(session.survivesClose ? "Open this shell's folder over SFTP"
+                  : reportedFolder.map { "Open \($0) over SFTP" } ?? "Open this shell's folder over SFTP, or home if it doesn't say")
 
 
             #if os(visionOS)
@@ -2126,9 +2130,9 @@ struct TerminalWindowView: View {
                     Label("Clear", systemImage: "trash")
                 }
 
-                if canOpenWorkingFolder, openFolderInEditor != nil {
+                if let openFolderInEditor {
                     Button {
-                        if let openFolderInEditor { withWorkingFolder(openFolderInEditor) }
+                        openWorkingFolder(in: openFolderInEditor)
                     } label: {
                         Label("Open Folder in Editor", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
@@ -2331,7 +2335,7 @@ struct TerminalWindowView: View {
         let canSplit: Bool? = nil
         #endif
         return TerminalToolsMenuKey(inMenu: inMenu, isTerminalActive: isTerminalActive,
-                                    canOpenWorkingFolder: canOpenWorkingFolder, opensEditor: openFolderInEditor != nil,
+                                    opensEditor: openFolderInEditor != nil,
                                     workgroupID: workgroupID, movesTabs: movesTabs, canSplit: canSplit,
                                     hasAssistant: aiAssistant.isAvailable, hasSnippets: !settingsManager.snippets.isEmpty,
                                     state: session.state, isRecording: session.recorder?.isRecording == true,
@@ -2422,7 +2426,6 @@ struct TerminalSteadyMenu<Key: Equatable, Content: View, MenuLabel: View>: View,
 struct TerminalToolsMenuKey: Equatable {
     var inMenu: Bool
     var isTerminalActive: Bool
-    var canOpenWorkingFolder: Bool
     var opensEditor: Bool
     var workgroupID: UUID?
     var movesTabs: Bool

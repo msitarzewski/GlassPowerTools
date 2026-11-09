@@ -31,7 +31,7 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-05 to 2026-11-08 — RESUME HERE: 0.4.604 (D100) to 0.4.610, committed, not pushed
+## 2026-11-05 to 2026-11-09 — RESUME HERE: 0.4.604 (D100) to 0.4.612, shipping as 0.4.612 at his word
 - **D100** (0.4.604, on all three devices): a machine is the name it was given; a shared address no longer folds two
   machines into one (`tasks/2026-11/2026-11-05_machine-is-its-name.md`). His repair steps and the D27 question are
   with him.
@@ -93,6 +93,25 @@ use the disposable test VM only).
   (control characters left out) and Drop (`$'…'` names) in `site/help/terminal-sessions.md`, SECURITY.md, D103,
   D102's status, progress rows for 0.4.604–0.4.610 (and 0.4.593–0.4.600 marked released), patterns, techContext's
   display-link fact, the toc's November rows. The site built locally; deploying it waits on his word.
+- **2026-11-08 (late), his "I can't scroll to the latest lines... it jumps and stutters"** in a tmux tab with Codex
+  at work, on the headset: SwiftTerm's UIKit view kept its row from where the hand let go, so a flick's coast was
+  undone by the next output. S4 (`Packages/SwiftTerm/PATCHES.md`), seen failing first (60 rows back); 848 passing on
+  the iPhone and Vision Pro simulators. **0.4.611 on the Mac, iPhone and headset, read back.** He said
+  showing the system keyboard smoothed it and the hide-keyboard choice brought it back; the fix doesn't explain
+  that, so the headset's scroll log lines now carry `top=`, `of=`, `keyboard=` and a `coast ended` line. Next: his
+  try with the keyboard hidden, then copy the log
+  (`tasks/2026-11/2026-11-08_flick-coast-snaps-back.md`).
+- **2026-11-09, his "Where is my folder icon for this connection!?"** on a Mac SSH tab (outside tmux) to an Ubuntu
+  server: Open Folder Here read only a bare OSC 7 path, which no shell sends, and Ubuntu's bash sends no OSC 7 (its
+  title names the folder). The button is always there now; the folder comes from tmux, OSC 7's URL, or the last
+  prompt's title (kept while Codex has the title), else home. Seen failing first; Mac 1,249, simulators 853 each.
+  **0.4.612 on the Mac, iPhone and headset, read back.** His "It worked!" on the Mac
+  (`tasks/2026-11/2026-11-09_folder-button-every-ssh-terminal.md`).
+- **2026-11-09, his "update the memory bank, docs, help, etc. commit. Ship it!"**: the help brought current through
+  0.4.612 (Open Folder Here and Open Folder in Editor on every terminal, ⌘V of a picture on the Mac, and type-ahead,
+  which the help had never described: Suggestions as you type, and the Settings ▸ Suggestions page); release notes,
+  README and the site's pages at 0.4.612, a Suggestions card and limit on the terminal page. Committed with 0.4.611
+  and 0.4.612; then shipped as 0.4.603 was: push, the Mac's eighth release, TestFlight 612, the site staged.
 
 ## 2026-11-05 — 0.4.603 shipped (Mac release, TestFlight 603)
 - **His word:** "go ahead, ship it". Committed `af5257e5` (0.4.601–0.4.603) and pushed; `release-mac.sh 0.4.603 603`

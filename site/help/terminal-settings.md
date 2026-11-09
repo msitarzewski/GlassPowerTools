@@ -1,6 +1,6 @@
 # Terminal settings, themes and snippets
 
-The terminal adds three pages to Settings: **Connections**, **Terminal** and **Snippets**. This page covers what each controls, choosing a theme or a color scheme, editing themes, giving a terminal window its own settings and look, importing an SSH config file, and Tailscale.
+The terminal adds four pages to Settings: **Connections**, **Terminal**, **Snippets** and **Suggestions**. This page covers what each controls, choosing a theme or a color scheme, editing themes, giving a terminal window its own settings and look, importing an SSH config file, and Tailscale.
 
 ## Connections
 
@@ -92,6 +92,16 @@ A snippet is a saved command you run from a terminal's tools menu.
 3. Choose **Add**.
 
 Each snippet shows how often and how recently you used it. Its edit button changes it; swipe it away, or use Delete, to remove it.
+
+## Suggestions
+
+The **Suggestions** page sets what a terminal offers as you type at a shell prompt (see [Suggestions as you type](terminal-sessions.md#suggestions-as-you-type)).
+
+- **Suggest commands as you type** turns them on or off. **On Mac**, **Show the suggestion in grey after the cursor** and **Mark prompts in this Mac's zsh terminals**, which lets zsh tell the terminal where its prompt and each command begin; it applies to terminals opened afterwards.
+- **Keep the commands run on each machine**: off, nothing new is kept.
+- **Suggest from**: each source on its own: **Commands you've run**, **The machine's own shell history**, **Snippets**, **Your library**, **The current folder**, **Common tools**, **Programs on the machine**, **Words on screen** and **On-device AI**, a likely next command worked out on this device, which is off unless you turn it on.
+- **Shell integration on your machines**: each machine a terminal is connected to, with whether its shell marks its prompts. **Install** adds one line to the shell's start-up file (`~/.zshrc`, `~/.bashrc` or fish's `config.fish`) and a script in `~/.config/glasspowertools`; **Remove** takes both out. A terminal on a server offers suggestions only once it is installed there, or once the shell is marked by iTerm2's, VS Code's or Ghostty's integration.
+- **Kept on this device**: how many commands are kept for each machine. **Import** reads the machine's own zsh, bash or fish history in, over a connected terminal (on Mac, This Mac's from its own files). **Forget** clears one machine, and **Forget All Commands…** every machine. The shells' own history isn't touched.
 
 ## Import an SSH config file
 

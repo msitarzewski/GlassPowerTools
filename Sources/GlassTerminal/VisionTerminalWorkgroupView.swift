@@ -1391,8 +1391,7 @@ struct VisionTerminalWorkgroupView: View {
         Task { @MainActor in
             var directory: String?
             if TerminalWatchFile.isRelative(path) {
-                directory = TerminalRepository.path(
-                    fromReported: await session.workingDirectory(reported: session.terminalHostModel.currentDirectory))
+                directory = await session.workingDirectory(reported: session.terminalHostModel.currentDirectory)
             }
             guard let command = TerminalWatchFile.command(for: path, in: directory) else { return }
             let label = TerminalWatchFile.tabLabel(for: path)

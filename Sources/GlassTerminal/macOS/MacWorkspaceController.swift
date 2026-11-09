@@ -313,8 +313,7 @@ final class MacWorkspaceController {
             guard let serverID = pane.intent.serverID else { return nil }
             // A relative path is the shell's folder's: tmux says which, where the pane runs in it.
             if TerminalWatchFile.isRelative(path), let session = sessionsByPaneID[paneID] {
-                directory = TerminalRepository.path(
-                    fromReported: await session.workingDirectory(reported: session.terminalHostModel.currentDirectory))
+                directory = await session.workingDirectory(reported: session.terminalHostModel.currentDirectory)
             }
             intent = MacWorkspacePaneIntent.ssh(serverID: serverID).startingWithoutTmux()
         }
@@ -865,7 +864,7 @@ final class MacWorkspaceController {
             }
             lookup = {
                 // tmux keeps the shell's reports to itself, so in tmux it is asked where the shell is.
-                guard let folder = TerminalRepository.path(fromReported: await terminal.workingDirectory(reported: reported))
+                guard let folder = await terminal.workingDirectory(reported: reported)
                 else { return terminal.survivesClose ? .unknown : .none }
                 return await cache.answer(for: .init(host: terminal.server.id, folder: folder), maximumAge: interval) {
                     guard let answer = try? await terminal.runTmuxCommand(TerminalRepository.remoteCommand(folder: folder))

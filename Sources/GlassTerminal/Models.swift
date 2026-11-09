@@ -1235,16 +1235,39 @@ class TerminalSession: Identifiable, Hashable {
         }
     }
 
-    /// Where this shell is standing, for the AI assistant and Open Folder Here. Outside tmux, what
-    /// the shell reported over OSC 7. **In tmux those reports stop at tmux**, so the terminal's
-    /// value is wherever the shell was before tmux started — usually home — and the assistant
-    /// suggested commands for the wrong directory (2026-10-03). tmux is asked instead, and an
-    /// unanswered question is "unknown", never the stale value.
+    /// Where this shell is standing, for the AI assistant and Open Folder Here, as a path. Outside
+    /// tmux, `shellFolder`. **In tmux those reports stop at tmux**, so the terminal's value is
+    /// wherever the shell was before tmux started — usually home — and the assistant suggested
+    /// commands for the wrong directory (2026-10-03). tmux is asked instead, and an unanswered
+    /// question is "unknown", never the stale value.
     func workingDirectory(reported: String?) async -> String? {
-        guard survivesClose, let name = tmuxSessionName else { return reported }
+        guard survivesClose, let name = tmuxSessionName else {
+            return await shellFolder(reported: reported, title: terminalHostModel.titleFolder)
+        }
         let path = try? await runTmuxCommand(TerminalTmux.currentPathCommand(name: name))
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return path.flatMap { $0.hasPrefix("/") ? $0 : nil }
+    }
+
+    /// A shell outside tmux: the folder it reported over OSC 7, which shells send as
+    /// `file://host/path`, else the folder its last prompt's title named (`TerminalShellTitle`:
+    /// bash on most Linux servers, which reports none), `~` made this account's home. Nil when
+    /// neither says.
+    func shellFolder(reported: String?, title: TerminalShellTitle.Folder?) async -> String? {
+        if let path = TerminalRepository.path(fromReported: reported) { return path }
+        guard let title else { return nil }
+        if title.path.hasPrefix("/") { return title.path }
+        // Another account's `~` (after `sudo -i`, say) is a home this one doesn't know.
+        guard title.user == server.username else { return nil }
+        return TerminalPathResolution.absolute(title.path, directory: nil, home: await homeFolder())
+    }
+
+    /// This account's home on the host: tmux's answer where the terminal runs in it, else the
+    /// host's. Nil when the host can't be asked.
+    func homeFolder() async -> String? {
+        if let home = tmuxPane?.home { return home }
+        let answer = try? await runTmuxCommand("printf '%s' \"$HOME\"")
+        return answer.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.hasPrefix("/") ? $0 : nil }
     }
 
     /// Waits for the attach in progress, if any — for tests and for callers that act after it.

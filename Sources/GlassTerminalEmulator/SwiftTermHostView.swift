@@ -442,6 +442,11 @@ public final class SwiftTermHostModel: ObservableObject {
     public private(set) var terminalTitle: String?
     public var onTerminalTitleChange: (@MainActor (String?) -> Void)?
 
+    /// The folder the last prompt's title named (`TerminalShellTitle`), for a shell that reports none over OSC 7:
+    /// bash on Debian, Ubuntu, Fedora or Arch. Kept while a program's own title stands in front of it (Codex, vim),
+    /// since the shell is still where that prompt was. Not published, as the title isn't.
+    public private(set) var titleFolder: TerminalShellTitle.Folder?
+
     /// Scrolling over a full-screen program that asked for no mouse, which a terminal otherwise
     /// sends as arrow keys — in tmux, Claude Code then steps through its earlier messages. A
     /// listener that takes it returns true: a local tmux pane scrolls tmux's own history instead
@@ -1147,6 +1152,7 @@ public final class SwiftTermHostModel: ObservableObject {
         let value = trimmed.isEmpty ? nil : trimmed
         guard terminalTitle != value else { return }
         terminalTitle = value
+        if let folder = TerminalShellTitle.folder(in: value) { titleFolder = folder }
         onTerminalTitleChange?(value)
     }
 
@@ -2971,11 +2977,15 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         TerminalSelectionDiagnostics.record?(message)
     }
 
-    /// The terminal's state beside each line: the screen, whether a program has the mouse, and the
-    /// selection.
+    /// The terminal's state beside each line: the screen, whether a program has the mouse, the
+    /// selection, the top row shown and how many rows there are (for "it jumps", 2026-11-08), and the
+    /// keyboard it would bring up: the system's, or none (`applySystemKeyboardChoice`).
     private var state: String {
         let terminal = getTerminal()
-        return "alt=\(terminal.isCurrentBufferAlternate) mouse=\(terminal.mouseMode) selection=\(selection.active) first=\(isFirstResponder)"
+        let rowHeight = getOptimalFrameSize().height / CGFloat(max(1, terminal.rows))
+        let lines = rowHeight > 0 ? Int((contentSize.height / rowHeight).rounded()) : 0
+        let keyboard = inputView == nil ? "system" : "none"
+        return "alt=\(terminal.isCurrentBufferAlternate) mouse=\(terminal.mouseMode) selection=\(selection.active) first=\(isFirstResponder) top=\(terminal.buffer.yDisp) of=\(lines) keyboard=\(keyboard)"
     }
 
     /// Every other recognizer on the terminal — SwiftTerm's tap, the scroll view's pan, the drag sent
@@ -3008,6 +3018,21 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         let cell = bufferCell(at: recognizer.location(in: self)).map { "\($0.row),\($0.col)" } ?? "-"
         let since = recognizer.state == .began ? " " + sinceTouchDown(recognizer.location(in: self)) : ""
         note("\(kind) \(Self.name(of: recognizer.state)) at=\(cell)\(since) \(state)")
+    }
+
+    /// Where a flick's coast left the view, at the first move after it (2026-11-08: "it jumps"): the
+    /// scroll's `ended` is the hand letting go, and the coast goes on after it.
+    private var coasting = false
+
+    override var contentOffset: CGPoint {
+        didSet {
+            if isDecelerating {
+                coasting = true
+            } else if coasting {
+                coasting = false
+                note("coast ended \(state)")
+            }
+        }
     }
 
     private static func name(of state: UIGestureRecognizer.State) -> String {
