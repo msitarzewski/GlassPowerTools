@@ -31,7 +31,23 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-05 to 2026-11-09 — RESUME HERE: 0.4.604 (D100) to 0.4.612, shipping as 0.4.612 at his word
+## 2026-11-09 — RESUME HERE: 0.4.612 shipped (Mac release, TestFlight 612)
+- **His word:** "update the memory bank, docs, help, etc. commit. Ship it!", then "you can run that" for the GitHub
+  release, which the auto-mode classifier had refused as a public surface. Committed `abc2cd91` (0.4.611–0.4.612,
+  the help, docs and memory bank) and pushed `b28c27aa..abc2cd91`, so 0.4.604–0.4.610 are public too.
+- **Mac:** `release-mac.sh 0.4.612 612` (Xcode 27.2, 27B52): notarized and stapled; GitHub release v0.4.612 (Latest)
+  on `abc2cd91` with dmg, zip and checksums, the downloads byte-identical to the build and the feed's zip URL serving
+  the same file; the feed entry committed after the release. The Mac's eighth release.
+- **TestFlight 612** (iOS and visionOS) uploaded, processed in about ten minutes, What to Test on both, in Testers,
+  both `WAITING_FOR_REVIEW`.
+- **The site:** built with the 0.4.612 pages, help and feed; staging and provisioning are his to run (the classifier
+  refuses the staging write since 2026-11-03), then every live file checked by hash.
+- **Found before the commit, open:** on the iPhone simulator a first tap on a terminal's Tools sometimes sends the
+  app to the home screen while it keeps running (2 of 8 runs at 0.4.612, 3 of 5 at `64b4fa1d`); cause not found
+  (`progress.md` Known and open; the folder-button task note). Still open with him: his headset try of 0.4.611 with
+  the keyboard hidden, the accept key (→ or Tab), the upstream SwiftTerm issue.
+
+## 2026-11-05 to 2026-11-09 — 0.4.604 (D100) to 0.4.612, shipped as 0.4.612
 - **D100** (0.4.604, on all three devices): a machine is the name it was given; a shared address no longer folds two
   machines into one (`tasks/2026-11/2026-11-05_machine-is-its-name.md`). His repair steps and the D27 question are
   with him.

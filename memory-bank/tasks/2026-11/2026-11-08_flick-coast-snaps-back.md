@@ -35,3 +35,7 @@ local fix, tests, build and installs; no commit or push without his word.
 - 0.4.611 built (Release) and installed on the headset, iPhone and Mac, each read back as 0.4.611; the Mac app
   relaunched, no new crash reports.
 - Not yet: his try on the headset with the keyboard hidden, and the log it leaves.
+
+## Shipped (2026-11-09)
+- Committed `abc2cd91` with 0.4.612 and released in it (Mac, TestFlight 612). Still open: his try on the headset with
+  the keyboard hidden, and the log it leaves.

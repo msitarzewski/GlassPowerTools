@@ -69,3 +69,7 @@ push without his word.
 - RELEASE-NOTES (what it holds at 0.4.612, suggestions in it, the eighth release line), README (0.4.612,
   suggestions), the site's pages at 0.4.612, a Suggestions card and a limit on the terminal page. The site built;
   every internal link and anchor resolves.
+
+## Shipped (2026-11-09)
+- Committed `abc2cd91` and pushed; released in 0.4.612: the Mac's eighth release (GitHub v0.4.612, notarized,
+  downloads byte-identical to the build, feed entry), TestFlight 612 for iOS and visionOS in beta review.

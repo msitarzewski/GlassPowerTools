@@ -6,6 +6,25 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.612</title>
+      <pubDate>Mon, 09 Nov 2026 18:05:13 GMT</pubDate>
+      <sparkle:version>612</sparkle:version>
+      <sparkle:shortVersionString>0.4.612</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.612</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.612</h2>
+<ul>
+  <li><b>Suggestions as you type.</b> At a shell prompt the terminal offers the rest of the command in grey after the cursor: → takes all of it, ⌥→ its next word. They come from what you've run on that machine, your snippets and library, the folder you're in, paths as you type them, common tools and the machine's programs, and what you run stays on this Mac. Settings ▸ Suggestions sets them; a terminal on a server needs the shell integration installed there, from the same page.</li>
+  <li><b>Every SSH terminal has its folder button.</b> Open Folder Here opens the folder the shell is in, read from its prompt's title on Ubuntu, Debian, Fedora and Arch, and Files at home when the shell doesn't say.</li>
+  <li><b>A paste is text, never keys.</b> Control characters hidden in copied text are left out, as xterm leaves them out, so a paste can't end itself early and run what follows.</li>
+  <li><b>⌘V pastes a picture</b> into a terminal as dropping it does: saved, or uploaded on a server, and its path typed.</li>
+  <li><b>Two machines at one address stay two machines</b>, such as two sites on one server; they were folded into one.</li>
+  <li>Resizing a tab in tmux no longer fills it with copies of the prompt, and Scale Text works in a local tab in tmux.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.612/GlassPowerTools-0.4.612.zip" length="29360308" type="application/octet-stream" sparkle:edSignature="iV8A/kgK7ZxfNw4vYk9qXFYLDykFXPxl2s6F2tjDxKgd71aUcXTTau8kGxNBrryOTUuVfkuxW/s+/38xdhILAg=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.603</title>
       <pubDate>Thu, 05 Nov 2026 18:35:03 GMT</pubDate>
       <sparkle:version>603</sparkle:version>
