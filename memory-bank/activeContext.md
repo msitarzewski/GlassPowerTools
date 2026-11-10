@@ -31,7 +31,21 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-09 — RESUME HERE: 0.4.612 shipped (Mac release, TestFlight 612)
+## 2026-11-10 — RESUME HERE: a terminal without its connection says so in the window (0.4.613, in QA)
+- **His word:** "a disconnected terminal shows a red text under the name in the tab, but the window itself still shows
+  what looks like a connected window … Dim the window, add a close or reconnect UI to the center of the window." The
+  first of "a few user requests to address". Task note `tasks/2026-11/2026-11-10_terminal-connection-lost-panel.md`.
+- **Built, not committed:** `TerminalConnectionNotice` (new) and its panel; `TerminalWindowView` dims the text and
+  shows it; Close Terminal on the Mac now closes the pane (it disconnected and left a "Connection Failed" pane);
+  `--demo-connection-lost` for UI tests; help's "When a terminal loses its connection".
+- **QA:** unit 8 of 8 (seen failing), Mac `GlassTerminalTests` 1,257; UI 2 of 2 on the Vision Pro and iPhone
+  simulators (seen failing without the panel); the macOS VM. Found and fixed on the way: the iPhone panel's reason
+  line not drawn (selectable text), the Mac panel mid grey (now the theme's light or dark).
+- **0.4.613:** built for all three; on the Mac 16:08 (read back, running, no crash reports). The iPhone and headset
+  were unavailable: a watcher installs each when it is reachable (`~/Software/glass/tmp/install-devices-613.zsh`).
+- **Next after this:** his other user requests.
+
+## 2026-11-09 — 0.4.612 shipped (Mac release, TestFlight 612)
 - **His word:** "update the memory bank, docs, help, etc. commit. Ship it!", then "you can run that" for the GitHub
   release, which the auto-mode classifier had refused as a public surface. Committed `abc2cd91` (0.4.611–0.4.612,
   the help, docs and memory bank) and pushed `b28c27aa..abc2cd91`, so 0.4.604–0.4.610 are public too.

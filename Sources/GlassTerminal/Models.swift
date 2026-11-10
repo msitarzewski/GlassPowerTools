@@ -367,6 +367,23 @@ class TerminalSession: Identifiable, Hashable {
     /// Screenshots only: the commands a demo's transcript runs are kept here, in memory, never in the device's
     /// own history (each demo is a new made-up machine).
     @ObservationIgnored var demoTypeAheadHistory: TerminalCommandHistory?
+    /// UI tests only (`--demo-connection-lost`): a demo terminal has no server, so its Reconnect comes
+    /// back connected after a moment rather than asking a library that has no such machine.
+    @ObservationIgnored var demoReconnects = false
+
+    /// The demo's connection drops as a real one does when it stops answering (`SSHTransport`'s words).
+    func demoLoseConnection() {
+        reportError("The connection stopped answering — the device slept, or the network changed")
+    }
+
+    func demoReconnect() {
+        state = .connecting
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard let self, self.state == .connecting else { return }
+            self.state = .connected
+        }
+    }
     #endif
     /// The terminal emulator belongs to the live session rather than any one
     /// presentation. Adaptive tab/sidebar changes may reconstruct views, but
@@ -376,9 +393,11 @@ class TerminalSession: Identifiable, Hashable {
     var state: SessionState = .disconnected {
         didSet {
             if oldValue != .connected, state == .connected {
+                hasConnected = true
                 tmuxWhileDown = nil
                 if usesTmux { attachTmux() } else { dispatchStartupCommandIfNeeded(); checkTmuxAvailability() }
             }
+            if case .error = state, !hasFailedToConnect { hasFailedToConnect = true }
             // A connection's control-mode client ends with it; the next one reads the pane afresh.
             if oldValue == .connected, state != .connected { endTmuxControl() }
             if oldValue != state { noteConnection("\(oldValue.diagnosticName) -> \(state.diagnosticName)") }
@@ -432,14 +451,23 @@ class TerminalSession: Identifiable, Hashable {
     private var initialTerminalPresentationRequest: InitialTerminalPresentationRequest?
     private(set) var didRequestInitialTerminalPresentation = false
     private(set) var hasMeasuredTerminalGeometry = false
-    private var userInitiatedDisconnect: Bool = false
+    private(set) var userInitiatedDisconnect: Bool = false
     /// Its shell ended on a connection that stood — an `exit`, or tmux's client leaving (detached,
     /// taken over by another device, its session ended) — rather than the connection dropping. Its
     /// window closes it; one that was away (in the dock) closes it as it is shown, and never
     /// connects it again (2026-11-01).
     private(set) var shellEnded = false
+    /// It has been connected at least once: down now, its connection was lost or ended, rather than
+    /// not made yet (`TerminalConnectionNotice`, 2026-11-10).
+    private(set) var hasConnected = false
+    /// A connection of its has failed: a Reconnect from there shows as one, not as a first connection.
+    private(set) var hasFailedToConnect = false
     private var reconnectTask: Task<Void, Never>?
     var reconnectAttemptCount: Int = 0
+    /// How many times auto-reconnect tries before it gives up.
+    static let autoReconnectAttempts = 5
+    /// Auto-reconnect is at work, waiting between its tries or trying: Cancel Reconnect stops it.
+    var isAutoReconnecting: Bool { reconnectTask != nil }
     var recorder: SessionRecorder?
     var reconnectPreparation: ((ServerConfiguration) async throws -> SessionConnectionPreparation)?
     var automaticReconnectSucceeded: (() -> Void)?
@@ -980,7 +1008,7 @@ class TerminalSession: Identifiable, Hashable {
         let initialConnection = detachSSHConnection(for: .automaticReconnect)
 
         reconnectTask = Task { [weak self] in
-            let maxAttempts = 5
+            let maxAttempts = Self.autoReconnectAttempts
             var connectionToDisconnect = initialConnection
 
             for attempt in 1...maxAttempts {
@@ -1041,8 +1069,8 @@ class TerminalSession: Identifiable, Hashable {
             let failedConnection = self.sshConnection
             self.sshConnection = nil
             await failedConnection?.disconnect()
-            self.state = .error("Reconnect failed after 5 attempts")
-            self.appendLine(TerminalLine(text: "Auto-reconnect failed after 5 attempts.", style: .error))
+            self.state = .error("Reconnect failed after \(maxAttempts) attempts")
+            self.appendLine(TerminalLine(text: "Auto-reconnect failed after \(maxAttempts) attempts.", style: .error))
             self.reconnectTask = nil
         }
     }

@@ -108,6 +108,16 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.613 (10 November 2026)
+- **A terminal that loses its connection says so in the window.** Only the red line under its tab's name said so,
+  and the terminal still looked connected. Now its text dims and a panel in the middle says **Connection Lost**
+  and why (**Couldn't Connect** for one that never connected), with **Reconnect** and **Close Terminal**. While
+  auto-reconnect works it shows each try, up to five, and **Cancel Reconnect**. The dimmed text stays there to
+  read, scroll and copy. On the Mac and iPhone the panel takes the terminal theme's light or dark; on Vision Pro
+  it is the system's glass.
+- **Close Terminal closes a disconnected terminal on the Mac.** From the tools menu it disconnected instead, and
+  the pane stayed, saying the session had ended. It now closes the pane, and the tab with its last.
+
 ### 0.4.612 (9 November 2026)
 - **0.4.612 is the Mac's eighth release**, through Sparkle, with everything since 0.4.603 below; TestFlight build
   612 for iPhone, iPad and Vision Pro.

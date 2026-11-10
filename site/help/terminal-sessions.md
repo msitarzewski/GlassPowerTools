@@ -66,6 +66,12 @@ Programs ring the terminal's bell to ask for you: a coding agent waiting for an 
 
 Choosing the tab clears it. A bell in the terminal you're looking at leaves nothing behind, and the mark appears whether or not **Bell enabled** plays a sound (see [Terminal settings](terminal-settings.md)).
 
+## When a terminal loses its connection
+
+When an SSH terminal's connection drops, its text dims and a panel in the middle of the terminal says **Connection Lost** and why; one that couldn't connect says **Couldn't Connect**. **Reconnect** connects it again where it is, and **Close Terminal** closes it (on Mac its pane, and the tab with its last). The dimmed text stays there to read, scroll and copy.
+
+With **Auto-reconnect on disconnect** on (see [Terminal settings](terminal-settings.md#connections)), the panel shows a spinner and each try, up to five, and **Cancel Reconnect** stops trying. A terminal kept in tmux comes back to its tmux session as it was (see [Keep terminals running with tmux](terminal-tmux.md)).
+
 ## Show All Windows
 
 See every terminal window and its tabs, with every other window you have open, at once, as live pictures, and go straight to one. **On Mac** press ⇧⌘\, or pinch in on a terminal or remote desktop window; **on iPad and iPhone** pull down from the bar at the top of the screen, or touch and hold ⚡; **on Vision Pro** pinch and hold ⚡, and choose **Around You** to stand the pictures around you. On the Mac you can also drag a terminal's picture onto another window's group to move that tab there. See [See everything open with Show All Windows](library-connect.md#see-everything-open-with-show-all-windows).

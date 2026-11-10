@@ -329,6 +329,7 @@ struct TerminalConnectFlow: ViewModifier {
             session.demoTypeAheadHistory = TerminalCommandHistory(folder: nil)
             session.feedTerminalData(output)
             presentTerminalWindow(for: session, windowSettings: windowSettings)
+            demoLoseConnectionIfAsked(session)
             #if DEBUG
             if let rows = Self.demoForeignGridRows {
                 // Once the window has its size: tmux's window at another device's, shorter.
@@ -407,6 +408,7 @@ struct TerminalConnectFlow: ViewModifier {
             }
             #endif
             guard let first = sessions.first else { return }
+            demoLoseConnectionIfAsked(first)
             #if os(visionOS)
             let workgroupID = sessionManager.createWorkgroup(name: first.server.name, colorTag: first.server.colorTag,
                                                              windowSettings: windowSettings)
@@ -1380,6 +1382,27 @@ extension TerminalConnectFlow {
         guard arguments.contains("--ui-testing"), let flag = arguments.firstIndex(of: "--demo-foreign-grid"),
               arguments.indices.contains(flag + 1), let rows = Int(arguments[flag + 1]), rows > 0 else { return nil }
         return rows
+    }
+
+    /// `--demo-connection-lost <seconds>` in a `--ui-testing` run: the demo window's first terminal loses its
+    /// connection that long after it opens, and its Reconnect comes back connected (2026-11-10: the panel over a
+    /// terminal without its connection).
+    static var demoConnectionLostAfter: Double? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"), let flag = arguments.firstIndex(of: "--demo-connection-lost"),
+              arguments.indices.contains(flag + 1), let seconds = Double(arguments[flag + 1]), seconds >= 0
+        else { return nil }
+        return seconds
+    }
+
+    /// Drops `session`'s demo connection after `--demo-connection-lost`'s wait, when it was given.
+    func demoLoseConnectionIfAsked(_ session: TerminalSession) {
+        guard let seconds = Self.demoConnectionLostAfter else { return }
+        session.demoReconnects = true
+        Task { @MainActor [weak session] in
+            try? await Task.sleep(for: .seconds(seconds))
+            session?.demoLoseConnection()
+        }
     }
 }
 

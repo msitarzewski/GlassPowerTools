@@ -1034,6 +1034,7 @@ struct TerminalWindowView: View {
             TerminalBackdropView(style: profile.lookStyle, theme: windowTheme,
                                  activity: terminalHostModel.outputActivity, agent: lookAgent,
                                  findAgent: { [session] in GlassTerminalCapability.agent(of: session) })
+                .opacity(connectionDimming)
             SwiftTermHostView(
                 model: terminalHostModel,
                 theme: swiftTermTheme,
@@ -1085,6 +1086,10 @@ struct TerminalWindowView: View {
                 TerminalDiagramMarks(model: terminalHostModel, draw: terminalRuntime?.diagramView)
             }
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
+            // Without its connection, its text dims under the panel that says so, still there to read,
+            // scroll and copy (the owner, 2026-11-10). Only the text and what is drawn behind it: the
+            // window's glass and colour stay as they are.
+            .opacity(connectionDimming)
             // Type-ahead's commands (D102), never over the terminal's text (the owner's choice, 2026-11-06); the Mac
             // draws its grey text in the terminal. iPhone and iPad: a row above the keyboard's bar while it's up.
             #if os(iOS)
@@ -1134,6 +1139,19 @@ struct TerminalWindowView: View {
                 terminalHostModel.stopFocusMaintenance()
             }
         }
+        // Lost, failed or reconnecting: said in the middle of the terminal, not only in red under its
+        // tab's name (`TerminalConnectionNotice`). Outside the tap that focuses the terminal.
+        .overlay {
+            if let notice = session.connectionNotice {
+                TerminalConnectionNoticePanel(notice: notice,
+                                              terminalColorScheme: windowTheme.resolvedAppearance.colorScheme,
+                                              reconnect: reconnectSession,
+                                              cancelReconnect: { session.cancelReconnect() },
+                                              close: closeTerminalWithoutConnection)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: session.connectionNotice)
         // Error detection for the AI explainer, once output has come to rest. Not per chunk of
         // output: this whole view was rebuilt for each one (W10).
         .onChange(of: session.outputSettledNonce) { _, _ in
@@ -1742,8 +1760,27 @@ struct TerminalWindowView: View {
         }
     }
 
+    /// Close Terminal on one with no connection to leave (the panel over it, and the Tools menu): it
+    /// goes, as a terminal whose shell ended goes. On the Mac that removes its pane, and the tab
+    /// with its last; `closeTerminalSession` is Disconnect's, which there leaves the pane in place
+    /// saying the session ended (2026-11-10).
+    private func closeTerminalWithoutConnection() {
+        closeTerminalAfterCleanExit()
+    }
+
+    /// The terminal's text at full strength, or dimmed under the panel that says it has no connection.
+    private var connectionDimming: Double {
+        session.connectionNotice == nil ? 1 : TerminalConnectionNotice.dimmedTextOpacity
+    }
+
     private func reconnectSession() {
         session.cancelReconnect()
+        #if DEBUG
+        if session.demoReconnects {
+            session.demoReconnect()
+            return
+        }
+        #endif
         Task {
             do {
                 try await sessionManager.reconnect(session, settingsManager: settingsManager)
@@ -2232,7 +2269,7 @@ struct TerminalWindowView: View {
                     // Nothing to detach from or disconnect: it closes (2026-10-31, the owner had two
                     // disconnected terminals on Vision Pro, and Detach was greyed out).
                     Button(role: .destructive) {
-                        closeTerminalSession()
+                        closeTerminalWithoutConnection()
                     } label: {
                         Label("Close Terminal", systemImage: "xmark.circle")
                     }
