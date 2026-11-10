@@ -38,13 +38,16 @@ use the disposable test VM only).
 - **Mac:** `release-mac.sh 0.4.612 612` (Xcode 27.2, 27B52): notarized and stapled; GitHub release v0.4.612 (Latest)
   on `abc2cd91` with dmg, zip and checksums, the downloads byte-identical to the build and the feed's zip URL serving
   the same file; the feed entry committed after the release. The Mac's eighth release.
-- **TestFlight 612** (iOS and visionOS) uploaded, processed in about ten minutes, What to Test on both, in Testers,
-  both `WAITING_FOR_REVIEW`.
+- **TestFlight 612** (iOS and visionOS) uploaded, processed in about ten minutes, What to Test on both, in Testers
+  (the external group), both `APPROVED` by beta review the same day (read 2026-11-09).
 - **The site:** built with the 0.4.612 pages, help and feed; he staged and provisioned it ("done"; the classifier
   refuses the staging write since 2026-11-03): all 111 live files match the build by hash, the feed offers 0.4.612.
 - **Checked independently** (an agent, from the raw sources): the release Latest on `abc2cd91`, assets passing their
   checksums, the dmg notarized and stapled, Sparkle's signature valid over the zip, main pushed and clean, both
   TestFlight builds waiting for beta review. One stale line found on the home page: "Coming to the beta with 0.4.574".
+  Fixed at his word ("fix the 0.4.574 line"): the Duo section now says "Both are in the beta." (0.4.574's pages and
+  0.4.591's full-width desktop are both in approved builds, 603 and 612). Deployed by him the same evening: all 111
+  live files match the build by hash.
 - **Found before the commit, open:** on the iPhone simulator a first tap on a terminal's Tools sometimes sends the
   app to the home screen while it keeps running (2 of 8 runs at 0.4.612, 3 of 5 at `64b4fa1d`); cause not found
   (`progress.md` Known and open; the folder-button task note). Still open with him: his headset try of 0.4.611 with
