@@ -69,4 +69,4 @@
 
 ## Shipped (2026-11-11)
 - Committed (`0e348599`) and pushed; released in 0.4.616: the Mac's ninth release (GitHub v0.4.616, notarized,
-  downloads byte-identical to the build, feed entry), TestFlight 616 for iOS and visionOS in beta review; the headset not yet installed.
+  downloads byte-identical to the build, feed entry), TestFlight 616 (visionOS approved, iOS in beta review on 2026-11-11); the headset not yet installed.

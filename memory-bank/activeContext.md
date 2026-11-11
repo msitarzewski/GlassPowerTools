@@ -39,11 +39,17 @@ use the disposable test VM only).
   `5bc77b45` with dmg, zip and checksums, all three downloaded back byte-identical to the build, the feed's zip URL
   serving the same length; the feed entry committed after the release. The Mac's ninth release.
 - **TestFlight 616** (iOS and visionOS) uploaded, processed in about three minutes, What to Test on both, in Testers
-  (read back from the group), both `WAITING_FOR_REVIEW`.
+  (read back from the group). By 2026-11-11 midday beta review had approved the visionOS build; the iOS build is
+  still `WAITING_FOR_REVIEW`, so iPhone and iPad testers keep 612 until it is approved.
 - **Devices:** the Mac and iPhone on 0.4.616 (616), read back, no crash reports. The headset out of reach since
   2026-11-10 evening; a watcher installs it when it appears (for 12 hours).
-- **The site:** built with the 0.4.616 pages, help and feed; staging and provisioning are his to run, then every
-  live file checked by hash. Its device sentences say the Vision Pro ran 0.4.612.
+- **The site:** live with the 0.4.616 pages, help and feed (staged from here, provisioned by him): 111 of 111 live
+  files match the build by hash; the feed is served no-cache with 0.4.616 first. Its device sentences say the
+  Vision Pro ran 0.4.612.
+- **Independent check (2026-11-11):** an agent rechecked from the raw sources: the release assets and the feed's
+  zip byte-identical to the build; the feed's EdDSA signature valid against the public key in 0.4.616 and 0.4.612
+  (so 0.4.612 accepts the update); the dmg and its app notarized, stapled and accepted by Gatekeeper; local main
+  equal to origin/main.
 - **Open with him:** his Allow at the notification prompt on his Mac; his headset try of 0.4.611 with the keyboard
   hidden; the iPhone-simulator Tools tap that goes home; line-editing keys with a hardware keyboard on iPad and
   Vision Pro not done.
