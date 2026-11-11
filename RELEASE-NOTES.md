@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.612 (9 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.616 (10 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.612)
+## What it holds (0.4.616)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -45,6 +45,12 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   iPhone and iPad and under the window on Vision Pro. They come from the commands you've run on that machine,
   your snippets and library, the folder you're in (paths complete as you type them), common tools and the
   machine's programs. What you run is kept on the device, never synced, never what looks like a password.
+- A terminal that loses its connection says so in the window: its text dims under a panel with the reason,
+  Reconnect and Close Terminal. A machine that doesn't answer, asleep or away, is found out once for all its
+  terminals, in 15 seconds; one at a Tailscale address while Tailscale is off on the device is said at once.
+- On the Mac, the Dock icon counts the terminals whose bell rang out of sight (on another desktop, covered,
+  minimized), with a notification naming one if you choose; and ⌥ and ⌘ with the arrows and Delete, and ⌥-click,
+  move along the command line as in Apple's Terminal.
 - Terminals that scale as well as resize: Scale Text keeps the rows and columns and scales the text,
   and ⌘+, ⌘− and ⌘0 size the window. Text up to
   28 points; on iPhone, iPad and Vision Pro it can follow the system's text size.
@@ -107,6 +113,43 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.616 (10 November 2026)
+- **0.4.616 is the Mac's ninth release**, through Sparkle, with everything since 0.4.612 below; TestFlight build
+  616 for iPhone, iPad and Vision Pro.
+- **Moving along the line you're typing, as in Apple's Terminal.** ⌥← and ⌥→ move a word, ⌘← and ⌘→ go to the
+  start and end of the line, ⌥⌫ and ⌥⌦ delete a word, and ⌘⌫ deletes back to the start of the line. Before,
+  ⌥←, ⌥→, ⌥⌫ and ⌘⌫ did nothing and ⌘← and ⌘→ moved a word. ⌥-click on the line puts the cursor there.
+  They work the same in a coding agent that asked for the newer keyboard protocol. With a suggestion showing,
+  ⌘→ takes all of it.
+
+### 0.4.615 (10 November 2026, Mac)
+- **The Dock icon counts the terminals that rang their bell where you can't see them.** The orange glow on a tab
+  and the orange tab on an orb are no help when the window is on another desktop or covered. Now the app's icon in
+  the Dock counts those terminals, a notification says which ("*bravo* rang its bell"), or both: choose under
+  Settings ▸ Connections, **A bell rung out of sight**; the count is the default. Both go once you look at the
+  terminal, and clicking the notification brings it forward.
+- **The app asks for notifications once, as it starts.** macOS draws a Dock badge only for an app allowed
+  notifications with badges, so the count needs it too. After that the choice is in System Settings ▸ Notifications.
+
+### 0.4.614 (10 November 2026)
+- **A machine that is asleep or away is found out once, not once per terminal.** With dozens of terminals kept in
+  tmux on a laptop that went into a bag, every one of them on iPhone, iPad and Vision Pro waited out a 30-second
+  connect of its own, one after another: a window of thirty took a quarter of an hour to give up. Now:
+  - The app waits 15 seconds for a machine to answer, not 30.
+  - Terminals waiting for their turn to sign in take the answer the first ones got.
+  - A window's terminals stop dialling a machine once one of them finds it not answering.
+  - The terminal says "*name* didn't answer. It may be asleep, or off the network." When auto-reconnect gives
+    up, it keeps that reason rather than only "Reconnect failed after 5 attempts".
+  - Active no longer shows a session on such a machine as **Detached**, as if it could be reattached, from what it
+    knew before: it says it couldn't check, and why.
+  - The **Connection Error** banners that repeated the panel's words at every try are gone.
+- **Tailscale off, said at once.** A machine at a Tailscale address (100.64.0.0/10, fd7a:115c:a1e0::/48, or a
+  .ts.net name) can't be reached while Tailscale is off on this device. Before, the connection simply timed out.
+  Now terminals, remote desktops and databases reached directly say **Tailscale Is Off**, "*name* is on your tailnet,
+  and Tailscale is off on this iPhone. Turn it on, then try again.", without trying. Auto-reconnect stops there
+  too, as no try can reach the machine until Tailscale is on. Nothing needs setting up: it is separate from the
+  Tailscale device list. A Tailscale IPv6 address is no longer taken for the local network.
 
 ### 0.4.613 (10 November 2026)
 - **A terminal that loses its connection says so in the window.** Only the red line under its tab's name said so,

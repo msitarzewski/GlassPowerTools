@@ -41,9 +41,11 @@ struct TerminalConnectionNotice: Equatable {
     ///   - hasFailed: a connection of its has failed, so connecting again is a retry, shown here.
     ///   - shellEnded: an `exit` on a connection that stood: its window closes it.
     ///   - autoReconnectAttempt: auto-reconnect's try now (0 before its first), nil when it isn't at work.
+    ///   - failure: why its last connection failed; Tailscale off on this device has a title of its own.
     static func make(state: SessionState, hasConnected: Bool, hasFailed: Bool, shellEnded: Bool,
                      userDisconnected: Bool, autoReconnectAttempt: Int?,
                      maxAttempts: Int = TerminalSession.autoReconnectAttempts,
+                     failure: TerminalConnectFailure? = nil,
                      serverName: String) -> TerminalConnectionNotice? {
         if shellEnded || state == .connected { return nil }
         if let attempt = autoReconnectAttempt {
@@ -70,7 +72,10 @@ struct TerminalConnectionNotice: Equatable {
                                             offersCancelReconnect: false)
         case .error(let message):
             let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-            return TerminalConnectionNotice(kind: .down, title: hasConnected ? "Connection Lost" : "Couldn't Connect",
+            // The machine is on a tailnet and this device isn't (the owner, 2026-11-10): what to do is turn it on.
+            let title = failure == .needsTailscale ? "Tailscale Is Off"
+                : hasConnected ? "Connection Lost" : "Couldn't Connect"
+            return TerminalConnectionNotice(kind: .down, title: title,
                                             message: trimmed.isEmpty ? nil : trimmed, offersCancelReconnect: false)
         }
     }
@@ -82,7 +87,7 @@ extension TerminalSession {
         TerminalConnectionNotice.make(state: state, hasConnected: hasConnected, hasFailed: hasFailedToConnect,
                                       shellEnded: shellEnded, userDisconnected: userInitiatedDisconnect,
                                       autoReconnectAttempt: isAutoReconnecting ? reconnectAttemptCount : nil,
-                                      serverName: server.name)
+                                      failure: lastConnectFailure, serverName: server.name)
     }
 }
 

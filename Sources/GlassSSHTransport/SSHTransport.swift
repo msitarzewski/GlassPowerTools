@@ -74,6 +74,12 @@ public struct SSHCommandOutput: Sendable, Equatable {
 /// Ownership: callers `acquire(owner:)` and `release(owner:)`; the final release closes the
 /// connection. `close()` closes regardless. A closing transport refuses new owners.
 public actor SSHTransport: SSHPooledTransport {
+    /// How long a connection waits for the machine to answer (TCP and the name's lookup) before it gives up. Citadel's
+    /// default is 30 s; a machine asleep or off the network took that long for each terminal on it, and a laptop with
+    /// dozens of tmux terminals took minutes (the owner, 2026-11-10). A machine that answers does so in well under a
+    /// second on a LAN and a few over Tailscale's relays.
+    public static let connectTimeout: TimeAmount = .seconds(15)
+
     public nonisolated let route: SSHRoute
     public nonisolated let identity: SSHTransportIdentity
     /// This connection's events. **Each read is a subscription of its own**, so every terminal
@@ -349,7 +355,8 @@ public actor SSHTransport: SSHPooledTransport {
                 authenticationMethod: authentication,
                 hostKeyValidator: validator,
                 reconnect: .never,
-                algorithms: SSHAlgorithms()
+                algorithms: SSHAlgorithms(),
+                connectTimeout: Self.connectTimeout
             )
         } catch {
             if let challenge = challengeBox.take() { throw SSHHostTrustRequiredError(challenge: challenge) }
@@ -362,7 +369,8 @@ public actor SSHTransport: SSHPooledTransport {
                     authenticationMethod: authentication,
                     hostKeyValidator: validator,
                     reconnect: .never,
-                    algorithms: SSHEngineAlgorithms.legacy
+                    algorithms: SSHEngineAlgorithms.legacy,
+                    connectTimeout: Self.connectTimeout
                 )
             } catch {
                 if let challenge = challengeBox.take() { throw SSHHostTrustRequiredError(challenge: challenge) }

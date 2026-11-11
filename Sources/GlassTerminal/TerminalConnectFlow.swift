@@ -697,11 +697,18 @@ struct TerminalConnectFlow: ViewModifier {
                                  into workgroupID: UUID) async -> (appended: [UUID], failures: [String]) {
         var appendedSessionIDs: [UUID] = []
         var failures: [String] = []
+        // Machines a terminal found not answering, or behind Tailscale that is off here: their other terminals aren't
+        // dialled, and the alert says so once (2026-11-10, `TerminalMachineReach`).
+        var outOfReach: [UUID: (name: String, notOpened: Int)] = [:]
         for target in plan.targets {
             guard target.intent.kind == .ssh,
                   let server = target.server,
                   let serverID = target.intent.serverID else {
                 failures.append("\(target.displayName): local terminals are available on macOS.")
+                continue
+            }
+            if outOfReach[serverID] != nil {
+                outOfReach[serverID]!.notOpened += 1
                 continue
             }
             do {
@@ -732,11 +739,15 @@ struct TerminalConnectFlow: ViewModifier {
                     sessionManager.closeSession(session)
                 } else if case .error(let message) = session.state {
                     failures.append("\(server.name): \(message)")
+                    if session.lastConnectFailure?.isTheMachines == true { outOfReach[serverID] = (server.name, 0) }
                     sessionManager.closeSession(session)
                 }
             } catch {
                 failures.append("\(server.name): \(error.localizedDescription)")
             }
+        }
+        for machine in outOfReach.values where machine.notOpened > 0 {
+            failures.append("\(machine.name): \(machine.notOpened) more of its terminals weren't opened.")
         }
         return (appendedSessionIDs, failures)
     }
@@ -1386,7 +1397,8 @@ extension TerminalConnectFlow {
 
     /// `--demo-connection-lost <seconds>` in a `--ui-testing` run: the demo window's first terminal loses its
     /// connection that long after it opens, and its Reconnect comes back connected (2026-11-10: the panel over a
-    /// terminal without its connection).
+    /// terminal without its connection). With `--demo-needs-tailscale`, it is lost as a machine on a tailnet is
+    /// with Tailscale off on this device.
     static var demoConnectionLostAfter: Double? {
         let arguments = ProcessInfo.processInfo.arguments
         guard arguments.contains("--ui-testing"), let flag = arguments.firstIndex(of: "--demo-connection-lost"),
@@ -1399,9 +1411,10 @@ extension TerminalConnectFlow {
     func demoLoseConnectionIfAsked(_ session: TerminalSession) {
         guard let seconds = Self.demoConnectionLostAfter else { return }
         session.demoReconnects = true
+        let needsTailscale = ProcessInfo.processInfo.arguments.contains("--demo-needs-tailscale")
         Task { @MainActor [weak session] in
             try? await Task.sleep(for: .seconds(seconds))
-            session?.demoLoseConnection()
+            session?.demoLoseConnection(needsTailscale: needsTailscale)
         }
     }
 }

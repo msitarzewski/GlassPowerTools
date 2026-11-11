@@ -29,14 +29,22 @@ public final class TerminalBellNotice {
 
     public init() {}
 
+    /// Told when a terminal's notice turns unseen, and when it is seen again: the Mac's notification of a bell rung out
+    /// of sight is posted, then taken back (2026-11-10).
+    public static var onUnseen: (@MainActor (TerminalBellNotice) -> Void)?
+    public static var onSeen: (@MainActor (TerminalBellNotice) -> Void)?
+
     /// The terminal rang its bell.
     public func ring() {
         guard !isInSight, !isUnseen else { return }
         isUnseen = true
+        Self.onUnseen?(self)
     }
 
     /// Seen: the terminal was chosen, or its notice is no longer wanted.
     public func clear() {
-        if isUnseen { isUnseen = false }
+        guard isUnseen else { return }
+        isUnseen = false
+        Self.onSeen?(self)
     }
 }

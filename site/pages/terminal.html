@@ -11,7 +11,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     <a class="button primary" href="help/terminal-connect.html">Connect over SSH</a>
     <a class="button" href="index.html">Back to the overview</a>
   </div>
-  <p class="status-note">In the Mac's release, 0.4.612; in a beta by invitation for iPhone, iPad and Vision Pro (<a href="mailto:msitarzewski@gmail.com?subject=Glass%20Power%20Tools%20beta&amp;body=The%20email%20of%20my%20Apple%20Account%2C%20for%20the%20TestFlight%20invitation%3A%0D%0A%0D%0AMy%20devices%20(iPhone%2C%20iPad%2C%20Vision%20Pro)%3A%0D%0A">request access</a>). Tested against OpenSSH 10.2 for shell, SFTP, and RSA and Ed25519 sign-in.</p>
+  <p class="status-note">In the Mac's release, 0.4.616; in a beta by invitation for iPhone, iPad and Vision Pro (<a href="mailto:msitarzewski@gmail.com?subject=Glass%20Power%20Tools%20beta&amp;body=The%20email%20of%20my%20Apple%20Account%2C%20for%20the%20TestFlight%20invitation%3A%0D%0A%0D%0AMy%20devices%20(iPhone%2C%20iPad%2C%20Vision%20Pro)%3A%0D%0A">request access</a>). Tested against OpenSSH 10.2 for shell, SFTP, and RSA and Ed25519 sign-in.</p>
 </section>
 
 <figure class="window-shot">
@@ -55,6 +55,18 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     <div class="card">
       <h3>Suggestions as you type</h3>
       <p>At a shell prompt the terminal offers the rest of the command: grey text on the Mac, taken with →, and a row of choices above the keyboard on iPhone and iPad and under the window on Vision Pro. From what you've run on that machine, your snippets and library, the folder you're in, paths as you type them, common tools and the machine's programs. Nothing in vim or less, or at a password prompt, and what you run stays on your device. See <a href="help/terminal-sessions.html#suggestions-as-you-type">Suggestions as you type</a>.</p>
+    </div>
+    <div class="card">
+      <h3>When the connection goes</h3>
+      <p>A terminal that loses its connection says so in the window: its text dims under a panel with the reason, <strong>Reconnect</strong> and <strong>Close Terminal</strong>. A laptop asleep in a bag is found out once for all its terminals, not one at a time, and a machine at a Tailscale address while Tailscale is off on this device says <strong>Tailscale Is Off</strong> at once. See <a href="help/terminal-sessions.html#when-a-terminal-loses-its-connection">When a terminal loses its connection</a>.</p>
+    </div>
+    <div class="card">
+      <h3>Bells you can't see</h3>
+      <p>A terminal that rings its bell for you, a coding agent waiting for an answer or a long job done, is marked in orange until you look. On the Mac the Dock icon counts them, or a notification names one, while their windows are on another desktop or covered. See <a href="help/terminal-sessions.html#when-a-terminal-rings-its-bell">When a terminal rings its bell</a>.</p>
+    </div>
+    <div class="card">
+      <h3>Edit the line as on a Mac</h3>
+      <p>⌥← and ⌥→ move a word, ⌘← and ⌘→ go to the line's start and end, ⌥⌫ and ⌘⌫ delete a word or back to the start, and ⌥-click puts the cursor where you click, as in Apple's Terminal. See <a href="help/terminal-sessions.html#move-along-the-line-youre-typing-mac">Move along the line you're typing</a>.</p>
     </div>
     <div class="card">
       <h3>Paste a picture, see a diagram</h3>
@@ -151,7 +163,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 <section class="band">
   <h2>A window's tabs, side by side</h2>
   <p class="intro"><strong>Terminal Overview</strong> (⌥⌘G on the Mac) shows a window's tabs as live pictures: in a grid, as Show All Windows draws them, or as a carousel, one in front and large with the rest turned toward it on either side, like an album view. Swipe, drag or press the arrow keys to go along the row, and click the one in front or press Return to open it. With Auto-focus on activity, the tab that is printing comes forward. On iPhone and iPad, <strong>Terminal View</strong> at the top left chooses Tabs, Grid or Carousel; on Vision Pro it is in the window's bar.</p>
-  <p class="status-note">In the Mac's release, 0.4.612, and in the beta for iPhone, iPad and Vision Pro.</p>
+  <p class="status-note">In the Mac's release, 0.4.616, and in the beta for iPhone, iPad and Vision Pro.</p>
   <div class="gallery">
     <figure>
       <img class="bezel only-dark" src="static/shots/macbook-carousel-dark.webp" width="3860" height="2540" loading="lazy" alt="A terminal window's overview on a Mac, as the carousel: five tabs as live pictures in a row. In front, a coding agent at work on the shop, explaining why the jobs worker keeps restarting; on the left, turned toward it, btop on alpha and another agent; on the right, two more agents; each reflected below, and the one in front named, Claude Code, under the row.">
@@ -179,7 +191,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 
 <section class="band">
   <h2>On each device</h2>
-  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-11-09 the Mac, the iPhone and the Vision Pro all ran 0.4.612. Not every newer change has been tried on every device yet, and Scale Text on iPad only in Apple's simulator.</p>
+  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-11-10 the Mac and the iPhone ran 0.4.616, and the Vision Pro 0.4.612. Not every newer change has been tried on every device yet, and Scale Text on iPad only in Apple's simulator.</p>
   <div class="two">
     <div>
       <h3>Vision Pro</h3>
@@ -205,6 +217,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     <li>On the Mac, a workgroup that includes a legacy-algorithm connection does not open. Open that connection directly.</li>
     <li>iPhone has no Scale Text: its terminal fills the screen.</li>
     <li>Suggestions in a terminal on a server need the shell integration installed there, from Settings ▸ Suggestions. The commands kept for them stay on each device and are not synced.</li>
+    <li>The Dock count and bell notifications are the Mac's, and show only while Glass Power Tools is allowed notifications. The ⌥ and ⌘ editing keys and ⌥-click are the Mac's too.</li>
   </ul>
 </section>
 
@@ -213,7 +226,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
   <div class="grid">
     <a class="card" href="help/terminal-connect.html"><h3>Connect over SSH</h3><p>Set up a service, passwords, jump hosts, old servers, dropped connections.</p></a>
     <a class="card" href="help/terminal-keys-and-trust.html"><h3>Keys and host trust</h3><p>Sign in with a key and decide whether to trust a machine.</p></a>
-    <a class="card" href="help/terminal-sessions.html"><h3>Work in a terminal</h3><p>Windows, tabs, splits, scaling, suggestions, links and paths, file previews, search, paste review, snippets, recording.</p></a>
+    <a class="card" href="help/terminal-sessions.html"><h3>Work in a terminal</h3><p>Windows, tabs, splits, scaling, suggestions, a lost connection, bells, editing the line, links and paths, file previews, search, paste review, snippets, recording.</p></a>
     <a class="card" href="help/terminal-tmux.html"><h3>Keep terminals running</h3><p>tmux sessions, Active, basic terminals, and the Mac's local terminals.</p></a>
     <a class="card" href="help/terminal-files.html"><h3>Files over SFTP</h3><p>Browse, transfer and edit files on a server.</p></a>
     <a class="card" href="help/terminal-port-forwarding.html"><h3>Port forwarding</h3><p>Local, remote and SOCKS5 forwards.</p></a>

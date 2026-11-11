@@ -50,6 +50,10 @@ Last changed 31 October 2026. Every change to this page is recorded in the publi
 
 - **Local Network** (iPhone, iPad and Vision Pro), to reach machines on your network.
 - **Face ID, Optic ID or Touch ID**, only to use an SSH key kept in the Secure Enclave.
+- **Notifications.** The Mac app asks once, as it starts: macOS shows the count on the app's Dock icon of
+  terminals whose bell rang out of sight, and a notification naming one if you choose that, only with this
+  permission. On every device the app also asks if you turn on **Notify when a query fails** or **Important
+  Session Notices**. Notifications are made on your device; none is sent through a server.
 
 ## This website
 

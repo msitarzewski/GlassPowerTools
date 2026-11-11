@@ -56,6 +56,11 @@ public actor SSHTransportPool<Transport: SSHPooledTransport> {
         var waiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     }
 
+    /// Per route, sign-ins that failed because the machine never answered, and the last one's error: a lease waiting
+    /// while one failed takes its error rather than opening another connection to wait out the same timeout. Kept
+    /// apart from `routes`, which lets a route go the moment it has nothing in it — as the waiters wake.
+    private var notAnswering: [SSHTransportIdentity: (count: Int, error: any Error)] = [:]
+
     public init(limits: SSHConnectionLimits = .standard, makeTransport: @escaping @Sendable (SSHRoute) -> Transport) {
         self.limits = limits
         self.makeTransport = makeTransport
@@ -113,14 +118,22 @@ public actor SSHTransportPool<Transport: SSHPooledTransport> {
     /// room — connected, or signing in, in which case it waits for that sign-in — or opens another
     /// from `candidate` (then from its siblings), at most `handshakesPerRoute` signing in at once.
     /// A failed sign-in fails every owner waiting for it, so a wrong password is tried once, not
-    /// once per terminal.
+    /// once per terminal. A machine that never answers fails, with that sign-in's error, every lease
+    /// waiting for a turn to sign in when it did, so dozens of terminals on a machine that is asleep
+    /// wait out one timeout, not one each (2026-11-10). A lease made after it tries again.
     public func lease(_ route: SSHRoute, owner: UUID, candidate: Transport? = nil) async throws -> Transport {
         let identity = route.identity
         var unused = candidate
         var waitLogged = false
+        let notAnsweringBefore = notAnswering[identity]?.count ?? 0
         while true {
             try Task.checkCancellation()
             let number = routeNumber(identity)
+            if let failed = notAnswering[identity], failed.count > notAnsweringBefore {
+                let error = failed.error
+                Logger.sshConnections.notice("SSH route r\(number, privacy: .public): the machine didn't answer a sign-in this lease waited on; failing it the same way")
+                throw error
+            }
 
             // A connection with room.
             let scanned = routes[identity]?.connections ?? []
@@ -233,9 +246,9 @@ public actor SSHTransportPool<Transport: SSHPooledTransport> {
         let ready = Task<Void, any Error> {
             do {
                 try await Self.signIn(transport, limits: limits, route: route, connection: number)
-                handshakeEnded(identity, transport, succeeded: true)
+                handshakeEnded(identity, transport, failure: nil)
             } catch {
-                handshakeEnded(identity, transport, succeeded: false)
+                handshakeEnded(identity, transport, failure: error)
                 throw error
             }
         }
@@ -278,11 +291,15 @@ public actor SSHTransportPool<Transport: SSHPooledTransport> {
         }
     }
 
-    private func handshakeEnded(_ identity: SSHTransportIdentity, _ transport: Transport, succeeded: Bool) {
+    private func handshakeEnded(_ identity: SSHTransportIdentity, _ transport: Transport, failure: (any Error)?) {
         guard var route = routes[identity] else { return }
         route.handshakes = max(0, route.handshakes - 1)
+        if let failure, SSHTransportError.isMachineNotAnswering(failure) {
+            notAnswering[identity] = ((notAnswering[identity]?.count ?? 0) + 1, failure)
+            Logger.sshConnections.notice("SSH route r\(route.number, privacy: .public): the machine didn't answer; \(route.waiters.count, privacy: .public) waiting lease(s) fail with it")
+        }
         if let index = route.connections.firstIndex(where: { $0.transport === transport }) {
-            if succeeded {
+            if failure == nil {
                 route.connections[index].signedIn = true
             } else {
                 // Nobody joins a failed sign-in; its owners have the error and let go.

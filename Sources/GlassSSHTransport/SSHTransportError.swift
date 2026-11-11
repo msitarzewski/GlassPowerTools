@@ -1,6 +1,7 @@
 import Foundation
 @preconcurrency import Citadel
 import NIOCore
+import NIOPosix
 @preconcurrency import NIOSSH
 
 /// glas.sh `SSHError` (Models.swift:2781) plus the trust and tunnel cases the engine adds.
@@ -182,6 +183,32 @@ public extension SSHTransportError {
         return raw.localizedCaseInsensitiveContains("exceeded maxstartups")
             || raw.localizedCaseInsensitiveContains("connection reset by peer")
     }
+
+    /// The machine never answered: the connect timed out, it is down or unreachable, or its name didn't resolve
+    /// (2026-11-10: a laptop asleep in a bag with dozens of tmux terminals on it). Not a refused port, a reset, a
+    /// host key or a rejected sign-in: each of those is the machine answering. The pool fails every terminal waiting
+    /// on a route with this, rather than each opening a connection of its own to wait out the same timeout.
+    static func isMachineNotAnswering(_ error: Error) -> Bool {
+        if let channelError = error as? ChannelError {
+            if case .connectTimeout = channelError { return true }
+            return false
+        }
+        if let ioError = error as? IOError { return notAnsweringErrnos.contains(ioError.errnoCode) }
+        if let connectionError = error as? NIOConnectionError {
+            if connectionError.connectionErrors.isEmpty {
+                // Nothing to connect to: the name didn't resolve.
+                return connectionError.dnsAError != nil || connectionError.dnsAAAAError != nil
+            }
+            return connectionError.connectionErrors.allSatisfy { isMachineNotAnswering($0.error) }
+        }
+        if (error as NSError).domain == NSPOSIXErrorDomain { return notAnsweringErrnos.contains(Int32((error as NSError).code)) }
+        let raw = String(describing: error).lowercased()
+        return raw.contains("connecttimeout") || raw.contains("timed out") || raw.contains("host is down")
+            || raw.contains("no route to host") || raw.contains("network is unreachable") || raw.contains("network is down")
+    }
+
+    /// Timed out, host down, host or network unreachable, network down.
+    private static let notAnsweringErrnos: Set<Int32> = [ETIMEDOUT, EHOSTDOWN, EHOSTUNREACH, ENETUNREACH, ENETDOWN]
 
     static func isChannelClosedError(_ error: Error) -> Bool {
         if let channelError = error as? ChannelError {

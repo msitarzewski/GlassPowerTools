@@ -31,7 +31,55 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-10 — RESUME HERE: a terminal without its connection says so in the window (0.4.613, in QA)
+## 2026-11-10 — RESUME HERE: moving along the command line as a Mac does (0.4.616, Mac)
+- **His word:** a user asked for editing "like Apple's terminal - holding keys while using arrows"; "Is this already
+  a feature?" No: a probe showed ⌥←/⌥→, ⌥⌫ and ⌘⌫ sent nothing and ⌘←/⌘→ moved a word. He chose ⌘←/⌘→ the line's
+  start and end. Task note `tasks/2026-11/2026-11-10_mac-line-editing-keys.md`.
+- **Built, not committed:** SwiftTerm S5 (`PATCHES.md`), `MacTerminalArrowKeysTests`, help, release notes 0.4.616.
+- **His badge report ("didn't clear on view of the window"):** clearing is per terminal, when its tab is in front;
+  the bells I rang were in `glass-16` and `glass-17`, whose names other tabs share. He chose to keep it per terminal.
+  The VM showed choosing the rung tab clears it (2 → 1 → none).
+- **Docs and help (his "update the docs and help with the new features!"):** help for 0.4.613–0.4.616 (lost
+  connection, machine out of reach and Tailscale, the Dock count, the line-editing keys; suggestions' ⌘→), the
+  registry, README's "What it does", PRIVACY.md's permissions (notifications), decisions D104–D106, release notes.
+  The site builds (its address guard refused Tailscale's range written as addresses; reworded). The site's pages
+  wait for the next release, as they say 0.4.612.
+- **0.4.616:** on the Mac 21:20 and the iPhone 21:20 (read back, no crash reports); the headset unavailable all
+  evening, `install-devices-616.zsh` watching.
+- **Not committed:** 0.4.614, 0.4.615, 0.4.616 and these docs.
+
+## 2026-11-10 — the Dock counts the terminals that rang out of sight (0.4.615, Mac)
+- **His word:** "badges for the number of terminals that need attention … nothing in the dock if the user is on
+  another virtual desktop or has windows covered"; then, asked: the permission "at the next launch", and "dock
+  count, notification, or both (in settings)". Task note `tasks/2026-11/2026-11-10_dock-bell-count.md`.
+- **Built, not committed:** `MacBellBadge.swift` (count, notification, setting), `TerminalBellNotice` hooks, the
+  shared notification delegate (`GlassSystemNotifications`), the launch-time ask, Settings ▸ Connections ▸ A bell
+  rung out of sight; help, release notes 0.4.615.
+- **QA:** unit 7, each piece seen failing; the macOS VM with permission (badge 2 → 1, the banner pictured); Mac
+  terminal 1,271, shell, desktop and connection UI suites passing (one test settled: the type-ahead chips' ornament
+  recorded as allowed, D102).
+- **0.4.615:** on the Mac 20:45 (read back, running, no crash reports) and the iPhone 20:43 (read back, no crash
+  logs); the headset unavailable, `install-devices-615.zsh` watching. His Allow at macOS's prompt still to come.
+- **Not committed either:** 0.4.614 (the machine out of reach, Tailscale), below.
+
+## 2026-11-10 — a machine out of reach, and Tailscale off (0.4.614)
+- **His word:** his MacBook Pro, with dozens of tmux terminals, asleep in his bag: from the iPhone and Vision Pro
+  they "try to connect, but time out, some show detached, as if they could be reattached"; and "recognize tailscale
+  IP ranges and notify the user (like the last feature) when tailscale is required". Task note
+  `tasks/2026-11/2026-11-10_machine-out-of-reach.md`.
+- **Built, not committed:** 15 s connects; the pool fails waiting sign-ins with a not-answering one; a window's
+  pass stops dialling such a machine (`TerminalMachineReach.swift`); Active forgets a "Detached" it couldn't check;
+  the reason kept when auto-reconnect gives up; no per-try banners; `GlassTailscaleReach` (GlassShell) checked
+  before dialling in terminals, desktops and direct databases, the panel titled Tailscale Is Off. Help, release
+  notes (0.4.614), progress, toc, November index.
+- **QA:** unit, each piece seen failing; the real network (ten terminals on an address nothing answers: 15.07 s,
+  over 120 s without the pass stop); Mac and package suites; UI 3 on the Vision Pro and iPhone simulators.
+- **0.4.614:** built for all three; on the Mac 16:58 (read back, running, no crash reports); on the iPhone 17:49
+  when it came back (reads back 0.4.614 (614); none of its 816 crash logs is the app's). The headset was
+  unavailable (0.4.613 never reached it either); `install-devices-614.zsh` installs it when reachable.
+- **Next:** his try with the laptop in the bag; his other requests.
+
+## 2026-11-10 — a terminal without its connection says so in the window (0.4.613, committed `0e348599`)
 - **His word:** "a disconnected terminal shows a red text under the name in the tab, but the window itself still shows
   what looks like a connected window … Dim the window, add a close or reconnect UI to the center of the window." The
   first of "a few user requests to address". Task note `tasks/2026-11/2026-11-10_terminal-connection-lost-panel.md`.

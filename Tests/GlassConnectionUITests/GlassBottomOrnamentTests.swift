@@ -17,8 +17,13 @@ import Testing
 
 @Suite("Every bottom bar is Apple's toolbar ornament")
 struct GlassBottomOrnamentTests {
-    /// Files allowed to draw their own ornament at the bottom of a scene, and why. None today.
-    static let handBuiltBottomOrnaments: [String: String] = [:]
+    /// Files allowed to draw their own ornament at the bottom of a scene, and why.
+    static let handBuiltBottomOrnaments: [String: String] = [
+        // Not a bar of controls: type-ahead's suggestions (D102), a row of chips that comes and goes with what is
+        // typed, under the window's toolbar ornament, where the owner chose them (2026-11-06, "Keyboard bar /
+        // ornament"). The window's controls stay in its toolbar's bottom ornament.
+        "TerminalWindowView.swift": "type-ahead's suggestion chips under the toolbar (D102)",
+    ]
 
     @Test func noSceneDrawsItsOwnBottomBar() throws {
         var found: Set<String> = []

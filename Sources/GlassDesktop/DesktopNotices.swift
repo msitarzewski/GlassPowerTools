@@ -23,7 +23,6 @@ public final class DesktopNotices {
     private let defaults: UserDefaults
     private let delivery: DesktopNoticeDelivery
     private var notified: [UUID] = []
-    private let delegate = DesktopNoticeDelegate()
     static let preferenceKey = "importantSessionNotificationsEnabled"
 
     init(defaults: UserDefaults, delivery: DesktopNoticeDelivery = .init()) {
@@ -31,8 +30,9 @@ public final class DesktopNotices {
         isEnabled = defaults.bool(forKey: Self.preferenceKey)
     }
 
+    /// The app's notification delegate, shared with the terminal's bell notices (`GlassSystemNotifications`).
     public func configurePresentation() {
-        UNUserNotificationCenter.current().delegate = delegate
+        GlassSystemNotifications.installDelegate()
     }
 
     public func setEnabled(_ enabled: Bool) async {
@@ -67,9 +67,3 @@ public final class DesktopNotices {
     }
 }
 
-private final class DesktopNoticeDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
-    func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
-    }
-}

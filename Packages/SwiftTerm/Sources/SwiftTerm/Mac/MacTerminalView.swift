@@ -1568,6 +1568,13 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         selection.active = false
         let eventFlags = event.modifierFlags
 
+        // Glass Power Tools S5: moving along the command line as a Mac moves along text (⌥/⌘ arrows, ⌥⌦), whatever
+        // keyboard protocol a program asked for, as Ghostty's macOS defaults do.
+        if let bytes = Self.lineEditingBytes(keyCode: event.keyCode, flags: eventFlags) {
+            send(bytes)
+            return
+        }
+
         if terminal.keyboardEnhancementFlags.isEmpty,
            eventFlags.contains(.command),
            !(eventFlags.contains(.option) && event.charactersIgnoringModifiers == "o") {
@@ -1766,6 +1773,14 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
                 if sendKittyFunctionalKey(.escape, modifiers: mods) { return }
             case #selector(deleteBackward(_:)):
                 if sendKittyFunctionalKey(.backspace, modifiers: mods) { return }
+            // Glass Power Tools S5: a program that asked for disambiguated keys hears ⌥⌫ and ⌘⌫ as the protocol
+            // encodes them; otherwise they are the shells' bytes, below.
+            case #selector(deleteWordBackward(_:)):
+                if terminal.keyboardEnhancementFlags.contains(.disambiguate),
+                   sendKittyFunctionalKey(.backspace, modifiers: mods.union(.alt)) { return }
+            case #selector(deleteToBeginningOfLine(_:)):
+                if terminal.keyboardEnhancementFlags.contains(.disambiguate),
+                   sendKittyFunctionalKey(.backspace, modifiers: mods.union(.super)) { return }
             case #selector(moveUp(_:)):
                 if sendKittyFunctionalKey(.up, modifiers: mods) { return }
             case #selector(moveDown(_:)):
@@ -1857,11 +1872,24 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
             } else {
                 send (EscapeSequences.cmdPageDown)
             }
+        // Glass Power Tools S5: the line's start and end (⌘← and ⌘→ come here through other routes too), a word
+        // back and forward (⌥← and ⌥→, Option not acting as Meta), and deleting a word back (⌥⌫), forward (⌥⌦)
+        // or to the line's start (⌘⌫): Apple's Terminal, iTerm2's Natural Text Editing and Ghostty's macOS
+        // defaults. These went unhandled, or moved a word for ⌘← and ⌘→.
         case #selector(moveToLeftEndOfLine(_:)):
-            // Apple sends the Emacs back-word commands
-            send (EscapeSequences.emacsBack)
+            send (Self.lineStart)
         case #selector(moveToRightEndOfLine(_:)):
+            send (Self.lineEnd)
+        case #selector(moveWordLeft(_:)), #selector(moveWordBackward(_:)):
+            send (EscapeSequences.emacsBack)
+        case #selector(moveWordRight(_:)), #selector(moveWordForward(_:)):
             send (EscapeSequences.emacsForward)
+        case #selector(deleteWordBackward(_:)):
+            send ([0x1b, backspaceSendsControlH ? 8 : 0x7f])
+        case #selector(deleteWordForward(_:)):
+            send ([0x1b, 0x64])
+        case #selector(deleteToBeginningOfLine(_:)):
+            send ([0x15])
         default:
             print ("Unhandle selector \(selector)")
         }
@@ -2942,6 +2970,14 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
             sharedMouseEvent(with: event)
             return
         }
+        // Glass Power Tools S5: ⌥-click puts the cursor there, on the line being typed, as Apple's Terminal does.
+        if !didSelectionDrag, event.clickCount == 1,
+           event.modifierFlags.intersection([.option, .command, .control, .shift]) == [.option],
+           let moves = optionClickMoves(to: hit) {
+            selection.active = false
+            send(moves)
+            return
+        }
 
         // The semantic route runs last, after the double-click interval.
         // A second press cancels this work before word selection completes.
@@ -3635,6 +3671,60 @@ final class DictationOverlayTextView: NSTextView {
                 r.fill()
             }
         }
+    }
+}
+
+// MARK: - Glass Power Tools S5: moving along the command line as a Mac moves along text
+
+extension TerminalView {
+    /// ⌃A and ⌃E: the start and end of the line in bash, zsh and every readline.
+    static let lineStart: [UInt8] = [0x01]
+    static let lineEnd: [UInt8] = [0x05]
+
+    /// What ⌥← / ⌥→ (a word), ⌘← / ⌘→ (the line's start and end) and ⌥⌦ (delete the word ahead) send, with no other
+    /// modifier held, as Apple's Terminal, iTerm2's Natural Text Editing and Ghostty's macOS defaults do; nil for any
+    /// other key. ⌥⌦ is here because the function-key branch would send a plain forward delete before AppKit's
+    /// `deleteWordForward:` could.
+    static func lineEditingBytes(keyCode: UInt16, flags: NSEvent.ModifierFlags) -> [UInt8]? {
+        let held = flags.intersection([.shift, .control, .option, .command])
+        switch (Int(keyCode), held) {
+        case (kVK_LeftArrow, [.option]): return EscapeSequences.emacsBack
+        case (kVK_RightArrow, [.option]): return EscapeSequences.emacsForward
+        case (kVK_LeftArrow, [.command]): return lineStart
+        case (kVK_RightArrow, [.command]): return lineEnd
+        case (kVK_ForwardDelete, [.option]): return [0x1b, 0x64]
+        default: return nil
+        }
+    }
+
+    /// The arrows that take the cursor to `click`, a cell on the line being typed: the cursor's row and the rows
+    /// soft-wrapped onto it. One step to a character, a wide character's second cell not counted. Nil off that line,
+    /// in a full-screen program (the alternate screen), or where the program takes the mouse.
+    func optionClickMoves(to click: Position) -> [UInt8]? {
+        guard !terminal.isCurrentBufferAlternate,
+              !(allowMouseReporting && terminal.mouseMode != .off) else { return nil }
+        let buffer = terminal.buffer
+        let cursor = Position(col: buffer.x, row: buffer.yBase + buffer.y)
+        var first = cursor.row, last = cursor.row
+        while first > 0, first < buffer.lines.count, buffer.lines[first].isWrapped { first -= 1 }
+        while last + 1 < buffer.lines.count, buffer.lines[last + 1].isWrapped { last += 1 }
+        guard (first...last).contains(click.row), click.row < buffer.lines.count else { return nil }
+        let cols = terminal.cols
+        let from = cursor.row * cols + cursor.col, to = click.row * cols + min(click.col, cols - 1)
+        guard from != to else { return nil }
+        var steps = 0
+        for index in min(from, to)..<max(from, to) {
+            let line = buffer.lines[index / cols]
+            let col = index % cols
+            if col < line.count, line[col].width == 0, line[col].code == 0, col > 0, line[col - 1].width == 2 { continue }
+            steps += 1
+        }
+        guard steps > 0 else { return nil }
+        let right = to > from
+        let key: [UInt8] = terminal.applicationCursor
+            ? (right ? EscapeSequences.moveRightApp : EscapeSequences.moveLeftApp)
+            : (right ? EscapeSequences.moveRightNormal : EscapeSequences.moveLeftNormal)
+        return Array((0..<min(steps, 4_000)).map { _ in key }.joined())
     }
 }
 #endif

@@ -9,9 +9,11 @@ import SwiftUI
 import GlassLayers
 import GlassShell
 import GlassConnectionKit
+import GlassConnectionUI
 import os
 #if os(macOS)
 import AppKit
+import UserNotifications
 
 @MainActor
 public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
@@ -38,6 +40,16 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         GlassRemoteChangeReceiver.register()
+        // A bell rung out of sight, said outside its window: a count on the Dock icon, a notification, or both
+        // (Settings ▸ Connections, under Notifications; 2026-11-10).
+        MacBellBadge.start()
+        MacBellNotifications.start()
+        // macOS draws neither without its permission, asked here, at launch (the owner's choice): its prompt shows
+        // once; after that this only reads the answer. Not in UI-test runs, whose prompt nobody answers, unless
+        // asked for (`--ask-notifications`).
+        if GlassUITestRun.identifier == nil || ProcessInfo.processInfo.arguments.contains("--ask-notifications") {
+            Task { _ = try? await GlassSystemNotifications.requestAuthorization(options: [.alert, .badge, .sound]) }
+        }
     }
 
     /// What answers the app's Finder services (`NSServices`), set by the composition root before

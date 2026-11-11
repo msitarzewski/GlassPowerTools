@@ -63,6 +63,7 @@ Programs ring the terminal's bell to ask for you: a coding agent waiting for an 
 - **A tab in an open window** glows orange beneath its row in the sidebar (Vision Pro and Mac). On iPhone, the name at the top glows while another terminal in the set rang, and that terminal shows a bell in the menu; on iPad, the tab's symbol becomes an orange bell.
 - **A window in the orb dock, or shrunk into its orb**: that tab's icon on the orb turns orange. A window with one terminal, whose orb has no tab icons around it, gets an orange rim.
 - **Show All Windows, Grid and Terminal Overview**: the terminal's picture glows orange beneath it. In **Carousel**, its picture's edge glows orange.
+- **On Mac, wherever its window is**, on another desktop, covered by other windows or minimized: the app's icon in the Dock counts the terminals that rang, a notification says which ("*name* rang its bell"), or both. Choose which in Settings ▸ **Connections**, under **A bell rung out of sight**; the count is the default. The count and the notification go once you look at the terminal, and clicking the notification brings that terminal forward. macOS shows them only while Glass Power Tools is allowed notifications, with badges for the count: the app asks once, as it starts, and the choice is then in System Settings ▸ Notifications.
 
 Choosing the tab clears it. A bell in the terminal you're looking at leaves nothing behind, and the mark appears whether or not **Bell enabled** plays a sound (see [Terminal settings](terminal-settings.md)).
 
@@ -71,6 +72,10 @@ Choosing the tab clears it. A bell in the terminal you're looking at leaves noth
 When an SSH terminal's connection drops, its text dims and a panel in the middle of the terminal says **Connection Lost** and why; one that couldn't connect says **Couldn't Connect**. **Reconnect** connects it again where it is, and **Close Terminal** closes it (on Mac its pane, and the tab with its last). The dimmed text stays there to read, scroll and copy.
 
 With **Auto-reconnect on disconnect** on (see [Terminal settings](terminal-settings.md#connections)), the panel shows a spinner and each try, up to five, and **Cancel Reconnect** stops trying. A terminal kept in tmux comes back to its tmux session as it was (see [Keep terminals running with tmux](terminal-tmux.md)).
+
+A machine that doesn't answer, such as a laptop asleep in a bag, is said to be one: "*name* didn't answer. It may be asleep, or off the network." The app waits 15 seconds for an answer. When one terminal finds its machine not answering, that machine's other terminals in the window say so at once rather than each waiting in turn, and Active stops showing them as **Detached**, since it couldn't check.
+
+**Tailscale.** A machine at a Tailscale address (one from 100.64 to 100.127, Tailscale's IPv6 addresses starting fd7a:115c:a1e0, or a name ending in .ts.net) can be reached only while Tailscale is on this device. With it off, the terminal says **Tailscale Is Off** at once, rather than after a wait. Turn on Tailscale, then choose **Reconnect**. Databases and remote desktops at those addresses say the same. This needs nothing set up; it is separate from the Tailscale device list in Settings (see [Terminal settings](terminal-settings.md#tailscale)).
 
 ## Show All Windows
 
@@ -160,7 +165,7 @@ Turning Scale off gives the terminal the rows and columns that fit the window, a
 
 At a shell prompt, the terminal offers the rest of the command you're typing.
 
-- **On Mac**, the rest is drawn in grey after the cursor. At the end of the line, → takes all of it and ⌥→ its next word. Typing on leaves it alone; nothing reaches the shell until you take it.
+- **On Mac**, the rest is drawn in grey after the cursor. At the end of the line, → or ⌘→ takes all of it and ⌥→ its next word. Typing on leaves it alone; nothing reaches the shell until you take it.
 - **On iPhone and iPad**, up to three suggestions stand in a row above the keyboard's bar while the keyboard is up. Tap one to type the rest of it.
 - **On Vision Pro**, the same row stands under the window's bar, for the terminal in front.
 
@@ -189,6 +194,18 @@ Text copied from a program that wraps its lines to the window, such as an AI cod
 **On iPhone, iPad and Vision Pro**, pasting a picture, such as a screenshot or a photo, or a file such as a PDF, sends it to the terminal's machine and types its path at the cursor, as dropping it does (see [Drop files on a terminal](#drop-files-on-a-terminal)). It goes into `~/.cache/glass-power-tools/dropped/`, in a folder for the day; a picture with no name of its own is called `Pasted`, for example `Pasted.png`. Nothing is run: press Return yourself.
 
 **On Mac**, ⌘V with a picture on the clipboard, such as a screenshot or an image copied from Preview, Safari or Photos, types a picture's path in the same way: in a local terminal it is saved on this Mac first, and in an SSH terminal it is uploaded to the drop folder on the machine. A program such as Claude Code takes the typed path as the picture. When the clipboard holds text beside the picture, as Excel, Numbers and Word copy it, the text is pasted. To send a file, drag it onto the terminal.
+
+## Move along the line you're typing (Mac)
+
+The keys that move through text everywhere on a Mac move through the command you're typing, as in Apple's Terminal:
+
+- **⌥←** and **⌥→** move back and forward a word.
+- **⌘←** and **⌘→** go to the start and end of the line.
+- **⌥⌫** deletes the word before the cursor, and **⌥⌦** (fn-⌥-Delete on a laptop) the word after it.
+- **⌘⌫** deletes back to the start of the line. In zsh it clears the whole line.
+- **⌥-click** on the line you're typing puts the cursor there. It works across a line that wraps onto the next row, but not in a full-screen program such as vim, or in one that uses the mouse.
+
+They send what bash, zsh and most command-line programs take for these moves (⌥← and ⌥→ the same as Esc B and Esc F, ⌘← and ⌘→ the same as ⌃A and ⌃E).
 
 ## Right-click in a terminal (Mac)
 

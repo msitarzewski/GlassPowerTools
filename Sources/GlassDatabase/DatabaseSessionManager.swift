@@ -211,6 +211,12 @@ class DatabaseSessionManager {
                 Logger.database.info("Tunnel open on local port \(forward.localPort)")
             }
 
+            // Reached directly, on a tailnet, with Tailscale off here: said now, not after `connectTimeout`
+            // (2026-11-10). Through a tunnel, the machine the tunnel goes through is what this device dials.
+            if !config.usesHostTunnel, GlassTailscaleReach.needsTailscale(config.host) {
+                throw GlassTailscaleReach.Required(machine: config.name, host: config.host)
+            }
+
             // Connect to the selected network engine (directly or through tunnel)
             let transportPlan = try Self.transportPlan(
                 for: config,

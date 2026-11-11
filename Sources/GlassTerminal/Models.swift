@@ -371,9 +371,16 @@ class TerminalSession: Identifiable, Hashable {
     /// back connected after a moment rather than asking a library that has no such machine.
     @ObservationIgnored var demoReconnects = false
 
-    /// The demo's connection drops as a real one does when it stops answering (`SSHTransport`'s words).
-    func demoLoseConnection() {
-        reportError("The connection stopped answering — the device slept, or the network changed")
+    /// The demo's connection drops as a real one does when it stops answering (`SSHTransport`'s words); with
+    /// `needsTailscale`, as one on a tailnet does with Tailscale off on this device.
+    func demoLoseConnection(needsTailscale: Bool = false) {
+        guard needsTailscale else {
+            reportError("The connection stopped answering — the device slept, or the network changed")
+            return
+        }
+        let failure = GlassTailscaleReach.Required(machine: server.name, host: "100.92.10.12")
+        lastConnectFailure = TerminalConnectFailure(failure)
+        reportError(failure.errorDescription ?? "")
     }
 
     func demoReconnect() {
@@ -394,6 +401,7 @@ class TerminalSession: Identifiable, Hashable {
         didSet {
             if oldValue != .connected, state == .connected {
                 hasConnected = true
+                lastConnectFailure = nil
                 tmuxWhileDown = nil
                 if usesTmux { attachTmux() } else { dispatchStartupCommandIfNeeded(); checkTmuxAvailability() }
             }
@@ -462,10 +470,16 @@ class TerminalSession: Identifiable, Hashable {
     private(set) var hasConnected = false
     /// A connection of its has failed: a Reconnect from there shows as one, not as a first connection.
     private(set) var hasFailedToConnect = false
+    /// Why its last connection failed, as far as what happens next goes: Tailscale off here, or the machine not
+    /// answering, are the machine's and not this terminal's, and a pass over its terminals stops at the first
+    /// (2026-11-10). Nil once connected. Settable for tests' session managers.
+    var lastConnectFailure: TerminalConnectFailure?
     private var reconnectTask: Task<Void, Never>?
     var reconnectAttemptCount: Int = 0
     /// How many times auto-reconnect tries before it gives up.
     static let autoReconnectAttempts = 5
+    /// This device's network addresses, for whether Tailscale is on here (`GlassTailscaleReach`). Tests give their own.
+    static var interfaceAddresses: () -> [GlassTailscaleReach.InterfaceAddress] = { GlassTailscaleReach.interfaceAddresses() }
     /// Auto-reconnect is at work, waiting between its tries or trying: Cancel Reconnect stops it.
     var isAutoReconnecting: Bool { reconnectTask != nil }
     var recorder: SessionRecorder?
@@ -899,6 +913,14 @@ class TerminalSession: Identifiable, Hashable {
         appendLine(TerminalLine(text: "Connecting to \(server.name)...", style: .system))
         
         do {
+            // The machine this device dials (the first jump host, else the server) on a tailnet, with Tailscale off
+            // here: said now, not after the connect timeout (the owner, 2026-11-10). A connection already open is
+            // shared whatever the network.
+            let firstHop = jumpHostChain.first ?? server
+            if sshConnection?.hasReusableTransport != true,
+               GlassTailscaleReach.needsTailscale(firstHop.host, interfaces: Self.interfaceAddresses()) {
+                throw GlassTailscaleReach.Required(machine: firstHop.name, host: firstHop.host)
+            }
             guard connectionPreparation != nil || sshConnection?.hasReusableTransport == true else {
                 throw SSHError.invalidCredentialPreparation
             }
@@ -939,6 +961,7 @@ class TerminalSession: Identifiable, Hashable {
                 "SSH connect error (\(self.server.host):\(self.server.port)); category=\(String(reflecting: type(of: error)), privacy: .public)"
             )
             lastConnectionMayBeLocalNetworkDenial = GlassLocalNetworkAccess.mayBeDenial(error)
+            lastConnectFailure = TerminalConnectFailure(error)
             lastConnectionDiagnostics =
                 "Attempted: \(server.host):\(server.port)\nAuth method: \(server.authMethod.displayName)\nHost key mode: \(mode.rawValue)\nFailure category: \(String(reflecting: type(of: error)))"
             connectionProgress = nil
@@ -1055,6 +1078,12 @@ class TerminalSession: Identifiable, Hashable {
                     self.automaticReconnectSucceeded?()
                     return
                 }
+                // Tailscale off here: no try will reach it until someone turns it on, so it is said now, with
+                // Reconnect, rather than after the tries run out (2026-11-10).
+                if self.lastConnectFailure == .needsTailscale {
+                    self.reconnectTask = nil
+                    return
+                }
 
                 if attempt < maxAttempts {
                     connectionToDisconnect = self.sshConnection
@@ -1066,10 +1095,13 @@ class TerminalSession: Identifiable, Hashable {
             }
 
             guard let self, !Task.isCancelled else { return }
+            // The last try's words, not only the count (2026-11-10: "Reconnect failed after 5 attempts" said nothing
+            // of a machine asleep, or Tailscale off).
+            let reason: String? = if case .error(let message) = self.state { message } else { nil }
             let failedConnection = self.sshConnection
             self.sshConnection = nil
             await failedConnection?.disconnect()
-            self.state = .error("Reconnect failed after \(maxAttempts) attempts")
+            self.state = .error([reason, "Tried \(maxAttempts) times."].compactMap { $0 }.joined(separator: " "))
             self.appendLine(TerminalLine(text: "Auto-reconnect failed after \(maxAttempts) attempts.", style: .error))
             self.reconnectTask = nil
         }

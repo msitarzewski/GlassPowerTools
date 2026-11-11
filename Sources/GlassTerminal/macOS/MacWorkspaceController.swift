@@ -663,6 +663,17 @@ final class MacWorkspaceController {
     /// glows beneath, its icon on the window's orb turns orange (`GlassBell`).
     var bellUnseen: Bool { paneModels.contains { $0.bellNotice.isUnseen } }
 
+    /// How many of this tab's terminals rang their bell out of sight and haven't been seen: the Dock icon's badge
+    /// counts them (`MacBellBadge`).
+    var unseenBellCount: Int { paneModels.filter { $0.bellNotice.isUnseen }.count }
+
+    /// The pane whose terminal holds `notice`, for the notification of its bell (`MacBellNotifications`).
+    func paneID(holding notice: TerminalBellNotice) -> UUID? {
+        (state.root?.paneIDs ?? []).first { id in
+            (sessionsByPaneID[id]?.terminalHostModel ?? localRuntimesByPaneID[id]?.model)?.bellNotice === notice
+        }
+    }
+
     /// Whether this tab is in front in a window on screen, which every pane of it is then: a bell is seen as it rings,
     /// and one rung before is seen now. Told by its window (`MacWorkspaceView`).
     @ObservationIgnored private var panesInSight = false

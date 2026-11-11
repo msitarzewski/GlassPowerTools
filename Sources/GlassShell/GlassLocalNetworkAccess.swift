@@ -47,6 +47,9 @@ public enum GlassLocalNetworkAccess {
 
         if host.contains(":") {
             let address = host.split(separator: "%", maxSplits: 1).first.map(String.init) ?? host
+            // Tailscale's fd7a:115c:a1e0::/48 is unique-local by its prefix, but it is reached through Tailscale's
+            // tunnel, not the local network (`GlassTailscaleReach`).
+            if GlassTailscaleReach.isTailnetIPv6(address) { return false }
             return address == "::1"
                 || address.hasPrefix("fc")
                 || address.hasPrefix("fd")

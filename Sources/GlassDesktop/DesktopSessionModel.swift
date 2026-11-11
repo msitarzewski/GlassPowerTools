@@ -612,8 +612,11 @@ public final class DesktopSessionModel {
     public var isConnected: Bool { state == .connected }
     var failurePresentation: DesktopFailurePresentation? {
         guard case .failed(let detail) = state else { return nil }
+        if needsTailscale { return .needsTailscale(detail) }
         return .init(hadDesktop: hadDesktop, details: detail)
     }
+    /// The last start failed because the machine is on a tailnet and Tailscale is off here.
+    private(set) var needsTailscale = false
     public var status: String {
         switch state {
         case .connecting: "Connecting…"
@@ -691,6 +694,10 @@ public final class DesktopSessionModel {
         await attempt.previousStop.value
         try requireCurrent(attempt.id)
         let value = try attempt.connection.validated()
+        // A machine on a tailnet with Tailscale off here: said now, not after the connect times out (2026-11-10).
+        if GlassTailscaleReach.needsTailscale(value.host) {
+            throw GlassTailscaleReach.Required(machine: value.name, host: value.host)
+        }
         let account = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let configuration: DesktopTransportConfiguration
         switch value.protocol {
@@ -746,7 +753,9 @@ public final class DesktopSessionModel {
         if case SecretStoreError.notFound = error { state = .disconnected }
         else { errorMessage = error.localizedDescription; state = .failed(error.localizedDescription) }
         started = false
-        needsCredentials = prompt
+        // Tailscale off here is no reason to ask for a password.
+        needsTailscale = error is GlassTailscaleReach.Required
+        needsCredentials = prompt && !needsTailscale
     }
 
     public func submitCredentials(username: String, password: String, remember: Bool) async {

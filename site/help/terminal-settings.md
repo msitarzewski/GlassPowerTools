@@ -11,6 +11,7 @@ The terminal adds four pages to Settings: **Connections**, **Terminal**, **Snipp
 - **On Mac**, **Local Terminal**: the **Shell** and **Working directory** for new local terminals. Leave them empty for your login shell and home folder. A Workgroup's tab can override them. Whether they run in tmux is on the **Terminal** page, under **tmux**.
 - **Session Recording**: how many recordings you have and the space they use.
 - **Bell enabled** plays a sound when a program rings the bell. It is off by default. **Visual bell** also flashes the terminal, and works only while **Bell enabled** is on.
+- **A bell rung out of sight** (Mac): **Dock Count**, **Notification** or **Both**, for a terminal whose bell rings while you can't see it (see [When a terminal rings its bell](terminal-sessions.md#when-a-terminal-rings-its-bell)).
 - **Host key verification**: **Ask** or **Strict**. See [Sign in with keys and trust host keys](terminal-keys-and-trust.md).
 
 ## Terminal
@@ -120,3 +121,5 @@ Each explicit `Host` entry becomes a saved connection, using `HostName`, `User`,
 3. Choose **Save & Test**. **Connected to Tailscale.** confirms it works.
 
 The library toolbar then has **Tailscale**, which lists your tailnet's devices. Select a device and choose **Import** to save it as a connection, finishing the form that opens, or **Connect** to enter a username, password and port and sign in once without saving.
+
+Without any of this set up, the app still knows a Tailscale address when it sees one, and says when Tailscale needs turning on before it can connect (see [When a terminal loses its connection](terminal-sessions.md#when-a-terminal-loses-its-connection)).

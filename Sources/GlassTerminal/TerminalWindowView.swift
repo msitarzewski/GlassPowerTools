@@ -2818,10 +2818,9 @@ extension TerminalWindowView {
         switch newState {
         case .connected where oldState == .reconnecting:
             notificationManager.post(icon: "checkmark.circle.fill", title: "Reconnected", style: .success)
-        case .error(let message):
-            notificationManager.post(icon: "exclamationmark.triangle.fill", title: "Connection Error", message: message, style: .error)
-        case .disconnected where oldState == .connected:
-            notificationManager.post(icon: "xmark.circle", title: "Disconnected", style: .warning)
+        // A failure or a drop is said by the panel in the middle of the terminal (`TerminalConnectionNotice`), for as
+        // long as it lasts. The banners said it again, once per try: seven for one auto-reconnect run, on a machine
+        // asleep (2026-11-10).
         default:
             break
         }

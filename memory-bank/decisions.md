@@ -2266,3 +2266,59 @@ thresholds (one short line sent at once) are as they were.
 **Consequence accepted.** A paste can no longer carry a key on purpose, such as an Escape for vi or a Ctrl-C: the
 character is dropped and the rest is sent. Nothing says so on screen; the log line counts them.
 
+
+## D104 — A machine out of reach is the machine's failure; Tailscale off is said before dialling — Implemented 2026-11-10 (0.4.614, not committed)
+
+**Context.** His MacBook Pro, with dozens of tmux terminals, asleep in his bag: on the iPhone and Vision Pro "they
+try to connect, but time out, some show detached, as if they could be reattached", and "recognize tailscale IP
+ranges and notify the user … when tailscale is required to be enabled before connecting". Traced
+(`tasks/2026-11/2026-11-10_machine-out-of-reach.md`): Citadel's 30 s connect for each terminal, one after another;
+waiting sign-ins re-dialling a dead route; `tmuxWhileDown` kept from an earlier listing.
+
+**Decided.**
+- **Timeout and words.** `SSHTransport.connectTimeout` is 15 s. A machine that never answered (connect timeout,
+  ETIMEDOUT, EHOSTDOWN, EHOSTUNREACH, ENETUNREACH, ENETDOWN, an unresolved name:
+  `SSHTransportError.isMachineNotAnswering`) is said to be one: "*name* at *host* didn't answer. It may be asleep, or
+  off the network."
+- **One failure for the machine.**
+  - `SSHTransportPool.lease` fails the leases waiting for a turn with that sign-in's failure. A lease made
+    afterwards tries again.
+  - A window's pass (`TerminalWorkgroupOpening.connect`) and the saved-workgroup open stop dialling the machine at
+    its first terminal that found it out of reach. The rest take that failure.
+- **Active and auto-reconnect.** Active forgets a down terminal's tmux state when it can't list the machine.
+  Auto-reconnect keeps the last reason when it gives up.
+- **Tailscale.** A host in 100.64.0.0/10, fd7a:115c:a1e0::/48 or `.ts.net`, while no `utun` here holds a tailnet
+  address, fails before dialling, with **Tailscale Is Off** (`GlassTailscaleReach`). This covers the terminal's
+  first hop, the remote desktop's host and a database reached directly. A 100.x host is exempt where this device's
+  own network is in 100.64.0.0/10 (carriers' NAT).
+
+**Not changed.** Reconnect and showing a window always try again. The integration with Tailscale's API (device
+list, import) is separate and untouched.
+
+## D105 — A bell rung out of sight is counted on the Dock icon, or notified, or both — Approved and implemented 2026-11-10 (0.4.615, Mac, not committed)
+
+**Context.** His "badges for the number of terminals that need attention … nothing in the dock if the user is on
+another virtual desktop or has windows covered". macOS draws a Dock badge only for an app allowed notifications
+with badges, which the app had never asked for (seen in the VM; Electron and OpenJDK report the same).
+
+**Decided (his choices).** The permission is asked "at the next launch" (alerts, badges, sounds; once).
+**A bell rung out of sight** in Settings ▸ Connections: Dock Count (default), Notification or Both ("dock count,
+notification, or both (in settings)"). The count and the notification clear per terminal, when its tab is in front
+("Per terminal, as now", after "the badge didn't clear on view of the window"). One notification delegate for the
+app (`GlassSystemNotifications`), with click handlers by thread.
+
+## D106 — The Mac terminal moves along the command line as a Mac moves along text — Approved and implemented 2026-11-10 (0.4.616, Mac, not committed)
+
+**Context.** A user asked for editing "like Apple's terminal - holding keys while using arrows". A probe through the
+real view: ⌥←/⌥→, ⌥⌫ and ⌘⌫ sent nothing (Option not acting as Meta, AppKit's commands unhandled), ⌘←/⌘→ a word.
+
+**Decided.** SwiftTerm `PATCHES.md` S5:
+- ⌥←/⌥→ send Esc B / Esc F, ⌘←/⌘→ send ⌃A / ⌃E (his choice: "Start / end of line"), and ⌥⌦ sends Esc D. These are
+  the same whatever keyboard protocol a program asked for, as Ghostty's macOS defaults are.
+- ⌥⌫ sends Esc DEL and ⌘⌫ sends ⌃U, or the kitty protocol's encoding when a program asked for disambiguated keys.
+- ⌥-click on the line being typed moves the cursor with arrows. It doesn't apply on the alternate screen or while
+  the mouse is reported.
+
+The bytes are Apple's Terminal's shortcuts, iTerm2's Natural Text Editing and Ghostty's macOS defaults.
+
+**Not changed.** Option still isn't Meta for letters; iPhone, iPad and Vision Pro keyboards are not covered yet.

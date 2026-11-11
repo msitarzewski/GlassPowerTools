@@ -21,7 +21,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPLv3-c8102e" alt="Licence: GPLv3"></a>
   <img src="https://img.shields.io/badge/runs%20on-Vision%20Pro%20%7C%20Mac%20%7C%20iPad%20%7C%20iPhone-555" alt="Runs on Vision Pro, Mac, iPad and iPhone">
-  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.612-2e7d32" alt="Mac: 0.4.612"></a>
+  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.616-2e7d32" alt="Mac: 0.4.616"></a>
   <a href="https://github.com/sponsors/msitarzewski"><img src="https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
@@ -226,7 +226,11 @@ whole argument is on [the Why page](https://glasspowertools.com/why.html).
   be picked up on another device, and with tmux 3.2 or later the terminal keeps every line itself, so
   you scroll and select through the whole history. At a shell prompt the terminal suggests the rest of
   the command, from what you've run on that machine, your snippets, the folder you're in and common
-  tools, kept on your device. Windows scale as well as resize, and each can have
+  tools, kept on your device. A terminal that loses its connection says so over its dimmed text, with
+  Reconnect; a machine that doesn't answer, asleep or away, is found out once for all its terminals, and one
+  on a tailnet while Tailscale is off on the device is said at once. On the Mac, the Dock icon counts the
+  terminals whose bell rang out of sight, and ⌥ and ⌘ with the arrows and Delete, and ⌥-click, move along
+  the command line as in Apple's Terminal. Windows scale as well as resize, and each can have
   a look of its own. Color schemes come from macOS Terminal profiles, any number of them, kept in
   iCloud Drive for every device. Links and paths a terminal prints are recognised, with actions of
   their own (right-click on the Mac, pinch and hold on Vision Pro): open the link, open the file in the
@@ -301,7 +305,7 @@ claims on the website were checked against the code and its test records.
 
 ## Status
 
-The Mac app is at 0.4.612 (its first release was 0.4.491): download it from
+The Mac app is at 0.4.616 (its first release was 0.4.491): download it from
 [glasspowertools.com](https://glasspowertools.com) or this repository's
 [releases](https://github.com/msitarzewski/GlassPowerTools/releases). It is signed with a Developer ID,
 notarized by Apple, and updates itself through Sparkle. It cannot be in the Mac App Store, because a

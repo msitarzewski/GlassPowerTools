@@ -136,6 +136,62 @@ struct SSHConnectionLimitsTests {
         #expect(await pool.transports(for: route).isEmpty)
     }
 
+    // MARK: A machine that never answers (2026-11-10)
+
+    /// A laptop asleep in a bag with dozens of tmux terminals on it: every terminal reconnecting at once waited out a
+    /// connect timeout of its own, five rounds of two sign-ins for thirty terminals. Those waiting for a turn take the
+    /// sign-ins' failure instead.
+    @Test func thirtyTerminalsOnAMachineThatNeverAnswersWaitOneTimeoutNotOneEach() async throws {
+        let server = FakeServer(handshake: .milliseconds(150), failure: ChannelError.connectTimeout(.seconds(15)))
+        let pool = SSHTransportPool<FakeTransport>(limits: Self.limits)
+        let route = Self.route()
+        let outcomes = await withTaskGroup(of: String.self, returning: [String].self) { group in
+            for _ in 0..<30 {
+                group.addTask {
+                    do { _ = try await pool.lease(route, owner: UUID(), candidate: FakeTransport(route: route, server: server)); return "connected" }
+                    catch { return "\(error)" }
+                }
+            }
+            var all: [String] = []
+            for await outcome in group { all.append(outcome) }
+            return all
+        }
+        #expect(outcomes == Array(repeating: "\(ChannelError.connectTimeout(.seconds(15)))", count: 30), "each terminal is told why")
+        #expect(server.snapshot.connectAttempts == 2, "the two sign-ins at once, then no more")
+        #expect(await pool.transports(for: route).isEmpty)
+    }
+
+    /// Afterwards, asking again tries again: the machine may be awake now (a Reconnect, a window shown).
+    @Test func aTerminalAskingAfterTheMachineDidntAnswerTriesAgain() async throws {
+        let server = FakeServer(handshake: .milliseconds(40), failure: ChannelError.connectTimeout(.seconds(15)))
+        let pool = SSHTransportPool<FakeTransport>(limits: Self.limits)
+        let route = Self.route()
+        await #expect(throws: ChannelError.self) {
+            _ = try await pool.lease(route, owner: UUID(), candidate: FakeTransport(route: route, server: server))
+        }
+        await #expect(throws: ChannelError.self) {
+            _ = try await pool.lease(route, owner: UUID(), candidate: FakeTransport(route: route, server: server))
+        }
+        #expect(server.snapshot.connectAttempts == 2, "the second asked after the first had failed, and tried")
+    }
+
+    /// Only a machine that never answered: a wrong password is still the server answering, and waiting terminals
+    /// still try their own sign-in after it, as before.
+    @Test func whatCountsAsTheMachineNotAnswering() {
+        #expect(SSHTransportError.isMachineNotAnswering(ChannelError.connectTimeout(.seconds(15))))
+        for code in [ETIMEDOUT, EHOSTDOWN, EHOSTUNREACH, ENETUNREACH, ENETDOWN] {
+            #expect(SSHTransportError.isMachineNotAnswering(IOError(errnoCode: code, reason: "connect")), "errno \(code)")
+            #expect(SSHTransportError.isMachineNotAnswering(NSError(domain: NSPOSIXErrorDomain, code: Int(code))), "errno \(code)")
+        }
+        #expect(SSHTransportError.isMachineNotAnswering(
+            NSError(domain: "x", code: 1, userInfo: [NSLocalizedDescriptionKey: "connect(descriptor:addr:size:): Host is down (errno: 64)"])))
+        for answered: any Error in [IOError(errnoCode: ECONNREFUSED, reason: "connect"), IOError(errnoCode: ECONNRESET, reason: "read"),
+                                    SSHTransportError.authenticationFailed, SSHTransportError.serverBusy, ChannelError.eof,
+                                    CancellationError()] {
+            #expect(!SSHTransportError.isMachineNotAnswering(answered), "\(answered)")
+        }
+    }
+
     // MARK: A session refused (MaxSessions below ours)
 
     @Test func aRefusedSessionIsOpenedOnAnotherConnection() async throws {
@@ -385,10 +441,11 @@ final class FakeServer: Sendable {
     struct Snapshot { var connectAttempts = 0, signingIn = 0, mostSigningIn = 0, dropsLeft = 0 }
     let handshake: Duration
     let sessionsPerConnection: Int
-    let failure: SSHTransportError?
+    /// How every sign-in fails, when it does: a rejected password, or a machine that never answers.
+    let failure: (any Error)?
     private let state: OSAllocatedUnfairLock<Snapshot>
 
-    init(handshake: Duration, drops: Int = 0, sessionsPerConnection: Int = 10, failure: SSHTransportError? = nil) {
+    init(handshake: Duration, drops: Int = 0, sessionsPerConnection: Int = 10, failure: (any Error)? = nil) {
         self.handshake = handshake
         self.sessionsPerConnection = sessionsPerConnection
         self.failure = failure

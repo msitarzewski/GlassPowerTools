@@ -517,6 +517,8 @@ class SSHConnection {
                 return "Warning: the host key changed for \(server.host):\(server.port). This may indicate a security risk."
             }
         }
+        // A machine that never answered, or Tailscale off here (`TerminalMachineReach`).
+        if let unreachable = unreachableMessage(for: error, server: server) { return unreachable }
 
         if let sshError = error as? SSHError {
             switch sshError {

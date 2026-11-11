@@ -114,6 +114,19 @@ struct GeneralSettingsView: View {
                     .onChange(of: settings.visualBell) { _, _ in
                         settings.saveSettings()
                     }
+                #if os(macOS)
+                // A bell rung where you can't see it — another desktop, a covered window, the orb dock — beyond its
+                // tab's orange glow (2026-11-10, `MacBellBadge`).
+                Picker("A bell rung out of sight", selection: Binding(
+                    get: { MacBellOutOfSightSetting.shared.choice },
+                    set: { MacBellOutOfSightSetting.shared.choice = $0 })) {
+                    ForEach(MacBellOutOfSight.allCases) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("terminal-settings-bell-out-of-sight")
+                Text("Counted on the app's icon in the Dock, a notification, or both, until you look at that terminal. macOS shows them only while Glass Power Tools is allowed notifications, with badges for the count, in System Settings ▸ Notifications.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                #endif
             }
 
             Section("Security") {

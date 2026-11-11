@@ -51,6 +51,10 @@ enum TerminalListingSkip: LocalizedError, Equatable {
     case locked
     case keyUnavailable
     case identityUnconfirmed
+    /// The machine didn't answer (2026-11-10: a laptop asleep in a bag).
+    case notAnswering
+    /// It is on a tailnet, and Tailscale is off on this device.
+    case needsTailscale
     case connectionFailed
     case unreadable
     case noTmux
@@ -62,6 +66,8 @@ enum TerminalListingSkip: LocalizedError, Equatable {
         case .locked: "Its saved password can't be read until this device is unlocked."
         case .keyUnavailable: "Its SSH key isn't on this device."
         case .identityUnconfirmed: "Connect once to confirm it's the right machine."
+        case .notAnswering: "It didn't answer. It may be asleep, or off the network."
+        case .needsTailscale: "It's on your tailnet, and Tailscale is off on this \(GlassTailscaleReach.deviceName). Turn it on, then check again."
         case .connectionFailed: "The connection failed. Connect to it to see why."
         case .unreadable: "Its tmux sessions couldn't be read."
         case .noTmux: "tmux isn't installed there, so nothing keeps running."
@@ -128,6 +134,11 @@ extension GlassTerminalCapability {
             switch listing {
             case .skipped(let reason):
                 report.unchecked.append(GlassUncheckedMachine(endpointID: EndpointID(rawValue: server.id), reason: reason))
+                // Not listed now: what an earlier listing said of a down terminal's session — "Detached", "Open
+                // elsewhere" — is no longer known, and read as if it could be reattached (the owner, 2026-11-10).
+                for terminal in manager.sessions where terminal.server.id == server.id && terminal.isDown {
+                    terminal.tmuxWhileDown = nil
+                }
                 continue
             case .sessions(let listed):
                 sessions = listed
@@ -314,7 +325,12 @@ extension GlassTerminalCapability {
                                                               purpose: .probe).session
         defer { manager.closeSession(probe) }
         guard probe.state == .connected else {
-            throw probe.pendingHostKeyChallenge != nil ? TerminalListingSkip.identityUnconfirmed : TerminalListingSkip.connectionFailed
+            if probe.pendingHostKeyChallenge != nil { throw TerminalListingSkip.identityUnconfirmed }
+            switch probe.lastConnectFailure {
+            case .notAnswering: throw TerminalListingSkip.notAnswering
+            case .needsTailscale: throw TerminalListingSkip.needsTailscale
+            case .other, nil: throw TerminalListingSkip.connectionFailed
+            }
         }
         return try await body(probe)
     }

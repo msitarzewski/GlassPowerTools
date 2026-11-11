@@ -26,13 +26,13 @@ final class TerminalConnectionLostUITests: XCTestCase {
         await MainActor.run { app?.terminate() }
     }
 
-    private func launch() {
+    private func launch(_ more: [String] = []) {
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh",
                                 // A blinking caret never lets the app go still, and XCUITest waits for that.
                                 "-blinkingCursor", "NO",
-                                "--demo-open", "terminal-tabs", "--demo-connection-lost", "8"]
+                                "--demo-open", "terminal-tabs", "--demo-connection-lost", "8"] + more
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
     }
@@ -95,6 +95,17 @@ final class TerminalConnectionLostUITests: XCTestCase {
         if !waitUntilGone(element("terminal-connection-panel"), timeout: 20) { attachTree("still-shown") }
         XCTAssertFalse(element("terminal-connection-panel").exists, "the panel stayed after reconnecting")
         attachScreen("reconnected")
+    }
+
+    /// A machine on a tailnet, with Tailscale off on this device (2026-11-10): the panel says to turn it on.
+    func testTailscaleOffSaysToTurnItOn() {
+        launch(["--demo-needs-tailscale"])
+        _ = waitForTheLostPanel()
+        XCTAssertEqual(element("terminal-connection-title").label, "Tailscale Is Off")
+        let message = element("terminal-connection-message").label
+        XCTAssertTrue(message.contains("is on your tailnet (100.92.10.12), and Tailscale is off on this"), message)
+        XCTAssertTrue(message.hasSuffix("Turn it on, then try again."), message)
+        XCTAssertTrue(element("terminal-connection-reconnect").exists, "Reconnect, for once it's on")
     }
 
     func testCloseTerminalClosesOnlyTheTerminalThatLostItsConnection() {

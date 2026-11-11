@@ -459,8 +459,12 @@ extension TerminalWorkgroupOpening {
     /// One machine's terminals one after another, so a second terminal shares the first one's
     /// connection, and the machines side by side, so one that doesn't answer holds up no other. A
     /// terminal that doesn't connect stays in its place, saying why, and **Reconnect** tries again.
-    private static func connect(_ terminals: [TerminalSession], sessionManager: SessionManager,
-                                settingsManager: SettingsManager) async -> [String] {
+    ///
+    /// A machine one of its terminals found not answering, or behind Tailscale that is off here, is not dialled again
+    /// for the rest: they fail as that one did (2026-11-10: thirty tmux terminals on a laptop asleep in a bag waited
+    /// out thirty timeouts, one after another). The failures are said once per machine.
+    static func connect(_ terminals: [TerminalSession], sessionManager: SessionManager,
+                        settingsManager: SettingsManager) async -> [String] {
         var byServer: [UUID: [TerminalSession]] = [:]
         var order: [UUID] = []
         for terminal in terminals {
@@ -471,10 +475,18 @@ extension TerminalWorkgroupOpening {
             let sessions = byServer[serverID] ?? []
             return Task { @MainActor () -> [String] in
                 var failures: [String] = []
+                var outOfReach: TerminalSession?
                 for session in sessions {
+                    if let outOfReach {
+                        session.takeFailure(from: outOfReach)
+                        continue
+                    }
                     do {
                         try await sessionManager.connectWhenShown(session, settingsManager: settingsManager)
-                        if case .error(let message) = session.state { failures.append("\(session.server.name): \(message)") }
+                        if case .error(let message) = session.state {
+                            failures.append("\(session.server.name): \(message)")
+                            if session.lastConnectFailure?.isTheMachines == true { outOfReach = session }
+                        }
                     } catch {
                         failures.append("\(session.server.name): \(error.localizedDescription)")
                     }
