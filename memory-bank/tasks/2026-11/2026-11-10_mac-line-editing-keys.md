@@ -45,3 +45,7 @@ The app runs SwiftTerm with Option not acting as Meta, and offers no setting for
 
 ## Next
 - 0.4.616 on the Mac; his try.
+
+## Shipped (2026-11-11)
+- Committed (`5bc77b45`) and pushed; released in 0.4.616: the Mac's ninth release (GitHub v0.4.616, notarized,
+  downloads byte-identical to the build, feed entry); Mac only, TestFlight 616 carries the rest.

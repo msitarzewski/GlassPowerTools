@@ -82,3 +82,7 @@
 
 ## Next
 - UI tests on the simulators, 0.4.614 on the Mac, iPhone and headset; then his try with the laptop in the bag.
+
+## Shipped (2026-11-11)
+- Committed (`5bc77b45`) and pushed; released in 0.4.616: the Mac's ninth release (GitHub v0.4.616, notarized,
+  downloads byte-identical to the build, feed entry), TestFlight 616 for iOS and visionOS in beta review; the headset not yet installed.

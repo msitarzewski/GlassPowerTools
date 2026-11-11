@@ -6,6 +6,24 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.616</title>
+      <pubDate>Wed, 11 Nov 2026 03:54:31 GMT</pubDate>
+      <sparkle:version>616</sparkle:version>
+      <sparkle:shortVersionString>0.4.616</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.616</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.616</h2>
+<ul>
+  <li><b>A terminal that loses its connection says so in the window.</b> Its text dims under a panel with the reason, Reconnect and Close Terminal; while it reconnects on its own, each try. Close Terminal closes a disconnected terminal's pane, rather than leaving it saying the session ended.</li>
+  <li><b>A machine asleep or away is found out once, not once per terminal.</b> The app waits 15 seconds for an answer, and a machine's other terminals take the first one's answer: "<i>name</i> didn't answer. It may be asleep, or off the network."</li>
+  <li><b>Tailscale off, said at once.</b> A machine at a Tailscale address while Tailscale is off on this Mac says Tailscale Is Off, rather than waiting out the connection; for terminals, remote desktops and databases.</li>
+  <li><b>The Dock icon counts the terminals that rang their bell</b> where you can't see them, on another desktop or covered; or a notification names one, or both (Settings ▸ Connections). The app asks once for permission to show them, as it starts.</li>
+  <li><b>Edit the line as on a Mac.</b> ⌥← / ⌥→ move a word, ⌘← / ⌘→ go to the line's start and end, ⌥⌫ / ⌥⌦ delete a word, ⌘⌫ back to the start, and ⌥-click puts the cursor where you click, as in Apple's Terminal.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.616/GlassPowerTools-0.4.616.zip" length="29408972" type="application/octet-stream" sparkle:edSignature="UArdB3bqBUPeQmm3y1saxzksE2VvF9GZJ3aATSg5gTByFeVGOzHJGkh5x8cqBdaoAvUdO5wC0ZXeFpdZZ6qrBg=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.612</title>
       <pubDate>Mon, 09 Nov 2026 18:05:13 GMT</pubDate>
       <sparkle:version>612</sparkle:version>
