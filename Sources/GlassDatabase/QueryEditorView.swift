@@ -14,6 +14,8 @@ import GlassLayers
 struct SQLRunAvailability: Equatable {
     var canRun = false
     var hasSelection = false
+    /// Whether the pane holds SQL, run or not: what Format needs, without a connection (B-X11).
+    var hasText = false
     var title: String { hasSelection ? "Run Selection" : "Run Statement" }
     func buttonTitle(runAll: Bool) -> String {
         runAll ? "All Statements" : (hasSelection ? "Selection" : "Statement")
@@ -23,8 +25,9 @@ struct SQLRunAvailability: Equatable {
 struct SQLRunAvailabilityKey: PreferenceKey {
     static let defaultValue = SQLRunAvailability()
     static func reduce(value: inout SQLRunAvailability, nextValue: () -> SQLRunAvailability) {
+        // Every hidden tab publishes too; only the active one ever says it can run or has text.
         let next = nextValue()
-        if next.canRun { value = next }
+        if next.canRun || next.hasText { value = next }
     }
 }
 
@@ -1034,7 +1037,8 @@ struct QueryEditorView: View {
 
 // MARK: - Durable History
 
-private struct QueryHistoryView: View {
+/// Also a table tab's, for its own SQL pane (B-X11).
+struct QueryHistoryView: View {
     let connectionID: UUID?
     let onSelect: (QueryHistoryEntry) -> Void
 
@@ -1140,7 +1144,8 @@ private struct QueryHistoryView: View {
     }
 }
 
-private struct SavedQueriesView: View {
+/// Also a table tab's, for its own SQL pane (B-X11).
+struct SavedQueriesView: View {
     let connectionID: UUID?
     let onSelect: (SavedQuery) -> Void
 

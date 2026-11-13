@@ -67,7 +67,7 @@ When you open the browser from a terminal with **Open Folder Here**, you can typ
 
 - **On iPhone and iPad**, the browser then closes and you're back in the terminal. If a transfer is still running, the browser stays open so the transfer can finish.
 - **On Vision Pro**, the terminal's window comes forward and the browser stays open.
-- **On Mac**, the browser stays in front; click the terminal to carry on.
+- **On Mac**, the terminal's window comes forward on its tab, with the pane the paths went into ready to type in.
 
 A browser opened from the library has no terminal, so **Insert Path** isn't offered there.
 

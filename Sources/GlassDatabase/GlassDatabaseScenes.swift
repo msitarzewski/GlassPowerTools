@@ -55,11 +55,7 @@ public struct GlassDatabaseScenes: Scene {
                         sessionManager.releaseWorkspace(workspaceID)
                     }
             } else {
-                ContentUnavailableView(
-                    "Database Workspace Not Found",
-                    systemImage: "cylinder.split.1x2",
-                    description: Text("Open a database from the library to begin.")
-                )
+                DatabaseWorkspaceNotFoundView()
             }
         }
         #if os(visionOS)
@@ -323,5 +319,27 @@ struct SchemaDiagramWindow: View {
             ContentUnavailableView("Diagram Not Found", systemImage: "point.3.connected.trianglepath.dotted",
                                    description: Text("Show a database's diagram from its menu in the sidebar."))
         }
+    }
+}
+
+/// A database window the system opened with no workspace: the Mac's tab bar "+", a window brought
+/// back with nothing to show. It keeps a database window's size: the bare `ContentUnavailableView`
+/// had no size of its own, so the window could be made a sliver of itself (B-X20). On Vision Pro the
+/// window is plain and draws its own glass, so this does too.
+struct DatabaseWorkspaceNotFoundView: View {
+    /// The smallest a database window's message is: room for its title, words and symbol.
+    static let minimumSize = CGSize(width: 480, height: 320)
+
+    var body: some View {
+        ContentUnavailableView(
+            "Database Workspace Not Found",
+            systemImage: "cylinder.split.1x2",
+            description: Text("Open a database from the library to begin.")
+        )
+        .frame(minWidth: Self.minimumSize.width, idealWidth: 1400, maxWidth: .infinity,
+               minHeight: Self.minimumSize.height, idealHeight: 900, maxHeight: .infinity)
+        #if os(visionOS)
+        .glassBackgroundEffect()
+        #endif
     }
 }

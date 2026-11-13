@@ -2127,6 +2127,10 @@ struct SFTPBrowserView: View {
     private func insertPaths(of targetEntries: [SFTPBrowserEntry]) {
         guard let terminal = insertTerminal,
               TerminalRemoteDrops.insertPaths(targetEntries.map(\.id), into: terminal) else { return }
+        #if os(macOS)
+        // The Files window stayed in front of the terminal it typed into (B-X24).
+        MacWorkspacePreviewRegistry.shared.reveal(sessionID: terminal.id)
+        #endif
         #if os(iOS) || os(visionOS)
         if let workgroup = sessionManager.workgroups.first(where: { $0.sessionIDs.contains(terminal.id) }) {
             sessionManager.selectSession(terminal.id, inWorkgroup: workgroup.id)

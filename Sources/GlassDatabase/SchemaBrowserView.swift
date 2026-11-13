@@ -418,6 +418,14 @@ struct SchemaBrowserView: View {
                     .simultaneousGesture(TapGesture(count: 2).onEnded {
                         onOpenSelection?(.database(database))
                     })
+                    // The click is the row's point (its statistics), and a tap gesture is not an
+                    // action assistive technology can perform: VoiceOver heard the name as plain
+                    // text and could only open a tab (B-X19, found 2026-09-12).
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction {
+                        onSelectionChanged?(.database(database))
+                    }
                     .accessibilityAction(named: "Open Database in Tab") {
                         onOpenSelection?(.database(database))
                     }
@@ -468,6 +476,12 @@ struct SchemaBrowserView: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             onOpenSelection?(.table(database: database, table: table))
         })
+        // The click as an action assistive technology can perform, as the database row's (B-X19).
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            onSelectionChanged?(.table(database: database, table: table))
+        }
         .accessibilityAction(named: "Open Table") {
             onOpenSelection?(.table(database: database, table: table))
         }

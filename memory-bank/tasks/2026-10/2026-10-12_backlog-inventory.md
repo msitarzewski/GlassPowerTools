@@ -3,6 +3,7 @@
 **Owner's ask:** "a full inventory of all future state and future features and requests and backlogs", then
 "we should also examine glassdb and glas.sh and glassdt — their lists may not have made it forward".
 **State:** inventory complete; nothing in it is approved or scheduled by being listed. The owner picks.
+**Status as of 2026-11-13:** `../2026-11/2026-11-13_backlog-status.md`. This note was not kept up after 2026-10-13; read that one for what is done.
 
 ## How it was taken
 

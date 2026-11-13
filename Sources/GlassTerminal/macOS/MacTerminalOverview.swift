@@ -254,13 +254,16 @@ final class MacWorkspacePreviewRegistry {
     /// Whether a window on screen shows this session in one of its tabs.
     func shows(sessionID: UUID) -> Bool { locate(sessionID: sessionID) != nil }
 
-    /// Brings the window holding the session forward, on its tab.
+    /// Brings the window holding the session forward, on its tab and its pane: what was typed into
+    /// it (Insert Path, B-X24) goes on from there.
     @discardableResult
-    func reveal(sessionID: UUID) -> Bool {
+    func reveal(sessionID: UUID,
+                present: (NSWindow) -> Void = { NSApp.activate(); $0.makeKeyAndOrderFront(nil) }) -> Bool {
         guard let found = locate(sessionID: sessionID) else { return false }
         found.controller.select(found.tab.workspaceID)
-        NSApp.activate()
-        found.window.makeKeyAndOrderFront(nil)
+        found.tab.focus(found.paneID)
+        if found.window.isMiniaturized { found.window.deminiaturize(nil) }
+        present(found.window)
         return true
     }
 

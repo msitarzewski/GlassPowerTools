@@ -31,7 +31,58 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-11 — RESUME HERE: 0.4.616 shipped (Mac release, TestFlight 616)
+## 2026-11-13 — RESUME HERE: the small defects (B-X11, B-X19, B-X20, B-X24), at his "do the defects"
+
+- **Shipping at his word (2026-11-13):** "Let's ship 0.4.618", with 0.4.617 in it. The Mac release, TestFlight 618
+  and the site follow 0.4.616's steps.
+- **His word:** "do the defects" — the five offered as needing nothing from him. **B-X7 left out, and told to him:**
+  the 2× request needs his eyes on the headset ("needs the headset to measure and to judge", 2026-10-13 note), and
+  the whole-frame copy (`FrameConverter.copy`, one BGRA copy per frame by design; the whole visible region uploaded
+  per new frame) is a performance rework to measure on the headset, not a small fix.
+- **Changed (not committed):**
+  - B-X19 `SchemaBrowserView.swift`: database and table rows are buttons to assistive technology, the click their
+    default action.
+  - B-X20 `GlassDatabaseScenes.swift`: `DatabaseWorkspaceNotFoundView`, a database window's size (and glass on
+    Vision Pro).
+  - B-X11 `Constants.swift` (`DatabaseQueryMenuAvailability`; `canFormat`, `canExplain`), `DatabaseWorkspaceView.swift`,
+    `TableDetailView.swift`, `QueryEditorView.swift`: a table tab's Format SQL, Query History and Saved Queries; the
+    menu's verbs go to the window's own scope (`databaseQueryMenuScope`), not the session, which a second window on
+    the same connection answered too (Execute included).
+  - B-X24 `SFTPBrowserView.swift`, `MacTerminalOverview.swift`: Insert Path brings its terminal forward on the Mac;
+    `reveal(sessionID:)` also focuses the pane.
+  - Tests: `DatabaseQueryMenuTests`, `DatabaseWorkspaceNotFoundTests`, `MacRevealSessionTests`.
+- **Validation:** each new test seen failing with its fix out; database suite 357 (25 live skipped); Mac terminal
+  1,280, simulators 869 each; the menu, its sheets and the rows' `AXButton` roles seen in the macOS VM. Two windows on
+  one connection not exercised. Task note `tasks/2026-11/2026-11-13_small-defects.md`.
+- **Built** 0.4.618 (618) for all three. **On his Mac, the headset and the iPhone** 06:53, each read back; the Mac running, no
+  crash reports. Every device current.
+- **Next:** commit 0.4.617 and 0.4.618 and ship only at his word. He is away from
+  the headset (2026-11-13 morning) and was offered the decisions sitting, SSH agent and MFA sign-in, SFTP folders.
+
+## 2026-11-13 — Backlog status taken; in-app feedback set aside
+
+- **His ask:** "What remains from the original task lists?" Every ID in the 2026-10-12 inventory is checked in
+  `tasks/2026-11/2026-11-13_backlog-status.md` (the inventory points there). About 36 of 144 done, 20 partly.
+- **Set aside at his word:** in-app feedback filed as GitHub issues ("Let's leave the feedback out for now"). Found
+  on the way: App Store Connect refuses TestFlight feedback reads with "A required agreement is missing or has
+  expired" (FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED); an agreement waits for him under Business.
+- **Next:** his pick from the status note; 0.4.617 still uncommitted (below).
+
+## 2026-11-12 — Claude Code from npm gets its agent mark (0.4.617, built, not committed)
+- **His word:** "build the fix as 0.4.617", after asking whether agent detection works for local terminals
+  outside tmux. Task note `tasks/2026-11/2026-11-12_npm-claude-agent-mark.md`.
+- **Changed:** `Sources/GlassTerminal/TerminalAgent.swift` (`agent(named:)` takes `.exe` names; a program run
+  from inside an agent's package is that agent, never an interpreter, shell or runner);
+  `Tests/GlassTerminalTests/TerminalAgentTests.swift` (`byProgramPath`); `Tests/GlassTerminalTests/macOS/LiveLocalAgentTests.swift`
+  (new: `claudeInFront`, `npmClaudeInFront`); `RELEASE-NOTES.md` 0.4.617.
+- **Validation:** the new checks fail on the old code, then pass; the interpreter guard's check fails without it;
+  the local read's test fails when pointed at the shell. Mac terminal 1,279, iOS and visionOS simulators 869
+  each, all passed.
+- **Built** 0.4.617 (617) for all three. **On his Mac** 13:36 and **the iPhone** 13:36, read back; the Mac running, no crash reports. **The
+  headset** 19:22, the first time it was in reach since 2026-11-10, read back 0.4.617 (617). Every device current.
+- **Next:** commit and ship only at his word.
+
+## 2026-11-11 — 0.4.616 shipped (Mac release, TestFlight 616)
 - **His word:** "ship it" (2026-11-10), then "Please release this app. i've already given permission." for the
   GitHub release, which the auto-mode classifier had refused as a public surface. Committed `5bc77b45` (0.4.614–0.4.616,
   the help, docs and memory bank) after `0e348599` (0.4.613) and pushed.
@@ -39,10 +90,20 @@ use the disposable test VM only).
   `5bc77b45` with dmg, zip and checksums, all three downloaded back byte-identical to the build, the feed's zip URL
   serving the same length; the feed entry committed after the release. The Mac's ninth release.
 - **TestFlight 616** (iOS and visionOS) uploaded, processed in about three minutes, What to Test on both, in Testers
-  (read back from the group). By 2026-11-11 midday beta review had approved the visionOS build; the iOS build is
-  still `WAITING_FOR_REVIEW`, so iPhone and iPad testers keep 612 until it is approved.
+  (read back from the group). Beta review approved the visionOS build by 2026-11-11 midday and the iOS build by
+  2026-11-12 morning: both `BETA_APPROVED` with their review submissions APPROVED (read back on 2026-11-12, and
+  rechecked by an independent agent), so testers on every platform can install 616.
 - **Devices:** the Mac and iPhone on 0.4.616 (616), read back, no crash reports. The headset out of reach since
-  2026-11-10 evening; a watcher installs it when it appears (for 12 hours).
+  2026-11-10 evening, through three 12-hour watches (the last ended 2026-11-12 10:24); a fourth installs it when it
+  appears.
+- **No Claude mark for Claude Code installed through npm (found 2026-11-12, Mac 0.4.616):** that install's command
+  is `…/@anthropic-ai/claude-code/bin/claude.exe` (`npm view @anthropic-ai/claude-code bin`), and run under that
+  name, `TerminalAgent.identify` finds no agent, on the command line or as tmux's program name; `claude` is found.
+  The process path itself works: `Tests/GlassTerminalTests/macOS/LiveLocalAgentTests.swift` (new, not committed)
+  runs zsh in a PTY with the app's integration and `claude` in front, and passes; with the check reading the shell
+  instead of the group in front, it fails at its `told` expectation (proven 2026-11-12, source restored). Claude
+  Code's `claude bg-spare` runs in a terminal of its own under `claude bg-pty-host`, never in a tab. Fixed in
+  0.4.617 at his word (the 2026-11-12 section above).
 - **The site:** live with the 0.4.616 pages, help and feed (staged from here, provisioned by him): 111 of 111 live
   files match the build by hash; the feed is served no-cache with 0.4.616 first. Its device sentences say the
   Vision Pro ran 0.4.612.

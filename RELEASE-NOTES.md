@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.616 (10 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.618 (13 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.616)
+## What it holds (0.4.618)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -113,6 +113,28 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.618 (13 November 2026)
+- **0.4.618 is the Mac's tenth release**, through Sparkle, with 0.4.617 below; TestFlight build 618 for iPhone, iPad
+  and Vision Pro.
+- **A table tab's Query menu works on the Mac.** Format SQL, Query History and Saved Queries were dimmed on a table
+  tab, though its SQL pane runs queries as a SQL document does. Now they format that pane and fill it from your
+  history or saved queries. Explain Plan stays a SQL document's. And the menu answers only its own window: with two
+  windows on one connection, Run Statement on a table tab ran in both.
+- **The schema sidebar works with VoiceOver.** A database or table there is a button to VoiceOver and other
+  assistive technology, and activating it shows its statistics, as a click does. Before, VoiceOver read it as text
+  and could only open it in a tab.
+- **Insert Path goes back to the terminal on the Mac.** After Files types the paths into its terminal, that
+  terminal's window comes forward on its tab, with the pane they went into focused, as it does on iPhone, iPad
+  and Vision Pro.
+- **A database window with nothing to show keeps its size.** One opened with no database in it, such as from a
+  window's tab bar, could be made a sliver; it now keeps a database window's size, with its own glass on Vision Pro.
+
+### 0.4.617 (12 November 2026)
+- **Claude Code installed through npm gets its mark.** That install's program is `claude.exe`, inside the
+  `@anthropic-ai/claude-code` package. When it ran under that name, its terminal showed no mark: not on the tab,
+  not in Show All Windows, not as the Coding Agent background. Now the name and the package both mean Claude Code,
+  in a Mac's own terminals and in tmux on any machine.
 
 ### 0.4.616 (10 November 2026)
 - **0.4.616 is the Mac's ninth release**, through Sparkle, with everything since 0.4.612 below; TestFlight build

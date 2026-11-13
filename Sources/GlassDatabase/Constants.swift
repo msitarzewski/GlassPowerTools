@@ -462,10 +462,35 @@ enum MacDatabaseWorkspaceWindowPolicy {
 /// editor exists. Enablement flags are computed from workspace-owned document
 /// state; editor-internal verbs delegate to the active tab's registered
 /// `QueryEditorCommandHandlers`.
+/// What the Query menu can do for the tab in front. A table tab has a SQL pane of its own, which
+/// runs, formats and takes a query from History or Saved Queries as a SQL document does; it has no
+/// Explain. Until 2026-11-13 everything but Run was off on a table tab (B-X11).
+struct DatabaseQueryMenuAvailability: Equatable {
+    var canExecute = false
+    var canFormat = false
+    var canExplain = false
+    var canUseQueryLibrary = false
+
+    /// A SQL document: Run, Format and Explain need SQL, a connection and no run under way.
+    static func document(_ run: SQLRunAvailability) -> Self {
+        Self(canExecute: run.canRun, canFormat: run.canRun, canExplain: run.canRun, canUseQueryLibrary: true)
+    }
+
+    /// A table tab's SQL pane: Format needs only SQL; History and Saved Queries fill the pane.
+    static func table(_ pane: SQLRunAvailability) -> Self {
+        Self(canExecute: pane.canRun, canFormat: pane.hasText, canExplain: false, canUseQueryLibrary: true)
+    }
+
+    /// A database's overview, or nothing in front.
+    static let none = Self()
+}
+
 struct DatabaseWorkspaceCommandActions {
     let canExecute: Bool
     let canCancel: Bool
     let canSave: Bool
+    let canFormat: Bool
+    let canExplain: Bool
     let canUseQueryLibrary: Bool
     let canCloseTab: Bool
     let newQueryTab: () -> Void
@@ -629,7 +654,7 @@ struct DatabaseCommands: Commands {
             // on one key left Explain Plan with none (2026-09-25).
             Button("Explain Plan") { workspaceActions?.explainPlan() }
                 .keyboardShortcut("e", modifiers: [.command, .option])
-                .disabled(workspaceActions?.canExecute != true || workspaceActions?.canUseQueryLibrary != true)
+                .disabled(workspaceActions?.canExplain != true)
             Button("Cancel Query") { workspaceActions?.cancel() }
                 .keyboardShortcut(".", modifiers: .command)
                 .disabled(workspaceActions?.canCancel != true)
@@ -638,7 +663,7 @@ struct DatabaseCommands: Commands {
 
             Button("Format SQL") { workspaceActions?.formatSQL() }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
-                .disabled(workspaceActions?.canExecute != true || workspaceActions?.canUseQueryLibrary != true)
+                .disabled(workspaceActions?.canFormat != true)
 
             Divider()
 

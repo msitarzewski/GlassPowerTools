@@ -12,6 +12,8 @@ A table tab has five views: **Data**, **Structure**, **DDL**, **Indexes** and **
 
 **Data** shows the table's generated `SELECT` in an editor above a grid. You can edit that SQL and run it; drag the handle under the editor to resize it.
 
+**On Mac:** the **Query** menu works on that SQL as it does in a SQL document: **Run Statement**, **Format SQL** (⇧⌘F), and **Query History** and **Saved Queries**, which put the statement you choose in the editor. **Explain Plan** is for SQL documents.
+
 ## Sort rows
 
 - Select a column header to sort by it ascending, again for descending, and a third time to remove the sort. Selecting other headers adds further sort keys, numbered in the header, for example `2↑`.

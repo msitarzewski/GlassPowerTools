@@ -122,16 +122,24 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
     /// `arguments` its program and script (`identifyingWords`), `title` the title it set.
     static func identify(program: String?, arguments: String?, title: String? = nil) -> TerminalAgent? {
         let name = program.map { ($0 as NSString).lastPathComponent.lowercased() }
-        if let name, let agent = byName[name] { return agent }
+        if let name, let agent = agent(named: name) { return agent }
         let words = arguments?.split(separator: " ").map(String.init) ?? []
         // The name it was run by: Claude Code's own installer runs it from a file named for its
         // version (`~/.local/share/claude/versions/2.1.296`), so tmux says `2.1.296` and the
         // command line says `claude`.
         let first = words.first.map { ($0 as NSString).lastPathComponent.lowercased() }
-        if let first, let agent = byName[first] { return agent }
-        if let target = launched(words)?.target, let agent = agent(for: target) { return agent }
+        if let first, let agent = agent(named: first) { return agent }
+        let launch = launched(words)
+        if let target = launch?.target, let agent = agent(for: target) { return agent }
+        // A program run by its path from inside an agent's package, as a script is told: Claude
+        // Code from npm is `…/node_modules/@anthropic-ai/claude-code/bin/claude.exe` (2026-11-12).
+        // Never an interpreter, shell or runner, whose own path says nothing of what it runs.
+        if launch == nil, let path = words.first, path.contains("/"), !needsCommandLine(path),
+           let agent = agent(forScript: path) {
+            return agent
+        }
         // The program, or the script it runs, inside an agent's own install folder.
-        let paths = [words.first] + [launched(words)?.target].map { target -> String? in
+        let paths = [words.first] + [launch?.target].map { target -> String? in
             if case .script(let script)? = target { return script }
             return nil
         }
@@ -147,6 +155,14 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
             return .claudeCode
         }
         return nil
+    }
+
+    /// The agent a program's name is, `.exe` or not: Claude Code's npm package names its program
+    /// `bin/claude.exe` on every platform, so tmux says `claude.exe` (2026-11-12).
+    static func agent(named name: String) -> TerminalAgent? {
+        if let agent = byName[name] { return agent }
+        guard name.hasSuffix(".exe") else { return nil }
+        return byName[String(name.dropLast(4))]
     }
 
     /// Whether `program` says too little by its name alone: an interpreter, or a file named for its

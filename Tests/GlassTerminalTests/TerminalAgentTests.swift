@@ -50,6 +50,26 @@ struct TerminalAgentTests {
         #expect(TerminalAgent.identify(program: "node", arguments: "node server.js") == nil)
     }
 
+    /// Claude Code installed through npm: the package names its program `bin/claude.exe` on every
+    /// platform (`npm view @anthropic-ai/claude-code bin`), and run by its path it went unmarked
+    /// (2026-11-12).
+    @Test("a program called name.exe, or sitting in an agent's package, is that agent; a project folder is not")
+    func byProgramPath() {
+        let npm = "/Users/someone/.nvm/versions/node/v22.17.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
+        #expect(TerminalAgent.identify(program: nil, arguments: TerminalAgent.identifyingWords("\(npm) -c")) == .claudeCode)
+        #expect(TerminalAgent.identifyingWords("\(npm) -c --api-key k") == npm, "the program alone is kept")
+        #expect(TerminalAgent.identify(program: "claude.exe", arguments: nil) == .claudeCode, "as tmux names it")
+        #expect(TerminalAgent.identify(program: nil, arguments: "/opt/x/lib/node_modules/@anthropic-ai/claude-code/bin/claude-native")
+                == .claudeCode, "by its package, whatever the program is called")
+        #expect(TerminalAgent.identify(program: nil, arguments: "/Users/someone/src/claude-code/bin/build") == nil,
+                "a project folder called claude-code is not the package")
+        #expect(TerminalAgent.identify(program: "notclaude.exe", arguments: nil) == nil)
+        #expect(TerminalAgent.identify(program: "setup.exe", arguments: nil) == nil)
+        #expect(TerminalAgent.identify(program: nil, arguments: "/usr/local/bin/setup.exe") == nil)
+        #expect(TerminalAgent.identify(program: nil, arguments: "/x/node_modules/@anthropic-ai/claude-code/node_modules/.bin/node")
+                == nil, "an interpreter's own path says nothing of what it runs")
+    }
+
     @Test("Claude Code's own title answers only where no other program is known")
     func byTitle() {
         #expect(TerminalAgent.identify(program: nil, arguments: nil, title: "✳ Claude Code") == .claudeCode)

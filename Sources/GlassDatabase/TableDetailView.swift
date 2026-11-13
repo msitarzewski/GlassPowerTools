@@ -307,8 +307,19 @@ private struct GridTransferRequest {
     }
 }
 
+extension EnvironmentValues {
+    /// The workspace window whose Query menu a table tab answers. The menu's verbs were sent to the
+    /// session, so a second window on the same connection ran (and would format) its table tab
+    /// too (B-X11, 2026-11-13).
+    @Entry var databaseQueryMenuScope: UUID? = nil
+}
+
 extension Notification.Name {
     static let glassdbExecuteQuery = Notification.Name("glassdbExecuteQuery")
+    /// The Query menu's Format SQL, Query History and Saved Queries for a table tab's SQL pane (B-X11).
+    static let glassdbFormatQuery = Notification.Name("glassdbFormatQuery")
+    static let glassdbShowQueryHistory = Notification.Name("glassdbShowQueryHistory")
+    static let glassdbShowSavedQueries = Notification.Name("glassdbShowSavedQueries")
     static let glassdbAddRow = Notification.Name("glassdbAddRow")
     static let glassdbRefreshData = Notification.Name("glassdbRefreshData")
     static let glassdbShowAI = Notification.Name("glassdbShowAI")
@@ -1398,6 +1409,7 @@ struct DataTabView: View {
     /// This window's own settings (W24), over All Databases'.
     @Environment(\.glassWindowOverrides) private var windowSettings
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.databaseQueryMenuScope) private var queryMenuScope
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -1430,6 +1442,8 @@ struct DataTabView: View {
     @State private var editorHeight: CGFloat = 120
     @State private var editorHeightDragStart: CGFloat?
     @State private var showAIAssistant = false
+    @State private var showingQueryHistory = false
+    @State private var showingSavedQueries = false
     @State private var showExporter = false
     @State private var exportFormat: GridExportFormat = .csv
     @State private var pendingQueryStatements: [SQLStatement]?
@@ -1698,8 +1712,36 @@ struct DataTabView: View {
             .preference(key: SQLRunAvailabilityKey.self, value: SQLRunAvailability(
                 canRun: isTableContext && isWorkspaceActive && session?.state.isConnected == true
                     && !isLoading && !queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                hasSelection: selectedRange.length > 0
+                hasSelection: selectedRange.length > 0,
+                hasText: isTableContext && isWorkspaceActive
+                    && !queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ))
+            // The Query menu's History and Saved Queries for this pane, as a SQL document has them
+            // (B-X11): the choice replaces the pane's SQL, as it replaces a document's.
+            .sheet(isPresented: $showingQueryHistory) {
+                QueryHistoryView(connectionID: session?.connectionConfig.id) { entry in
+                    replaceQuery(with: entry.sql)
+                    showingQueryHistory = false
+                }
+            }
+            .sheet(isPresented: $showingSavedQueries) {
+                SavedQueriesView(connectionID: session?.connectionConfig.id) { query in
+                    replaceQuery(with: query.sql)
+                    settingsManager.useSavedQuery(query.id)
+                    showingSavedQueries = false
+                }
+            }
+    }
+
+    /// A Query menu verb for this window's table tab in front, as Execute's is (`.glassdbExecuteQuery`).
+    private func answersQueryMenu(_ notification: Notification) -> Bool {
+        guard isWorkspaceActive, isTableContext, let scope = notification.object as? UUID else { return false }
+        return scope == actionScope || scope == queryMenuScope
+    }
+
+    private func replaceQuery(with sql: String) {
+        queryText = sql
+        selectedRange = NSRange(location: (sql as NSString).length, length: 0)
     }
 
     private var presentedView: some View {
@@ -2084,9 +2126,22 @@ struct DataTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .glassdbExecuteQuery)) { notification in
             guard isWorkspaceActive, isTableContext,
                   let scope = notification.object as? UUID,
-                  scope == actionScope || scope == sessionID else { return }
+                  scope == actionScope || scope == queryMenuScope else { return }
             let mode = (notification.userInfo?["mode"] as? String).flatMap(SQLExecutionMode.init(rawValue:)) ?? .automatic
             Task { await executeCurrentQuery(mode: mode) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .glassdbFormatQuery)) { notification in
+            guard answersQueryMenu(notification),
+                  !queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            formatQuery()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .glassdbShowQueryHistory)) { notification in
+            guard answersQueryMenu(notification) else { return }
+            showingQueryHistory = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .glassdbShowSavedQueries)) { notification in
+            guard answersQueryMenu(notification) else { return }
+            showingSavedQueries = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .glassdbAddRow)) { notification in
             guard notification.object as? UUID == actionScope else { return }

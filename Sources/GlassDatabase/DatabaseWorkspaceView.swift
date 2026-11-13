@@ -214,6 +214,8 @@ struct DatabaseWorkspaceView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var appliedInitialSidebarVisibility = false
     @State private var tableRunAvailability = SQLRunAvailability()
+    /// This window's own address for the Query menu's verbs to its table tab (B-X11).
+    @State private var queryMenuScope = UUID()
     @State private var tabState: WorkspaceTabState
     @State private var queryDocuments: [UUID: QueryDocumentTab]
     @State private var tableSQLDrafts: [WorkspaceSelection: QueryDocumentTab] = [:]
@@ -278,6 +280,7 @@ struct DatabaseWorkspaceView: View {
 
     var body: some View {
         layout
+        .environment(\.databaseQueryMenuScope, queryMenuScope)
         .databaseWorkspaceWindowBackground()
         .onPreferenceChange(SQLRunAvailabilityKey.self) { tableRunAvailability = $0 }
         .databaseWorkspaceWindowChrome()
@@ -1359,12 +1362,21 @@ struct DatabaseWorkspaceView: View {
             canRun: session?.state.isConnected == true && hasQuery && document?.isExecuting != true,
             hasSelection: (document?.selectedRange.length ?? 0) > 0
         )
+        let menu: DatabaseQueryMenuAvailability = if activeQueryDocumentID != nil {
+            .document(availability)
+        } else if showsTableTab {
+            .table(tableRunAvailability)
+        } else {
+            .none
+        }
         return DatabaseWorkspaceCommandActions(
-            canExecute: availability.canRun,
+            canExecute: menu.canExecute,
             canCancel: document?.isExecuting == true
                 && session?.connection?.capabilities.contains(.cancellation) == true,
             canSave: sqlDocument(for: tabState.displayed)?.text.isEmpty == false,
-            canUseQueryLibrary: activeQueryDocumentID != nil,
+            canFormat: menu.canFormat,
+            canExplain: menu.canExplain,
+            canUseQueryLibrary: menu.canUseQueryLibrary,
             canCloseTab: tabState.previewed != nil || canCloseWorkspace(tabState.selected),
             newQueryTab: {
                 openQueryDocument()
@@ -1380,9 +1392,15 @@ struct DatabaseWorkspaceView: View {
             executeScript: { runActiveSQL(.all) },
             explainPlan: { activeEditorHandlers?.explainPlan() },
             cancel: { activeEditorHandlers?.cancel() },
-            formatSQL: { formatActiveQueryDocument() },
-            showHistory: { activeEditorHandlers?.showHistory() },
-            showSavedQueries: { activeEditorHandlers?.showSavedQueries() },
+            formatSQL: {
+                if activeQueryDocumentID != nil { formatActiveQueryDocument() } else { tellTableTab(.glassdbFormatQuery) }
+            },
+            showHistory: {
+                if let handlers = activeEditorHandlers { handlers.showHistory() } else { tellTableTab(.glassdbShowQueryHistory) }
+            },
+            showSavedQueries: {
+                if let handlers = activeEditorHandlers { handlers.showSavedQueries() } else { tellTableTab(.glassdbShowSavedQueries) }
+            },
             runTitle: availability.title,
             canRunSelection: availability.canRun && availability.hasSelection,
             executeSelection: { runActiveSQL(.selection) },
@@ -1398,10 +1416,20 @@ struct DatabaseWorkspaceView: View {
             case .selection: handlers.executeSelection()
             case .all: handlers.executeScript()
             }
-        } else if case .table = tabState.displayed {
-            NotificationCenter.default.post(name: .glassdbExecuteQuery, object: sessionID,
-                                            userInfo: ["mode": mode.rawValue])
+        } else {
+            tellTableTab(.glassdbExecuteQuery, userInfo: ["mode": mode.rawValue])
         }
+    }
+
+    private var showsTableTab: Bool {
+        if case .table = tabState.displayed { true } else { false }
+    }
+
+    /// A Query menu verb for this window's table tab in front, and no other window's: sent to the
+    /// window's own scope, not the session a second window may share (B-X11).
+    private func tellTableTab(_ name: Notification.Name, userInfo: [String: String]? = nil) {
+        guard showsTableTab else { return }
+        NotificationCenter.default.post(name: name, object: queryMenuScope, userInfo: userInfo)
     }
 
     /// File > Save routes through the workspace's exporter so it works from
