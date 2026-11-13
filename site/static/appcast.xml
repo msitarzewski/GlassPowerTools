@@ -6,6 +6,24 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.618</title>
+      <pubDate>Fri, 13 Nov 2026 21:31:58 GMT</pubDate>
+      <sparkle:version>618</sparkle:version>
+      <sparkle:shortVersionString>0.4.618</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.618</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.618</h2>
+<ul>
+  <li><b>Claude Code installed through npm gets its mark.</b> That install runs as <code>claude.exe</code> inside its npm package, and its terminal showed no mark: not on the tab, not in Show All Windows, not as the Coding Agent background. Now it does, in the Mac's own terminals and in tmux.</li>
+  <li><b>A table tab's Query menu works.</b> Format SQL, Query History and Saved Queries work on a table's own SQL, and the menu answers only its own window.</li>
+  <li><b>The schema sidebar works with VoiceOver.</b> A database or table there is a button, and activating it shows its statistics.</li>
+  <li><b>Insert Path goes back to the terminal.</b> After Files types the paths, that terminal's window comes forward with the pane ready to type in.</li>
+  <li><b>A database window with nothing to show keeps its size.</b></li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.618/GlassPowerTools-0.4.618.zip" length="29427616" type="application/octet-stream" sparkle:edSignature="D1VHOvdMvkZF3pdTWaCjYjTCV19IMhGNU3Dp8YaUCvwb1IPweAMx7YF6PMoQhGJK5A140SN6o88jcsFnbkGNBA=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.616</title>
       <pubDate>Wed, 11 Nov 2026 03:54:31 GMT</pubDate>
       <sparkle:version>616</sparkle:version>
