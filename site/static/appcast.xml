@@ -6,6 +6,21 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.619</title>
+      <pubDate>Sun, 15 Nov 2026 11:52:02 GMT</pubDate>
+      <sparkle:version>619</sparkle:version>
+      <sparkle:shortVersionString>0.4.619</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.619</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.619</h2>
+<ul>
+  <li><b>Every window in the orb dock, if you like.</b> Turn on Settings ▸ Appearance ▸ Orbs ▸ Show Every Window in the Dock, and every open terminal window has its orb in the dock, not only the ones put away. Open windows' orbs are fainter; click one to bring that window to the front. The dock stays up while it's on.</li>
+  <li><b>Coding agents started with npx get their marks.</b> <code>npx @openai/codex</code>, <code>npx @anthropic-ai/claude-code</code> and <code>npm exec</code> now mark their terminal, as does Homebrew's Codex in tmux.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.619/GlassPowerTools-0.4.619.zip" length="29430831" type="application/octet-stream" sparkle:edSignature="k8u3jtIJc7FQ0VfQ+lb0MZVpa1o/QaebVqsz+Xs/bMneCJ1Md/Y7wCCbCEPGPpdpIlO+KYo7c4uuPow7W4rxCQ=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.618</title>
       <pubDate>Fri, 13 Nov 2026 21:31:58 GMT</pubDate>
       <sparkle:version>618</sparkle:version>
