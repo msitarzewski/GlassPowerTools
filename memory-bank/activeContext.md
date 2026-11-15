@@ -31,10 +31,50 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-13 — RESUME HERE: the small defects (B-X11, B-X19, B-X20, B-X24), at his "do the defects"
+## 2026-11-15 — RESUME HERE: shipping 0.4.619 at his word
+
+- **His word:** "Let's ship 0.4.619" (2026-11-15): commit, push, the Mac release, TestFlight 619 and the site, as
+  0.4.618 went. Docs at 0.4.619: release notes (the Mac's eleventh release), README, the site's pages (every device
+  ran it on 2026-11-14; the home page's orb dock names the setting). The build comes from a clean worktree at the
+  commit. **Next:** `release-mac.sh 0.4.619 619`, the GitHub release, the feed, TestFlight 619, the site.
+
+## 2026-11-13 — every window in the orb dock (D107, 0.4.619), while 0.4.618 waits on Apple
+
+- **His ask:** "a toggle to allow all windows to show in the dock all the time"; his choices in D107. Built and unit
+  tested (each piece seen failing); task note `tasks/2026-11/2026-11-13_orb-dock-every-window.md`. Not committed.
+- **Also in 0.4.619:** agents started with npx or `npm exec`, and Homebrew's Codex in tmux, get their marks (task
+  note, last section). His screenshot's unmarked-looking row was Codex, marked correctly (tmux `glass-35`).
+- **0.4.618 released (Mac, 2026-11-13):** he accepted Apple's agreement; built from a clean worktree at `e418d41b`
+  (`tmp/release-618-tree`), so the uncommitted 0.4.619 work stays out. Notarized, stapled, Gatekeeper-accepted;
+  GitHub v0.4.618 with dmg, zip and checksums, all downloaded back byte-identical; feed committed `826f0427` and
+  pushed; the site built in the worktree, staged from here, provisioned by him ("done"): 111 of 111 live files match,
+  feed no-cache with 0.4.618 first, its zip link the same length. The Mac's tenth release.
+- **TestFlight 618:** both in beta review (`WAITING_FOR_REVIEW`), What to Test set, in Testers. iOS went first;
+  visionOS's upload failed "Failed to Use Accounts … App Store Connect access for the team is required" (Xcode's
+  sign-in had lapsed; the API key can't cloud-sign: "Cloud signing permission error"). He signed Xcode in again
+  ("signed in, go ahead"); the export of `tmp/release-618-tree/build/testflight/GlassPowerTools-visionOS.xcarchive`
+  with `tmp/release-618/ExportOptions-upload.plist` uploaded, processed VALID, and `testflight-618.py --only
+  VISION_OS` submitted it. **Lesson:** a lapsed Xcode account shows only at export; the iOS export before it worked.
+- **0.4.619 checked (2026-11-13 evening), not committed:** builds for all three with the agent change; suites shell
+  426, terminal Mac 1,282, iPhone and Vision Pro simulators 871 each. The history reader's timing test failed once on
+  the iPhone simulator (28.2 of 27): its allowance was the Mac's; now per platform, measured, each seen failing with a
+  regular expression per entry (task note). The macOS VM: the setting on brings the dock with the open terminal's
+  faint orb, a click brings it forward, off hides the dock, put away and back keeps it. Vision Pro simulator: a new
+  UI test, passing three times, seen failing twice; the shared simulator was taken over once by another project's
+  app (the task note says how to tell). **Installed (read back):** the Mac 0.4.619 (619), 2026-11-13 19:00, no crash
+  reports; the iPhone 0.4.619 (619), 20:44; the headset 0.4.619 (619), 2026-11-14 17:06, once it was on (unavailable
+  overnight). Next: his word to commit and ship.
+
+## 2026-11-13 — the small defects (B-X11, B-X19, B-X20, B-X24), at his "do the defects"
 
 - **Shipping at his word (2026-11-13):** "Let's ship 0.4.618", with 0.4.617 in it. The Mac release, TestFlight 618
   and the site follow 0.4.616's steps.
+  **Done:** committed `e418d41b` and pushed. **Blocked on him:** Apple refuses with "A required agreement is missing or
+  has expired" (403) for the notary service and for every App Store Connect read, so `release-mac.sh` stops before
+  archiving and TestFlight cannot upload. He accepts it in App Store Connect ▸ Business (account holder). Then:
+  `release-mac.sh 0.4.618 618 tmp/release-618/notes.html`, the GitHub release, the feed, TestFlight 618, the site
+  (its pages already link v0.4.618: not deployed before the release exists). `release-mac.sh` now prints Apple's
+  answer: it called this a missing notary profile (uncommitted).
 - **His word:** "do the defects" — the five offered as needing nothing from him. **B-X7 left out, and told to him:**
   the 2× request needs his eyes on the headset ("needs the headset to measure and to judge", 2026-10-13 note), and
   the whole-frame copy (`FrameConverter.copy`, one BGRA copy per frame by design; the whole visible region uploaded

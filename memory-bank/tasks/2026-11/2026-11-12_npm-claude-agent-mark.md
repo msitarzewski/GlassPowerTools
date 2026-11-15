@@ -3,7 +3,7 @@
 ## Task
 - **Asked (the owner, 2026-11-11):** whether agent detection works for local (not tmux) terminals: a local tab
   running Claude Code showed no mark while another did.
-- **His word (2026-11-12):** "build the fix as 0.4.617". Not committed.
+- **His word (2026-11-12):** "build the fix as 0.4.617". Committed `e418d41b` and released in 0.4.618 at his "Let's ship 0.4.618" (2026-11-13).
 - **Scope:** `TerminalAgent.identify`, which every surface asks (a Mac's local terminals from the process table,
   tmux here and on other machines from tmux's program name and the foreground group's command line, Show All
   Windows' tiles).

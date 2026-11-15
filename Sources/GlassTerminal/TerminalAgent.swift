@@ -161,6 +161,11 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
     /// `bin/claude.exe` on every platform, so tmux says `claude.exe` (2026-11-12).
     static func agent(named name: String) -> TerminalAgent? {
         if let agent = byName[name] { return agent }
+        // A build named for its platform: Homebrew's Codex is `codex-aarch64-apple-darwin`, linked as `codex`,
+        // and tmux names the file (2026-11-13).
+        for arch in ["-aarch64-", "-x86_64-", "-arm64-"] {
+            if let at = name.range(of: arch), let agent = byName[String(name[..<at.lowerBound])] { return agent }
+        }
         guard name.hasSuffix(".exe") else { return nil }
         return byName[String(name.dropLast(4))]
     }
@@ -224,7 +229,14 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
     /// (2026-10-14, Hermes Agent, whose command was not told).
     private static let shells: Set<String> = ["sh", "bash", "zsh", "dash", "ksh", "fish"]
     /// Programs that fetch or find a tool and run it.
-    private static let runners: Set<String> = ["uv", "uvx", "pipx", "npx", "pnpx", "bunx", "pnpm", "yarn"]
+    private static let runners: Set<String> = ["uv", "uvx", "pipx", "npx", "pnpx", "bunx", "pnpm", "yarn", "npm"]
+
+    /// The runner a script is, by its file: npm's `bin/npx` and `npx-cli.js`, `npm-cli.js`, `pnpm.cjs`, `yarn.js`.
+    static func runner(named script: String) -> String? {
+        let stem = ((script as NSString).lastPathComponent.lowercased() as NSString).deletingPathExtension
+        let name = ["npx-cli": "npx", "npm-cli": "npm"][stem] ?? stem
+        return runners.contains(name) ? name : nil
+    }
 
     /// What `words` launch and how many of them say so — the program up to its script, module or
     /// tool, and none after: the rest can hold a secret. Inline code (`-c`, `-e`) is never kept.
@@ -258,6 +270,12 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
             let start = program == "deno" && words.count > 1 && words[1] == "run" ? 2 : 1
             guard let index = operand(from: start, valued: ["-r", "--require", "--import", "--loader"],
                                       code: ["-e", "--eval", "-p", "--print"]) else { return nil }
+            // A runner that is itself a script: npm's `npx` is `node …/bin/npx @openai/codex`, and what it
+            // runs is the tool after it, not the runner (2026-11-13).
+            if let runner = runner(named: words[index]),
+               let inner = launched([runner] + words[(index + 1)...]) {
+                return (index + inner.kept, inner.target)
+            }
             return (index + 1, .script(words[index]))
         }
         if shells.contains(program) {
@@ -273,6 +291,9 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
             else { return nil }
         case "pipx", "pnpm", "yarn":
             guard words.count > 1, ["run", "dlx", "exec"].contains(words[1]) else { return nil }
+            start = 2
+        case "npm":
+            guard words.count > 1, ["exec", "x"].contains(words[1]) else { return nil }
             start = 2
         default:
             break

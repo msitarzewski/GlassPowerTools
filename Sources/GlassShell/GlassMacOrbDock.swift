@@ -153,12 +153,17 @@ public final class GlassOrbDockModel {
     public private(set) var docked: [String] = []
     /// Connections is in the dock.
     public private(set) var holdsConnections = false
+    /// The windows open now that could go into the dock, by dock id, docked or not, in the order they came: listed
+    /// beside the docked ones while the dock shows every window (`GlassOrbDockEveryWindow`). Connections is not one.
+    public private(set) var openIDs: [String] = []
     /// Where each orb stands, as the person set it by carrying one; this Mac's.
     public private(set) var order: GlassOrbDockOrder
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var windows: [String: WeakDockable] = [:]
     @ObservationIgnored private var faces: [String: GlassOrbFaceSource] = [:]
+    @ObservationIgnored private var openWindows: [String: WeakDockable] = [:]
+    @ObservationIgnored private var openFaces: [String: GlassOrbFaceSource] = [:]
     /// Pictures taken as windows docked, for those that have none of their own.
     @ObservationIgnored private var pictures: [String: Image] = [:]
     @ObservationIgnored private var connections: WeakDockable?
@@ -181,11 +186,17 @@ public final class GlassOrbDockModel {
     /// Nothing to show: no window in it, and Connections out.
     public var isEmpty: Bool { docked.isEmpty && !holdsConnections }
 
+    /// Every open window in the dock, as Settings says.
+    var everyWindow: Bool { GlassOrbDockEveryWindow.isOn(in: defaults) }
+
+    /// The dock stays up: something is in it, or it shows every window.
+    public var keepsShown: Bool { !isEmpty || everyWindow }
+
     public func isDocked(_ id: String) -> Bool { docked.contains(id) }
 
     /// The face of a docked window, with the picture it had as it docked where it has none now.
     func face(of id: String) -> GlassSessionOrbFace? {
-        guard var face = faces[id]?.face else { return nil }
+        guard var face = (faces[id] ?? openFaces[id])?.face else { return nil }
         let own = face.picture, kept = pictures[id]
         face.picture = { own() ?? kept }
         return face
@@ -215,6 +226,37 @@ public final class GlassOrbDockModel {
         GlassOrbDock.logger.info("docking \(id, privacy: .public)")
         presence?(true)
         window.putAway(animated: animated) { [weak self] in self?.departing.remove(id) }
+    }
+
+    /// A window that can go into the dock is open, under `id`, drawing `face`: listed when the dock shows every
+    /// window, which comes up with it. Asked again as the window is found again, it changes nothing.
+    func opened(_ id: String, window: any GlassDockableWindow, face: GlassOrbFaceSource) {
+        watchWindows()
+        if id != GlassOrbDock.connectionsID {
+            openWindows[id] = WeakDockable(window)
+            openFaces[id] = face
+            if !openIDs.contains(id) { openIDs.append(id) }
+        }
+        if everyWindow { presence?(true) }
+    }
+
+    /// Settings turned every window in the dock on or off: the dock comes up, or goes when nothing is in it.
+    public func everyWindowChanged() {
+        presence?(keepsShown)
+    }
+
+    /// The window in front: back from the dock, or forward where it is open; after `first` (choosing its tab).
+    /// False when there is no such window.
+    @discardableResult
+    func bringForward(_ id: String, first: (@MainActor () -> Void)? = nil) -> Bool {
+        if docked.contains(id) || id == GlassOrbDock.connectionsID { return bringBack(id, first: first) }
+        guard let window = openWindows[id]?.window else {
+            dropOpen(id)
+            return false
+        }
+        first?()
+        window.bringForward()
+        return true
     }
 
     /// Brings a docked window back, after `first` (choosing its tab). False when it is not in the
@@ -267,6 +309,7 @@ public final class GlassOrbDockModel {
     /// The windows came and went: one on screen again — Active, Show All Windows, the Window menu —
     /// is out of the dock; one closed or gone is forgotten.
     func windowsChanged() {
+        for id in openIDs where openWindows[id]?.window == nil { dropOpen(id) }
         for id in docked where !departing.contains(id) {
             guard let window = windows[id]?.window else {
                 forget(id)
@@ -286,8 +329,15 @@ public final class GlassOrbDockModel {
     /// The window closed while in the dock: its orb goes. Kept in what the next launch puts back
     /// until something else changes it, since the app's own windows close as it quits.
     func closed(_ window: any GlassDockableWindow) {
+        for id in openIDs where openWindows[id]?.window === window { dropOpen(id) }
         for id in docked where windows[id]?.window === window { forget(id, saving: false) }
         if connections?.window === window { leaveConnections(saving: false) }
+    }
+
+    private func dropOpen(_ id: String) {
+        openIDs.removeAll { $0 == id }
+        openWindows[id] = nil
+        openFaces[id] = nil
     }
 
     private func leave(_ id: String) {
@@ -297,7 +347,7 @@ public final class GlassOrbDockModel {
         faces[id] = nil
         pictures[id] = nil
         save()
-        if isEmpty { presence?(false) }
+        if !keepsShown { presence?(false) }
     }
 
     private func forget(_ id: String, saving: Bool = true) {
@@ -307,14 +357,14 @@ public final class GlassOrbDockModel {
         faces[id] = nil
         pictures[id] = nil
         if saving { save() }
-        if isEmpty { presence?(false) }
+        if !keepsShown { presence?(false) }
     }
 
     private func leaveConnections(saving: Bool = true) {
         holdsConnections = false
         connections = nil
         if saving { defaults.set(false, forKey: GlassOrbDock.connectionsKey) }
-        if isEmpty { presence?(false) }
+        if !keepsShown { presence?(false) }
     }
 
     /// What the next launch puts back: the windows docked now, and those of the last run still on
@@ -385,6 +435,7 @@ private struct GlassMacSessionOrbModifier: ViewModifier {
                 GlassOrbWindowReader { found in
                     window.window = found
                     putBackIfDockedLastRun(found)
+                    register(found)
                 }
                 .accessibilityHidden(true)
             }
@@ -392,7 +443,16 @@ private struct GlassMacSessionOrbModifier: ViewModifier {
                 if source == nil { source = GlassOrbFaceSource(face) }
                 // So the dock can open Connections, and a window, from outside any window.
                 GlassWindowOpener.shared.register(openWindow)
+                if let found = window.window { register(found) }
             }
+    }
+
+    /// The window is open: the dock lists it while it shows every window (`GlassOrbDockEveryWindow`).
+    private func register(_ found: NSWindow) {
+        guard let id = face.dockID else { return }
+        let source = source ?? GlassOrbFaceSource(face)
+        if self.source == nil { self.source = source }
+        GlassOrbDockModel.shared.opened(id, window: found, face: source)
     }
 
     private func shrink() {
@@ -854,6 +914,8 @@ struct GlassMacOrbDockView: View {
     @AppStorage(GlassOrbDock.lookKey, store: GlassUITestRun.settingsDefaults) private var lookData = Data()
     @AppStorage(GlassOrbDockOrientation.key, store: GlassUITestRun.settingsDefaults)
     private var orientationSetting = GlassOrbDockOrientation.horizontal.rawValue
+    /// Every open window in the dock, not only those put away (Settings > Appearance > Orbs, 2026-11-13).
+    @AppStorage(GlassOrbDockEveryWindow.key, store: GlassUITestRun.settingsDefaults) private var everyWindow = false
     /// A row or a column, as Settings ▸ Appearance ▸ Orbs says (the owner, 2026-11-05).
     private var orientation: GlassOrbDockOrientation { GlassOrbDockOrientation(rawValue: orientationSetting) ?? .horizontal }
     /// The longest a drag left a row and a column at (`GlassOrbDockLongest`); 0 until one has.
@@ -1040,10 +1102,11 @@ struct GlassMacOrbDockView: View {
         }
     }
 
-    /// The docked windows drawn from their faces, then a machine for each with a database, a desktop
-    /// or an editor open, in the order the person set.
+    /// The docked windows drawn from their faces (with every window shown, the open ones too), then a machine for
+    /// each with a database, a desktop or an editor open, in the order the person set.
     private func cells(open: [GlassOpenSession]) -> [Cell] {
-        let windows = dock.docked.filter { !Self.isMachineService($0) }.compactMap { id -> Cell? in
+        let shown = GlassOrbDockEveryWindow.windows(docked: dock.docked, open: dock.openIDs, everyWindow: everyWindow)
+        let windows = shown.filter { !Self.isMachineService($0) }.compactMap { id -> Cell? in
             dock.face(of: id).map { .window(id: id, face: $0) }
         }
         let machines = machines(of: open.filter { Self.isMachineService($0.id) }).map(Cell.machine)
@@ -1060,9 +1123,9 @@ struct GlassMacOrbDockView: View {
         switch cell {
         case .window(let id, let face):
             GlassMacSessionOrbView(face: face, point: point(at: cell.id)) {
-                clicked { dock.bringBack(id) }
+                clicked { dock.bringForward(id) }
             } choose: { tab in
-                clicked { dock.bringBack(id, first: tab.select) }
+                clicked { dock.bringForward(id, first: tab.select) }
             }
         case .machine(let machine):
             GlassMacSessionOrbView(face: face(of: machine), point: point(at: cell.id)) {
@@ -1071,6 +1134,16 @@ struct GlassMacOrbDockView: View {
                 clicked { if let session = machine.sessions.first(where: { $0.id == tab.id }) { bringBack(session) } }
             }
         }
+    }
+
+    /// Full for an orb with a window put away; fainter for one whose windows are all open, while the dock shows
+    /// every window (the owner's choice: put-away orbs at full strength).
+    private func strength(of cell: Cell) -> Double {
+        let ids: [String] = switch cell {
+        case .window(let id, _): [id]
+        case .machine(let machine): machine.sessions.map(\.id)
+        }
+        return GlassOrbDockEveryWindow.opacity(of: ids, docked: { dock.isDocked($0) }, everyWindow: everyWindow)
     }
 
     /// A docked window's own: shown again. One that is open: forward, as Active brings it.
@@ -1112,6 +1185,7 @@ struct GlassMacOrbDockView: View {
             return nil
         } == cell.id
         return orb(cell)
+            .opacity(strength(of: cell))
             .frame(width: Self.size(of: cell).width, height: Self.size(of: cell).height)
             .modifier(GlassOrbDropArrival())
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.row)) } action: { frames[cell.id] = $0 }

@@ -9,7 +9,8 @@
 //   vmtool wallpaper get              each screen's desktop picture (NSWorkspace.desktopImageURL(for:))
 //   vmtool wallpaper set <file>       set it on every screen (setDesktopImageURL), then read it back
 //   vmtool press <bundle-id|name|pid> <title> [window]  press the first button, menu item, radio button or
-//                                     checkbox with that title or description: in the windows, then the menu bar;
+//                                     checkbox with that title, description or accessibility identifier: in the
+//                                     windows, then the menu bar;
 //                                     or only in the window with that title
 //   vmtool place <app> x y w h [title]  move and size the app's front window, or its window with that title (points)
 //   vmtool display [set WIDTHxHEIGHT]  list the main display's modes, or pick one by size in points (HiDPI if any)
@@ -176,9 +177,10 @@ func press(_ query: String, _ name: String, window: String? = nil) {
         let role = text(element, kAXRoleAttribute) ?? ""
         let description = text(element, kAXDescriptionAttribute)
         // SwiftUI labels choices "Label, explanation"; the part before the comma is enough.
+        // Or by its accessibility identifier: a SwiftUI switch in a form has no title of its own.
         if ["AXButton", "AXMenuItem", "AXRadioButton", "AXCheckBox"].contains(role),
            text(element, kAXTitleAttribute) == name || description == name
-            || description?.hasPrefix(name + ",") == true {
+            || description?.hasPrefix(name + ",") == true || text(element, kAXIdentifierAttribute) == name {
             return element
         }
         guard depth < 12, let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] else { return nil }

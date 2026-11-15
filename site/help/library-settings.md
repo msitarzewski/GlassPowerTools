@@ -51,6 +51,7 @@ Each follows **Appearance** until you change it there, and only that window chan
 
 - **Shrink to Orb**: **Where the Window Is** (the starting setting), and the window becomes an orb where it stands; or **Into the Dock**, and orbs, with Connections, gather in a dock. See [Gather orbs in a dock on Vision Pro](library-connect.md#gather-orbs-in-a-dock-on-vision-pro).
 - **Dock**, with **Into the Dock**: **Horizontal** (the starting setting), a row of orbs, or **Vertical**, a column. The dock grows and shrinks along it as windows come and go, and scrolls when there are more orbs than fit; resize it to set how many fit.
+- **Show Every Window in the Dock**, with **Into the Dock**: off (the starting setting), the dock holds the windows you put in it; on, every open terminal window has its orb there too, fainter than those put away, and the dock stays open. Pinch an open window's orb to bring it to the front.
 - **Windows From a Vertical Dock**, with **Into the Dock**: **On Its Left** or **On Its Right** (the starting setting), the side a window comes back on from a vertical dock. In Focus Mode a window comes back on the side away from where you turned to look at the dock instead.
 
 With **Into the Dock**, a **Dock** section follows, with the dock's own **Opacity** and **Glass**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**. Set both to 0% for a clear dock.
@@ -63,6 +64,7 @@ These settings are kept on this device.
 
 - **Dock Floats**: **Above This App’s Windows** (the starting setting), and the dock is hidden while another app is in front; or **Above All Windows**, and it stays over every window, whichever app is in front, on every desktop.
 - **Dock**: **Horizontal** (the starting setting), a row of orbs, or **Vertical**, a column. The dock grows and shrinks along it as windows come and go, and scrolls when there are more orbs than fit; resize it to set how many fit.
+- **Show Every Window in the Dock**: off (the starting setting), the dock holds the windows you put in it; on, every open terminal window has its orb there too, fainter than those put away, and the dock stays up. Click an open window's orb to bring it to the front.
 
 A **Dock** section follows, with the dock's own **Opacity**, **Glass** and **Material**. They follow **Appearance** until you change them here; a small ↺ beside a setting returns it to **Appearance**. The dock is Apple's Liquid Glass: **Glass** sets how much of it shows, **Material** Light to Heavy is the clear glass, dimmed a little more behind it as it gets heavier, and Max the frostier glass. macOS draws Liquid Glass clear only in the window you are working in, and the dock is never that window, so its glass looks frosted.
 

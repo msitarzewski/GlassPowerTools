@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.618 (13 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.619 (15 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.618)
+## What it holds (0.4.619)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -102,7 +102,8 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - Light, Dark or System for the whole app on the Mac, iPhone and iPad; window opacity and glass
   everywhere; and session windows that shrink into an orb: on the Mac into a dock of Liquid Glass, and on
   Vision Pro where they stand or into one dock. The dock is a row or a column, as long as you make it; its
-  orbs are drops of liquid that wobble as windows land and leave, with drops falling into a busy one.
+  orbs are drops of liquid that wobble as windows land and leave, with drops falling into a busy one. It can
+  show every open terminal window too, not only those put away.
 
 ### Known limits
 - The Mac app runs outside App Sandbox (a terminal cannot work inside it), so it will be distributed
@@ -113,6 +114,18 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.619 (13 November 2026)
+- **0.4.619 is the Mac's eleventh release** (15 November 2026), through Sparkle; TestFlight build 619 for iPhone,
+  iPad and Vision Pro.
+- **Every window in the orb dock, if you like.** Settings ▸ Appearance ▸ Orbs ▸ **Show Every Window in the Dock** puts
+  every open terminal window's orb in the dock, not only the ones put away, on the Mac and on Vision Pro (with Into
+  the Dock). The orbs of windows put away stay at full strength and open windows' are fainter; click or pinch an
+  open window's orb to bring it to the front. The dock stays up while it's on, from the moment the app starts. Off
+  until you turn it on.
+- **Coding agents started with npx get their marks.** npm's `npx` runs as a script of its own, so `npx @openai/codex`
+  or `npx @anthropic-ai/claude-code` showed no mark; nor did `npm exec`. Now the agent after the runner is the one
+  marked. So is Homebrew's Codex in tmux, which tmux names `codex-aarch64-apple-darwin`.
 
 ### 0.4.618 (13 November 2026)
 - **0.4.618 is the Mac's tenth release**, through Sparkle, with 0.4.617 below; TestFlight build 618 for iPhone, iPad

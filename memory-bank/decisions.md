@@ -2322,3 +2322,19 @@ real view: ⌥←/⌥→, ⌥⌫ and ⌘⌫ sent nothing (Option not acting as M
 The bytes are Apple's Terminal's shortcuts, iTerm2's Natural Text Editing and Ghostty's macOS defaults.
 
 **Not changed.** Option still isn't Meta for letters; iPhone, iPad and Vision Pro keyboards are not covered yet.
+
+## D107 — Every window in the orb dock, a setting — Approved and implemented 2026-11-13 (0.4.619, shipped at his word 2026-11-15)
+**Owner:** "let's also allow a toggle to allow all windows to show in the dock all the time." Until then the dock
+held only the windows put into it (Shrink to Orb), and went when that was nothing (D88, D95).
+
+**Asked, he chose:**
+- **Both docks**, the Mac's and Vision Pro's (Vision Pro's with Into the Dock), alike.
+- **An open window's orb brings it to the front**; Shrink to Orb still puts it away.
+- **The look:** "opposite of 2", of the offered "put-away orbs dimmed": put-away orbs at full strength, open windows'
+  fainter (`GlassOrbDockEveryWindow.openOpacity`, 0.5). Read that way and told to him; one value to flip.
+
+**Decided.** Settings ▸ Appearance ▸ Orbs ▸ **Show Every Window in the Dock**, off by default, this device's. On, the dock
+lists every open terminal window after those put away (databases, desktops and editors were already on their
+machine's orb, docked or not), draws an orb fainter while none of its windows is put away, and stays up: on the Mac
+from the first window that opens, on Vision Pro from the launch and as the setting is turned on. The Mac learns
+each window as it opens (`GlassOrbDockModel.opened`); Vision Pro reads the open sessions it already listed.

@@ -2,7 +2,7 @@
 
 ## Task
 - **Asked (the owner):** "do the defects": the five offered from the backlog status
-  (`2026-11-13_backlog-status.md`) as needing nothing from him. Not committed.
+  (`2026-11-13_backlog-status.md`) as needing nothing from him. Committed `e418d41b` and released in 0.4.618 at his "Let's ship 0.4.618" (2026-11-13).
 - **B-X7 left out**, and he was told why: whether Automatic should ask a Vision Pro for twice the pixels is judged
   by looking on the headset (the 2026-10-13 note: "needs the headset to measure and to judge"); and the
   whole-frame copy is by design (`FrameConverter.copy` in `GlassRDPSession.swift` makes one BGRA copy per frame, and

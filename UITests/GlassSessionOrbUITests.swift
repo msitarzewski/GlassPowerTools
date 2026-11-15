@@ -78,6 +78,43 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertTrue(dock.waitForNonExistence(timeout: 10), "the dock stayed with nothing in it")
     }
 
+    /// D107: with Show Every Window in the Dock (the owner, 2026-11-13: "a toggle to allow all windows to show in the
+    /// dock all the time"), the dock opens at launch and lists the open terminal while its window stays open. A pinch
+    /// on that orb brings the window forward and closes nothing; put away and brought back, the dock stays.
+    /// Usually about 95 s: the runner places no tap on visionOS ("hit point {-1, -1}"), and the pinch on the open
+    /// window's orb also lands in the terminal (its log: `tap1 ended at=22,80`, `keyboard taken=true`). A terminal
+    /// holding the keyboard never reports its animations idle, so the next tap waits the runner's 60 s
+    /// (2026-11-13, on a simulator of its own, twice).
+    func testEveryOpenWindowIsInTheDock() {
+        app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "terminal",
+                                "-com.glasspowertools.orbs.inDock", "YES", "-com.glasspowertools.orbs.everyWindow", "YES"]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+
+        let window = element("terminal-footer-new-tab")
+        XCTAssertTrue(window.waitForExistence(timeout: 40), "no terminal window")
+        let dock = element("orb-dock")
+        XCTAssertTrue(dock.waitForExistence(timeout: 15), "the dock did not open with the setting on")
+        let orb = dock.descendants(matching: .any).matching(identifier: "session-orb").firstMatch
+        XCTAssertTrue(orb.waitForExistence(timeout: 10), "the open window has no orb in the dock")
+        XCTAssertTrue(window.exists, "listing the window in the dock closed it")
+        // For the capture from outside.
+        sleep(8)
+
+        orb.tap()
+        XCTAssertFalse(window.waitForNonExistence(timeout: 3), "a pinch on an open window's orb closed the window")
+        XCTAssertTrue(dock.exists, "the dock went")
+
+        element("session-orb-shrink").tap()
+        XCTAssertTrue(window.waitForNonExistence(timeout: 10), "Shrink to Orb left the window open")
+        XCTAssertTrue(orb.waitForExistence(timeout: 10), "the window put away has no orb")
+        orb.tap()
+        XCTAssertTrue(window.waitForExistence(timeout: 15), "the window did not come back")
+        XCTAssertFalse(dock.waitForNonExistence(timeout: 3), "the dock went with the setting on")
+        XCTAssertTrue(orb.exists, "the window back has no orb")
+    }
+
     /// D88: an orb held and let go on another takes its place in the dock (the owner, 2026-10-25:
     /// "pinch/click and hold on a docked window to move its order so muscle memory can land"). Two
     /// terminal windows, each shrunk into the dock as it opens (`--demo-session-orb`). The hold is

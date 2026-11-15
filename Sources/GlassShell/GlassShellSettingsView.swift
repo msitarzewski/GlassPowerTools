@@ -270,7 +270,8 @@ public struct GlassShellSettingsView: View {
             .onChange(of: dockFloats) { _, _ in GlassOrbDockPanel.shared.applyFloat() }
             .accessibilityIdentifier("settings-orbs-dock-floats")
             dockOrientationPicker
-            Text("Shrink to Orb, in a window's toolbar, puts the window in the orb dock with its sessions still running. Connections can go there too. Click an orb to bring its window back, and drag one onto another to move it. The dock is a row or a column of orbs that grows and shrinks as they come and go, and scrolls when there are more than fit. Above This App’s Windows hides the dock while another app is in front.")
+            everyWindowToggle
+            Text("Shrink to Orb, in a window's toolbar, puts the window in the orb dock with its sessions still running. Connections can go there too. Click an orb to bring its window back, and drag one onto another to move it. The dock is a row or a column of orbs that grows and shrinks as they come and go, and scrolls when there are more than fit. Above This App’s Windows hides the dock while another app is in front. Show Every Window in the Dock adds every open window's orb, fainter than those put away, and keeps the dock up; click one to bring its window to the front.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -290,6 +291,18 @@ public struct GlassShellSettingsView: View {
             }
         }
         .accessibilityIdentifier("settings-orbs-dock-orientation")
+    }
+
+    @AppStorage(GlassOrbDockEveryWindow.key, store: GlassUITestRun.settingsDefaults)
+    private var everyWindowInDock = false
+
+    /// Every open window in the dock (the owner, 2026-11-13: "a toggle to allow all windows to show in the dock all
+    /// the time"); the dock comes up, or goes when nothing is in it.
+    private var everyWindowToggle: some View {
+        Toggle("Show Every Window in the Dock", isOn: $everyWindowInDock)
+            .onChange(of: everyWindowInDock) { _, _ in GlassOrbDockModel.shared.everyWindowChanged() }
+            .accessibilityIdentifier("settings-orbs-every-window")
+            .help("Every open window has its orb in the dock, fainter than the ones put away, and the dock stays up. Click an open window's orb to bring it to the front.")
     }
     #endif
 
@@ -319,6 +332,10 @@ public struct GlassShellSettingsView: View {
     private var dockOrientation = GlassOrbDockOrientation.horizontal.rawValue
     @AppStorage(GlassOrbDock.tallSideKey, store: GlassUITestRun.settingsDefaults)
     private var tallDockSide = GlassOrbDockSide.trailing.rawValue
+    /// Every open window in the dock (the owner, 2026-11-13); the dock opens as it is turned on.
+    @AppStorage(GlassOrbDockEveryWindow.key, store: GlassUITestRun.settingsDefaults)
+    private var everyWindowInDock = false
+    @Environment(\.openWindow) private var openWindow
 
     /// Where a window shrunk to its orb goes (D88): where it is, or into one dock with the rest. The
     /// side a window comes back on from a tall dock outside Focus Mode (the owner, 2026-10-27: "Head
@@ -337,6 +354,14 @@ public struct GlassShellSettingsView: View {
                 .foregroundStyle(.secondary)
             if orbsInDock {
                 dockOrientationPicker
+                Toggle("Show Every Window in the Dock", isOn: $everyWindowInDock)
+                    .onChange(of: everyWindowInDock) { _, on in
+                        if on { GlassOrbDockModel.shared.open(with: openWindow) }
+                    }
+                    .accessibilityIdentifier("settings-orbs-every-window")
+                Text("Every open window has its orb in the dock, fainter than the ones put away, and the dock stays up. Pinch an open window's orb to bring it to the front.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Picker("Windows From a Vertical Dock", selection: $tallDockSide) {
                     Text("On Its Left").tag(GlassOrbDockSide.leading.rawValue)
                     Text("On Its Right").tag(GlassOrbDockSide.trailing.rawValue)

@@ -355,6 +355,8 @@ public struct GlassOrbDockView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
+    /// Every open window in the dock, not only those put away (Settings > Appearance > Orbs, 2026-11-13).
+    @AppStorage(GlassOrbDockEveryWindow.key, store: GlassUITestRun.settingsDefaults) private var everyWindow = false
 
     /// An orb with a ring, and one without: the ring's width and a little.
     static let ringedWidth: CGFloat = 280
@@ -385,7 +387,9 @@ public struct GlassOrbDockView: View {
     public var body: some View {
         let open = model.registry.openSessions()
         let docked = dock.docked.compactMap { id in open.first { $0.id == id } }
-        let terminals = docked.filter { Self.kind(of: $0) == .ssh }
+        // With every window shown, the open terminal windows too, after those put away.
+        let shown = GlassOrbDockEveryWindow.windows(docked: dock.docked, open: open.map(\.id), everyWindow: everyWindow)
+        let terminals = shown.compactMap { id in open.first { $0.id == id } }.filter { Self.kind(of: $0) == .ssh }
         // An editor opened from a terminal in the dock is on that terminal's ring (`orbServiceDots`);
         // any other database, desktop or editor open is on its machine's orb.
         let dockedTerminals = Set(terminals.map(\.id))
@@ -413,7 +417,7 @@ public struct GlassOrbDockView: View {
                 // orb's dots covered an open name (the owner, 2026-10-26: "I was looking at the one on
                 // the left and the one to the right opened"). More than a ring's own depth apart.
                 ForEach(Array(cells.enumerated()), id: \.element.id) { index, cell in
-                    movable(dockCell(cell), id: cell.id, among: cells)
+                    movable(dockCell(cell).opacity(strength(of: cell)), id: cell.id, among: cells)
                         .environment(\.glassOrbKicks, jelly.kicks(for: cell.id))
                         .offset(z: Self.depth(of: cells.count - 1 - index))
                 }
@@ -537,8 +541,8 @@ public struct GlassOrbDockView: View {
         .onChange(of: dock.docked, initial: true) { _, ids in
             Self.logger.info("dock holds \(ids.joined(separator: ","), privacy: .public); open \(open.map(\.id).joined(separator: ","), privacy: .public); orbs \(terminals.count + machines.count, privacy: .public)")
         }
-        // Nothing left in it but Connections, which is open: the dock goes.
-        .onChange(of: docked.isEmpty && !dock.holdsConnections) { _, empty in
+        // Nothing left in it but Connections, which is open: the dock goes, unless it shows every window.
+        .onChange(of: docked.isEmpty && !dock.holdsConnections && !everyWindow) { _, empty in
             if empty { dismissWindow() }
         }
     }
@@ -859,9 +863,20 @@ public struct GlassOrbDockView: View {
     /// for (a tab, which brings its window back on that tab).
     private func reopen(_ sessions: [GlassOpenSession], by action: (@MainActor () -> Void)? = nil) {
         for session in sessions {
-            dock.returning(session.id)
+            // One open, shown with every window, comes forward where it is.
+            if dock.isDocked(session.id) { dock.returning(session.id) }
             (action ?? session.activate)()
         }
+    }
+
+    /// Full for an orb with a window put away; fainter for one whose windows are all open, while the dock shows
+    /// every window (the owner's choice: put-away orbs at full strength).
+    private func strength(of cell: DockCell) -> Double {
+        let ids: [String] = switch cell {
+        case .terminal(let terminal): [terminal.session.id]
+        case .machine(let machine): machine.sessions.map(\.id)
+        }
+        return GlassOrbDockEveryWindow.opacity(of: ids, docked: { dock.isDocked($0) }, everyWindow: everyWindow)
     }
 
     /// Each one forward, or back from the dock above it.

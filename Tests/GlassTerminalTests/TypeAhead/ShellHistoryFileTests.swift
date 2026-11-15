@@ -240,12 +240,25 @@ nonisolated struct ShellHistoryFileTests {
         }
     }
 
-    /// How many times the cost of splitting and decoding lines a reader may take: one and a half
-    /// times the most measured in a debug build (bash 7, fish 13–14, zsh 17–18, steady within 5% at
-    /// load averages of 60 to 110, 2026-11-06). The splitting is the standard library's optimised
-    /// code; the reader here is not. A regular expression compiled for each entry measures 37.
+    /// How many times the cost of splitting and decoding lines a reader may take: one and a half times the most
+    /// measured in a debug build on that platform, zsh's being the highest. The splitting is the standard library's
+    /// optimised code; the reader here is not, and how much slower unoptimised code runs differs by platform, so
+    /// one figure doesn't fit all three.
+    /// - **Mac:** bash 7–8, fish 13–14, zsh 17–18.4, steady within 5% at load averages of 60 to 110 (2026-11-06,
+    ///   again 2026-11-13).
+    /// - **iPhone simulator:** bash 10–11.5, fish 16–16.6, zsh 25–28.2. It failed at the Mac's 27 inside the whole
+    ///   suite (2026-11-13, zsh 28.2); alone it measures 25–27.3, so this is where the reader is, not load.
+    /// - **Vision Pro simulator:** zsh 22.6–24.5.
+    /// Each still fails with an `NSRegularExpression` compiled for each zsh entry (Mac 39.9, iPhone 53.2, Vision Pro
+    /// 42.4) and with a Swift `Regex` (about 120 on all three), measured 2026-11-13.
+    #if os(macOS)
     private static let readingAllowance = 27
-    /// Splitting passes per measurement: about the reading's length (zsh's ratio is 17–18).
+    #elseif os(visionOS)
+    private static let readingAllowance = 36
+    #else
+    private static let readingAllowance = 42
+    #endif
+    /// Splitting passes per measurement: about the reading's length (zsh's ratio is 17–18 on the Mac).
     private static let splittingPasses = 16
 }
 

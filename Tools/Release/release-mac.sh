@@ -55,9 +55,17 @@ TEAM="$(setting DEVELOPMENT_TEAM)"
 IDENTITY="$(security find-identity -v -p codesigning | grep "Developer ID Application" | grep "($TEAM)" | head -1 | awk '{print $2}')"
 [ -n "$IDENTITY" ] || { echo "No Developer ID Application certificate for team $TEAM in the Keychain"; exit 1; }
 # Before the archive, not after it: a missing profile would otherwise surface only at the first submission.
-[ -n "$DRY_RUN" ] || xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 || {
-  echo "No notarytool profile '$NOTARY_PROFILE' in the Keychain. Save one (see the header of this script),"
-  echo "or name the one you have: GPT_NOTARY_PROFILE=<name> $0 $*"; exit 1; }
+# Apple's own answer is printed: a refusal for an unsigned agreement read as a missing profile (2026-11-13).
+NOTARY_CHECK=""
+[ -n "$DRY_RUN" ] || NOTARY_CHECK="$(xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" 2>&1)" || {
+  echo "Apple's notary service didn't answer with profile '$NOTARY_PROFILE':"
+  echo "$NOTARY_CHECK" | head -3
+  case "$NOTARY_CHECK" in
+    *agreement*) echo "The account holder accepts the waiting agreement in App Store Connect > Business, then run this again." ;;
+    *) echo "No such profile: save one (see the header of this script), or name the one you have:"
+       echo "GPT_NOTARY_PROFILE=<name> $0 $*" ;;
+  esac
+  exit 1; }
 
 OUT="$ROOT/build/release"
 PACKAGES="$ROOT/build/SourcePackages"

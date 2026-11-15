@@ -186,7 +186,9 @@ With it on:
 - **Connections** is first in the dock, a little larger than the rest. Each terminal window has an orb of its own, with its terminals as dots around it. Databases, remote desktops and editors are gathered by machine: one orb for each machine with any of them open, docked or not, with a dot for each. An editor opened from a terminal in the dock is a dot on that terminal's orb.
 - Look at a dot to see its name beside it.
 
-The dock closes by itself when no window is in it and Connections is open.
+The dock closes by itself when no window is in it and Connections is open, unless it shows every window.
+
+To keep every open window in the dock, not only the ones put away, turn on **Show Every Window in the Dock** in **Settings** ▸ **Appearance** ▸ **Orbs**. Each open terminal window then has its orb there too, fainter than the windows put away, and the dock stays open from the moment the app starts. Pinch an open window's orb to bring that window to the front; a machine's orb is fainter while none of its windows is put away.
 
 ### Bring a window back from the dock
 
@@ -232,7 +234,9 @@ A window can go into the orb dock with its sessions still running, and come back
 - Databases, remote desktops and editors are gathered by machine: one orb for each machine with any of them open, docked or not, with a dot for each.
 - Point at an orb to see its window's name just above the dock, as the Mac's Dock names its icons; when the dock is taller than it is wide, the name shows beside it. Point at a dot to see its name the same way and its picture in the orb.
 
-The dock goes away when no window is in it and Connections is out of it.
+The dock goes away when no window is in it and Connections is out of it, unless it shows every window.
+
+To keep every open window in the dock, not only the ones put away, turn on **Show Every Window in the Dock** in **Settings** ▸ **Appearance** ▸ **Orbs**. Each open terminal window then has its orb there too, fainter than the windows put away, and the dock stays up. Click an open window's orb to bring that window to the front, or a dot to bring it forward on that tab; a machine's orb is fainter while none of its windows is put away.
 
 ### Bring a window back from the dock on Mac
 

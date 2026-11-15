@@ -50,6 +50,35 @@ struct TerminalAgentTests {
         #expect(TerminalAgent.identify(program: "node", arguments: "node server.js") == nil)
     }
 
+    /// npm's `npx` is a node script, so what is in front is `node …/bin/npx @openai/codex`: the agent is
+    /// the tool after the runner, not the runner (2026-11-13). Every agent started with npx went unmarked.
+    @Test("a runner run as a script (npx, npm exec) runs the tool after it; only up to the tool is kept")
+    func byRunnerScript() {
+        let npx = "/Users/someone/.nvm/versions/node/v22.17.0/bin/npx"
+        func told(_ line: String) -> TerminalAgent? {
+            TerminalAgent.identify(program: nil, arguments: TerminalAgent.identifyingWords(line))
+        }
+        #expect(told("node \(npx) @openai/codex") == .codex)
+        #expect(told("node \(npx) -y @anthropic-ai/claude-code@latest") == .claudeCode)
+        #expect(told("node /x/lib/node_modules/npm/bin/npx-cli.js @openai/codex") == .codex)
+        #expect(told("node /x/lib/node_modules/npm/bin/npm-cli.js exec @openai/codex") == .codex)
+        #expect(told("npm exec @openai/codex") == .codex)
+        #expect(told("npm install @openai/codex") == nil, "npm installing is not running it")
+        #expect(told("node \(npx) prettier") == nil, "npx running something else")
+        #expect(TerminalAgent.identifyingWords("node \(npx) @openai/codex --api-key k") == "node \(npx) @openai/codex",
+                "up to the tool; nothing after it, where a secret can be")
+        #expect(TerminalAgent.identifyingWords("node \(npx)") == "node \(npx)")
+    }
+
+    /// Homebrew's Codex is `codex-aarch64-apple-darwin`, linked as `codex`; tmux names the file (2026-11-13).
+    @Test("a build named for its platform is that agent; another program with such a name is not")
+    func byPlatformName() {
+        #expect(TerminalAgent.identify(program: "codex-aarch64-apple-darwin", arguments: nil) == .codex)
+        #expect(TerminalAgent.identify(program: "codex-x86_64-apple-darwin", arguments: nil) == .codex)
+        #expect(TerminalAgent.identify(program: "node-aarch64-apple-darwin", arguments: nil) == nil)
+        #expect(TerminalAgent.identify(program: "codexify", arguments: nil) == nil)
+    }
+
     /// Claude Code installed through npm: the package names its program `bin/claude.exe` on every
     /// platform (`npm view @anthropic-ai/claude-code bin`), and run by its path it went unmarked
     /// (2026-11-12).

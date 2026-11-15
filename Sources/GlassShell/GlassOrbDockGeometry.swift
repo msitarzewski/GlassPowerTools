@@ -39,6 +39,34 @@ public enum GlassOrbDockOrientation: String, CaseIterable, Sendable {
     }
 }
 
+/// Every open window in the dock, not only the ones put away (the owner, 2026-11-13: "a toggle to allow all windows to
+/// show in the dock all the time"). His choices: on the Mac's dock and Vision Pro's alike; an open window's orb brings
+/// it forward; the orbs of windows put away at full strength and open windows' fainter. Off, the dock holds what was put
+/// away and goes when that's nothing; on, it stays up. This device's.
+public enum GlassOrbDockEveryWindow {
+    public static let key = "com.glasspowertools.orbs.everyWindow"
+    /// How strongly an open window's orb is drawn, beside one put away at full strength.
+    public static let openOpacity = 0.5
+
+    /// The setting in `defaults`; off until chosen.
+    public static func isOn(in defaults: UserDefaults) -> Bool { defaults.bool(forKey: key) }
+
+    /// The windows the dock lists, by dock id: those put away, then, with the setting on, every other open one, each
+    /// once, in the order they came. Arranged after by the person's order (`GlassOrbDockOrder`).
+    public static func windows(docked: [String], open: [String], everyWindow: Bool) -> [String] {
+        guard everyWindow else { return docked }
+        var seen = Set(docked)
+        return docked + open.filter { seen.insert($0).inserted }
+    }
+
+    /// The opacity of an orb holding `ids`: full while the setting is off, or while any of them is put away; fainter
+    /// when every one is open (a machine's orb holds several).
+    public static func opacity(of ids: [String], docked: (String) -> Bool, everyWindow: Bool) -> Double {
+        guard everyWindow, !ids.contains(where: docked) else { return 1 }
+        return openOpacity
+    }
+}
+
 /// The dock's orbs in one line, Connections first and set apart: left to right in a row, each standing on the row's
 /// middle; top to bottom in a column, each on the column's middle.
 public enum GlassOrbLine {

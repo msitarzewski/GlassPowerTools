@@ -191,6 +191,10 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     /// for, a host key to confirm, what failed), is in use, or was asked for: then it stays open.
     private func comeBackAsLeft() async {
         let wasDocked = GlassOrbDockModel.shared.takeConnectionsWereDocked()
+        // A dock that shows every window is up from the launch (2026-11-13), not only once a window goes in.
+        if inDock, GlassOrbDockEveryWindow.isOn(in: GlassUITestRun.settingsDefaults) {
+            GlassOrbDockModel.shared.open(with: openWindow)
+        }
         let askedAtLaunch = GlassConnectionsRequests.shared.untrackedCount
         var waited = 0
         while probe.windowSize == nil, waited < 30, !Task.isCancelled {
