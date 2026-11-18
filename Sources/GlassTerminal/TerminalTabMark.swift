@@ -97,3 +97,29 @@ struct TerminalSessionMark: View {
                         rang: rang)
     }
 }
+
+extension TerminalSessionMark {
+    /// Drawn where the shell asks (`GlassSessionMarkPlacement`): alone on an orb's ring, at its side, showing its bell;
+    /// at the head of a row (Active's), at the row's text size, the row glowing beneath for the bell.
+    static func placed(_ placement: GlassSessionMarkPlacement, session: TerminalSession, color: Color) -> AnyView {
+        switch placement {
+        case .alone(let side): AnyView(TerminalSessionMark(session: session, color: color, size: side, showsBell: true))
+        case .row: AnyView(TerminalSessionMark(session: session, color: color))
+        }
+    }
+}
+
+extension TerminalTabMark {
+    /// A tmux session running on a machine, as its listing says (Active's running rows): its agent in its colour, still,
+    /// since the listing is minutes old at most (`GlassShellModel.runningSessionsMaxAge`), and not a pulse; orange
+    /// alone on an orb's ring where its bell is kept (`TerminalTmux.bellOption`).
+    static func placed(_ placement: GlassSessionMarkPlacement, listed: TerminalTmux.Session) -> AnyView {
+        let agent = GlassTerminalCapability.agent(of: listed)
+        switch placement {
+        case .alone(let side):
+            return AnyView(TerminalTabMark(agent: agent, color: .secondary, working: false, size: side, rang: listed.bell))
+        case .row:
+            return AnyView(TerminalTabMark(agent: agent, color: .secondary, working: false))
+        }
+    }
+}

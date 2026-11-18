@@ -23,6 +23,8 @@ import Foundation
 import SwiftUI
 #if canImport(AppKit)
 import AppKit
+#elseif canImport(UIKit)
+import UIKit
 #endif
 
 nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
@@ -437,5 +439,26 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
     }
 
     @MainActor private static var logos: [TerminalAgent: NSImage] = [:]
+    #elseif canImport(UIKit)
+    /// The mark at a menu's icon size. A menu draws an image at the image's own size, and a mark's SVG says `1em`, one
+    /// point: the iPhone's name menu drew Claude Code's as a dot (2026-11-16). Everywhere else the mark is resized.
+    @MainActor var menuImage: Image {
+        if let cached = Self.menuImages[self] { return Image(uiImage: cached) }
+        guard logoSVG != nil, let mark = UIImage(named: markName, in: Self.markBundle, with: nil) else {
+            return Image(systemName: Self.fallbackSymbol)
+        }
+        let side = Self.menuImageSide
+        let drawn = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in
+            mark.draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+        }.withRenderingMode(.alwaysTemplate)
+        drawn.accessibilityLabel = displayName
+        Self.menuImages[self] = drawn
+        return Image(uiImage: drawn)
+    }
+
+    /// About a symbol's size beside a menu item's text.
+    static let menuImageSide: CGFloat = 20
+
+    @MainActor private static var menuImages: [TerminalAgent: UIImage] = [:]
     #endif
 }

@@ -252,6 +252,11 @@ extension GlassShellModel {
         plan.opening.first?.attachment.map { registry.tabGroups(for: $0.kind) } ?? []
     }
 
+    /// The same, with windows open here chosen too: with no running session among them, the windows theirs can join.
+    func tabGroups(for plan: GlassOpenTogetherPlan, sets: [GlassOpenSession]) -> [GlassTabGroup] {
+        plan.opening.isEmpty ? registry.tabGroups(holding: sets.compactMap(\.tabGroupID)) : tabGroups(for: plan)
+    }
+
     /// Opens running sessions together: one new window holding them, a tab each, in the order
     /// given (W13). Each capability is asked once, with all of its own — never each row's `open`,
     /// which makes a window apiece. Those opened leave the list at once, as one opened alone does;
@@ -309,13 +314,25 @@ final class GlassActiveSelection {
         machines.flatMap(\.running).filter { ids.contains($0.id) }
     }
 
+    /// The chosen windows open here, in the order Active lists them (the owner, 2026-11-15, on the iPhone: Select
+    /// "doesnt work, so i cant select multiple to add to a set"): those whose capability gathers them.
+    func chosenSets(in machines: [GlassActiveMachine]) -> [GlassOpenSession] {
+        Self.gatherable(in: machines).filter { ids.contains($0.id) }
+    }
+
+    /// The windows open here that can be chosen, to be gathered into one.
+    static func gatherable(in machines: [GlassActiveMachine]) -> [GlassOpenSession] {
+        machines.flatMap(\.sessions).filter { $0.tabGroupID != nil }
+    }
+
     /// The list's selection changed. A plain click — one row, nothing held, not in selection mode
     /// — opens that row at once, as a tap always has, and leaves nothing chosen: the row to open
     /// is returned. Otherwise the rows are chosen.
     func listSelected(_ newIDs: Set<String>, plainClick: Bool,
                       in machines: [GlassActiveMachine]) -> GlassRunningSession? {
         let listed = machines.flatMap(\.running)
-        let selected = newIDs.filter { id in listed.contains { $0.id == id } }
+        let sets = Self.gatherable(in: machines)
+        let selected = newIDs.filter { id in listed.contains { $0.id == id } || sets.contains { $0.id == id } }
         guard plainClick, !isSelecting, selected.count == 1, let row = listed.first(where: { selected.contains($0.id) }) else {
             ids = selected
             return nil
@@ -324,22 +341,53 @@ final class GlassActiveSelection {
         return row
     }
 
-    /// Open N in New Window: the chosen sessions open together and the choice ends.
+    /// Open N in New Window: the chosen sessions open together and the choice ends. With windows open here among
+    /// them, those are gathered into the first, and the running sessions open there too.
     @discardableResult
     func openChosen(in model: GlassShellModel) -> GlassOpenTogetherPlan {
-        let plan = model.openTogether(chosen(in: model.activeMachines()))
+        let machines = model.activeMachines()
+        let running = chosen(in: machines)
+        let gathered = model.registry.gather(tabGroups: chosenSets(in: machines).compactMap(\.tabGroupID), into: nil)
+        let plan = gathered.map { model.open(running, inTabGroup: GlassTabGroup(id: $0.tabGroup, title: "")) }
+            ?? model.openTogether(running)
         finish()
-        notice = plan.note
+        notice = Self.note(plan: plan, gathered: gathered)
         return plan
     }
 
-    /// Open N as Tabs In: the chosen sessions join a window here and the choice ends.
+    /// Open N as Tabs In: the chosen sessions join a window here and the choice ends; windows open here among them
+    /// are gathered into it.
     @discardableResult
     func openChosen(in model: GlassShellModel, inTabGroup group: GlassTabGroup) -> GlassOpenTogetherPlan {
-        let plan = model.open(chosen(in: model.activeMachines()), inTabGroup: group)
+        let machines = model.activeMachines()
+        let running = chosen(in: machines)
+        let gathered = model.registry.gather(tabGroups: chosenSets(in: machines).compactMap(\.tabGroupID), into: group.id)
+        let plan = model.open(running, inTabGroup: group)
         finish()
-        notice = plan.note
+        notice = Self.note(plan: plan, gathered: gathered)
         return plan
+    }
+
+    /// Whether Open has anything to do: a running session to open, or two windows to make one.
+    static func canOpen(_ plan: GlassOpenTogetherPlan, sets: [GlassOpenSession]) -> Bool {
+        !plan.opening.isEmpty || sets.count > 1
+    }
+
+    /// Whether Open as Tabs In has: a running session, or a window to move into another.
+    static func canOpenIn(_ plan: GlassOpenTogetherPlan, sets: [GlassOpenSession]) -> Bool {
+        !plan.opening.isEmpty || !sets.isEmpty
+    }
+
+    /// What to say afterwards: sessions that open only alone, and terminals the window had no room for.
+    static func note(plan: GlassOpenTogetherPlan, gathered: GlassGathering?) -> GlassActiveNotice? {
+        let full = gathered.map(\.leftOut) ?? []
+        guard !full.isEmpty else { return plan.note }
+        let stayed = "\(full.joined(separator: ", ")) stayed where \(full.count == 1 ? "it was" : "they were"): the window is full."
+        guard let earlier = plan.note else {
+            return GlassActiveNotice(title: full.count == 1 ? "A Terminal Didn't Fit" : "\(full.count) Terminals Didn't Fit",
+                                     message: stayed)
+        }
+        return GlassActiveNotice(title: earlier.title, message: earlier.message + "\n" + stayed)
     }
 
     /// End N: asks once, for all of them; `endChosen` ends each once it is answered.
@@ -368,11 +416,13 @@ final class GlassActiveSelection {
 
     /// Where several open: a new window on a Mac and Vision Pro. On iPhone and iPad a terminal
     /// takes the library's place rather than opening a window, so they open together there.
-    static func openTitle(count: Int) -> String {
+    static func openTitle(count: Int, gathering: Bool = false) -> String {
         #if os(iOS)
         count > 1 ? "Open \(count) Together" : "Open"
         #else
-        count > 1 ? "Open \(count) in New Window" : "Open in New Window"
+        // Windows open here among them go into the first of them, not a new one.
+        if gathering { return "Open \(count) Together" }
+        return count > 1 ? "Open \(count) in New Window" : "Open in New Window"
         #endif
     }
 
@@ -475,7 +525,8 @@ struct GlassActiveConnectionsList: View {
         Button(selection.isSelecting ? "Done" : "Select") {
             withAnimation { selection.isSelecting.toggle() }
         }
-        .disabled(!selection.isSelecting && machines.allSatisfy(\.running.isEmpty))
+        .disabled(!selection.isSelecting && machines.allSatisfy(\.running.isEmpty)
+                  && GlassActiveSelection.gatherable(in: machines).isEmpty)
         .accessibilityIdentifier("active-select")
     }
     #endif
@@ -490,16 +541,20 @@ struct GlassActiveConnectionsList: View {
             set: { expanded in if expanded { collapsed.remove(machine.id) } else { collapsed.insert(machine.id) } }
         )) {
             ForEach(machine.sessions) { session in
-                GlassActiveSessionRow(session: session) {
+                let gatherable = session.tabGroupID != nil
+                GlassActiveSessionRow(session: session, opensOnTap: !gatherable || opensOnTap) {
                     // A detached session is still running on its machine: list it there.
                     // The client takes a moment to leave, so ask once it has.
                     guard session.closeTitle != "Close" else { return }
                     try? await Task.sleep(for: .seconds(1))
                     await model.refreshRunningSessions()
                 }
-                // Open here already: nothing to open together (W13). Choosing one switches to it.
-                .selectionDisabled()
-                .disabled(selection.isSelecting)
+                // A window open here is chosen to gather with others into one, where its capability gathers them
+                // (2026-11-15, on the iPhone: "i cant select multiple to add to a set"). Any other: nothing to
+                // open together (W13), and choosing it switches to it.
+                .tag(GlassActiveRowTag(sessionID: session.id))
+                .selectionDisabled(!gatherable)
+                .disabled(!gatherable && selection.isSelecting)
             }
             ForEach(machine.running) { session in
                 GlassRunningSessionRow(session: session,
@@ -601,25 +656,29 @@ struct GlassActiveConnectionsList: View {
     /// and the row offers its own.
     private func batchActions(for session: GlassRunningSession,
                               chosen: [GlassRunningSession]) -> GlassActiveBatchActions? {
-        guard chosen.count > 1, chosen.contains(where: { $0.id == session.id }) else { return nil }
+        let sets = selection.chosenSets(in: model.activeMachines())
+        guard chosen.count + sets.count > 1, chosen.contains(where: { $0.id == session.id }) else { return nil }
         let plan = GlassOpenTogetherPlan(chosen)
+        let count = plan.opening.count + sets.count
         return GlassActiveBatchActions(
-            openTitle: GlassActiveSelection.openTitle(count: plan.opening.count),
-            canOpen: !plan.opening.isEmpty,
+            openTitle: GlassActiveSelection.openTitle(count: count, gathering: !sets.isEmpty),
+            canOpen: GlassActiveSelection.canOpen(plan, sets: sets),
             endTitle: GlassActiveSelection.endTitle(count: chosen.count),
             open: { selection.openChosen(in: model) },
             end: { selection.askToEnd() },
-            openInTitle: GlassActiveSelection.openInTitle(count: plan.opening.count),
-            tabGroups: model.tabGroups(for: plan),
+            openInTitle: GlassActiveSelection.openInTitle(count: count),
+            tabGroups: model.tabGroups(for: plan, sets: sets),
             openIn: { selection.openChosen(in: model, inTabGroup: $0) })
     }
 
-    /// Open N as Tabs In, beside Open N in New Window: the windows the chosen sessions can join.
+    /// Open N as Tabs In, beside Open N in New Window: the windows the chosen sessions can join, and the chosen
+    /// windows open here can go into.
     @ViewBuilder
-    private func openInMenu(_ plan: GlassOpenTogetherPlan) -> some View {
-        let groups = model.tabGroups(for: plan)
+    private func openInMenu(_ plan: GlassOpenTogetherPlan, sets: [GlassOpenSession]) -> some View {
+        let groups = model.tabGroups(for: plan, sets: sets)
         if !groups.isEmpty {
-            Menu(GlassActiveSelection.openInTitle(count: plan.opening.count), systemImage: "rectangle.stack.badge.plus") {
+            Menu(GlassActiveSelection.openInTitle(count: plan.opening.count + sets.count),
+                 systemImage: "rectangle.stack.badge.plus") {
                 ForEach(groups) { group in
                     Button(group.title) { selection.openChosen(in: model, inTabGroup: group) }
                 }
@@ -627,6 +686,7 @@ struct GlassActiveConnectionsList: View {
             #if !os(macOS)
             .labelStyle(.titleOnly)
             #endif
+            .disabled(!GlassActiveSelection.canOpenIn(plan, sets: sets))
             .help("Opens the chosen sessions as tabs of a window already open.")
             .accessibilityIdentifier("active-open-in-together")
         }
@@ -635,6 +695,7 @@ struct GlassActiveConnectionsList: View {
     @ToolbarContentBuilder
     private func selectionToolbar(machines: [GlassActiveMachine], chosen: [GlassRunningSession]) -> some ToolbarContent {
         let plan = GlassOpenTogetherPlan(chosen)
+        let sets = selection.chosenSets(in: machines)
         #if os(macOS)
         if !chosen.isEmpty {
             ToolbarItem {
@@ -644,7 +705,7 @@ struct GlassActiveConnectionsList: View {
                 .disabled(plan.opening.isEmpty)
                 .help(GlassActiveSelection.openHelp)
             }
-            ToolbarItem { openInMenu(plan) }
+            ToolbarItem { openInMenu(plan, sets: sets) }
         }
         #else
         // In the column's header on the headset (`glassSpatialColumn`).
@@ -653,13 +714,14 @@ struct GlassActiveConnectionsList: View {
         #endif
         if selection.isSelecting {
             ToolbarItemGroup(placement: .glassActiveSelectionActions) {
-                Button(GlassActiveSelection.openTitle(count: plan.opening.count), systemImage: "macwindow.badge.plus") {
+                Button(GlassActiveSelection.openTitle(count: plan.opening.count + sets.count, gathering: !sets.isEmpty),
+                       systemImage: "macwindow.badge.plus") {
                     selection.openChosen(in: model)
                 }
                 .labelStyle(.titleOnly)
-                .disabled(plan.opening.isEmpty)
+                .disabled(!GlassActiveSelection.canOpen(plan, sets: sets))
                 .accessibilityIdentifier("active-open-together")
-                openInMenu(plan)
+                openInMenu(plan, sets: sets)
                 #if os(iOS)
                 // Mail's bar: one action at each end. An ornament sizes to what it holds.
                 Spacer()
@@ -761,9 +823,8 @@ struct GlassRunningSessionRow: View {
 
     private var content: some View {
         HStack(spacing: 10) {
-            Image(systemName: session.symbolName)
-                .foregroundStyle(.secondary)
-                .frame(width: 22)
+            GlassSessionRowIcon(symbolName: session.symbolName, icon: session.icon,
+                                symbolStyle: AnyShapeStyle(.secondary))
             VStack(alignment: .leading, spacing: 1) {
                 Text(session.title)
                 Text(session.subtitle ?? (session.isAttachedElsewhere ? "Open elsewhere" : "Running on the machine"))
@@ -774,6 +835,8 @@ struct GlassRunningSessionRow: View {
                 .foregroundStyle(.tertiary)
         }
         .contentShape(.rect)
+        // A bell kept on the session, shown on no device since: the row glows beneath, as an open window's does.
+        .glassBellGlow(session.bellRang)
     }
 
     var body: some View {
@@ -846,6 +909,7 @@ struct GlassRunningSessionRow: View {
             Text(endFailure ?? "")
         }
         .accessibilityElement(children: .combine)
+        .accessibilityValue(session.bellRang ? GlassBell.accessibilityWord : "")
         .accessibilityHint(session.isOpenHere ? "Switches to this session" : "Opens this session here")
         .accessibilityIdentifier("active-running-\(session.id)")
     }
@@ -854,6 +918,8 @@ struct GlassRunningSessionRow: View {
 /// One live session. Choosing it switches to it; the swipe ends it.
 struct GlassActiveSessionRow: View {
     let session: GlassOpenSession
+    /// False where the list's selection takes the tap: a window that can be gathered, in selection mode.
+    var opensOnTap = true
     var didClose: @MainActor () async -> Void = {}
     /// A session whose ending would lose something, waiting on the question.
     @State private var asking: GlassOpenSession?
@@ -864,27 +930,44 @@ struct GlassActiveSessionRow: View {
         if !asked { Task { await didClose() } }
     }
 
-    var body: some View {
-        Button {
-            session.activate()
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: session.symbolName)
-                    .foregroundStyle(.tint)
-                    .frame(width: 22)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(session.title)
-                    if let subtitle = session.subtitle {
-                        Text(subtitle).font(.caption).foregroundStyle(.secondary)
-                    }
+    private func content(rang: Bool) -> some View {
+        HStack(spacing: 10) {
+            GlassSessionRowIcon(symbolName: session.symbolName, icon: session.icon, symbolStyle: AnyShapeStyle(.tint))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(session.title)
+                if let subtitle = session.subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.right.circle")
-                    .foregroundStyle(.tertiary)
             }
-            .contentShape(.rect)
+            Spacer(minLength: 0)
+            Image(systemName: "arrow.right.circle")
+                .foregroundStyle(.tertiary)
         }
-        .buttonStyle(.plain)
+        .contentShape(.rect)
+        // A terminal in it rang its bell out of sight: the row glows beneath, as a Mac sidebar's tab does (`GlassBell`;
+        // the owner, 2026-11-15, on the iPhone: Active "doesn't highlight which terminals need attention"; 2026-11-16:
+        // beneath, as on the Mac, rather than the icon turned orange, which Claude Code's own mark already is).
+        .glassBellGlow(rang)
+    }
+
+    var body: some View {
+        // Read in the body, so the row follows the bell as it rings and as its terminal is seen.
+        let rang = session.hasUnseenBell
+        Group {
+            if opensOnTap {
+                Button {
+                    session.activate()
+                } label: {
+                    content(rang: rang)
+                }
+                .buttonStyle(.plain)
+            } else {
+                // The list's selection takes the tap; VoiceOver's activate still switches to it.
+                content(rang: rang)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { session.activate() }
+            }
+        }
         // A button row in a list is highlighted by the list; ours nested inside it (2026-09-28).
         .glassSpatialListRow()
         .swipeActions(edge: .trailing) {
@@ -899,6 +982,7 @@ struct GlassActiveSessionRow: View {
         .glassAskingBeforeClosing($asking) { Task { await didClose() } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(session.title), \(session.subtitle ?? "")")
+        .accessibilityValue(rang ? GlassBell.accessibilityWord : "")
         .accessibilityHint("Switches to this session")
         .accessibilityIdentifier("active-session-\(session.id)")
     }
@@ -914,7 +998,7 @@ struct GlassActiveConnectionsDetail: View {
         #if os(macOS)
         "Choose a session to switch to it. Right-click one to close it. ⌘-click running sessions to open several in one window."
         #else
-        "Choose a session to switch to it. Swipe one to close it. Choose Select to open several running sessions together."
+        "Choose a session to switch to it. Swipe one to close it. Choose Select to open several running sessions together, or to gather terminal windows into one."
         #endif
     }
 

@@ -51,6 +51,35 @@ struct TerminalTabMovesTests {
         #expect(manager.sessions.count == 3)
     }
 
+    /// The owner, 2026-11-15, on the iPhone: "i cant select multiple to add to a set". Active gathers the chosen sets.
+    @Test("sets gathered into one: each terminal after the destination's, in order, the same sessions; emptied sets go; a full set leaves the rest where they were")
+    func gatheredIntoOne() {
+        let manager = SessionManager(loadImmediately: false)
+        let a = terminal("alpha", in: manager), b1 = terminal("bravo", in: manager), b2 = terminal("bravo", in: manager)
+        let c = terminal("charlie", in: manager)
+        let first = workgroup("First", [a], in: manager)
+        let second = workgroup("Second", [b1, b2], in: manager)
+        let third = workgroup("Third", [c], in: manager)
+        manager.selectSession(a.id, inWorkgroup: first)
+
+        let gathered = TerminalTabMoves.gather([first, second, third], into: first, in: manager)
+        #expect(gathered == TerminalTabMoves.Gathered(moved: 3, leftOut: []))
+        #expect(manager.workgroup(for: first)?.sessionIDs == [a.id, b1.id, b2.id, c.id])
+        #expect(manager.selectedSession(inWorkgroup: first) === a, "the set gathered into shows what it showed")
+        #expect(manager.workgroup(for: second) == nil && manager.workgroup(for: third) == nil, "emptied, they go")
+        #expect(manager.sessions.count == 4, "moved, never copied")
+
+        // A set holds so many terminals: what doesn't fit stays where it was, and is named.
+        let full = workgroup("Full", (0..<(LayoutPreset.maximumSessionCount - 1)).map { _ in terminal("delta", in: manager) },
+                             in: manager)
+        let echo1 = terminal("echo", in: manager), echo2 = terminal("echo", in: manager)
+        let last = workgroup("Last", [echo1, echo2], in: manager)
+        let partly = TerminalTabMoves.gather([last], into: full, in: manager)
+        #expect(partly.moved == 1 && partly.leftOut == ["echo"])
+        #expect(manager.workgroup(for: last)?.sessionIDs == [echo2.id], "the one that didn't fit stays, in its set")
+        #expect(TerminalTabMoves.gather([last], into: UUID(), in: manager) == TerminalTabMoves.Gathered(), "no destination: nothing")
+    }
+
     @Test("within one window a drop takes the place it lands on and keeps the selection")
     func reorderedWithinAWindow() {
         let manager = SessionManager(loadImmediately: false)

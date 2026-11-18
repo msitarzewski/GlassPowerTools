@@ -445,6 +445,11 @@ public protocol GlassCapability: AnyObject {
     /// `tabGroups()`, in the order given, and brings that window forward. Default: nothing.
     func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID)
 
+    /// Gathers windows here, by their `GlassOpenSession.tabGroupID`, into one: `destination`, one of its
+    /// `tabGroups()`, or else the first of them; and shows it. Nil when none of them is this capability's. Default:
+    /// nil. A requirement for the same reason as `openSessions()`.
+    func gather(tabGroups: [GlassTabGroup.ID], into destination: GlassTabGroup.ID?) -> GlassGathering?
+
     /// Surfaces the capability contributes to the library's sidebar, beside Collections.
     ///
     /// For things that span the whole fleet rather than belonging to one machine — Workgroups,

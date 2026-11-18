@@ -31,12 +31,62 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-15 — RESUME HERE: shipping 0.4.619 at his word
+## 2026-11-15 (evening) — RESUME HERE: the iPhone's Active, from his day on the phone (not committed)
+
+- **His reports (iPhone, 0.4.619):** Active "doesn't highlight which terminals need attention / have alerts (the orange
+  pulse/highlight)"; Active's Select "doesn't work, so i cant select multiple to add to a set"; moving a terminal
+  into another set from the name menu "worked, but it crashed", and after it Active's names were "generic …
+  session names".
+- **Done, tested:** (1) an Active row whose set has a bell unseen: its symbol orange and glowing as a tab's mark is,
+  "Bell rang" to VoiceOver (`GlassActiveConnections.swift`; a glow beneath the row, as a sidebar's, lay over the text
+  like a highlighter on the iPhone's list, so not that). `UITests/ActiveBellUITests` passes on an iPhone simulator,
+  seen failing with the bell unread. The bell demo (`--demo-bell`) is `terminal-tabs`'s, not `terminal`'s. (2) A
+  terminal down and not read since it connected (after a relaunch, every iPhone terminal but the one on screen) is
+  named by the machine's last listing (`TerminalSession.nameWhileDown`, Models.swift); `TerminalSessionNamesTests.
+  downNamedByTheListing`, 4 checks failing without it. Shows once Active has checked the machine.
+- **The "crash":** "screen just went black. no controls" — no crash report on the phone; not reproduced
+  (`UITests/TerminalMoveOnIPhoneUITests` passes). His word: "Not worried about it. Let's work on the other stuff."
+- **Then built (0.4.620, task note `tasks/2026-11/2026-11-15_active-on-the-iphone.md`, D108):** Select chooses
+  sets open here and gathers them (Open N Together, Open N as Tabs In); the bell kept on each tmux session
+  (`@glass-bell`, the session's own `alert-bell` hook), so Active marks terminals open on the Mac and bells rung
+  while the phone was put away. Each piece seen failing; live tmux test; Mac terminal 1,286, shell 428; iPhone UI.
+- **Installed everywhere at his word** ("install it everywhere", 2026-11-16 06:17): Mac, iPhone and headset each read
+  back 0.4.620 (620); no crash report on the Mac; the Mac reattached its tmux sessions and every `glass-` session
+  there carries the `alert-bell` hook (`tmux show-hooks`), none with a bell kept yet. iPhone and Vision Pro
+  simulator suites 874 each passed first.
+- **His answer:** "it worked" (a Mac bell seen in the phone's Active). Then: the glow differs on iOS, and terminals
+  don't show their coding agent as tabs do, "a constant when a terminal icon is shown". Asked, he chose the glow
+  beneath every row at the Mac's strength, and the name menu showing the agent's mark, else the dot.
+- **Building (0.4.621, D109, task note `tasks/2026-11/2026-11-16_agent-marks-everywhere.md`):** Active's rows draw the
+  tabs' mark through `GlassOpenSession.icon` / `GlassRunningSession.icon` (`GlassSessionMarkPlacement`); the listing
+  carries each session's command line (`TerminalTmux.programsScript`); every row's bell glows beneath. Then D110
+  (2026-11-16): off the Mac, a terminal whose tmux session the listing leaves out closes, and Active's names drop an
+  agent's spinner. Live tests now run only in the VM or a simulator (his rule; `LiveTestGuard`).
+- **2026-11-18, local builds verified (Codex):** the owner's requested 0.4.621 (621) Release bundles for macOS,
+  iOS and visionOS are in `build/0.4.621/`. All three are arm64 with verified signatures. Active now requires a
+  complete, readable tmux listing before closing a disconnected tab. iPhone simulator 5 UI tests passed;
+  Vision Pro simulator 65 terminal tests and 4 app UI tests passed. See the D109/D110 task note for details.
+  The 0.4.619 site is still recorded as awaiting provisioning.
+- **2026-11-18, shipping 0.4.621 (Codex):** the owner approved the public Mac release, the external TestFlight
+  beta on iOS and visionOS, and the website update. The source, release notes and site copy are being prepared
+  from the verified local build. Build distribution archives from the release commit. Publish the notarized
+  Mac downloads before staging the site and its Sparkle feed. Track Apple's beta review per platform.
+
+## 2026-11-15 — shipping 0.4.619 at his word
 
 - **His word:** "Let's ship 0.4.619" (2026-11-15): commit, push, the Mac release, TestFlight 619 and the site, as
   0.4.618 went. Docs at 0.4.619: release notes (the Mac's eleventh release), README, the site's pages (every device
-  ran it on 2026-11-14; the home page's orb dock names the setting). The build comes from a clean worktree at the
-  commit. **Next:** `release-mac.sh 0.4.619 619`, the GitHub release, the feed, TestFlight 619, the site.
+  ran it on 2026-11-14; the home page's orb dock names the setting).
+- **Done (2026-11-15):** `3548dea4` pushed. Built from a clean worktree at it (`tmp/release-619-tree`, the 0.4.618
+  one moved): notarized, stapled, Gatekeeper-accepted (Notarized Developer ID); GitHub v0.4.619 with dmg, zip and
+  checksums, all downloaded back byte-identical, the tag at `3548dea4`; feed committed `9e4d1a23` and pushed. The
+  Mac's eleventh release. TestFlight 619 uploaded from `9e4d1a23` (no Xcode sign-in trouble this time), VALID on
+  both in about 3 minutes, What to Test set, in Testers, both `WAITING_FOR_REVIEW`. TestFlight 618: approved on
+  both. The site built at `9e4d1a23` (111 files) and staged on the server, matching the build file for file.
+- **Found while writing the notes:** the npx marks read the command line from the Mac's process table
+  (`MacLocalTmux.foregroundArguments`, `TerminalProcessTable`), so they are the Mac's only; Homebrew's Codex name
+  is told on every device. RELEASE-NOTES said it for every device; corrected after `9e4d1a23`.
+- **Next:** his provisioning of the site, then every live file checked against the build; then the records commit.
 
 ## 2026-11-13 — every window in the orb dock (D107, 0.4.619), while 0.4.618 waits on Apple
 
@@ -49,7 +99,7 @@ use the disposable test VM only).
   GitHub v0.4.618 with dmg, zip and checksums, all downloaded back byte-identical; feed committed `826f0427` and
   pushed; the site built in the worktree, staged from here, provisioned by him ("done"): 111 of 111 live files match,
   feed no-cache with 0.4.618 first, its zip link the same length. The Mac's tenth release.
-- **TestFlight 618:** both in beta review (`WAITING_FOR_REVIEW`), What to Test set, in Testers. iOS went first;
+- **TestFlight 618:** approved on both (read 2026-11-15); What to Test set, in Testers. iOS went first;
   visionOS's upload failed "Failed to Use Accounts … App Store Connect access for the team is required" (Xcode's
   sign-in had lapsed; the API key can't cloud-sign: "Cloud signing permission error"). He signed Xcode in again
   ("signed in, go ahead"); the export of `tmp/release-618-tree/build/testflight/GlassPowerTools-visionOS.xcarchive`

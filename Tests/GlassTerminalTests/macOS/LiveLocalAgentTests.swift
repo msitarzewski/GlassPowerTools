@@ -11,7 +11,7 @@ import Testing
 /// under the agent's name, so nothing is installed or run.
 extension LocalTmuxServerSuites {
 @MainActor
-@Suite("A local terminal's agent, from this Mac's process table (live)", .serialized)
+@Suite("A local terminal's agent, from this Mac's process table (live)", .serialized, LiveTestGuard.refusal)
 struct LiveLocalAgentTests {
     private let settings = SwiftTermRuntimeSettings(cursorStyle: "block", blinkingCursor: false, scrollbackLines: 1_000)
     private let theme = SwiftTermTheme(fontSize: 13, foreground: (1, 1, 1), background: (0, 0, 0, 1), cursor: (1, 1, 1))

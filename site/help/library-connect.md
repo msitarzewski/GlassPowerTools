@@ -52,13 +52,15 @@ Siri, the Shortcuts app, Spotlight, Control Center, Handoff, `ssh://` links and,
 - **On Vision Pro:** choose the **Active** tab beside the library window.
 - **On Mac, iPad and iPhone:** choose **Active** in the sidebar's **Library** section. The number beside it is how many sessions **Active** lists: those open on this device, and the tmux sessions running on your machines when **Active** last checked.
 
-Sessions are grouped under the host they belong to, with a count for each host. A host whose Terminal service keeps sessions running with tmux also lists the tmux sessions running there, by the names their tabs have, and a host **Active** couldn't check says why; see [Keep terminals running with tmux](terminal-tmux.md). Sessions that belong to no host in the library are grouped under **Elsewhere**. Collapse a host's group with its disclosure arrow. When nothing is open, **Active** says **Nothing Is Open** and lists your machines under **Terminal**, **Database** and **Desktop**; choose one to connect to that service.
+Sessions are grouped under the host they belong to, with a count for each host. A host whose Terminal service keeps sessions running with tmux also lists the tmux sessions running there, by the names their tabs have, and a host **Active** couldn't check says why; see [Keep terminals running with tmux](terminal-tmux.md). Sessions that belong to no host in the library are grouped under **Elsewhere**. A terminal running an AI coding agent shows the agent's mark, as its tab does: for a window, the agent in the terminal it shows; for a tmux session, the agent running there when **Active** last checked the machine. Collapse a host's group with its disclosure arrow. When nothing is open, **Active** says **Nothing Is Open** and lists your machines under **Terminal**, **Database** and **Desktop**; choose one to connect to that service.
 
 ## Switch to a session
 
 Choose a session in **Active** to switch to it. The open session comes back to the screen; a second session is not opened. You can also right-click the session, or touch and hold it, and choose **Switch To**.
 
-Sessions running on your machines can be chosen several at a time and opened together; see [Open several together](terminal-tmux.md#open-several-together).
+Sessions running on your machines can be chosen several at a time and opened together, and on iPhone, iPad and Vision Pro terminal windows open on the device can be gathered into one; see [Open several together](terminal-tmux.md#open-several-together).
+
+A terminal that rang its bell where you couldn't see it has its row in **Active** glowing orange beneath, until you look at it; see [When a terminal rings its bell](terminal-sessions.md#when-a-terminal-rings-its-bell).
 
 ## Get to Active from anywhere
 

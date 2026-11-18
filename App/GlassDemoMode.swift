@@ -573,19 +573,20 @@ enum GlassDemoMode {
     private static func runningSessions(in shell: GlassShellModel) -> [GlassRunningSession] {
         var sessions: [GlassRunningSession] = []
         if let alpha = terminalService("alpha", in: shell)?.endpointID {
+            // A coding agent in two of them, as the machines' listings say (2026-11-16).
             sessions += GlassTerminalCapability.demoRunningSessions(on: alpha, [
-                ("glass-1", nil, "shop", "shop", "main", 1, 1),
-                ("glass-2", "jobs", "shop", "shop", "main", 0, 35),
+                ("glass-1", nil, "shop", "shop", "main", 1, 1, "claude"),
+                ("glass-2", "jobs", "shop", "shop", "main", 0, 35, nil),
             ])
         }
         if let build = terminalService("build", in: shell)?.endpointID {
             sessions += GlassTerminalCapability.demoRunningSessions(on: build, [
-                ("glass-1", "release", "shop", "shop", "release/2.15", 1, 3),
+                ("glass-1", "release", "shop", "shop", "release/2.15", 1, 3, "codex"),
             ])
         }
         if let nas = terminalService("nas", in: shell)?.endpointID {
             sessions += GlassTerminalCapability.demoRunningSessions(on: nas, [
-                ("glass-1", nil, "backups", nil, nil, 0, 190),
+                ("glass-1", nil, "backups", nil, nil, 0, 190, nil),
             ])
         }
         return sessions

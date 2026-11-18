@@ -43,11 +43,17 @@ enum TerminalTmux {
         var title: String? = nil
         var directory: String? = nil
         var command: String? = nil
+        /// The front program's command line, down to the words that tell an agent (`TerminalAgent.identifyingWords`):
+        /// tmux says only a program's name, and Claude Code's own installer names its program for its version
+        /// (`2.1.318`), its title the task once it has one (2026-11-16). Nil where the host's `ps` can't say.
+        var programArguments: String? = nil
         /// The home folder of the account that listed it, so a folder is named as a tab names it.
         var home: String? = nil
         /// The repository and branch its active pane is in (W11): kept on the session by the tab
         /// that last showed it (`@glass-repo`, `@glass-branch`), or on this Mac read from the folder.
         var repository: TerminalRepository? = nil
+        /// A bell rang in it that no device has shown since (`bellOption`).
+        var bell = false
         var id: String { name }
         var isGlass: Bool { TerminalTmux.glassNumber(name) != nil }
 
@@ -79,9 +85,15 @@ enum TerminalTmux {
 
     private nonisolated static let missingMarker = "__glass_no_tmux__"
     private nonisolated static let failedMarker = "__glass_tmux_failed__"
+    private nonisolated static let completeMarker = "__glass_tmux_list_complete__"
     /// Starts the line after a listing that says whose home the listing ran in: `sh` knows it, and
     /// tmux formats cannot read the environment.
     private nonisolated static let homeMarker = "__glass_home__"
+    /// Starts a line after a listing with one session's front program's command line: the session's name, then the line
+    /// (`programsScript`).
+    nonisolated static let sessionProgramMarker = "__glass_session_program__"
+    /// Between the host's processes and its sessions' panes, in what `programsScript` reads.
+    private nonisolated static let panesMarker = "__glass_panes__"
 
     /// The user option a session's given name is kept in (W6): set when its tab is renamed, read
     /// by every device's Active and by a tab attaching to it.
@@ -92,6 +104,12 @@ enum TerminalTmux {
     nonisolated static let repositoryOption = "@glass-repo"
     nonisolated static let branchOption = "@glass-branch"
 
+    /// The user option a session's bell is kept in (the owner, 2026-11-15, on the iPhone: Active "doesn't highlight
+    /// which terminals need attention"): set by the session's own `alert-bell` hook as the bell passes through tmux,
+    /// whoever is attached, none included; cleared by the device that shows the terminal. Every device's Active reads
+    /// it, so a terminal open on the Mac, or rung while the phone was put away, says so everywhere.
+    nonisolated static let bellOption = "@glass-bell"
+
     /// What `list-sessions` prints for each session, read by `parse`: name, attached clients,
     /// windows, last activity; then (W6) the server's pid, start time and socket, the active pane's
     /// program, the host's names (tmux's default pane title), the session's given name, the
@@ -100,8 +118,9 @@ enum TerminalTmux {
     /// `parse` splits a bounded number of times.
     nonisolated static let listFormat = "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_activity}"
         + "\t#{pid}\t#{start_time}\t#{socket_path}\t#{pane_current_command}\t#{host}\t#{host_short}"
-        + "\t#{\(givenNameOption)}\t#{pane_current_path}\t#{\(repositoryOption)}\t#{\(branchOption)}\t#{pane_title}"
-    private nonisolated static let listFieldCount = 15
+        + "\t#{\(givenNameOption)}\t#{pane_current_path}\t#{\(repositoryOption)}\t#{\(branchOption)}"
+        + "\t#{\(bellOption)}\t#{pane_title}"
+    private nonisolated static let listFieldCount = 16
 
     /// A session name Glass will pass to tmux: tmux rejects `:` and `.` in names, a leading `-`
     /// would read as an option, and control characters have no business in a tab's record.
@@ -130,30 +149,63 @@ enum TerminalTmux {
         let run = ([tmux, "-u"] + serverArguments.map(quoted)).joined(separator: " ")
         return "command -v \(tmux) >/dev/null 2>&1 || { echo \(missingMarker); exit 0; }; "
             + "out=$(\(run) list-sessions -F '\(listFormat)' 2>/dev/null) && { printf '%s\\n' \"$out\"; "
-            + "printf '\(homeMarker)\\t%s\\n' \"$HOME\"; exit 0; }; "
+            + "printf '\(homeMarker)\\t%s\\n' \"$HOME\"; \(programsScript(run: run)); echo \(completeMarker); exit 0; }; "
             + "case $(\(run) list-sessions 2>&1) in "
-            + "*'no server running'*|*'error connecting to'*'No such file or directory'*|*'error connecting to'*'Connection refused'*) ;; "
+            + "*'no server running'*|*'error connecting to'*'No such file or directory'*|*'error connecting to'*'Connection refused'*) echo \(completeMarker) ;; "
             + "*) echo \(failedMarker) ;; esac; exit 0"
+    }
+
+    /// After a listing, each session's front program's command line, as a terminal's own read finds it
+    /// (`paneStateCommand`): its pane's shell's terminal's process group. One `ps` of the host, joined to the sessions'
+    /// panes on the host, so only those lines leave it, each read down to the words that tell an agent as it arrives
+    /// (`parse`). A host whose `ps` or `awk` can't do it prints none, and the program's name stands alone.
+    nonisolated static func programsScript(run: String) -> String {
+        let join = "$0 == m { s = 1; next } "
+            + "!s { p = $1; g = $2; sub(/^[ \\t]*[0-9]+[ \\t]+-?[0-9]+[ \\t]*/, \"\"); t[p] = g; a[p] = $0; next } "
+            + "{ i = index($0, \"\\t\"); if (i < 2) next; g = t[substr($0, 1, i - 1)]; "
+            + "if (g + 0 > 0 && (g in a)) { x = a[g]; gsub(/\\t/, \" \", x); "
+            + "print o \"\\t\" substr($0, i + 1) \"\\t\" substr(x, 1, 1024) } }"
+        return "{ ps -A -o pid= -o tpgid= -o args= 2>/dev/null; echo \(panesMarker); "
+            + "\(run) list-sessions -F '#{pane_pid}\t#{session_name}' 2>/dev/null; } "
+            + "| awk -v m=\(panesMarker) -v o=\(sessionProgramMarker) \(quoted(join)) 2>/dev/null"
     }
 
     /// Reads a listing. The markers count only as whole lines: a program's title can say anything.
     /// Lines from an older format — four fields — still read, without what came later.
-    static func parse(_ output: String) -> Listing {
+    /// When an absent row can close a terminal, require the listing to finish and every row to read.
+    static func parse(_ output: String, requireComplete: Bool = false) -> Listing {
         var home: String?
         var lines: [Substring] = []
+        var programs: [String: String] = [:]
+        var completed = false
         for line in output.split(whereSeparator: \.isNewline) where !line.allSatisfy(\.isWhitespace) {
             switch line.trimmingCharacters(in: .whitespaces) {
             case missingMarker: return .unavailable
             case failedMarker: return .failed
+            case completeMarker:
+                completed = true
+                continue
             default: break
             }
             if line.hasPrefix(homeMarker + "\t") {
                 home = String(line.dropFirst(homeMarker.count + 1)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix(sessionProgramMarker + "\t") {
+                // Never kept whole: past an interpreter's script, a command line can hold a password (`mysql -p…`).
+                let fields = line.dropFirst(sessionProgramMarker.count + 1)
+                    .split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
+                if fields.count == 2, !fields[0].isEmpty {
+                    programs[String(fields[0])] = TerminalAgent.identifyingWords(String(fields[1]))
+                }
             } else {
                 lines.append(line)
             }
         }
-        let sessions = lines.compactMap { session(from: $0, home: home?.hasPrefix("/") == true ? home : nil) }
+        let sessions = lines.compactMap { line -> Session? in
+            guard var session = session(from: line, home: home?.hasPrefix("/") == true ? home : nil) else { return nil }
+            session.programArguments = programs[session.name]
+            return session
+        }
+        if requireComplete && (!completed || sessions.count != lines.count) { return .failed }
         // Lines and not one session: tmux's tabs turned to `_`, or an answer from something else.
         return !lines.isEmpty && sessions.isEmpty ? .failed : .sessions(sessions)
     }
@@ -176,9 +228,41 @@ enum TerminalTmux {
         session.repository = TerminalSessionNaming.displayText(fields[12]).map {
             TerminalRepository(name: $0, branch: TerminalSessionNaming.displayText(fields[13]))
         }
-        session.title = TerminalSessionNaming.programTitle(fields[14], hostNames: [fields[8], fields[9]])
+        session.bell = !fields[14].isEmpty
+        session.title = TerminalSessionNaming.programTitle(fields[15], hostNames: [fields[8], fields[9]])
         session.home = home
         return session
+    }
+
+    // MARK: A session's bell (2026-11-15)
+
+    /// tmux's argv for keeping a session's bell on it: its own `alert-bell` hook sets `bellOption` as a bell passes
+    /// through tmux, whoever is attached (tmux 3.8 with a control client on the window, detached, and renamed: the
+    /// hook's `set-option` takes the session it fires in). Once per session; setting it again replaces it. Nil for a
+    /// session name tmux could misread.
+    nonisolated static func bellHookArguments(session: String) -> [String]? {
+        guard isValidSessionName(session) else { return nil }
+        return ["-u", "set-hook", "-t", "=" + session + ":", "alert-bell", "set-option \(bellOption) 1"]
+    }
+
+    /// tmux's argv for clearing a session's bell: shown here, it has been seen.
+    nonisolated static func clearBellArguments(session: String) -> [String]? {
+        guard isValidSessionName(session) else { return nil }
+        return ["-u", "set-option", "-u", "-t", "=" + session + ":", bellOption]
+    }
+
+    /// The same two, for a host: through `sh -c`, every word quoted, as every exec-channel command is. A tmux that
+    /// refuses (an old one, a session gone) changes nothing and says nothing.
+    nonisolated static func bellHookCommand(session: String) -> String? {
+        bellHookArguments(session: session).map(hostCommand)
+    }
+
+    nonisolated static func clearBellCommand(session: String) -> String? {
+        clearBellArguments(session: session).map(hostCommand)
+    }
+
+    private nonisolated static func hostCommand(_ arguments: [String]) -> String {
+        "sh -c \(quoted(searchPath + "tmux " + arguments.map(quoted).joined(separator: " ") + " 2>/dev/null; true"))"
     }
 
     // MARK: A session's given name (W6, 2026-10-08)
@@ -238,7 +322,7 @@ enum TerminalTmux {
     /// `TerminalAgent`), and last its title, so that the title may hold anything. This Mac's tabs ask
     /// with it (`MacLocalTmux.context`), and so do terminals on every other device (`paneStateCommand`).
     nonisolated static let contextFormat = "#{pane_current_path}\t#{host}\t#{host_short}\t#{\(givenNameOption)}"
-        + "\t#{pane_current_command}\t#{pane_pid}\t#{pane_title}"
+        + "\t#{pane_current_command}\t#{pane_pid}\t#{\(bellOption)}\t#{pane_title}"
 
     /// What a session's active pane shows, and what the session is called.
     nonisolated struct PaneState: Equatable, Sendable {
@@ -257,18 +341,21 @@ enum TerminalTmux {
         /// The foreground program and the script it runs, where the machine said them: what tells
         /// one node script from another. Never the rest of its command line, which can hold a secret.
         var programArguments: String? = nil
+        /// A bell rang in the session that no device has shown since (`bellOption`).
+        var bell = false
     }
 
     /// Reads one `contextFormat` line.
     nonisolated static func parseContext(_ output: String) -> PaneState? {
         let fields = output.trimmingCharacters(in: .newlines)
-            .split(separator: "\t", maxSplits: 6, omittingEmptySubsequences: false).map(String.init)
-        guard fields.count == 7 else { return nil }
+            .split(separator: "\t", maxSplits: 7, omittingEmptySubsequences: false).map(String.init)
+        guard fields.count == 8 else { return nil }
         return PaneState(givenName: TerminalSessionNaming.displayText(fields[3]),
-                         title: TerminalSessionNaming.programTitle(fields[6], hostNames: [fields[1], fields[2]]),
+                         title: TerminalSessionNaming.programTitle(fields[7], hostNames: [fields[1], fields[2]]),
                          directory: fields[0].hasPrefix("/") ? fields[0] : nil,
                          program: fields[4].isEmpty ? nil : fields[4],
-                         shellProcessID: Int32(fields[5]).flatMap { $0 > 0 ? $0 : nil })
+                         shellProcessID: Int32(fields[5]).flatMap { $0 > 0 ? $0 : nil },
+                         bell: !fields[6].isEmpty)
     }
 
     /// Starts the line with the foreground program's command line, in a pane-state read.

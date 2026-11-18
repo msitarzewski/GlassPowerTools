@@ -34,6 +34,45 @@ struct TerminalBellNoticeTests {
         #expect(notice.isUnseen)
     }
 
+    /// The owner, 2026-11-15, on the iPhone: Active "doesn't highlight which terminals need attention". The bell is
+    /// kept on the terminal's tmux session too, for every device: seen here, that one is cleared; said by the session,
+    /// it is unseen here.
+    @Test("kept on the session: seen here, cleared there; rung in sight, cleared at once; the session's word is unseen here; cleared once")
+    func keptOnTheSession() {
+        let notice = TerminalBellNotice()
+        var cleared = 0
+        var connected = true
+        notice.clearsSession = { guard connected else { return false }; cleared += 1; return true }
+
+        notice.isInSight = true
+        #expect(cleared == 0, "nothing rang: nothing to clear")
+        notice.isInSight = false
+        notice.ring()
+        #expect(notice.isUnseen && cleared == 0, "out of sight: kept, everywhere")
+        notice.isInSight = true
+        #expect(!notice.isUnseen && cleared == 1, "seen here: cleared on the session too")
+        notice.isInSight = false
+        notice.isInSight = true
+        #expect(cleared == 1, "once")
+
+        notice.ring()
+        #expect(cleared == 2, "rung while in sight: the hook kept it on its way past; cleared at once")
+
+        notice.isInSight = false
+        notice.sessionKeepsOne()
+        #expect(notice.isUnseen, "the session says a bell rang that no device showed: unseen here")
+        connected = false
+        notice.isInSight = true
+        #expect(!notice.isUnseen && cleared == 2, "seen, but not connected: the session's can't be cleared now")
+        connected = true
+        notice.isInSight = false
+        notice.isInSight = true
+        #expect(cleared == 3, "the next time it is seen, it is")
+
+        notice.sessionKeepsOne()
+        #expect(!notice.isUnseen && cleared == 4, "the session's word while in sight: seen, and cleared")
+    }
+
     #if os(macOS)
     /// The whole way in, on the Mac's SwiftTerm view: output with a BEL, read by SwiftTerm, told to the host's
     /// delegate, kept on the model — no window, as a terminal whose window is in the dock has none.

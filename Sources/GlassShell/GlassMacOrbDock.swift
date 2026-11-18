@@ -1159,7 +1159,7 @@ struct GlassMacOrbDockView: View {
                 GlassSessionOrbTab(
                     id: session.id, title: session.title, symbolName: session.symbolName,
                     tint: session.connectedEndpointIDs.isEmpty && !session.endpointIDs.isEmpty ? .secondary : .primary,
-                    icon: session.icon.map { draw in draw(GlassSessionOrbTab.iconSize) },
+                    icon: session.icon.map { draw in draw(.alone(side: GlassSessionOrbTab.iconSize)) },
                     growsWindow: false,
                     picture: { session.snapshot?() },
                     select: {})

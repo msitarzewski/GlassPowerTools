@@ -92,12 +92,16 @@ public struct GlassOpenSession: Identifiable {
     /// The open session this one was opened from, by its id: an editor opened from a terminal's
     /// folder button names that terminal's window, and goes with its orb (D88). Nil otherwise.
     public let openedFrom: String?
-    /// Its mark as its tab draws it, at a side: a terminal's coding agent in its colour, pulsing while
-    /// it prints. The orb dock's dots (D88); `mark` is the plain picture where this is nil.
-    public let icon: (@MainActor (_ side: CGFloat) -> AnyView)?
+    /// Its mark as its tab draws it: a terminal's coding agent in its colour, pulsing while it prints. The orb dock's
+    /// dots (D88) and Active's rows (the owner, 2026-11-16: "That should be a constant when a terminal icon is
+    /// shown"); `mark` is the plain picture where this is nil. A window's is the terminal it shows.
+    public let icon: (@MainActor (GlassSessionMarkPlacement) -> AnyView)?
     /// Its terminal rang its bell out of sight and has not been seen since (`GlassBell`, 2026-11-03): its card glows
     /// beneath, its window's orb shows it. A window's own is any of its tabs'. Nil for a session with no bell.
     public let bellRang: (@MainActor () -> Bool)?
+    /// The window it is, as its capability's `tabGroups()` names it, where Active can gather it with others into one
+    /// (the owner, 2026-11-15, on the iPhone: "i cant select multiple to add to a set"). Nil where it can't be chosen.
+    public let tabGroupID: GlassTabGroup.ID?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -110,8 +114,8 @@ public struct GlassOpenSession: Identifiable {
                 unsavedChanges: (@MainActor () -> String?)? = nil,
                 backdrop: (@MainActor () -> GlassSessionBackdrop?)? = nil,
                 lastActivity: (@MainActor () -> Date?)? = nil, openedFrom: String? = nil,
-                icon: (@MainActor (_ side: CGFloat) -> AnyView)? = nil,
-                bellRang: (@MainActor () -> Bool)? = nil) {
+                icon: (@MainActor (GlassSessionMarkPlacement) -> AnyView)? = nil,
+                bellRang: (@MainActor () -> Bool)? = nil, tabGroupID: GlassTabGroup.ID? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -133,6 +137,7 @@ public struct GlassOpenSession: Identifiable {
         self.openedFrom = openedFrom
         self.icon = icon
         self.bellRang = bellRang
+        self.tabGroupID = tabGroupID
     }
 
     /// Whether it, or any of its tabs, has a bell unseen.
@@ -144,6 +149,37 @@ public struct GlassOpenSession: Identifiable {
     @MainActor
     public func requestClose(asking ask: (GlassOpenSession) -> Void) {
         if unsavedChanges?() != nil { ask(self) } else { close() }
+    }
+}
+
+/// Where a session's mark is drawn, which decides what shows its bell (`GlassBell`): the mark itself where it alone
+/// stands for its tab, the row beneath it in a list (the owner, 2026-11-16: every row glows beneath, as the Mac's
+/// sidebar does).
+public enum GlassSessionMarkPlacement: Equatable, Sendable {
+    /// On an orb's ring, at a side: orange and glowing where its bell rang out of sight.
+    case alone(side: CGFloat)
+    /// At the head of a list's row, at the row's text size, in its own colour.
+    case row
+}
+
+/// A session's icon at the head of a row: its capability's mark where it gives one — a terminal's coding agent in its
+/// colour, as its tab draws it — else its symbol. Its bell is the row's to show, beneath it (`glassBellGlow`).
+struct GlassSessionRowIcon: View {
+    let symbolName: String
+    let icon: (@MainActor (GlassSessionMarkPlacement) -> AnyView)?
+    /// The symbol's colour, where there is no mark.
+    let symbolStyle: AnyShapeStyle
+
+    var body: some View {
+        Group {
+            if let icon {
+                icon(.row)
+            } else {
+                Image(systemName: symbolName)
+                    .foregroundStyle(symbolStyle)
+            }
+        }
+        .frame(width: 22)
     }
 }
 
@@ -211,18 +247,27 @@ public struct GlassRunningSession: Identifiable {
     /// and lists this the moment it is closed (2026-10-24, the owner, on the iPhone: each dropped
     /// tab was listed twice, as itself and as its session "Open elsewhere"). Asked as Active draws.
     public let isHeldHere: @MainActor () -> Bool
+    /// A bell rang in it that no device has shown since, as the machine last said (the owner, 2026-11-15, on the
+    /// iPhone: Active "doesn't highlight which terminals need attention"): its row's symbol is orange (`GlassBell`).
+    public let bellRang: Bool
+    /// Its mark as a tab showing it would draw it: a terminal's coding agent in its colour, as the machine last said
+    /// (the owner, 2026-11-16: "That should be a constant when a terminal icon is shown"). Nil: its symbol.
+    public let icon: (@MainActor (GlassSessionMarkPlacement) -> AnyView)?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointID: EndpointID, isAttachedElsewhere: Bool, isOpenHere: Bool = false,
                 open: @escaping @MainActor () -> Void, takeOver: @escaping @MainActor () -> Void,
                 end: @escaping @MainActor () async throws -> Void,
                 attachment: GlassRunningAttachment? = nil,
-                isHeldHere: @escaping @MainActor () -> Bool = { false }) {
+                isHeldHere: @escaping @MainActor () -> Bool = { false }, bellRang: Bool = false,
+                icon: (@MainActor (GlassSessionMarkPlacement) -> AnyView)? = nil) {
         self.id = id; self.title = title; self.subtitle = subtitle; self.symbolName = symbolName
         self.endpointID = endpointID; self.isAttachedElsewhere = isAttachedElsewhere; self.isOpenHere = isOpenHere
         self.open = open; self.takeOver = takeOver; self.end = end
         self.attachment = attachment
         self.isHeldHere = isHeldHere
+        self.bellRang = bellRang
+        self.icon = icon
     }
 }
 
@@ -254,6 +299,18 @@ public struct GlassTabGroup: Identifiable, Hashable, Sendable {
     public init(id: String, title: String) {
         self.id = id
         self.title = title
+    }
+}
+
+/// Windows gathered into one by Active (2026-11-15): the window they went to, and what found it full.
+public struct GlassGathering: Equatable, Sendable {
+    public let tabGroup: GlassTabGroup.ID
+    /// What stayed where it was, by name.
+    public let leftOut: [String]
+
+    public init(tabGroup: GlassTabGroup.ID, leftOut: [String] = []) {
+        self.tabGroup = tabGroup
+        self.leftOut = leftOut
     }
 }
 
@@ -326,6 +383,9 @@ public extension GlassCapability {
 
     /// Opens running sessions as more tabs of a window. Default: nothing.
     func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {}
+
+    /// Gathers windows into one. Default: none of them is this capability's.
+    func gather(tabGroups: [GlassTabGroup.ID], into destination: GlassTabGroup.ID?) -> GlassGathering? { nil }
 }
 
 public extension GlassCapabilityRegistry {
@@ -376,6 +436,21 @@ public extension GlassCapabilityRegistry {
     func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {
         guard let kind = attachments.first?.kind else { return }
         capability(for: kind)?.openRunningSessions(attachments.filter { $0.kind == kind }, inTabGroup: group)
+    }
+
+    /// Gathers windows here into one (2026-11-15): asked of each capability until one says they are its own.
+    func gather(tabGroups: [GlassTabGroup.ID], into destination: GlassTabGroup.ID?) -> GlassGathering? {
+        guard !tabGroups.isEmpty else { return nil }
+        for capability in registered {
+            if let gathered = capability.gather(tabGroups: tabGroups, into: destination) { return gathered }
+        }
+        return nil
+    }
+
+    /// The windows that windows chosen by `tabGroupID` can be gathered into: those of the capability listing them.
+    func tabGroups(holding chosen: [GlassTabGroup.ID]) -> [GlassTabGroup] {
+        guard let first = chosen.first else { return [] }
+        return registered.lazy.map { $0.tabGroups() }.first { groups in groups.contains { $0.id == first } } ?? []
     }
 
     /// The rows to offer from inside `currentSessionID`: everything open except the session

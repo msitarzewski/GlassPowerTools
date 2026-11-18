@@ -196,6 +196,37 @@ enum TerminalTabMoves {
         return created
     }
 
+    /// What gathering left where it was: terminals that found the window full, by name.
+    struct Gathered: Equatable {
+        var moved = 0
+        var leftOut: [String] = []
+    }
+
+    /// Several windows into one (the owner, 2026-11-15, on the iPhone: Active's Select "doesnt work, so i cant select
+    /// multiple to add to a set"): every terminal of each of `sources`, in order, after the last of `destination`'s,
+    /// the same session each, still running. A window emptied goes; one that is the destination stays. Those that
+    /// don't fit — a window holds `LayoutPreset.maximumSessionCount` — stay where they were.
+    @discardableResult
+    static func gather(_ sources: [UUID], into destination: UUID, in manager: SessionManager) -> Gathered {
+        var gathered = Gathered()
+        guard let before = manager.workgroup(for: destination) else { return gathered }
+        // The set gathered into shows what it showed: each move selects the terminal it brings, as one move does.
+        defer {
+            if gathered.moved > 0, let shown = before.selectedSessionID { manager.selectSession(shown, inWorkgroup: destination) }
+        }
+        for source in sources where source != destination {
+            for sessionID in manager.workgroup(for: source)?.sessionIDs ?? [] {
+                guard let session = manager.session(for: sessionID) else { continue }
+                if case .moved = move(sessionID, to: destination, at: nil, in: manager) {
+                    gathered.moved += 1
+                } else {
+                    gathered.leftOut.append(TerminalWorkgroupOpening.label(session, on: .active))
+                }
+            }
+        }
+        return gathered
+    }
+
     /// Where **Move to** can send a terminal from `workgroupID`.
     nonisolated struct Destination: Identifiable, Equatable {
         let id: UUID

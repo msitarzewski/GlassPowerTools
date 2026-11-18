@@ -8,8 +8,9 @@
 //  - a tab's icon where the icon is all that stands for it — an orb's ring, in the dock or where the window shrank
 //    — turns orange, with an orange glow behind it, since Claude Code's own mark is already an orange (#D97757);
 //    a window alone on its orb, with no tab icons on its ring, takes an orange rim;
-//  - a tab drawn whole — a window's sidebar or tab bar, Show All Windows' cards, a window's grid and its carousel —
-//    glows orange beneath it.
+//  - a tab drawn whole — a window's sidebar or tab bar, Show All Windows' cards, a window's grid and its carousel,
+//    Active's rows — glows orange beneath it, its icon in its own colour (the owner, 2026-11-16: every row as the
+//    Mac's sidebar, on every device).
 //  The notice itself is `TerminalBellNotice`: kept with the terminal, cleared once it is in sight.
 //
 
@@ -47,7 +48,8 @@ public extension View {
         }
     }
 
-    /// The orange glow behind a tab's icon while its terminal's bell is unseen (an orb's ring, a row's icon).
+    /// The orange glow behind a tab's icon while its terminal's bell is unseen, where the icon alone stands for the tab
+    /// (an orb's ring); a row glows beneath instead (`glassBellGlow`).
     func glassBellIconGlow(_ isOn: Bool) -> some View {
         background {
             if isOn {
@@ -65,13 +67,10 @@ public extension View {
 
 /// Light from under the shape, strongest along its foot: it reads as beneath the tab, not a frame around it.
 private struct GlassBellGlow: ViewModifier {
-    /// Behind a row's text: on the Mac's light sidebar the headset's strength read as a highlighter over the name
-    /// (the macOS VM, 2026-11-03).
-    #if os(macOS)
+    /// Behind a row's text, on every device: on the Mac's light sidebar the headset's 0.7 read as a highlighter over
+    /// the name (the macOS VM, 2026-11-03), as it did on the iPhone's light list (2026-11-15); the owner chose the Mac's
+    /// strength for every row (2026-11-16).
     static let rowOpacity = 0.42
-    #else
-    static let rowOpacity = 0.7
-    #endif
 
     let isOn: Bool
     let cornerRadius: CGFloat

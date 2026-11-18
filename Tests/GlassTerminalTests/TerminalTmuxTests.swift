@@ -162,10 +162,17 @@ struct TerminalTmuxTests {
     }
 
     /// A command a test counts as asking the host about its sessions: not `tmux -V`, which control
-    /// mode asks (D83), and not the read of the session's name and folder that an iPhone, iPad or
-    /// Vision Pro makes once attached (`readsTmuxPane`; a Mac's tabs ask tmux themselves).
+    /// mode asks (D83), not the read of the session's name and folder that an iPhone, iPad or
+    /// Vision Pro makes once attached (`readsTmuxPane`; a Mac's tabs ask tmux themselves), and not the
+    /// session's bell hook, set at each attach (2026-11-15).
     static func asksTheHost(_ command: String) -> Bool {
-        command != TerminalTmux.versionCommand && !command.contains(TerminalTmux.paneMarker)
+        command != TerminalTmux.versionCommand && !command.contains(TerminalTmux.paneMarker) && !isBellCommand(command)
+    }
+
+    /// The session's bell hook, or the clearing of its bell: the option as an argument of its own. A listing and a
+    /// read name it only inside their formats (`#{@glass-bell}`).
+    static func isBellCommand(_ command: String) -> Bool {
+        command.contains("'set-hook'") || command.contains("'\(TerminalTmux.bellOption)'")
     }
 
     /// Until a private server's pane shows `text` as a line of its own, up to 30 s.
@@ -223,8 +230,20 @@ struct TerminalTmuxTests {
         #expect(lines.dropFirst(300).first == long, "a line wider than the pane, joined")
     }
 
-    nonisolated static let tmux: String? = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
-        .first { FileManager.default.isExecutableFile(atPath: $0) }
+    /// Nil inside the owner's tmux (`LiveTestGuard`): every live tmux test that is gated on it skips there.
+    nonisolated static let tmux: String? = LiveTestGuard.refuses ? nil
+        : ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"].first { FileManager.default.isExecutableFile(atPath: $0) }
+
+    /// Starts nothing: it reads the environment and the lookups the live tests are gated on.
+    @Test("inside the owner's tmux, every lookup of tmux the live tests are gated on is nil (LiveTestGuard)")
+    func liveTestsRefuseInsideTmux() {
+        guard LiveTestGuard.refuses else { return }
+        #expect(TerminalTmuxTests.tmux == nil)
+        #if os(macOS)
+        #expect(MacTmuxServiceTests.tmux == nil)
+        #expect(LiveTmuxControlTests.tmux == nil)
+        #endif
+    }
 
     // MARK: tmux in UTF-8 (2026-10-08)
     //
@@ -236,6 +255,18 @@ struct TerminalTmuxTests {
         #expect(TerminalTmux.parse("glass-1_1_1_1700000000\n") == .failed)
         #expect(TerminalTmux.parse("__glass_tmux_failed__\n") == .failed)
         #expect(TerminalTmux.parse("\n") == .sessions([]), "nothing printed: no sessions")
+    }
+
+    @Test("A listing can establish that a session ended only when it finished and every row was readable")
+    func completeListing() {
+        let readable = "glass-1\t1\t1\t1700000000\n"
+        let unreadable = "glass-2_1_1_1700000000\n"
+        let complete = "__glass_tmux_list_complete__\n"
+        #expect(TerminalTmux.parse(readable + unreadable + complete, requireComplete: true) == .failed)
+        #expect(TerminalTmux.parse(readable, requireComplete: true) == .failed)
+        #expect(TerminalTmux.parse("", requireComplete: true) == .failed)
+        #expect(TerminalTmux.parse(complete, requireComplete: true) == .sessions([]))
+        #expect(TerminalTmux.parse(readable + complete, requireComplete: true) == TerminalTmux.parse(readable))
     }
 
     @Test("a new terminal never takes a name from an answer it could not read")
@@ -271,15 +302,118 @@ struct TerminalTmuxTests {
         let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
         func sh(_ command: String) async -> String { await offMainActor { Self.shell(command, environment) } }
         let tmux = TerminalTmuxTests.tmux!
-        #expect(TerminalTmux.parse(await sh(TerminalTmux.listCommand)) == .sessions([]),
+        #expect(TerminalTmux.parse(await sh(TerminalTmux.listCommand), requireComplete: true) == .sessions([]),
                 "no server running: nothing runs, which is not a failure")
         _ = await sh("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 'sleep 600'")
         defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
-        guard case .sessions(let sessions) = TerminalTmux.parse(await sh(TerminalTmux.listCommand)) else {
+        guard case .sessions(let sessions) = TerminalTmux.parse(await sh(TerminalTmux.listCommand), requireComplete: true) else {
             Issue.record("not read as a list")
             return
         }
         #expect(sessions.map(\.name) == ["glass-1"])
+    }
+
+    /// The owner, 2026-11-15, on the iPhone: Active "doesn't highlight which terminals need attention". A session
+    /// keeps its own bell, as the commands a device runs over SSH set it up and clear it, on a private server.
+    @Test("live: a session's hook keeps its bell, attached or not; the listing and a pane read say it; clearing takes it away",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func bellLive() async throws {
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
+        func sh(_ command: String) async -> String { await offMainActor { Self.shell(command, environment) } }
+        let tmux = TerminalTmuxTests.tmux!
+        _ = await sh("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 sh")
+        defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
+        func kept() async -> Bool {
+            guard case .sessions(let sessions) = TerminalTmux.parse(await sh(TerminalTmux.listCommand)) else { return false }
+            return sessions.first { $0.name == "glass-1" }?.bell == true
+        }
+        func ring() async throws {
+            _ = await sh("\(tmux) send-keys -t glass-1 \"printf '\\\\a'\" Enter")
+            try await Task.sleep(for: .milliseconds(800))
+        }
+        try await ring()
+        #expect(!(await kept()), "no hook: tmux keeps nothing of its own that a listing reads")
+
+        _ = await sh(try #require(TerminalTmux.bellHookCommand(session: "glass-1")))
+        try await ring()
+        #expect(await kept(), "rung with nobody attached")
+        let read = try #require(TerminalTmux.paneStateCommand(session: "glass-1"))
+        #expect(TerminalTmux.parsePaneState(await sh(read))?.bell == true, "a terminal's own read says it too")
+        _ = await sh(try #require(TerminalTmux.clearBellCommand(session: "glass-1")))
+        #expect(!(await kept()), "shown on a device: cleared")
+        #expect(TerminalTmux.parsePaneState(await sh(read))?.bell == false)
+
+        // A control-mode client on the window, as a Mac showing it is: tmux's own bell flag stays off; the hook's doesn't.
+        _ = await sh("(sleep 4 | \(tmux) -C attach -t glass-1 > /dev/null 2>&1 &)")
+        try await Task.sleep(for: .milliseconds(500))
+        try await ring()
+        #expect(await kept(), "rung with a client attached and the window current")
+    }
+
+    /// The owner, 2026-11-16, on Active: "the terminals don't reflect the coding agent like the tabs do". A listing
+    /// says each session's front program's command line, as a tab's own read does, cut to the words that tell an agent.
+    @Test("a listing's program lines: read to the words that tell an agent, never the rest, never a session")
+    func listingPrograms() {
+        let output = "glass-1\t1\t1\t1790000000\nglass-2\t0\t1\t1790000000\n"
+            + "__glass_home__\t/home/ann\n"
+            + "__glass_session_program__\tglass-1\t/home/ann/.local/bin/claude --resume\n"
+            + "__glass_session_program__\tglass-2\tmysql -u ann -psecret shop\n"
+            + "__glass_session_program__\tglass-9\tcodex\n"
+        guard case .sessions(let sessions) = TerminalTmux.parse(output) else { Issue.record("not a list"); return }
+        #expect(sessions.map(\.name) == ["glass-1", "glass-2"], "a program line is never a session")
+        #expect(sessions.first?.programArguments == "/home/ann/.local/bin/claude")
+        #expect(sessions.last?.programArguments == "mysql", "past the program, a command line can hold a password")
+    }
+
+    @Test("a listed session's agent: by its program, its command line or its title, as a tab's")
+    func listedAgents() {
+        func agent(_ command: String?, _ arguments: String?, title: String? = nil) -> TerminalAgent? {
+            GlassTerminalCapability.agent(of: TerminalTmux.Session(name: "glass-1", attachedClients: 0, windows: 1,
+                                                                   lastActivity: nil, title: title, command: command,
+                                                                   programArguments: arguments))
+        }
+        #expect(agent("2.1.318", "/home/ann/.local/bin/claude") == .claudeCode,
+                "Claude Code's own installer: a program named for its version, run as claude")
+        #expect(agent("2.1.318", nil, title: "✳ Startup") == nil, "the program's name and a task's title don't tell it")
+        #expect(agent("2.1.318", nil, title: "✳ Claude Code") == .claudeCode)
+        #expect(agent("codex", nil) == .codex)
+        #expect(agent("node", "node /usr/lib/node_modules/@openai/codex/bin/codex.js") == .codex)
+        #expect(agent("zsh", "-zsh") == nil)
+    }
+
+    /// The executable's name can differ from the command line. Use `sleep` through a `claude` link
+    /// to exercise that distinction with a system binary at its original path.
+    @Test("live: a listing tells a session's agent by its command line, as a tab's own read does",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func listingProgramsLive() async throws {
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let link = folder.appendingPathComponent("claude")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "/bin/sleep")
+        let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
+        func sh(_ command: String) async -> String { await offMainActor { Self.shell(command, environment) } }
+        let tmux = TerminalTmuxTests.tmux!
+        _ = await sh("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 sh")
+        defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
+        _ = await sh("\(tmux) new-session -d -s glass-2 -x 80 -y 10 sh")
+        _ = await sh("\(tmux) send-keys -t glass-1 '\(link.path) 60' Enter")
+        var sessions: [TerminalTmux.Session] = []
+        for _ in 0..<20 {
+            if case .sessions(let listed) = TerminalTmux.parse(await sh(TerminalTmux.listCommand)) { sessions = listed }
+            if sessions.first(where: { $0.name == "glass-1" })?.programArguments == link.path { break }
+            try await Task.sleep(for: .milliseconds(150))
+        }
+        let claude = try #require(sessions.first { $0.name == "glass-1" })
+        #expect(claude.command == "sleep", "tmux names the executable")
+        #expect(claude.programArguments == link.path)
+        #expect(GlassTerminalCapability.agent(of: claude) == .claudeCode)
+        let shell = try #require(sessions.first { $0.name == "glass-2" })
+        #expect(shell.programArguments != nil, "a shell in front is told too")
+        #expect(GlassTerminalCapability.agent(of: shell) == nil)
     }
 
     /// A tmux that fails in some way other than "no server running" — never a real one: given a
@@ -598,10 +732,11 @@ struct TerminalTmuxTests {
         let server = TerminalTmux.Server(pid: 4242, startTime: 1_789_990_000, socketPath: "/private/tmp/tmux-501/default")
         func line(_ fields: [String]) -> String { fields.joined(separator: "\t") }
         // The repository and branch fields (W11) are empty here; `TerminalRepositoryTests` reads them.
+        // Its bell (2026-11-15) is the fifteenth: rung, and not shown on any device since.
         let titled = line(["glass-3", "1", "2", "1790000000", "4242", "1789990000", server.socketPath, "claude",
-                           "alpha.example.com", "alpha", "shop", "/Users/ann/src/shop", "", "", "✳ Claude\tCode: fix: the build"])
+                           "alpha.example.com", "alpha", "shop", "/Users/ann/src/shop", "", "", "1", "✳ Claude\tCode: fix: the build"])
         let atHome = line(["glass-4", "0", "1", "1790000200", "4242", "1789990000", server.socketPath, "zsh",
-                           "alpha.example.com", "alpha", "", "/Users/ann", "", "", "alpha.example.com"])
+                           "alpha.example.com", "alpha", "", "/Users/ann", "", "", "", "alpha.example.com"])
         let older = "work\t0\t1\t1790000100"
         let output = [titled, older, atHome, "__glass_home__\t/Users/ann"].joined(separator: "\n") + "\n"
         guard case .sessions(let sessions) = TerminalTmux.parse(output) else {
@@ -609,7 +744,8 @@ struct TerminalTmuxTests {
             return
         }
         try #require(sessions.map(\.name) == ["glass-3", "work", "glass-4"])
-        #expect(sessions[0].title == "✳ Claude\tCode: fix: the build", "everything after the fourteenth tab is the title")
+        #expect(sessions[0].title == "✳ Claude\tCode: fix: the build", "everything after the fifteenth tab is the title")
+        #expect(sessions[0].bell && !sessions[2].bell, "a bell kept on the session, and none")
         #expect(sessions[0].directory == "/Users/ann/src/shop" && sessions[0].command == "claude")
         #expect(sessions[0].givenName == "shop" && sessions[0].displayName == "shop")
         #expect(sessions[0].server == server && sessions[0].home == "/Users/ann")

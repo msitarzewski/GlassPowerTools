@@ -2338,3 +2338,52 @@ lists every open terminal window after those put away (databases, desktops and e
 machine's orb, docked or not), draws an orb fainter while none of its windows is put away, and stays up: on the Mac
 from the first window that opens, on Vision Pro from the launch and as the setting is turned on. The Mac learns
 each window as it opens (`GlassOrbDockModel.opened`); Vision Pro reads the open sessions it already listed.
+
+## D108 — A terminal's bell is kept on its tmux session, for every device's Active — Approved and implemented 2026-11-15 (0.4.620, not committed)
+**Owner:** on the iPhone, Active "doesn't highlight which terminals need attention / have alerts"; offered the bell kept
+on the tmux session (it also catches bells while the phone is put away and its connections are down, which were lost),
+he answered "Let's work on the other stuff".
+
+**Decided.** Each Glass tmux session gets its own `alert-bell` hook (`set-option @glass-bell 1`), set at each attach
+and as a Mac pane first shows a local session; never a global hook, so a user's own sessions are untouched. tmux runs
+it as a bell passes, attached or not (tmux's own bell flag stays off for a window current in an attached session, so
+it can't serve). Every device's listing and pane read carry `@glass-bell`: Active marks a running session's row,
+and a terminal here takes it as unseen. The device that shows the terminal clears it (`TerminalBellNotice.clearsSession`).
+**Limits:** Active shows it as of its last check of the machine; a tmux whose `bell-action` is `none` or with
+`monitor-bell` off never fires the hook; sessions made before 0.4.620 get the hook when a device attaches.
+Task note `tasks/2026-11/2026-11-15_active-on-the-iphone.md`.
+
+## D109 — A terminal's icon is its agent's mark wherever one is shown; every row's bell glows beneath it — Approved and implemented 2026-11-16 (0.4.621, not committed)
+**Owner:** with 0.4.620 on the iPhone, "the glow is different on iOS … the terminals don't reflect the coding agent like
+the tabs do. That should be a constant when a terminal icon is shown. Do we need to centralize that code?" Asked, he
+chose the glow beneath every row at the Mac's strength, and the name menu showing an agent's shape, else the dot.
+
+**Decided.** One mark, `TerminalTabMark` (the agent in its colour, pulsing while it prints, else a terminal), reaches
+the shell through one seam: `GlassOpenSession.icon` and now `GlassRunningSession.icon`, drawn for a
+`GlassSessionMarkPlacement`: `.alone(side:)` on an orb's ring shows the bell on the mark (orange, glowing), `.row` at
+a list's text size leaves it to the row, which glows beneath (`glassBellGlow`, 0.42 on every device; it was 0.7 off
+the Mac). Active's rows draw it through `GlassSessionRowIcon`, a window's being the terminal it shows. A machine's
+listing now carries each session's front program's command line (one `ps` on the host joined to its panes there;
+read down to `TerminalAgent.identifyingWords` on arrival), since tmux names Claude Code's installer's program for its
+version and its title holds the task. The iPhone's name menu: the bell, else the agent's mark, else the dot.
+**Limits:** a running row's mark is as of Active's last check of the machine (five minutes at most) and doesn't pulse;
+a host whose `ps` lacks `tpgid` says only the program's name.
+
+## D110 — Off the Mac, a terminal whose tmux session has ended closes — Approved and implemented 2026-11-16 (0.4.621, not committed)
+**Owner:** on the iPhone, after every tmux session on his Mac had ended, Active held ~30 windows, each named after the
+machine and saying "its tmux session has ended": "this is less than useful". Asked whether such a window should close,
+gather into one "ended" row, or stay with a bulk Close, he chose closing.
+
+**Decided.** On iPhone, iPad and Vision Pro, when Active's complete listing of a machine leaves out a down terminal's tmux
+session, the terminal closes (`SessionManager.removeSessionFromWorkgroup`) and a window left with none goes with it
+(`GlassTerminalCapability.closesEndedTerminals`, in `runningReport(local:hosts:closingEnded:)`). As the Mac's pane
+closes once its session has ended (`MacLocalTerminalExitPolicy`), and as a relaunch's terminal goes when it finds its
+session gone (W15, 2026-10-29). Not a machine skipped or not answering; not a terminal reconnecting; not one that
+claims its session (`tmuxClaimsGivenName`, a saved Workgroup's not yet connected: it makes the session when it does,
+and runs its startup command). The Mac keeps its SSH tabs saying so. Active's names also drop an agent's spinner
+(`TerminalSessionNaming.steady`), which iOS drew as a green emoji beside the agent's own mark.
+**Limits:** the listing's answer is trusted as the subtitle already trusted it: a host whose login shell points tmux at
+another socket than the listing's would read as every session ended.
+
+**Implementation check, 2026-11-18:** Active requires a completed reply with readable rows before inferring that
+a session ended. A partial or unreadable reply follows the existing unchecked-machine path.

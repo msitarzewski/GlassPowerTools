@@ -24,11 +24,14 @@ struct TerminalSessionNamesTests {
         var program = ""
         var pid = ""
         var repository: (top: String, branch: String)? = ("/home/ann/src/app", "main")
+        /// A bell kept on the session (`@glass-bell`).
+        var bell = false
         /// How long a read takes on the host.
         var delay: Duration = .zero
 
         func answer() -> String {
-            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, program, pid, title]
+            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, program, pid,
+                        bell ? "1" : "", title]
                 .joined(separator: "\t")
             guard let repository else { return pane + "\n" }
             return pane + "\n" + [TerminalRepository.remoteMarker, repository.top, "../.git", repository.branch, "/home/ann"]
@@ -83,7 +86,7 @@ struct TerminalSessionNamesTests {
     @Test("one command reads what a session says about itself; the session is its argument, never part of the script")
     func readCommand() throws {
         #expect(TerminalTmux.paneStateCommand(session: "it's")
-                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; s=$1; tmux -u has-session -t "=$s" 2>/dev/null || exit 0; c=$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}\#t#{host}\#t#{host_short}\#t#{@glass-name}\#t#{pane_current_command}\#t#{pane_pid}\#t#{pane_title}'\'' 2>/dev/null) || exit 0; printf '\''__glass_pane__\t%s\t%s\n'\'' "$HOME" "$c"; p=$(tmux -u display-message -p -t "=$s:" '\''#{pane_pid}'\'' 2>/dev/null); g=$(ps -o tpgid= -p "$p" 2>/dev/null | tr -d '\'' '\''); [ -n "$g" ] && [ "$g" -gt 0 ] 2>/dev/null && printf '\''__glass_program__\t%s\n'\'' "$(ps -o args= -p "$g" 2>/dev/null)"; set -- "$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}'\'' 2>/dev/null)"; case $1 in /*) ;; *) exit 0;; esac; command -v git >/dev/null 2>&1 || exit 0; if [ -x /usr/bin/xcode-select ] && ! /usr/bin/xcode-select -p >/dev/null 2>&1; then exit 0; fi; cd -- "$1" 2>/dev/null || exit 0; t=$(git rev-parse --show-toplevel --git-common-dir 2>/dev/null) || exit 0; b=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short=7 HEAD 2>/dev/null); h=$(cd -- "$HOME" 2>/dev/null && pwd -P); printf '\''__glass_repo__\n%s\n%s\n%s\n'\'' "$t" "$b" "$h"' _ 'it'\''s'"#)
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; s=$1; tmux -u has-session -t "=$s" 2>/dev/null || exit 0; c=$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}\#t#{host}\#t#{host_short}\#t#{@glass-name}\#t#{pane_current_command}\#t#{pane_pid}\#t#{@glass-bell}\#t#{pane_title}'\'' 2>/dev/null) || exit 0; printf '\''__glass_pane__\t%s\t%s\n'\'' "$HOME" "$c"; p=$(tmux -u display-message -p -t "=$s:" '\''#{pane_pid}'\'' 2>/dev/null); g=$(ps -o tpgid= -p "$p" 2>/dev/null | tr -d '\'' '\''); [ -n "$g" ] && [ "$g" -gt 0 ] 2>/dev/null && printf '\''__glass_program__\t%s\n'\'' "$(ps -o args= -p "$g" 2>/dev/null)"; set -- "$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}'\'' 2>/dev/null)"; case $1 in /*) ;; *) exit 0;; esac; command -v git >/dev/null 2>&1 || exit 0; if [ -x /usr/bin/xcode-select ] && ! /usr/bin/xcode-select -p >/dev/null 2>&1; then exit 0; fi; cd -- "$1" 2>/dev/null || exit 0; t=$(git rev-parse --show-toplevel --git-common-dir 2>/dev/null) || exit 0; b=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short=7 HEAD 2>/dev/null); h=$(cd -- "$HOME" 2>/dev/null && pwd -P); printf '\''__glass_repo__\n%s\n%s\n%s\n'\'' "$t" "$b" "$h"' _ 'it'\''s'"#)
         #expect(TerminalTmux.paneStateCommand(session: "a:b") == nil, "a session name tmux would misread")
 
         let host = Host()
@@ -318,6 +321,38 @@ struct TerminalSessionNamesTests {
         #expect([label(.tabOrnament), label(.grid), label(.tabBar)] == Array(repeating: "alpha", count: 3))
         #expect(label(.switcher) == "Terminal 3 · alpha")
         session.state = .disconnected
+    }
+
+    /// The owner, on the iPhone (2026-11-15): after a relaunch, Active's names were "filled with generic … session
+    /// names". Every terminal but the one on screen waits, down, to be shown, and had read nothing since it
+    /// connected; the machine's listing already said what each session was.
+    @Test("a terminal down, never read since it connected, is named by what the machine last said of its session")
+    func downNamedByTheListing() {
+        var server = ServerConfiguration(name: "alpha", host: "alpha.example.com", username: "ann")
+        server.tmux = true
+        let session = TerminalSession(server: server, terminalWriteSink: { _ in })
+        session.tmuxSessionName = "glass-5"
+        #expect(session.terminalName == nil && TerminalWorkgroupOpening.label(session, on: .active) == "alpha")
+
+        var known = TerminalTmux.Session(name: "glass-5", attachedClients: 1, windows: 1, lastActivity: nil)
+        known.title = "✳ Review the parser"
+        known.directory = "/home/ann/src/app"
+        known.home = "/home/ann"
+        known.repository = TerminalRepository(name: "app", branch: "main")
+        session.tmuxWhileDown = .running(known)
+        #expect(session.terminalName == "✳ Review the parser", "the program's title")
+        #expect(TerminalWorkgroupOpening.label(session, on: .active) == "✳ Review the parser")
+        known.title = nil
+        session.tmuxWhileDown = .running(known)
+        #expect(session.terminalName == "app", "no title: the repository")
+        known.givenName = "deploys"
+        session.tmuxWhileDown = .running(known)
+        #expect(session.terminalName == "deploys", "a name given on any device first")
+        session.workgroupLabel = "API"
+        #expect(session.terminalName == "API", "the workgroup's label for it before the machine's word")
+        session.workgroupLabel = nil
+        session.tmuxWhileDown = .ended
+        #expect(session.terminalName == nil, "an ended session names nothing")
     }
 
     @Test("a Mac's terminal does not read: its tabs ask tmux for themselves")

@@ -849,7 +849,7 @@ public struct GlassOrbDockView: View {
         GlassSessionOrbTab(
             id: session.id, title: session.title, symbolName: session.symbolName,
             tint: session.connectedEndpointIDs.isEmpty && !session.endpointIDs.isEmpty ? .secondary : .primary,
-            icon: session.icon.map { draw in draw(GlassSessionOrbTab.iconSize) }
+            icon: session.icon.map { draw in draw(.alone(side: GlassSessionOrbTab.iconSize)) }
                 ?? session.mark?().map { mark in
                     AnyView(mark.resizable().scaledToFit()
                         .frame(width: GlassSessionOrbTab.iconSize, height: GlassSessionOrbTab.iconSize))

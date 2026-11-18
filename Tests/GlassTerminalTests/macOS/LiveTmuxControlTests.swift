@@ -13,8 +13,9 @@ import SwiftTerm
 /// timing tests running beside them.
 @Suite("tmux control mode against this Mac's tmux (live)", .serialized, .enabled(if: MacTmuxServiceTests.tmux != nil, "no tmux on this Mac"))
 nonisolated struct LiveTmuxControlTests {
-    static let tmux = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
-        .first { FileManager.default.isExecutableFile(atPath: $0) }
+    /// Nil inside the owner's tmux (`LiveTestGuard`): every live tmux test that is gated on it skips there.
+    static let tmux = LiveTestGuard.refuses ? nil
+        : ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"].first { FileManager.default.isExecutableFile(atPath: $0) }
     /// Where tmux keeps a `-L` server's socket, for the environment above (no TMUX_TMPDIR). A server
     /// that ended left it there: 360 had gathered by 2026-10-24, so each test now removes its own.
     static func socketPath(_ name: String) -> String { "/private/tmp/tmux-\(getuid())/\(name)" }

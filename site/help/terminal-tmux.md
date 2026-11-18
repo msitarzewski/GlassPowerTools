@@ -72,7 +72,7 @@ A session can be open in more than one place at once: on your Mac and your Visio
 - **Open elsewhere**: another device, or a terminal outside Glass Power Tools, is attached.
 - **Open here**: a tab on this Mac shows it. Choosing it brings that tab forward.
 
-A terminal this device has open over SSH is listed with the open sessions instead, so nothing appears twice. That holds after its connection drops, as an iPhone's do while it's put away: the terminal's row then says **Disconnected** and what the machine last said of its session (where it is, whether it's open elsewhere, when it was used), or that the session has ended. Choosing it reconnects to the session, or starts a new one in its place if it ended. Swipe it to **Detach** and the session is listed under the machine straight away. Your own tmux sessions, with names you gave them, are listed too.
+A terminal this device has open over SSH is listed with the open sessions instead, so nothing appears twice. That holds after its connection drops, as an iPhone's do while it's put away: the terminal's row then says **Disconnected** and what the machine last said of its session (where it is, whether it's open elsewhere, when it was used). Choosing it reconnects to the session. On iPhone, iPad and Vision Pro, a terminal whose session **Active** finds has ended closes, and a window left with no terminal closes with it; a machine **Active** couldn't check closes nothing. A Workgroup's terminal that hasn't connected yet stays, and starts its session again when you open it. On a Mac, the row says the session has ended, and choosing it starts a new one in its place. Swipe it to **Detach** and the session is listed under the machine straight away. Your own tmux sessions, with names you gave them, are listed too.
 
 Choose a session to open it here. To use it here and disconnect everyone else, right-click it (touch and hold on touch devices) and choose **Take Over**.
 
@@ -89,6 +89,13 @@ To open several running sessions at once, choose them in **Active** and open the
 - **On iPad and iPhone:** the same, with **Open 3 Together**. They open as one workgroup, in place of the library as a terminal does. On iPhone only the terminal on screen connects, and each of the others connects when you switch to it.
 
 To add them to a terminal window you already have open instead, choose **Open 3 as Tabs In**, beside the button that opens them or in a chosen session's menu, then the window. They join it as tabs, in order.
+
+**On iPhone, iPad and Vision Pro**, terminal windows already open on the device can be chosen too, to gather them into one. Choose **Select**, tap each window and any running sessions, then:
+
+- **Open 3 Together** moves the terminals of the windows you chose into the first of them, after its own, and opens the running sessions there too. The windows they left close; the terminals keep running.
+- **Open 3 as Tabs In**, then a window, moves them all into that window instead. With one window chosen, this moves its terminals into another.
+
+A window holds up to 32 terminals: any that don't fit stay where they were, and **Active** says which.
 
 They open in the order **Active** lists them, each on its own session, joining whoever is already there. A session that says **Open here** stays where it is and isn't counted. A machine that allows legacy SSH algorithms is left out, because it asks before each connection: open its sessions one at a time. Nothing is saved as a workgroup.
 

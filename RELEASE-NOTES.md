@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.619 (15 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.621 (18 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.619)
+## What it holds (0.4.621)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -115,6 +115,36 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.621 (16 November 2026)
+- **Mac release, 18 November 2026.** Includes the Active updates from 0.4.620 and 0.4.621.
+- **Active shows each terminal's coding agent, as its tab does.** A window's row shows the mark of the agent running
+  in the terminal it shows, in the agent's colour, pulsing while it works; a session running on a machine shows its
+  agent as of Active's last check of that machine, including Claude Code installed with its own installer, which tmux
+  names only by its version number. On iPhone, the menu of a window's terminals shows each one's agent too.
+- **A bell glows beneath Active's row**, as it does beneath a tab in the Mac's sidebar, rather than turning the icon
+  orange, which Claude Code's mark already is. The glow beneath a row is now as faint on iPhone, iPad and Vision Pro
+  as on the Mac.
+- **A terminal whose tmux session has ended closes** on iPhone, iPad and Vision Pro, as a Mac's tab already does, and
+  a window left with no terminal closes with it. Before, each stayed in **Active** as the machine's name, saying "its
+  tmux session has ended", one row per terminal, closed one at a time. Active closes a terminal only after a
+  complete check confirms its session is gone.
+- **Names in Active leave out the spinner** Claude Code turns at the start of its title, which the iPhone drew as a
+  green emoji; the agent's mark beside the name says the same.
+
+### 0.4.620 (15 November 2026)
+- **Active shows which terminals rang their bell.** A window whose terminal rang its bell where you couldn't see it
+  has its symbol in orange in **Active**, as its tab is marked. A terminal kept in tmux keeps its bell on its tmux
+  session too, so every device's **Active** marks it: one open on your Mac, and one that rang while your iPhone was
+  put away, whose tab is marked once it connects again. It goes once you look at that terminal on any device.
+- **Gather windows into one from Active**, on iPhone, iPad and Vision Pro. **Select** now chooses terminal windows
+  open on the device as well as sessions running on your machines. **Open 3 Together** moves the chosen windows'
+  terminals into the first of them, still running, and opens the running sessions there; **Open 3 as Tabs In** puts
+  them all in a window you choose. Before, Select chose only sessions running on the machine, so on an iPhone whose
+  terminals were all open it chose nothing.
+- **Terminals are named after a relaunch.** On iPhone, iPad and Vision Pro, a terminal waiting to reconnect after the
+  app relaunched was named after its machine ("Terminal on alpha") until it connected. It now takes the name its
+  tmux session has, from Active's last check of the machine.
+
 ### 0.4.619 (13 November 2026)
 - **0.4.619 is the Mac's eleventh release** (15 November 2026), through Sparkle; TestFlight build 619 for iPhone,
   iPad and Vision Pro.
@@ -123,9 +153,10 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   the Dock). The orbs of windows put away stay at full strength and open windows' are fainter; click or pinch an
   open window's orb to bring it to the front. The dock stays up while it's on, from the moment the app starts. Off
   until you turn it on.
-- **Coding agents started with npx get their marks.** npm's `npx` runs as a script of its own, so `npx @openai/codex`
-  or `npx @anthropic-ai/claude-code` showed no mark; nor did `npm exec`. Now the agent after the runner is the one
-  marked. So is Homebrew's Codex in tmux, which tmux names `codex-aarch64-apple-darwin`.
+- **Coding agents started with npx get their marks on the Mac.** npm's `npx` runs as a script of its own, so
+  `npx @openai/codex` or `npx @anthropic-ai/claude-code` showed no mark; nor did `npm exec`. Now the agent after the
+  runner is the one marked, in the Mac's own terminals and in tmux on the Mac. And Homebrew's Codex in tmux, which
+  tmux names `codex-aarch64-apple-darwin`, is marked on every device.
 
 ### 0.4.618 (13 November 2026)
 - **0.4.618 is the Mac's tenth release**, through Sparkle, with 0.4.617 below; TestFlight build 618 for iPhone, iPad

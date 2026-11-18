@@ -1178,10 +1178,14 @@ struct VisionTerminalWorkgroupView: View {
         Menu {
             Picker("Session", selection: $selectedSessionID) {
                 ForEach(Array(sessions.enumerated()), id: \.element.id) { position, session in
-                    // A bell where its bell rang out of sight (`GlassBell`).
+                    // A bell where its bell rang out of sight (`GlassBell`); else the coding agent running in it, as its
+                    // tab marks it, in the menu's one colour (the owner, 2026-11-16: "That should be a constant when a
+                    // terminal icon is shown"); else whether it is connected.
                     let rang = session.terminalHostModel.bellNotice.isUnseen
-                    Label(TerminalWorkgroupOpening.slotTitle(session, position: position),
-                          systemImage: rang ? "bell.fill" : session.state == .connected ? "circle.fill" : "circle")
+                    let icon = rang ? Image(systemName: "bell.fill")
+                        : GlassTerminalCapability.agent(of: session)?.menuImage
+                        ?? Image(systemName: session.state == .connected ? "circle.fill" : "circle")
+                    Label { Text(TerminalWorkgroupOpening.slotTitle(session, position: position)) } icon: { icon }
                         .accessibilityValue([rang ? GlassBell.accessibilityWord : nil,
                                              session.state == .connected ? "Connected" : "Not connected"]
                             .compactMap { $0 }.joined(separator: ", "))

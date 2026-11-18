@@ -1,5 +1,19 @@
 import Foundation
 import GlassTerminalEmulator
+import Testing
+
+/// Live tests that start tmux or shells run in the macOS VM or a simulator, never on the owner's Mac (the owner,
+/// 2026-11-16, after a probe run from Claude Code's shell, inside his tmux, reached his tmux server and ended every
+/// session on it: "From now on run test shell stuff in a VM/sim"). His Mac's agents work inside his tmux, so `TMUX`
+/// set says where these tests are: they refuse, and a mistake skips them rather than running them there. The tmux
+/// lookups (`TerminalTmuxTests.tmux`, `MacTmuxServiceTests.tmux`, `LiveTmuxControlTests.tmux`) are nil here, which
+/// every live tmux test is gated on; the suites of real shells take `refusal` as a trait.
+nonisolated enum LiveTestGuard {
+    static let refuses = ProcessInfo.processInfo.environment["TMUX"] != nil
+    static let reason: Comment = "inside a tmux session (the owner's Mac): live tests run in the VM or a simulator"
+    /// For a suite or a test that starts a real shell or tmux of its own.
+    static var refusal: ConditionTrait { .enabled(if: !refuses, reason) }
+}
 
 /// Runs a program for a live test: what it printed, and how it exited.
 ///

@@ -642,6 +642,8 @@ final class MacWorkspaceController {
         for paneID in state.root?.paneIDs ?? [] where localRuntimesByPaneID[paneID] != nil {
             guard let session = localTmuxSession(for: paneID), let context = contexts[session] else { continue }
             setPaneContext(context, for: paneID)
+            // A bell its session keeps, shown on no device: rung while this pane wasn't attached (2026-11-15).
+            if context.bell { localRuntimesByPaneID[paneID]?.model.bellNotice.sessionKeepsOne() }
             if generation == givenNameGeneration { followSessionName(context.givenName, for: paneID) }
         }
     }
@@ -968,6 +970,13 @@ final class MacWorkspaceController {
         let runtime = SwiftTermLocalProcessRuntime()
         localRuntimesByPaneID[paneID] = runtime
         observeOutput(of: runtime.model)
+        // Its session keeps its own bell, for every device's Active; seen here, that is cleared (2026-11-15).
+        if let tmuxSession { MacLocalTmux.keepBell(session: tmuxSession) }
+        runtime.model.bellNotice.clearsSession = { [weak self] in
+            guard let name = self?.localTmuxSession(for: paneID) else { return false }
+            MacLocalTmux.clearBell(session: name)
+            return true
+        }
         runtime.model.onWatchFile = { [weak self] path in Task { await self?.watchFile(path, from: paneID) } }
         installPathActions(on: runtime.model, for: paneID, local: true)
         if tmuxSession != nil {

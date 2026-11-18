@@ -599,6 +599,17 @@ class TerminalSession: Identifiable, Hashable {
         givenName ?? workgroupLabel
             ?? TerminalSessionNaming.automaticName(title: tmuxPane?.title, directory: tmuxPane?.directory,
                                                    home: tmuxPane?.home, repository: tmuxPane?.repository)
+            ?? nameWhileDown
+    }
+
+    /// Down and not read since it last connected — after a relaunch, every iPhone terminal but the one on screen —
+    /// what the machine last said of its session names it, as that answer already says where it is (the owner,
+    /// 2026-11-15, after a relaunch on the iPhone: Active's names were "filled with generic … session names").
+    private var nameWhileDown: String? {
+        guard case .running(let known)? = tmuxWhileDown else { return nil }
+        return known.givenName
+            ?? TerminalSessionNaming.automaticName(title: known.title, directory: known.directory, home: known.home,
+                                                   repository: known.repository)
     }
 
     /// In a repository, its name and branch, said before the machine as a Mac's SSH tab says them.
@@ -662,6 +673,8 @@ class TerminalSession: Identifiable, Hashable {
               let pane = TerminalTmux.parsePaneState(answer) else { return }
         if tmuxPane != pane { tmuxPane = pane }
         if generation == givenNameGeneration, givenName != pane.givenName { givenName = pane.givenName }
+        // A bell kept on the session: rung while this device wasn't connected, or shown nowhere yet.
+        if pane.bell { terminalHostModel.bellNotice.sessionKeepsOne() }
         let first = !tmuxPaneReadSinceAttach
         tmuxPaneReadSinceAttach = true
         tmuxPaneObserved?(pane, first)
@@ -721,6 +734,8 @@ class TerminalSession: Identifiable, Hashable {
         // In front — focused, its window the key one — while another device has the session's
         // size: this terminal takes it (2026-10-22).
         terminalHostModel.onTerminalFocused = { [weak self] in self?.claimTmuxWindow() }
+        // Seen here, a bell kept on the tmux session is cleared for every device (2026-11-15).
+        terminalHostModel.bellNotice.clearsSession = { [weak self] in self?.clearBellOnSession() ?? false }
     }
 
     // MARK: Scrolling in tmux (2026-10-08)
@@ -1175,7 +1190,32 @@ class TerminalSession: Identifiable, Hashable {
             // What the session is called and shows (W11): a name given on another device, at once.
             tmuxPaneReadSinceAttach = false
             readTmuxPaneIfDue()
+            keepBellOnSession(name)
         }
+    }
+
+    // MARK: Its bell, kept on its tmux session (2026-11-15)
+
+    /// The session keeps its own bell from now on (`TerminalTmux.bellHookCommand`): every device's Active then says
+    /// a bell rang that no device has shown, whoever is attached, none included. Asked at each attach; setting the
+    /// hook again replaces it.
+    private func keepBellOnSession(_ name: String) {
+        guard let command = TerminalTmux.bellHookCommand(session: name) else { return }
+        Task { [weak self] in _ = try? await self?.runTmuxCommand(command) }
+    }
+
+    /// The machine says its session keeps a bell no device has shown: unseen here unless in sight.
+    func sessionKeepsBell() {
+        terminalHostModel.bellNotice.sessionKeepsOne()
+    }
+
+    /// The bell kept on the session is cleared: this terminal was seen (`TerminalBellNotice.clearsSession`). False
+    /// when it can't be now.
+    private func clearBellOnSession() -> Bool {
+        guard survivesClose, state == .connected, let name = tmuxSessionName,
+              let command = TerminalTmux.clearBellCommand(session: name) else { return false }
+        Task { [weak self] in _ = try? await self?.runTmuxCommand(command) }
+        return true
     }
 
     /// Claims a name for a new terminal: the lowest free `glass-N` when the host's list reads,

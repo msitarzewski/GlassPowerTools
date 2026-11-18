@@ -130,9 +130,9 @@ swift test
 **Unlock the screen first.** Several stores write files with complete data protection, which are
 unreadable while the Mac is locked; a locked screen shows up as permission and `mktemp` failures.
 
-The terminal tests that need tmux run only when it is installed, on private servers of their own; they
-never touch your tmux sessions (`memory-bank/projectRules.md`, rule 63). `tmux list-sessions` before
-and after a run should show the same sessions.
+Run terminal tests that start shells or tmux in a macOS VM or Apple simulator. Tests that require tmux
+use their own servers, separate from any existing sessions (`memory-bank/projectRules.md`, rule 63).
+On the host Mac, select unit tests that exercise terminal behavior without starting live processes.
 
 UI tests run through Xcode or `xcodebuild test` against a simulator, for example:
 

@@ -906,9 +906,17 @@ public final class GlassTerminalCapability: GlassCapability {
                 snapshot: { Self.preview(of: session) },
                 mark: { Self.agent(of: session)?.markImage },
                 backdrop: { [runtime] in Self.backdrop(window: GlassWindowOverrides(), runtime: runtime) },
-                lastActivity: { session.terminalHostModel.lastActivityAt }
+                lastActivity: { session.terminalHostModel.lastActivityAt },
+                icon: Self.loneIcon(of: session)
             )
         }
+    }
+
+    /// A terminal in no workgroup's mark, as its tab draws it (the owner, 2026-11-16); nil for a file browser, which
+    /// keeps its folder.
+    private static func loneIcon(of session: TerminalSession) -> (@MainActor (GlassSessionMarkPlacement) -> AnyView)? {
+        guard session.purpose != .sftp else { return nil }
+        return { placement in TerminalSessionMark.placed(placement, session: session, color: .secondary) }
     }
 
     /// What a terminal's window paints behind it on iPhone and iPad — its theme's canvas, an opaque
@@ -1000,9 +1008,28 @@ public final class GlassTerminalCapability: GlassCapability {
                     Self.backdrop(window: manager.workgroup(for: workgroup.id)?.windowSettings ?? GlassWindowOverrides(),
                                   runtime: runtime)
                 },
-                lastActivity: { live.compactMap(\.terminalHostModel.lastActivityAt).max() }
+                lastActivity: { live.compactMap(\.terminalHostModel.lastActivityAt).max() },
+                // The mark of the terminal it shows, as its tab draws it (Active's row; the owner, 2026-11-16).
+                icon: { [runtime] placement in
+                    let shown = workgroup.selectedSessionID.flatMap { manager.session(for: $0) } ?? live[0]
+                    return TerminalSessionMark.placed(placement, session: shown,
+                                                      color: Self.markColor(workgroupID: workgroup.id, manager: manager,
+                                                                            runtime: runtime))
+                },
+                // Chosen in Active with others and gathered into one (2026-11-15). Off the Mac, where a workgroup is
+                // the window; a Mac's terminal windows are its workspaces, whose tabs drag between them.
+                tabGroupID: Self.gatherableTabGroup(workgroup)
             )
         }
+    }
+
+    /// A workgroup's id as Active gathers it, off the Mac (`gather(tabGroups:into:)`).
+    static func gatherableTabGroup(_ workgroup: TerminalWorkgroup) -> GlassTabGroup.ID? {
+        #if os(macOS)
+        nil
+        #else
+        workgroup.id.uuidString
+        #endif
     }
 
     /// One of a workgroup's terminals as All Windows shows it off the Mac: a card of its own,
@@ -1015,7 +1042,7 @@ public final class GlassTerminalCapability: GlassCapability {
         let waits = session.connectsWhenShown && session.state == .disconnected
         return GlassOpenSession(
             id: Self.tabID(sessionID: session.id),
-            title: TerminalWorkgroupOpening.label(session, on: .allWindows),
+            title: TerminalSessionNaming.steady(TerminalWorkgroupOpening.label(session, on: .allWindows)),
             subtitle: waits ? Self.waitingSubtitle(for: session) : Self.subtitle(for: [session]),
             symbolName: symbolName,
             endpointIDs: [EndpointID(rawValue: session.server.id)],
@@ -1037,15 +1064,11 @@ public final class GlassTerminalCapability: GlassCapability {
             },
             lastActivity: { session.terminalHostModel.lastActivityAt },
             // Its agent in its colour, else a terminal in the window's, pulsing while it prints: as the
-            // window's own orb and its sidebar draw it.
-            icon: { [runtime] side in
-                let workgroup = manager.workgroup(for: workgroupID)
-                let look = TerminalLook.resolved(workgroup?.windowSettings ?? GlassWindowOverrides(),
-                                                 settings: runtime.settingsManager)
-                // Drawn on an orb's ring, in the dock: orange where its bell rang out of sight (`GlassBell`).
-                return AnyView(TerminalSessionMark(session: session,
-                                                   color: look.tintColor ?? workgroup?.colorTag.color ?? .secondary,
-                                                   size: side, showsBell: true))
+            // window's own orb and its sidebar draw it. On an orb's ring, in the dock, orange where its bell rang
+            // out of sight (`GlassBell`).
+            icon: { [runtime] placement in
+                TerminalSessionMark.placed(placement, session: session,
+                                           color: Self.markColor(workgroupID: workgroupID, manager: manager, runtime: runtime))
             },
             bellRang: { session.terminalHostModel.bellNotice.isUnseen }
         )
@@ -1067,11 +1090,12 @@ public final class GlassTerminalCapability: GlassCapability {
     /// so its row is named as its window names the terminal (W11): the name it was given, its
     /// program's title, its repository. The owner, on the Vision Pro (2026-10-09): Active said
     /// "Terminal on …" while the window had the name. A workgroup with a name of its own, or with
-    /// several terminals, keeps its name.
+    /// several terminals, keeps its name. Without the spinner an agent turns at the start of its title, which the
+    /// iPhone drew as a green emoji, and which the row's mark already says (the owner, 2026-11-16).
     static func title(of workgroup: TerminalWorkgroup, live: [TerminalSession]) -> String {
         if let given = workgroup.givenName { return given }
         guard live.count == 1, let only = live.first, workgroup.name == only.server.name else { return workgroup.name }
-        return TerminalWorkgroupOpening.label(only, on: .active)
+        return TerminalSessionNaming.steady(TerminalWorkgroupOpening.label(only, on: .active))
     }
 
     /// D44: a row says when its terminals are in tmux, and ending it is a detach when they all
@@ -1121,6 +1145,21 @@ public final class GlassTerminalCapability: GlassCapability {
     static func agent(of session: TerminalSession) -> TerminalAgent? {
         TerminalAgent.identify(program: session.tmuxPane?.program, arguments: session.tmuxPane?.programArguments,
                                title: session.tmuxPane?.title ?? session.terminalHostModel.terminalTitle)
+    }
+
+    /// The AI agent a tmux session on a machine is running, as its listing says: the same three things a terminal's own
+    /// read gives (`TerminalTmux.listScript`; the owner, 2026-11-16, on Active: "the terminals don't reflect the coding
+    /// agent like the tabs do").
+    static func agent(of listed: TerminalTmux.Session) -> TerminalAgent? {
+        TerminalAgent.identify(program: listed.command, arguments: listed.programArguments, title: listed.title)
+    }
+
+    /// The colour a terminal's mark takes with no agent, or an agent with no colour of its own: its window's tint, else
+    /// its workgroup's colour, as the window's sidebar and orb draw it.
+    static func markColor(workgroupID: UUID, manager: SessionManager, runtime: GlassTerminalRuntime) -> Color {
+        let workgroup = manager.workgroup(for: workgroupID)
+        let look = TerminalLook.resolved(workgroup?.windowSettings ?? GlassWindowOverrides(), settings: runtime.settingsManager)
+        return look.tintColor ?? workgroup?.colorTag.color ?? .secondary
     }
 
     /// A still of a terminal, in whatever image type this platform uses. 800px wide is the

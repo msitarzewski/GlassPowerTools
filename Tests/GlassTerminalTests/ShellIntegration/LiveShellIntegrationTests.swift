@@ -10,7 +10,7 @@ import Testing
 /// Shells are found where they are usually installed; `GPT_TEST_SHELLS` (paths, `:`-separated)
 /// adds more, so another bash or a fish can be tried without installing it. Never the real home
 /// folder or its start-up files: every shell runs with a HOME of its own in the temporary folder.
-@Suite("Shell integration in real shells (live)")
+@Suite("Shell integration in real shells (live)", LiveTestGuard.refusal)
 struct LiveShellIntegrationTests {
 
     // MARK: The marks

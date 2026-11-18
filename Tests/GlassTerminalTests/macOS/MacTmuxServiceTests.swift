@@ -84,7 +84,8 @@ nonisolated struct MacTmuxServiceTests {
         #expect(calls.list == [["/t", "-S", "/tmp/s", "kill-server"], ["/bin/launchctl", "bootout", "gui/\(getuid())/l"]])
     }
 
-    nonisolated static var tmux: String? { MacLocalTmux.executablePath() }
+    /// Nil inside the owner's tmux (`LiveTestGuard`): every live tmux test that is gated on it skips there.
+    nonisolated static var tmux: String? { LiveTestGuard.refuses ? nil : MacLocalTmux.executablePath() }
 
     /// A process's resource coalition: macOS counts everything an app starts, and everything those
     /// start, as the app's, and a server tmux daemonizes stays in it (its parent and process group

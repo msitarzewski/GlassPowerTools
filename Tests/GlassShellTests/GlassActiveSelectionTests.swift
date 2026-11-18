@@ -22,6 +22,7 @@ struct GlassActiveSelectionTests {
         var ended: [String] = []
         var together: [[GlassRunningAttachment]] = []
         var intoWindow: [(attachments: [GlassRunningAttachment], window: String)] = []
+        var gathered: [(groups: [String], into: String?)] = []
     }
 
     private final class TerminalStub: GlassCapability {
@@ -40,6 +41,22 @@ struct GlassActiveSelectionTests {
         func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {
             log.intoWindow.append((attachments, group))
         }
+        /// Windows open here, as Active lists them.
+        var sets: [GlassOpenSession] = []
+        func openSessions() -> [GlassOpenSession] { sets }
+        /// What a gathering finds no room for.
+        var full: [String] = []
+        func gather(tabGroups: [GlassTabGroup.ID], into destination: GlassTabGroup.ID?) -> GlassGathering? {
+            guard tabGroups.contains(where: { id in sets.contains { $0.tabGroupID == id } }) else { return nil }
+            log.gathered.append((tabGroups, destination))
+            return GlassGathering(tabGroup: destination ?? tabGroups[0], leftOut: full)
+        }
+    }
+
+    /// A window open here, as the terminal lists one: gathered by its id where `gatherable` (off the Mac).
+    private func set(_ name: String, on endpoint: EndpointID, gatherable: Bool = true) -> GlassOpenSession {
+        GlassOpenSession(id: "terminal:\(name)", title: name, symbolName: "terminal", endpointIDs: [endpoint],
+                         activate: {}, close: {}, tabGroupID: gatherable ? name : nil)
     }
 
     /// A row as the terminal makes one: opening, ending and its attachment are recorded.
@@ -276,6 +293,63 @@ struct GlassActiveSelectionTests {
         #expect(selection.notice == GlassActiveNotice(title: "Only Terminal Sessions Open Together",
                                                       message: "report didn't open. Open it on its own."))
         #expect(f.model.runningSessions.map(\.title) == ["report"], "and it stays listed")
+    }
+
+    /// The owner, 2026-11-15, on the iPhone: "the active list has a select, but it doesnt work, so i cant select
+    /// multiple to add to a set." Every row was a set open on the phone, and only running sessions could be chosen.
+    @Test("sets open here are chosen too: Open N Together gathers them into the first and opens running sessions there; one that can't gather can't be chosen")
+    func gathersSetsOpenHere() async throws {
+        let f = try await fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        f.terminal.windows = [GlassTabGroup(id: "one", title: "one"), GlassTabGroup(id: "two", title: "two")]
+        f.terminal.sets = [set("one", on: f.alpha), set("mac", on: f.alpha, gatherable: false), set("two", on: f.bravo)]
+        f.terminal.running = [row("glass-9", on: f.alpha, log: f.log)]
+        await f.model.refreshRunningSessions()
+        let machines = f.model.activeMachines()
+        #expect(GlassActiveSelection.gatherable(in: machines).map(\.title) == ["one", "two"])
+
+        let selection = GlassActiveSelection()
+        selection.isSelecting = true
+        let everything = machines.flatMap(\.sessions).map(\.id) + machines.flatMap(\.running).map(\.id)
+        _ = selection.listSelected(Set(everything), plainClick: false, in: machines)
+        let sets = selection.chosenSets(in: machines)
+        #expect(sets.map(\.title) == ["one", "two"], "in Active's order; the one that can't gather isn't chosen")
+        let plan = GlassOpenTogetherPlan(selection.chosen(in: machines))
+        #expect(GlassActiveSelection.canOpen(plan, sets: sets))
+        #expect(GlassActiveSelection.openTitle(count: plan.opening.count + sets.count, gathering: true) == "Open 3 Together")
+
+        selection.openChosen(in: f.model)
+        #expect(f.log.gathered.map(\.groups) == [["one", "two"]] && f.log.gathered.first?.into == nil,
+                "one request, into the first")
+        #expect(f.log.intoWindow.map(\.window) == ["one"], "the running session opens in the set gathered into")
+        #expect(f.log.intoWindow.first?.attachments == [GlassRunningAttachment(kind: .ssh, endpointID: f.alpha, name: "glass-9")])
+        #expect(f.log.together.isEmpty, "not a window of their own")
+        #expect(selection.chosen(in: f.model.activeMachines()).isEmpty && !selection.isSelecting, "the choice ends")
+    }
+
+    @Test("one set into another: Open as Tabs In offers the sets, gathers into the one chosen, and says what didn't fit")
+    func oneSetIntoAnother() async throws {
+        let f = try await fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        f.terminal.windows = [GlassTabGroup(id: "one", title: "one"), GlassTabGroup(id: "two", title: "two")]
+        f.terminal.sets = [set("one", on: f.alpha), set("two", on: f.bravo)]
+        f.terminal.full = ["build"]
+        let machines = f.model.activeMachines()
+        let selection = GlassActiveSelection()
+        selection.isSelecting = true
+        _ = selection.listSelected(["terminal:two"], plainClick: false, in: machines)
+        let sets = selection.chosenSets(in: machines)
+        let plan = GlassOpenTogetherPlan(selection.chosen(in: machines))
+        #expect(!GlassActiveSelection.canOpen(plan, sets: sets), "one set alone has nothing to open together")
+        #expect(GlassActiveSelection.canOpenIn(plan, sets: sets))
+        #expect(f.model.tabGroups(for: plan, sets: sets).map(\.title) == ["one", "two"], "the sets it can go into")
+        #expect(GlassActiveSelection.openInTitle(count: sets.count) == "Open as Tab In")
+
+        selection.openChosen(in: f.model, inTabGroup: f.terminal.windows[0])
+        #expect(f.log.gathered.map(\.groups) == [["two"]] && f.log.gathered.first?.into == "one")
+        #expect(f.log.intoWindow.isEmpty, "no running session to open")
+        #expect(selection.notice == GlassActiveNotice(title: "A Terminal Didn't Fit",
+                                                      message: "build stayed where it was: the window is full."))
     }
 
     @Test("the registry asks each capability once, with only its own sessions, in order")

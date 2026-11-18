@@ -53,6 +53,9 @@ enum MacLocalTmux {
         var ensureRunning: @Sendable (_ tmux: String, _ environment: [String: String]) -> Void = { _, _ in }
         /// Ends the server and every session in it (Settings ▸ Terminal). Stand-ins: nothing.
         var endServer: @Sendable (_ tmux: String) -> Void = { _ in }
+        /// Has a session keep its own bell (`TerminalTmux.bellHookArguments`), or clears the one it keeps
+        /// (`clearBellArguments`) — `true` sets the hook, `false` clears (2026-11-15). Stand-ins: nothing.
+        var bell: @Sendable (_ session: String, _ hook: Bool, _ tmux: String) -> Void = { _, _, _ in }
 
         nonisolated static let live = Server(
             executablePath: { MacLocalTmux.executablePath() },
@@ -89,7 +92,12 @@ enum MacLocalTmux {
             },
             readRepository: { TerminalRepository.read(folder: $0, home: $1) },
             ensureRunning: { MacTmuxService.ensureDefaultServer(tmux: $0, environment: $1) },
-            endServer: { MacTmuxService.stopDefaultServer(tmux: $0) }
+            endServer: { MacTmuxService.stopDefaultServer(tmux: $0) },
+            bell: { session, hook, tmux in
+                guard let arguments = hook ? TerminalTmux.bellHookArguments(session: session)
+                                           : TerminalTmux.clearBellArguments(session: session) else { return }
+                _ = MacLocalTmux.run(tmux, arguments)
+            }
         )
     }
 
@@ -304,7 +312,8 @@ enum MacLocalTmux {
         TerminalTmux.parseContext(output).map {
             MacWorkspacePaneContext(title: $0.title, directory: $0.directory, givenName: $0.givenName,
                                     program: $0.program,
-                                    programArguments: foregroundArguments(program: $0.program, shell: $0.shellProcessID))
+                                    programArguments: foregroundArguments(program: $0.program, shell: $0.shellProcessID),
+                                    bell: $0.bell)
         }
     }
 
@@ -328,6 +337,24 @@ enum MacLocalTmux {
     }
 
     nonisolated static let nameQueue = DispatchQueue(label: "GlassPowerTools.local-tmux-name", qos: .utility)
+
+    /// Has a session keep its own bell from now on, for every device's Active (`TerminalTmux.bellOption`,
+    /// 2026-11-15): once per session in this run of the app, as a pane first shows it. On the name's queue.
+    @MainActor static func keepBell(session: String) {
+        guard bellKept.insert(session).inserted else { return }
+        let server = server
+        guard let tmux = server.executablePath() else { return }
+        nameQueue.async { server.bell(session, true, tmux) }
+    }
+
+    @MainActor private static var bellKept: Set<String> = []
+
+    /// Clears the bell a session keeps: a pane here showing it was seen. On the name's queue.
+    @MainActor static func clearBell(session: String) {
+        let server = server
+        guard let tmux = server.executablePath() else { return }
+        nameQueue.async { server.bell(session, false, tmux) }
+    }
 
     /// Keeps on a session the repository and branch its tab found (W11), so Active on another
     /// device says them. On the name's queue, so changes arrive in the order they were made.

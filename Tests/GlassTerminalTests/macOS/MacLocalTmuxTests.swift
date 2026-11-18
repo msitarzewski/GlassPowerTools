@@ -227,13 +227,15 @@ struct MacLocalTmuxTests {
 
     @Test("what tmux says a pane shows: its host name is not a title; the name a tab gave the session comes too")
     func context() {
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\t\t\talpha.example.com\n")
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\t\t\t\talpha.example.com\n")
                 == MacWorkspacePaneContext(title: nil, directory: "/Users/ann/src"))
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\t\t\talpha\n")?.title == nil)
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\tbuild\tclaude\t0\t✳ Fix the build\tnow\n")
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\t\t\t\talpha\n")?.title == nil)
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\tbuild\tclaude\t0\t\t✳ Fix the build\tnow\n")
                 == MacWorkspacePaneContext(title: "✳ Fix the build\tnow", directory: "/Users/ann/src", givenName: "build",
                                            program: "claude"))
-        #expect(MacLocalTmux.parseContext("relative\th\th\t\t\t\t\n") == MacWorkspacePaneContext(title: nil, directory: nil))
+        #expect(MacLocalTmux.parseContext("relative\th\th\t\t\t\t\t\n") == MacWorkspacePaneContext(title: nil, directory: nil))
+        // Its bell, kept on the session (2026-11-15), before the title.
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\th\th\t\tclaude\t0\t1\t✳ Waiting\n")?.bell == true)
         // The older five-field line, from a tmux asked before 2026-10-14, does not read as anything.
         #expect(MacLocalTmux.parseContext("/Users/ann/src\th\th\t\ttitle\n") == nil)
         #expect(MacLocalTmux.parseContext("garbage") == nil)
@@ -706,7 +708,7 @@ struct MacLocalTmuxTests {
                                          title: String = "alpha.example.com", given: String = "", command: String = "zsh",
                                          repository: String = "", branch: String = "") -> String {
         [name, String(attached), "1", "", String(server.pid), String(server.startTime), server.socketPath, command,
-         "alpha.example.com", "alpha", given, directory, repository, branch, title].joined(separator: "\t")
+         "alpha.example.com", "alpha", given, directory, repository, branch, "", title].joined(separator: "\t")
     }
 
     /// Waits up to two seconds for `condition`.
@@ -934,7 +936,7 @@ struct MacLocalTmuxTests {
             }
             guard command == read else { return "" }
             readTimes.append(.now)
-            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, "", "", title]
+            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, "", "", "", title]
                 .joined(separator: "\t")
             let answer = pane + "\n" + (repository.map {
                 [TerminalRepository.remoteMarker, $0.top, "../.git", $0.branch, "/home/ann"].joined(separator: "\n") + "\n"
@@ -1156,9 +1158,9 @@ struct MacLocalTmuxTests {
             let none = try #require(TerminalTmux.repositoryCommand(session: "glass-5", repository: nil))
             // The note goes from a task of its own, after the title: under a full run's load the
             // title came first and the list was read with the second note still to come.
-            // `tmux -V`, for control mode (D83), is a question of its own.
-            _ = await eventually { host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand }.count >= 2 }
-            #expect(host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand } == [kept, none],
+            // `tmux -V`, for control mode (D83), is a question of its own; the bell hook, set at each attach, is no note.
+            _ = await eventually { host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand && !TerminalTmuxTests.isBellCommand($0) }.count >= 2 }
+            #expect(host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand && !TerminalTmuxTests.isBellCommand($0) } == [kept, none],
                     "the read says the folder and repository too: no lookup or name query of its own: \(host.commands)")
             _ = window
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))

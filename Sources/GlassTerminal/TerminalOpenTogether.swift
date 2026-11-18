@@ -85,6 +85,22 @@ extension GlassTerminalCapability {
     }
     #endif
 
+    /// Active's chosen sets gathered into one (the owner, 2026-11-15, on the iPhone: "i cant select multiple to add to
+    /// a set"): every terminal of each into `destination`, else into the first chosen, and that set shown. Off the Mac.
+    public func gather(tabGroups: [GlassTabGroup.ID], into destination: GlassTabGroup.ID?) -> GlassGathering? {
+        #if os(macOS)
+        return nil
+        #else
+        let manager = runtime.sessionManager
+        let sources = tabGroups.compactMap(UUID.init(uuidString:)).filter { manager.workgroup(for: $0) != nil }
+        guard let target = destination.flatMap(UUID.init(uuidString:)) ?? sources.first,
+              manager.workgroup(for: target) != nil, !sources.isEmpty else { return nil }
+        let gathered = TerminalTabMoves.gather(sources, into: target, in: manager)
+        runtime.enqueue(.showWorkgroup(workgroupID: target))
+        return GlassGathering(tabGroup: target.uuidString, leftOut: gathered.leftOut)
+        #endif
+    }
+
     /// Running sessions as more tabs of a window here, in order (Open as Tab In).
     public func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {
         let targets = attachments.compactMap(TerminalTmuxTarget.init(attachment:))

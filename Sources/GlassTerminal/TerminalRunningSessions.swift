@@ -122,11 +122,15 @@ extension GlassTerminalCapability {
     /// tmux server is this Mac, in the library as an SSH host: its sessions are This Mac's, listed
     /// there once, where Open attaches without SSH and a tab here showing one is found.
     /// - Parameter local: this Mac's sessions; nil where there is no local tmux, or it did not read.
+    /// - Parameter closingEnded: whether a terminal that is down closes once its machine's listing says its session has
+    ///   ended (`closesEndedTerminals`).
     func runningReport(local: [TerminalTmux.Session]?,
-                       hosts: [(server: ServerConfiguration, listing: TerminalHostListing)]) -> GlassRunningReport {
+                       hosts: [(server: ServerConfiguration, listing: TerminalHostListing)],
+                       closingEnded: Bool = GlassTerminalCapability.closesEndedTerminals) -> GlassRunningReport {
         let manager = runtime.sessionManager
         let thisMac = Set((local ?? []).compactMap(\.server))
         var report = GlassRunningReport()
+        var ended: [TerminalSession] = []
         // Sessions an SSH terminal here shows on a host that is this Mac: an open row already.
         var shownOverSSH: Set<String> = []
         for (server, listing) in hosts {
@@ -154,6 +158,11 @@ extension GlassTerminalCapability {
             for terminal in here where terminal.isDown {
                 guard let name = terminal.tmuxSessionName else { continue }
                 terminal.tmuxWhileDown = byName[name].map(TerminalTmuxWhileDown.running) ?? .ended
+                // Not one that claims its session: a saved Workgroup's, not yet connected, makes it when it does and
+                // runs its startup command there; on iPhone and iPad, only the one shown has.
+                if byName[name] == nil, !terminal.tmuxClaimsGivenName { ended.append(terminal) }
+                // A bell kept on its session (2026-11-15): rung while this device was put away, or shown nowhere yet.
+                if byName[name]?.bell == true { terminal.sessionKeepsBell() }
             }
             if let theirs = sessions.first?.server, thisMac.contains(theirs) {
                 shownOverSSH.formUnion(shownHere)
@@ -176,7 +185,23 @@ extension GlassTerminalCapability {
         #else
         _ = shownOverSSH  // No local sessions here: nothing for it to leave out.
         #endif
+        if closingEnded {
+            for terminal in ended { manager.removeSessionFromWorkgroup(terminal) }
+        }
         return report
+    }
+
+    /// Off the Mac, a terminal whose tmux session has ended closes, and a window left with none goes with it, as a Mac's
+    /// tab kept in tmux closes once its session has ended (`MacLocalTerminalExitPolicy`). Only on the machine's word:
+    /// a machine not asked, or not answering, closes nothing. Reconnecting one would only make its session again, empty.
+    /// The owner, 2026-11-16, of the iPhone's Active after every tmux session on his Mac had ended, ~30 rows of
+    /// "Terminal on …" each saying "its tmux session has ended": "this is less than useful"; asked, he chose closing.
+    nonisolated static var closesEndedTerminals: Bool {
+        #if os(macOS)
+        false
+        #else
+        true
+        #endif
     }
 
     /// Glass's own first, by number, then the others by name.
@@ -215,7 +240,7 @@ extension GlassTerminalCapability {
         let name = session.name
         return GlassRunningSession(
             id: "terminal-tmux:local:\(name)",
-            title: session.displayName,
+            title: TerminalSessionNaming.steady(session.displayName),
             subtitle: Self.runningDetails(session, shownHere: shown),
             symbolName: "terminal",
             endpointID: Self.localShellEndpointID,
@@ -242,7 +267,9 @@ extension GlassTerminalCapability {
                 guard let tmux = server.executablePath() else { return }
                 await Task.detached { server.kill(name, tmux) }.value
             },
-            attachment: Self.attachment(serverID: nil, name: name))
+            attachment: Self.attachment(serverID: nil, name: name),
+            bellRang: session.bell,
+            icon: { TerminalTabMark.placed($0, listed: session) })
     }
     #endif
 
@@ -273,7 +300,7 @@ extension GlassTerminalCapability {
         let manager = runtime.sessionManager
         return GlassRunningSession(
             id: "terminal-tmux:\(server.id.uuidString):\(tmux.name)",
-            title: tmux.displayName,
+            title: TerminalSessionNaming.steady(tmux.displayName),
             subtitle: Self.runningDetails(tmux),
             symbolName: "terminal",
             endpointID: EndpointID(rawValue: server.id),
@@ -291,7 +318,9 @@ extension GlassTerminalCapability {
                 manager.sessions.contains {
                     $0.server.id == server.id && $0.purpose == .terminal && $0.tmuxSessionName == tmux.name
                 }
-            })
+            },
+            bellRang: tmux.bell,
+            icon: { TerminalTabMark.placed($0, listed: tmux) })
     }
 
     /// The host's tmux sessions, or why they were not listed: it could not be asked without a
@@ -299,7 +328,7 @@ extension GlassTerminalCapability {
     private func tmuxListing(on server: ServerConfiguration) async -> TerminalHostListing {
         do {
             let output = try await withTmuxSession(on: server) { try await $0.runTmuxCommand(TerminalTmux.listCommand) }
-            switch TerminalTmux.parse(output) {
+            switch TerminalTmux.parse(output, requireComplete: Self.closesEndedTerminals) {
             case .sessions(let sessions): return .sessions(sessions)
             case .failed:
                 Logger.ssh.notice("tmux sessions on a saved server could not be read")
@@ -344,21 +373,24 @@ extension GlassTerminalCapability {
     public static func demoRunningSessions(
         on endpointID: EndpointID,
         _ sessions: [(name: String, given: String?, folder: String, repository: String?, branch: String?,
-                      attached: Int, minutesAgo: Int)]
+                      attached: Int, minutesAgo: Int, program: String?)]
     ) -> [GlassRunningSession] {
         sessions.map { demo in
             let home = "/home/ann"
             let tmux = TerminalTmux.Session(
                 name: demo.name, attachedClients: demo.attached, windows: 1,
                 lastActivity: Date().addingTimeInterval(-Double(demo.minutesAgo) * 60),
-                givenName: demo.given, directory: home + "/" + demo.folder, home: home,
+                givenName: demo.given, directory: home + "/" + demo.folder,
+                command: demo.program.flatMap { $0.split(separator: " ").first.map(String.init) },
+                programArguments: demo.program.flatMap(TerminalAgent.identifyingWords), home: home,
                 repository: demo.repository.map { TerminalRepository(name: $0, branch: demo.branch, root: home + "/" + $0) })
             return GlassRunningSession(
                 id: "terminal-tmux:\(endpointID.rawValue.uuidString):\(demo.name)",
-                title: tmux.displayName, subtitle: runningDetails(tmux), symbolName: "terminal",
+                title: TerminalSessionNaming.steady(tmux.displayName), subtitle: runningDetails(tmux), symbolName: "terminal",
                 endpointID: endpointID, isAttachedElsewhere: demo.attached > 0,
                 open: {}, takeOver: {}, end: {},
-                attachment: attachment(serverID: endpointID.rawValue, name: demo.name))
+                attachment: attachment(serverID: endpointID.rawValue, name: demo.name),
+                icon: { TerminalTabMark.placed($0, listed: tmux) })
         }
     }
 }

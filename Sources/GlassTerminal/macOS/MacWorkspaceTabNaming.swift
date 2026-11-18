@@ -29,6 +29,8 @@ nonisolated struct MacWorkspacePaneContext: Equatable, Sendable {
     /// 2026-10-14). Only tmux answers the first; nil everywhere else.
     var program: String? = nil
     var programArguments: String? = nil
+    /// A bell rang in the pane's tmux session that no device has shown since (`TerminalTmux.bellOption`, 2026-11-15).
+    var bell = false
 }
 
 enum MacWorkspaceTabNaming {

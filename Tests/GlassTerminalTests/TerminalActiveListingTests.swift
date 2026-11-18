@@ -214,7 +214,7 @@ struct TerminalActiveListingTests {
         #expect(report.sessions.map { $0.isHeldHere() } == [false, false])
     }
 
-    @Test("A dropped tab whose session has ended says so; a live one is shown as it was")
+    @Test("When ended tabs are kept, a dropped tab says whether its session ended or is reconnecting")
     func aDroppedTabWhoseSessionEnded() throws {
         let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
         let capability = GlassTerminalCapability(runtime: runtime)
@@ -228,7 +228,7 @@ struct TerminalActiveListingTests {
         terminal.state = .disconnected
         let other = TerminalTmux.Session(name: "glass-2", attachedClients: 0, windows: 1)
 
-        _ = capability.runningReport(local: nil, hosts: [(terminal.server, .sessions([other]))])
+        _ = capability.runningReport(local: nil, hosts: [(terminal.server, .sessions([other]))], closingEnded: false)
         let window = try #require(capability.openSessions().first)
         #expect(window.subtitle == "Disconnected · its tmux session has ended")
         #expect(window.tabs.first?.subtitle == window.subtitle, "its card in All Windows says the same")
@@ -236,9 +236,81 @@ struct TerminalActiveListingTests {
         // On its way back, it is listed as it always was, and its session is not listed again.
         terminal.state = .reconnecting
         let mine = TerminalTmux.Session(name: "glass-1", attachedClients: 1, windows: 1)
-        let report = capability.runningReport(local: nil, hosts: [(terminal.server, .sessions([mine, other]))])
+        let report = capability.runningReport(local: nil, hosts: [(terminal.server, .sessions([mine, other]))], closingEnded: false)
         #expect(report.sessions.map(\.attachment?.name) == ["glass-2"])
         #expect(capability.openSessions().first?.subtitle == "Reconnecting... · in tmux (Terminal 1)")
+    }
+
+    /// The owner, 2026-11-16, of the iPhone's Active once every tmux session on his Mac had ended: ~30 windows, each
+    /// "Terminal on …" and "its tmux session has ended" — "this is less than useful". Asked, he chose closing them.
+    @Test("Off the Mac, a terminal whose session the machine says has ended closes, and its window if it was the last; nothing else does")
+    func endedTerminalsClose() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let server = ServerConfiguration(name: "alpha", host: "example.invalid", port: 22, username: "casey")
+        func terminal(_ tmux: String?, _ state: SessionState, in group: UUID) -> TerminalSession {
+            let terminal = TerminalSession(server: server)
+            manager.registerSession(terminal)
+            #expect(manager.appendSession(terminal, toWorkgroup: group))
+            terminal.tmuxSessionName = tmux
+            terminal.state = state
+            return terminal
+        }
+        let alone = manager.createWorkgroup(name: "alpha", colorTag: .blue)
+        let pair = manager.createWorkgroup(name: "Backend", colorTag: .green)
+        let others = manager.createWorkgroup(name: "Others", colorTag: .red)
+        defer { for group in [alone, pair, others] { manager.closeWorkgroup(group) } }
+        let gone = terminal("glass-1", .disconnected, in: alone)
+        let goneOfTwo = terminal("glass-2", .disconnected, in: pair)
+        let runningOfTwo = terminal("glass-3", .disconnected, in: pair)
+        let onItsWayBack = terminal("glass-4", .reconnecting, in: others)
+        let plainShell = terminal(nil, .disconnected, in: others)
+        let workgroupSlot = terminal("glass-5", .disconnected, in: others)
+        workgroupSlot.tmuxClaimsGivenName = true
+        let listed = TerminalTmux.Session(name: "glass-3", attachedClients: 0, windows: 1)
+
+        // Not asked, or not answering: nothing is known, and nothing closes.
+        _ = capability.runningReport(local: nil, hosts: [(server, .skipped("The machine didn't answer."))], closingEnded: true)
+        #expect(manager.sessions.count == 6)
+
+        // The Mac keeps its tabs to say so (it closes its own once their sessions end, as their shells exit).
+        _ = capability.runningReport(local: nil, hosts: [(server, .sessions([listed]))], closingEnded: false)
+        #expect(manager.sessions.count == 6)
+        #expect(gone.tmuxWhileDown == .ended)
+
+        _ = capability.runningReport(local: nil, hosts: [(server, .sessions([listed]))], closingEnded: true)
+        let left = Set(manager.sessions.map(\.id))
+        #expect(!left.contains(gone.id) && !left.contains(goneOfTwo.id), "the machine said their sessions have ended")
+        #expect(manager.workgroup(for: alone) == nil, "a window left with no terminal goes")
+        #expect(manager.workgroup(for: pair)?.sessionIDs == [runningOfTwo.id], "its other terminal's session runs on")
+        #expect(left.contains(onItsWayBack.id), "reconnecting: its session is being made again")
+        #expect(left.contains(plainShell.id), "not in tmux: no session to have ended")
+        #expect(left.contains(workgroupSlot.id), "a saved Workgroup's, not yet shown: it makes its session as it connects")
+    }
+
+    @Test("Active's names leave out the spinner an agent turns at the start of its title")
+    func namesWithoutTheSpinner() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let terminal = session(named: "alpha")
+        manager.registerSession(terminal)
+        let group = manager.createWorkgroup(name: "alpha", colorTag: .blue)
+        defer { manager.closeWorkgroup(group) }
+        #expect(manager.appendSession(terminal, toWorkgroup: group))
+        terminal.tmuxSessionName = "glass-1"
+        terminal.state = .disconnected
+        var mine = TerminalTmux.Session(name: "glass-1", attachedClients: 0, windows: 1)
+        mine.title = "✳ Second pass"
+        var other = TerminalTmux.Session(name: "glass-2", attachedClients: 0, windows: 1)
+        other.title = "✶ Review the parser"
+
+        let report = capability.runningReport(local: nil, hosts: [(terminal.server, .sessions([mine, other]))])
+        #expect(report.sessions.map(\.title) == ["Second pass", "Review the parser"], "sessions running on the machine")
+        let window = try #require(capability.openSessions().first)
+        #expect(window.title == "Second pass", "a window")
+        #expect(window.tabs.first?.title == "Second pass", "its card in All Windows")
     }
 
     @Test("Choosing a dropped tab in tmux reconnects it; not one disconnected on purpose, a plain shell, or a slot where slots connect as shown")
