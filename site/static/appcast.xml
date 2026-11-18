@@ -6,6 +6,17 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.621</title>
+      <pubDate>Wed, 18 Nov 2026 22:03:33 GMT</pubDate>
+      <sparkle:version>621</sparkle:version>
+      <sparkle:shortVersionString>0.4.621</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.621</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<p>Active shows coding-agent marks and highlights terminal bells that rang out of sight. On iPhone, iPad and Vision Pro, select terminal windows and running sessions to gather them in one window. Tabs close after a complete tmux check confirms that their session ended.</p>
+<p>See <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a> for 0.4.620 and 0.4.621.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.621/GlassPowerTools-0.4.621.zip" length="29453129" type="application/octet-stream" sparkle:edSignature="SPL+7vDEev7rjOIvB2GYTVBw4qqwAXWQGmVZPjvB9OrbPZiYmg1yDPs8w/PjIVj8547KanKxbH/Z8+uwp0OfCg=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.619</title>
       <pubDate>Sun, 15 Nov 2026 11:52:02 GMT</pubDate>
       <sparkle:version>619</sparkle:version>
