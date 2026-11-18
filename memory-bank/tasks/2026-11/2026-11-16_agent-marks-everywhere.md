@@ -86,3 +86,16 @@
   and the Tailscale-off message. All three device Release bundles are staged in `build/0.4.621/`, with build
   logs and simulator result bundles beside them. Verified platform, 0.4.621 (621), arm64 and signatures on
   all three staged copies. The simulator runs used iOS and visionOS 27.2 with zero skipped tests.
+
+## Distribution release (2026-11-18)
+
+- The owner approved the same release sequence as 0.4.619. The source, README, release notes and site were
+  prepared in `7b940e5a`. Both distribution jobs used clean worktrees of that commit.
+- Mac `v0.4.621` published from `7b940e5a`. App and DMG passed notarization, stapling and Gatekeeper. The
+  three published files match their local copies and the Sparkle signature verifies against the app's key.
+- Feed commit `fe00d199` pushed after the GitHub assets were verified. The site build passed its Help checks,
+  and 111 of 111 files in staging match. The owner runs the provisioning step. The previous public feed
+  offered 0.4.619 before this release.
+- Both TestFlight builds uploaded and processed as valid. App Store Connect confirmed What to Test and
+  Testers membership on both. Vision Pro went to beta review first while iOS was processing. Both then
+  read back `WAITING_FOR_REVIEW`.

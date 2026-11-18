@@ -66,11 +66,14 @@ use the disposable test VM only).
   iOS and visionOS are in `build/0.4.621/`. All three are arm64 with verified signatures. Active now requires a
   complete, readable tmux listing before closing a disconnected tab. iPhone simulator 5 UI tests passed;
   Vision Pro simulator 65 terminal tests and 4 app UI tests passed. See the D109/D110 task note for details.
-  The 0.4.619 site is still recorded as awaiting provisioning.
+  The live Sparkle feed was verified at 0.4.619 before staging the new site.
 - **2026-11-18, shipping 0.4.621 (Codex):** the owner approved the public Mac release, the external TestFlight
-  beta on iOS and visionOS, and the website update. The source, release notes and site copy are being prepared
-  from the verified local build. Build distribution archives from the release commit. Publish the notarized
-  Mac downloads before staging the site and its Sparkle feed. Track Apple's beta review per platform.
+  beta on iOS and visionOS, and the website update. Built from clean worktrees at `7b940e5a`. Mac `v0.4.621`
+  is public, notarized, stapled and checked by Gatekeeper. All three GitHub assets match the local files;
+  the release tag points to the source commit and the Sparkle signature matches the ZIP. Feed `fe00d199`
+  is pushed. All 111 staged site files match the build by SHA-256. Provisioning is with the owner, and the
+  public feed still offered 0.4.619 at handoff. App Store Connect reports both iOS and visionOS build 621
+  as valid and waiting for beta review. Both have the release's What to Test notes and are in Testers.
 
 ## 2026-11-15 — shipping 0.4.619 at his word
 

@@ -2339,7 +2339,7 @@ machine's orb, docked or not), draws an orb fainter while none of its windows is
 from the first window that opens, on Vision Pro from the launch and as the setting is turned on. The Mac learns
 each window as it opens (`GlassOrbDockModel.opened`); Vision Pro reads the open sessions it already listed.
 
-## D108 — A terminal's bell is kept on its tmux session, for every device's Active — Approved and implemented 2026-11-15 (0.4.620, not committed)
+## D108 — A terminal's bell is kept on its tmux session, for every device's Active — Approved and implemented 2026-11-15 (0.4.620, included in the 0.4.621 release)
 **Owner:** on the iPhone, Active "doesn't highlight which terminals need attention / have alerts"; offered the bell kept
 on the tmux session (it also catches bells while the phone is put away and its connections are down, which were lost),
 he answered "Let's work on the other stuff".
@@ -2353,7 +2353,7 @@ and a terminal here takes it as unseen. The device that shows the terminal clear
 `monitor-bell` off never fires the hook; sessions made before 0.4.620 get the hook when a device attaches.
 Task note `tasks/2026-11/2026-11-15_active-on-the-iphone.md`.
 
-## D109 — A terminal's icon is its agent's mark wherever one is shown; every row's bell glows beneath it — Approved and implemented 2026-11-16 (0.4.621, not committed)
+## D109 — A terminal's icon is its agent's mark wherever one is shown; every row's bell glows beneath it — Approved and implemented 2026-11-16 (Mac 0.4.621 released, TestFlight 621 submitted)
 **Owner:** with 0.4.620 on the iPhone, "the glow is different on iOS … the terminals don't reflect the coding agent like
 the tabs do. That should be a constant when a terminal icon is shown. Do we need to centralize that code?" Asked, he
 chose the glow beneath every row at the Mac's strength, and the name menu showing an agent's shape, else the dot.
@@ -2369,7 +2369,7 @@ version and its title holds the task. The iPhone's name menu: the bell, else the
 **Limits:** a running row's mark is as of Active's last check of the machine (five minutes at most) and doesn't pulse;
 a host whose `ps` lacks `tpgid` says only the program's name.
 
-## D110 — Off the Mac, a terminal whose tmux session has ended closes — Approved and implemented 2026-11-16 (0.4.621, not committed)
+## D110 — Off the Mac, a terminal whose tmux session has ended closes — Approved and implemented 2026-11-16 (TestFlight 621 submitted)
 **Owner:** on the iPhone, after every tmux session on his Mac had ended, Active held ~30 windows, each named after the
 machine and saying "its tmux session has ended": "this is less than useful". Asked whether such a window should close,
 gather into one "ended" row, or stay with a bulk Close, he chose closing.
