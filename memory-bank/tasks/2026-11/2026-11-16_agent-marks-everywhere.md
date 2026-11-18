@@ -102,3 +102,7 @@
 - Deployment follow-up: the initial staging check used a different route. The owner identified the
   deployment host and its private runbook. Refreshed the 13 stale files there and checked all 111 hashes.
   Read the installed static-site script and gave the owner the command for the live update.
+- After provisioning, 111 of 111 public files matched the staged build, including the homepage at `/`.
+  The public Sparkle feed has `Cache-Control: no-cache` and leads with 0.4.621 (621). The ZIP fetched
+  from the live feed matched its stated length and the release SHA-256, and its Ed25519 signature
+  verified against the Mac app's public key.
