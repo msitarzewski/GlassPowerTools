@@ -71,7 +71,8 @@ use the disposable test VM only).
   beta on iOS and visionOS, and the website update. Built from clean worktrees at `7b940e5a`. Mac `v0.4.621`
   is public, notarized, stapled and checked by Gatekeeper. All three GitHub assets match the local files;
   the release tag points to the source commit and the Sparkle signature matches the ZIP. Feed `fe00d199`
-  is pushed. All 111 staged site files match the build by SHA-256. Provisioning is with the owner, and the
+  is pushed. After the owner identified the deployment host, 13 stale files were refreshed there and all
+  111 staged files matched the build by SHA-256. Provisioning is with the owner, and the
   public feed still offered 0.4.619 at handoff. App Store Connect reports both iOS and visionOS build 621
   as valid and waiting for beta review. Both have the release's What to Test notes and are in Testers.
 

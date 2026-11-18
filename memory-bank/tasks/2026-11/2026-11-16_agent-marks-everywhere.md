@@ -99,3 +99,6 @@
 - Both TestFlight builds uploaded and processed as valid. App Store Connect confirmed What to Test and
   Testers membership on both. Vision Pro went to beta review first while iOS was processing. Both then
   read back `WAITING_FOR_REVIEW`.
+- Deployment follow-up: the initial staging check used a different route. The owner identified the
+  deployment host and its private runbook. Refreshed the 13 stale files there and checked all 111 hashes.
+  Read the installed static-site script and gave the owner the command for the live update.
