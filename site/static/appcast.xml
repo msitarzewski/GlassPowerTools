@@ -6,6 +6,21 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.622</title>
+      <pubDate>Thu, 19 Nov 2026 19:42:57 GMT</pubDate>
+      <sparkle:version>622</sparkle:version>
+      <sparkle:shortVersionString>0.4.622</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.622</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.622</h2>
+<ul>
+  <li><b>After the Mac restarts, its terminals in tmux don't come back empty.</b> A restart ends tmux and what ran in it. Before, every tab came back anyway as an empty shell in your home folder, and closing those windows left the empty sessions running. Now a tab whose session has ended doesn't come back, and neither does a window left with no tab. Open a Workgroup to start its terminals again.</li>
+  <li><b>A terminal only goes back to its own session.</b> Reconnecting or relaunching joins the session the terminal had and never starts a new one in its place. A new session that took the same name is someone else's.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.622/GlassPowerTools-0.4.622.zip" length="29456660" type="application/octet-stream" sparkle:edSignature="wpaO4v2CofbzhIAiav1bEDsYq8ZuDPh23OgkdvwRMRef1aw4Zlvdf07UTycTRb8O2rm4nYKRfB1qxKLZoGDQCA=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.621</title>
       <pubDate>Wed, 18 Nov 2026 22:03:33 GMT</pubDate>
       <sparkle:version>621</sparkle:version>
