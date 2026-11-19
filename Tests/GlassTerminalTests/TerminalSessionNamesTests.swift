@@ -26,12 +26,14 @@ struct TerminalSessionNamesTests {
         var repository: (top: String, branch: String)? = ("/home/ann/src/app", "main")
         /// A bell kept on the session (`@glass-bell`).
         var bell = false
+        /// When tmux made the session (2026-11-19).
+        var created: Int? = nil
         /// How long a read takes on the host.
         var delay: Duration = .zero
 
         func answer() -> String {
             let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, program, pid,
-                        bell ? "1" : "", title]
+                        bell ? "1" : "", created.map(String.init) ?? "", title]
                 .joined(separator: "\t")
             guard let repository else { return pane + "\n" }
             return pane + "\n" + [TerminalRepository.remoteMarker, repository.top, "../.git", repository.branch, "/home/ann"]
@@ -53,7 +55,7 @@ struct TerminalSessionNamesTests {
         session.tmuxSessionName = "glass-5"
         session.tmuxCommandRunner = { command in
             host.commands.append(command)
-            guard command == Self.read else { return "" }
+            guard command == Self.read else { return command == TerminalTmux.listCommand ? "glass-5\t1\t1\t0\n" : "" } // It runs: joined.
             host.reads += 1
             host.readTimes.append(.now)
             let answer = host.answer()
@@ -86,7 +88,7 @@ struct TerminalSessionNamesTests {
     @Test("one command reads what a session says about itself; the session is its argument, never part of the script")
     func readCommand() throws {
         #expect(TerminalTmux.paneStateCommand(session: "it's")
-                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; s=$1; tmux -u has-session -t "=$s" 2>/dev/null || exit 0; c=$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}\#t#{host}\#t#{host_short}\#t#{@glass-name}\#t#{pane_current_command}\#t#{pane_pid}\#t#{@glass-bell}\#t#{pane_title}'\'' 2>/dev/null) || exit 0; printf '\''__glass_pane__\t%s\t%s\n'\'' "$HOME" "$c"; p=$(tmux -u display-message -p -t "=$s:" '\''#{pane_pid}'\'' 2>/dev/null); g=$(ps -o tpgid= -p "$p" 2>/dev/null | tr -d '\'' '\''); [ -n "$g" ] && [ "$g" -gt 0 ] 2>/dev/null && printf '\''__glass_program__\t%s\n'\'' "$(ps -o args= -p "$g" 2>/dev/null)"; set -- "$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}'\'' 2>/dev/null)"; case $1 in /*) ;; *) exit 0;; esac; command -v git >/dev/null 2>&1 || exit 0; if [ -x /usr/bin/xcode-select ] && ! /usr/bin/xcode-select -p >/dev/null 2>&1; then exit 0; fi; cd -- "$1" 2>/dev/null || exit 0; t=$(git rev-parse --show-toplevel --git-common-dir 2>/dev/null) || exit 0; b=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short=7 HEAD 2>/dev/null); h=$(cd -- "$HOME" 2>/dev/null && pwd -P); printf '\''__glass_repo__\n%s\n%s\n%s\n'\'' "$t" "$b" "$h"' _ 'it'\''s'"#)
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; s=$1; tmux -u has-session -t "=$s" 2>/dev/null || exit 0; c=$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}\#t#{host}\#t#{host_short}\#t#{@glass-name}\#t#{pane_current_command}\#t#{pane_pid}\#t#{@glass-bell}\#t#{session_created}\#t#{pane_title}'\'' 2>/dev/null) || exit 0; printf '\''__glass_pane__\t%s\t%s\n'\'' "$HOME" "$c"; p=$(tmux -u display-message -p -t "=$s:" '\''#{pane_pid}'\'' 2>/dev/null); g=$(ps -o tpgid= -p "$p" 2>/dev/null | tr -d '\'' '\''); [ -n "$g" ] && [ "$g" -gt 0 ] 2>/dev/null && printf '\''__glass_program__\t%s\n'\'' "$(ps -o args= -p "$g" 2>/dev/null)"; set -- "$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}'\'' 2>/dev/null)"; case $1 in /*) ;; *) exit 0;; esac; command -v git >/dev/null 2>&1 || exit 0; if [ -x /usr/bin/xcode-select ] && ! /usr/bin/xcode-select -p >/dev/null 2>&1; then exit 0; fi; cd -- "$1" 2>/dev/null || exit 0; t=$(git rev-parse --show-toplevel --git-common-dir 2>/dev/null) || exit 0; b=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short=7 HEAD 2>/dev/null); h=$(cd -- "$HOME" 2>/dev/null && pwd -P); printf '\''__glass_repo__\n%s\n%s\n%s\n'\'' "$t" "$b" "$h"' _ 'it'\''s'"#)
         #expect(TerminalTmux.paneStateCommand(session: "a:b") == nil, "a session name tmux would misread")
 
         let host = Host()

@@ -31,6 +31,9 @@ nonisolated struct MacWorkspacePaneContext: Equatable, Sendable {
     var programArguments: String? = nil
     /// A bell rang in the pane's tmux session that no device has shown since (`TerminalTmux.bellOption`, 2026-11-15).
     var bell = false
+    /// When tmux made the pane's session (`TerminalTmux.Session.created`, 2026-11-19): the pane keeps it, so a relaunch
+    /// comes back to that session and never to a later one by its name.
+    var sessionCreated: Int? = nil
 }
 
 enum MacWorkspaceTabNaming {

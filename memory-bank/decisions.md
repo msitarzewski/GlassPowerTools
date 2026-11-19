@@ -2387,3 +2387,30 @@ another socket than the listing's would read as every session ended.
 
 **Implementation check, 2026-11-18:** Active requires a completed reply with readable rows before inferring that
 a session ended. A partial or unreadable reply follows the existing unchecked-machine path.
+
+## D111 — A terminal only ever rejoins its own tmux session; a relaunch doesn't reopen one that ended — Approved 2026-11-19, implemented, not released
+**Owner:** his Mac ran out of memory and he force-restarted it with ~29 local tabs in tmux (Workgroups' and ad hoc).
+Every tab came back "an empty shell", all in `~`, and "because they're tmux now, closing the window leaves that number of
+empty tmux sessions running", so he typed `exit` in each. On the iPhone (621), D110 closed the terminals whose names
+were gone, "but it did find one, and it kept the old session name": the Mac's three new tabs had taken `glass-1`…, and
+the iPhone kept a terminal's old name over a new, unrelated session. Asked whether a dead tab should be restored, closed, or
+kept asking, he chose: "I'd rather close it, or rather not reopen it, if it was a tmux session. Wouldn't that be easier
+to explain than getting it wrong?" Resuming agents was weighed and set aside: `claude -c` takes the folder's latest
+conversation, `--resume`/`codex resume` need an id the app knows only for agents it started.
+
+**Decided.** A session is known by its name and when tmux made it (`#{session_created}`, read in the listing and in each
+terminal's own read: `TerminalTmux.Session.created`, `PaneState.sessionCreated`, `Session.isSession(_:created:)`).
+- **Every device:** a terminal keeps `tmuxSessionCreated` (from Active's listing, the reopen record, or its first read).
+  Once it has attached, every later attach joins only (`attachLine(joining:)`: `attach-session -t =name`, never
+  `new-session -A`); a session gone or replaced closes the terminal as `exit` does. Active's open, a continuation and
+  the new-tab menu's running sessions join only too. Only a claim makes a session (a new terminal, a Workgroup slot not
+  yet attached). Active's matching uses the identity: a later session by the name is "ended" for the old terminal
+  (D110 closes it) and listed as its own row.
+- **The Mac:** a pane intent keeps `localTmuxSessionCreated` / `sshTmuxSessionCreated` once read. At launch the reopen
+  list leaves out tabs whose local sessions aren't running as the same session (`MacLocalTmux.reopens`,
+  `withoutEndedSessions`; their records go, a window with none left stays closed). A local pane that has been in its
+  session starts with `attach-session` (`joinsLocalTmuxSession`, both start paths); an SSH pane that has rejoins only.
+  A Workgroup opened by hand still claims, so its startup commands run in sessions made for it.
+**Limits:** a terminal or pane that never read its session (records from 621 and before) goes by the name alone. With
+the Mac's listing unreadable at launch, windows come back and a pane whose session is gone shows its tmux exit rather
+than closing (unknown keeps a pane, `MacLocalTerminalExitPolicy`). A split tab with one dead local pane keeps the tab.

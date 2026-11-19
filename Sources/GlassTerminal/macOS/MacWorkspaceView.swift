@@ -1261,6 +1261,7 @@ private struct MacWorkspaceTabContent: View {
                     shellOverride: pane.intent.localShell,
                     directoryOverride: pane.intent.localDirectory,
                     tmuxSession: pane.intent.localTmuxSession,
+                    tmuxSessionJoins: controller.joinsLocalTmuxSession(pane),
                     isFocused: isFocused,
                     showsPaneChrome: showsPaneChrome,
                     findRequest: findRequest(for: pane.id),

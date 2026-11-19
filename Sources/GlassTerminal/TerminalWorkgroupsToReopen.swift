@@ -47,6 +47,9 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
         var name: String?
         /// Opened without tmux by choice (2026-10-12): it comes back the same; nil otherwise.
         var withoutTmux: Bool? = nil
+        /// When tmux made `tmuxSession`, once known (2026-11-19): it comes back to that session, never a later one
+        /// by the same name. Absent from lists written before it, which go by the name alone.
+        var tmuxSessionCreated: Int? = nil
     }
 
     var id: UUID
@@ -281,7 +284,8 @@ final class TerminalWorkgroupsToReopen {
                     tmuxSession: terminal.survivesClose ? terminal.tmuxSessionName : nil,
                     label: terminal.workgroupLabel,
                     name: terminal.givenName,
-                    withoutTmux: terminal.withoutTmux ? true : nil)
+                    withoutTmux: terminal.withoutTmux ? true : nil,
+                    tmuxSessionCreated: terminal.survivesClose ? terminal.tmuxSessionCreated : nil)
             }
             guard terminals.contains(where: { $0.tmuxSession != nil }) else { return nil }
             return TerminalWorkgroupReopenRecord(
@@ -407,6 +411,7 @@ extension TerminalWorkgroupOpening {
                 ) { session in
                     prepare(session, for: target, workgroupID: workgroupID, settingsManager: settingsManager,
                             joinsOnly: true)
+                    session.tmuxSessionCreated = terminal.tmuxSessionCreated
                     session.isWorkgroupSlot = true
                     session.connectsWhenShown = connectsWhenShown
                     if let name = terminal.name { session.rename(to: name) }

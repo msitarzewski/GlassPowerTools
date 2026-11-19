@@ -31,7 +31,24 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-15 (evening) — RESUME HERE: the iPhone's Active, from his day on the phone (not committed)
+## 2026-11-19 — RESUME HERE: after a restart, tmux tabs came back empty and terminals kept old names (D111, not committed)
+
+- **His report:** his Mac ran out of memory and he force-restarted it with ~29 local tabs in tmux (Workgroups' and ad
+  hoc, one window of 12–13). Every tab came back an empty shell in `~` under its old session name; closing windows
+  left the empties running, so he `exit`ed each. On the iPhone (621), terminals whose names his three new Mac tabs had
+  taken stayed, under their old names (a project's name over a new session). His choice for a tab whose session died: "I'd
+  rather close it, or rather not reopen it, if it was a tmux session."
+- **Built (D111, task note `tasks/2026-11/2026-11-19_restart-tmux-identity.md`):** a session is its name and when tmux
+  made it; a terminal that has had a session only rejoins it (`attach-session`), and is gone once it's gone or
+  replaced; Active matches by both; a Mac relaunch leaves out tabs (and windows) whose local sessions ended. RELEASE-NOTES
+  0.4.622 and `site/help/terminal-tmux.md` written.
+- **Checked:** 82 pure tests on his Mac (live ones skip under his tmux); each new piece seen failing without it. In the
+  macOS VM: tmux 3.7c's `session_created` and `attach-session` behaviour; an ungraceful VM reboot with three tabs open
+  reopened nothing and made nothing; quit and relaunch with tmux running rejoined both tabs. A first VM run found the
+  pane view still starting with `new-session -A`; fixed. iPhone and Vision Pro simulator builds pass. VM stopped.
+- **Next:** his word to commit and ship 0.4.622 (Mac release, TestFlight, site, devices). All three devices run 0.4.621.
+
+## 2026-11-15 (evening) — the iPhone's Active, from his day on the phone (released in 0.4.621)
 
 - **His reports (iPhone, 0.4.619):** Active "doesn't highlight which terminals need attention / have alerts (the orange
   pulse/highlight)"; Active's Select "doesn't work, so i cant select multiple to add to a set"; moving a terminal

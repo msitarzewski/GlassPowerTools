@@ -66,6 +66,15 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
     /// 2026-10-29: the folder an SSH pane's session starts in when its claim makes one — another
     /// Mac's terminal, opened on that Mac, in the folder it has there. Absent for every other pane.
     var sshDirectory: String? = nil
+    /// 2026-11-19: when tmux made the pane's session (`TerminalTmux.Session.created`), once it has read it. A pane
+    /// that has one has been in that session: a relaunch only joins it again, and a pane whose session is gone — or
+    /// is another by the same name — is not reopened (the owner, after a restart brought every tab back an empty
+    /// shell in his home folder: "I'd rather close it, or rather not reopen it, if it was a tmux session").
+    var localTmuxSessionCreated: Int? = nil
+    var sshTmuxSessionCreated: Int? = nil
+
+    /// The tmux session this pane was in, and when tmux made it: a local pane's on this Mac, an SSH pane's on its host.
+    var tmuxSessionCreated: Int? { kind == .local ? localTmuxSessionCreated : sshTmuxSessionCreated }
 
     static let local = MacWorkspacePaneIntent(kind: .local, serverID: nil)
     static func local(shell: String?, directory: String?) -> Self {
@@ -85,6 +94,8 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
         plain.withoutTmux = true
         plain.localTmuxSession = nil
         plain.sshTmuxSession = nil
+        plain.localTmuxSessionCreated = nil
+        plain.sshTmuxSessionCreated = nil
         return plain
     }
 
@@ -123,18 +134,29 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
             .flatMap { kind == .ssh && TerminalTmux.isValidSessionName($0) ? $0 : nil }
         self.withoutTmux = try container.decodeIfPresent(Bool.self, forKey: .withoutTmux) ?? false
         self.sshDirectory = kind == .ssh ? try container.decodeIfPresent(String.self, forKey: .sshDirectory) : nil
+        // Read leniently, and only beside the session it dates: one that can't be read costs the pane only the date.
+        localTmuxSessionCreated = localTmuxSession == nil ? nil
+            : (try? container.decodeIfPresent(Int.self, forKey: .localTmuxSessionCreated)) ?? nil
+        sshTmuxSessionCreated = sshTmuxSession == nil ? nil
+            : (try? container.decodeIfPresent(Int.self, forKey: .sshTmuxSessionCreated)) ?? nil
         if withoutTmux {
             localTmuxSession = nil
             sshTmuxSession = nil
+            localTmuxSessionCreated = nil
+            sshTmuxSessionCreated = nil
         }
     }
 
-    /// The same pane to start, whatever tmux session an SSH pane has since claimed: a name
-    /// written back while it connects does not make it another pane.
+    /// The same pane to start, whatever tmux session an SSH pane has since claimed, and whenever its session was
+    /// made: a name or a date written back while it connects does not make it another pane.
     func startsSamePane(as other: Self) -> Bool {
         var mine = self, theirs = other
         mine.sshTmuxSession = nil
         theirs.sshTmuxSession = nil
+        mine.localTmuxSessionCreated = nil
+        theirs.localTmuxSessionCreated = nil
+        mine.sshTmuxSessionCreated = nil
+        theirs.sshTmuxSessionCreated = nil
         return mine == theirs
     }
 

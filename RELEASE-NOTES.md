@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.621 (18 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.622 (19 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.621)
+## What it holds (0.4.622)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -29,7 +29,8 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - Terminals kept in tmux, on servers and on the Mac, so they outlive the app and the device: pick a
   session up from Active on another device, or add it to a window as a tab. Basic terminals outside
   tmux when you want one. With tmux 3.2 or later the terminal keeps every line itself: its whole
-  history, a drag that selects through a scroll, and the mouse for full-screen programs.
+  history, a drag that selects through a scroll, and the mouse for full-screen programs. A terminal only
+  goes back to its own session; one whose session ended, as a restart ends them, doesn't come back empty.
 - Looks for a terminal window: a picture behind the text, Digital Rain that quickens while the
   terminal prints, a Synthwave horizon or a phosphor screen; green or amber phosphor text, a glow, and
   Vaporwave's colours, on the Mac, iPad and Vision Pro. Readability keeps the text legible over any
@@ -114,6 +115,18 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.622 (19 November 2026)
+- **Mac release, 19 November 2026.**
+- **After the Mac restarts, its terminals in tmux don't come back empty.** Restarting the Mac ends its tmux sessions
+  and everything running in them. Before, each tab came back anyway as an empty shell in your home folder, under its
+  old session name, and closing those windows left that many empty sessions running. Now a tab whose session has
+  ended doesn't come back, and neither does a window left with no tab. Open a Workgroup to start its terminals again.
+- **A terminal only goes back to its own session.** Each terminal remembers when tmux made its session as well as the
+  session's name. Reconnecting or relaunching joins that session and never starts a new one in its place. If it has
+  ended, the terminal closes, on every device. A new session that has since taken the same name is treated as a
+  different session. Before, after a restart, the iPhone's terminals stayed in **Active** with their old names over
+  new sessions on the Mac that had taken those names, and opening one joined the wrong session.
 
 ### 0.4.621 (16 November 2026)
 - **Mac release, 18 November 2026.** Includes the Active updates from 0.4.620 and 0.4.621.

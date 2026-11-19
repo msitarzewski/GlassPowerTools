@@ -157,12 +157,15 @@ extension GlassTerminalCapability {
             let byName = Dictionary(sessions.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
             for terminal in here where terminal.isDown {
                 guard let name = terminal.tmuxSessionName else { continue }
-                terminal.tmuxWhileDown = byName[name].map(TerminalTmuxWhileDown.running) ?? .ended
+                // Its own session, not a later one by its name (2026-11-19): after a restart the Mac's new tabs took
+                // the lowest free names, the ones the iPhone's terminals had, and those terminals stayed, named as before.
+                let own = byName[name].flatMap { $0.isSession(name, created: terminal.tmuxSessionCreated) ? $0 : nil }
+                terminal.tmuxWhileDown = own.map(TerminalTmuxWhileDown.running) ?? .ended
                 // Not one that claims its session: a saved Workgroup's, not yet connected, makes it when it does and
                 // runs its startup command there; on iPhone and iPad, only the one shown has.
-                if byName[name] == nil, !terminal.tmuxClaimsGivenName { ended.append(terminal) }
+                if own == nil, !terminal.tmuxClaimsGivenName { ended.append(terminal) }
                 // A bell kept on its session (2026-11-15): rung while this device was put away, or shown nowhere yet.
-                if byName[name]?.bell == true { terminal.sessionKeepsBell() }
+                if own?.bell == true { terminal.sessionKeepsBell() }
             }
             if let theirs = sessions.first?.server, thisMac.contains(theirs) {
                 shownOverSSH.formUnion(shownHere)
@@ -306,17 +309,20 @@ extension GlassTerminalCapability {
             endpointID: EndpointID(rawValue: server.id),
             isAttachedElsewhere: tmux.attachedClients > 0,
             open: { runtime.enqueue(.connect(serverID: server.id, purpose: .terminal, report: nil,
-                                             tmux: TerminalTmuxAttachment(name: tmux.name))) },
+                                             tmux: TerminalTmuxAttachment(name: tmux.name, created: tmux.created))) },
             takeOver: { runtime.enqueue(.connect(serverID: server.id, purpose: .terminal, report: nil,
-                                                 tmux: TerminalTmuxAttachment(name: tmux.name, takeOver: true))) },
+                                                 tmux: TerminalTmuxAttachment(name: tmux.name, takeOver: true,
+                                                                              created: tmux.created))) },
             end: { [weak self] in
                 guard let self else { return }
                 try await self.withTmuxSession(on: server) { _ = try await $0.runTmuxCommand(TerminalTmux.killCommand(name: tmux.name)) }
             },
             attachment: Self.attachment(serverID: server.id, name: tmux.name),
             isHeldHere: {
-                manager.sessions.contains {
-                    $0.server.id == server.id && $0.purpose == .terminal && $0.tmuxSessionName == tmux.name
+                // Held by a terminal here that had this session — not one that met an earlier session by its name.
+                manager.sessions.contains { terminal in
+                    terminal.server.id == server.id && terminal.purpose == .terminal
+                        && terminal.tmuxSessionName.map { tmux.isSession($0, created: terminal.tmuxSessionCreated) } == true
                 }
             },
             bellRang: tmux.bell,

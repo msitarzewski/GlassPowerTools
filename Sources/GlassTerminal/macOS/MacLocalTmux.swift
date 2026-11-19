@@ -313,7 +313,7 @@ enum MacLocalTmux {
             MacWorkspacePaneContext(title: $0.title, directory: $0.directory, givenName: $0.givenName,
                                     program: $0.program,
                                     programArguments: foregroundArguments(program: $0.program, shell: $0.shellProcessID),
-                                    bell: $0.bell)
+                                    bell: $0.bell, sessionCreated: $0.sessionCreated)
         }
     }
 
@@ -426,6 +426,13 @@ enum MacLocalTmux {
             + sessionEnvironment.flatMap { ["-e", $0] }
     }
 
+    /// A pane's tmux client for a session it has been in (2026-11-19): attached only. `attach-session` never makes
+    /// one; gone, it says so and exits, and the pane closes as after an `exit`. `=` is the exact name.
+    nonisolated static func joinArguments(session: String, control: Bool = false) -> [String] {
+        control ? ["-u", "-C", "attach-session", "-t", "=" + session]
+            : ["-u", "-T", "sync,RGB", "attach-session", "-t", "=" + session]
+    }
+
     /// Whether this Mac's tmux can have a control-mode client (3.2 or later): asked once a run, for
     /// each tmux, and only while the setting allows control mode.
     nonisolated static func supportsControlMode(_ tmux: String) -> Bool {
@@ -530,6 +537,38 @@ enum MacLocalTmux {
             let duplicate = tabs.allSatisfy { $0.map { $0.isSubset(of: claimed) } ?? false }
             if !duplicate { for case let sessions? in tabs { claimed.formUnion(sessions) } }
             return !duplicate
+        }
+    }
+
+    /// Whether a saved pane comes back (2026-11-19): a local pane in tmux only while its session runs on this Mac — the
+    /// same session, when the pane knows when it was made. Anything else comes back as it always has: an SSH pane joins
+    /// its session as it connects, and goes then if it can't (`TerminalTmux.attachLine(joining:)`). Not known what
+    /// runs here (`local` nil), every pane comes back, and one whose session is gone closes once tmux says so.
+    /// The owner, after a restart brought 29 tabs back as empty shells in his home folder, each a tmux session that
+    /// stayed when its window closed: "I'd rather close it, or rather not reopen it, if it was a tmux session."
+    nonisolated static func reopens(_ pane: MacWorkspacePaneIntent, local: [TerminalTmux.Session]?) -> Bool {
+        guard pane.kind == .local, !pane.withoutTmux, let name = pane.localTmuxSession, let local else { return true }
+        return local.contains { $0.isSession(name, created: pane.localTmuxSessionCreated) }
+    }
+
+    /// Of `windows`, those that come back, each with the tabs that do (`reopens`): a tab none of whose panes would
+    /// is left closed, and its record goes; a window left without tabs is left closed, and its record goes too.
+    @MainActor static func withoutEndedSessions(_ windows: [UUID], local: [TerminalTmux.Session]?,
+                                                defaults: UserDefaults) -> [UUID] {
+        guard let local else { return windows }
+        return windows.filter { windowID in
+            guard case .restored(let saved) = MacWorkspaceWindowController.load(windowID: windowID, defaults: defaults) else {
+                return true
+            }
+            let ending = saved.tabs.filter { tab in
+                guard let panes = MacWorkspaceController.savedPanes(workspaceID: tab.id, defaults: defaults),
+                      !panes.isEmpty else { return false }
+                return !panes.contains { reopens($0.intent, local: local) }
+            }.map(\.id)
+            guard !ending.isEmpty else { return true }
+            let kept = MacWorkspaceWindowController.forgetTabs(Set(ending), of: windowID, saved: saved, defaults: defaults)
+            logger.notice("Reopen: \(ending.count) of a window's \(saved.tabs.count) tabs left closed, their tmux sessions gone\(kept ? "" : "; the window too", privacy: .public)")
+            return kept
         }
     }
 
@@ -682,11 +721,17 @@ final class MacLocalTmuxContextReads {
 /// windows open and close and their tabs are saved, so a crash or a forced quit brings back the
 /// same windows. Quitting writes it once more, and the windows closing for the quit leave it alone.
 final class MacWindowsToReopen: NSObject {
-    static let shared = MacWindowsToReopen()
+    static let shared = MacWindowsToReopen(localSessions: {
+        MacLocalTmux.server.executablePath().flatMap { MacLocalTmux.listing(tmux: $0) }
+    })
     private nonisolated static let logger = Logger(subsystem: "sh.glas", category: "local-tmux")
 
     private let defaults: UserDefaults
     private let registry: MacWorkspacePreviewRegistry
+    /// This Mac's tmux sessions as the last run's windows are taken, nil when they couldn't be read: tabs whose
+    /// sessions have ended stay closed (2026-11-19). Said by whoever makes the list — the app's own reads this Mac's
+    /// server; a test says what runs, and never asks the owner's.
+    private let localSessions: @MainActor () -> [TerminalTmux.Session]?
     /// This run has taken the last run's list: from then on, this run's windows are the list.
     private(set) var hasTaken = false
     /// Windows of the last run asked to open and not on screen yet, kept in the list until they
@@ -695,9 +740,11 @@ final class MacWindowsToReopen: NSObject {
     /// Set as the app quits. Windows closing after it are closing for the quit, not by hand.
     private(set) var isQuitting = false
 
-    init(defaults: UserDefaults = .standard, registry: MacWorkspacePreviewRegistry = .shared) {
+    init(defaults: UserDefaults = .standard, registry: MacWorkspacePreviewRegistry = .shared,
+         localSessions: @escaping @MainActor () -> [TerminalTmux.Session]?) {
         self.defaults = defaults
         self.registry = registry
+        self.localSessions = localSessions
         super.init()
         registry.windowsChanged = { [weak self] in self?.update() }
         NotificationCenter.default.addObserver(self, selector: #selector(recordSaved(_:)),
@@ -715,11 +762,13 @@ final class MacWindowsToReopen: NSObject {
         hasTaken = true
         Self.logger.notice("Reopen: asked by \(asker, privacy: .public)")
         let candidates = MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: registry.openWindowIDs)
-        let reopening = MacLocalTmux.withoutDuplicates(candidates, shown: MacLocalTmux.sessionsShown(registry: registry),
-                                                       defaults: defaults)
-        if reopening.count < candidates.count {
-            Self.logger.notice("Reopen: \(candidates.count - reopening.count) left closed, every tab's sessions already shown")
+        let unshown = MacLocalTmux.withoutDuplicates(candidates, shown: MacLocalTmux.sessionsShown(registry: registry),
+                                                     defaults: defaults)
+        if unshown.count < candidates.count {
+            Self.logger.notice("Reopen: \(candidates.count - unshown.count) left closed, every tab's sessions already shown")
         }
+        // Tabs whose tmux sessions on this Mac have ended — a restart ends them all — stay closed (2026-11-19).
+        let reopening = MacLocalTmux.withoutEndedSessions(unshown, local: localSessions(), defaults: defaults)
         opening = reopening
         write()
         return reopening

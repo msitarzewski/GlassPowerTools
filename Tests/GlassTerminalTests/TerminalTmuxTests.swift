@@ -92,6 +92,11 @@ struct TerminalTmuxTests {
         #expect(TerminalTmux.attachLine(name: "glass-2", takeOver: false)
                 == " command -v tmux >/dev/null && exec tmux -u new-session -A -s 'glass-2'")
         #expect(TerminalTmux.attachLine(name: "work", takeOver: true).contains("new-session -A -D -s 'work'"))
+        // A session the terminal has had, or was handed (2026-11-19): joined, never made again.
+        #expect(TerminalTmux.attachLine(name: "glass-2", takeOver: false, joining: true)
+                == " command -v tmux >/dev/null && exec tmux -u attach-session -t '=glass-2'")
+        #expect(TerminalTmux.attachLine(name: "work", takeOver: true, control: true, joining: true)
+                == " command -v tmux >/dev/null && exec tmux -u -CC attach-session -d -t '=work'")
         #expect(TerminalTmux.killCommand(name: "work")
                 == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux -u kill-session -t '\''=work'\'''"#)
         // D47: every exec-channel command also looks where Homebrew puts tmux on a Mac.
@@ -642,11 +647,48 @@ struct TerminalTmuxTests {
                 "made for this terminal: the startup command follows")
     }
 
+    /// The owner, 2026-11-19: after his Mac restarted, terminals reconnecting to it made their sessions again under
+    /// their names, empty in his home folder, or joined later ones that had taken those names.
+    @Test("a terminal that has had its session only joins it again: gone, or another made since by its name, the terminal goes")
+    func rejoinsOnlyItsOwn() async {
+        let join = " command -v tmux >/dev/null && exec tmux -u attach-session -t '=glass-2'\n"
+        /// `glass-2` in the full listing format, made at `created`.
+        func listed(_ created: Int) -> String {
+            ["glass-2", "0", "1", "", "4242", "1789990000", "/private/tmp/tmux-501/default", "zsh", "alpha.example.com",
+             "alpha", "", "/home/ann", "", "", "", String(created), "alpha.example.com"].joined(separator: "\t") + "\n"
+        }
+        for (now, stays) in [(listed(1_790_000_000), true), (listed(1_795_105_500), false), ("", false)] {
+            let writes = Writes()
+            var listing = listed(1_790_000_000)
+            let terminal = TerminalSession(server: server(tmux: true), terminalWriteSink: { writes.receive($0) })
+            terminal.tmuxCommandRunner = { _ in listing }
+            terminal.tmuxSessionName = "glass-2"
+            terminal.tmuxSessionCreated = 1_790_000_000
+            terminal.state = .connected
+            await terminal.waitForTmuxAttach()
+            await terminal.waitUntilTerminalWritesComplete()
+            #expect(writes.lines == [join], "a session it was handed is joined, never made")
+            // The connection drops; back, the machine says what runs there now.
+            listing = now
+            terminal.state = .reconnecting
+            terminal.state = .connected
+            await terminal.waitForTmuxAttach()
+            await terminal.waitUntilTerminalWritesComplete()
+            if stays {
+                #expect(writes.lines == [join, join] && terminal.closeWindowNonce == 0, "its own session: joined again")
+            } else {
+                #expect(writes.lines == [join], "nothing typed: no session made again, none of another's joined")
+                #expect(terminal.closeWindowNonce == 1 && terminal.state == .disconnected, "the terminal goes, as after an exit")
+            }
+        }
+    }
+
     @Test("a session this terminal joins never has the startup command typed into it")
     func startupOnlyWhenCreated() async {
         let attach = " command -v tmux >/dev/null && exec tmux -u new-session -A -s 'work'\n"
+        let join = " command -v tmux >/dev/null && exec tmux -u attach-session -t '=work'\n"
 
-        // Active: joined on purpose, and not claimed.
+        // Active: joined on purpose, and not claimed — looked for, and joined only, never made (2026-11-19).
         var asked: [String] = []
         let writes = Writes()
         let active = session(server(tmux: true), writes: writes, listing: "work\t1\t1\t0\n", commands: { asked.append($0) })
@@ -658,8 +700,9 @@ struct TerminalTmuxTests {
         active.state = .connected
         await active.waitForTmuxAttach()
         await active.waitUntilTerminalWritesComplete()
-        #expect(asked.filter(Self.asksTheHost).isEmpty, "Active's choice is not claimed")
-        #expect(writes.lines == [attach, attach], "the attach line alone, then again on reconnecting")
+        #expect(asked.filter(Self.asksTheHost).allSatisfy { $0 == TerminalTmux.listCommand },
+                "Active's choice is listed to see it still runs, never claimed")
+        #expect(writes.lines == [join, join], "the join line alone, then again on reconnecting")
         #expect(!active.hasPendingStartupCommand)
 
         // A name kept from before: claimed. Running, it is joined; ended, it is made again.
@@ -732,11 +775,13 @@ struct TerminalTmuxTests {
         let server = TerminalTmux.Server(pid: 4242, startTime: 1_789_990_000, socketPath: "/private/tmp/tmux-501/default")
         func line(_ fields: [String]) -> String { fields.joined(separator: "\t") }
         // The repository and branch fields (W11) are empty here; `TerminalRepositoryTests` reads them.
-        // Its bell (2026-11-15) is the fifteenth: rung, and not shown on any device since.
+        // Its bell (2026-11-15) is the fifteenth: rung, and not shown on any device since. The sixteenth (2026-11-19)
+        // is when tmux made it.
         let titled = line(["glass-3", "1", "2", "1790000000", "4242", "1789990000", server.socketPath, "claude",
-                           "alpha.example.com", "alpha", "shop", "/Users/ann/src/shop", "", "", "1", "✳ Claude\tCode: fix: the build"])
+                           "alpha.example.com", "alpha", "shop", "/Users/ann/src/shop", "", "", "1", "1789995000",
+                           "✳ Claude\tCode: fix: the build"])
         let atHome = line(["glass-4", "0", "1", "1790000200", "4242", "1789990000", server.socketPath, "zsh",
-                           "alpha.example.com", "alpha", "", "/Users/ann", "", "", "", "alpha.example.com"])
+                           "alpha.example.com", "alpha", "", "/Users/ann", "", "", "", "", "alpha.example.com"])
         let older = "work\t0\t1\t1790000100"
         let output = [titled, older, atHome, "__glass_home__\t/Users/ann"].joined(separator: "\n") + "\n"
         guard case .sessions(let sessions) = TerminalTmux.parse(output) else {
@@ -744,7 +789,8 @@ struct TerminalTmuxTests {
             return
         }
         try #require(sessions.map(\.name) == ["glass-3", "work", "glass-4"])
-        #expect(sessions[0].title == "✳ Claude\tCode: fix: the build", "everything after the fifteenth tab is the title")
+        #expect(sessions[0].title == "✳ Claude\tCode: fix: the build", "everything after the sixteenth tab is the title")
+        #expect(sessions[0].created == 1_789_995_000 && sessions[2].created == nil, "when tmux made it, and not said")
         #expect(sessions[0].bell && !sessions[2].bell, "a bell kept on the session, and none")
         #expect(sessions[0].directory == "/Users/ann/src/shop" && sessions[0].command == "claude")
         #expect(sessions[0].givenName == "shop" && sessions[0].displayName == "shop")

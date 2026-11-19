@@ -52,6 +52,11 @@ struct WorkgroupMacTerminalsTests {
         " command -v tmux >/dev/null && exec tmux -u new-session -A -s '\(name)'\n"
     }
 
+    /// A session it was in, or the last run left it: joined only (2026-11-19).
+    private static func join(_ name: String) -> String {
+        " command -v tmux >/dev/null && exec tmux -u attach-session -t '=\(name)'\n"
+    }
+
     private func server(_ name: String) -> ServerConfiguration {
         var server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
         server.tmux = true
@@ -263,7 +268,7 @@ struct WorkgroupMacTerminalsTests {
                 await terminal.waitUntilTerminalWritesComplete()
                 #expect(host.claims.isEmpty, "never claimed, so never made")
                 if running {
-                    #expect(writes.lines == [Self.attach("glass-3")], "joined, nothing typed")
+                    #expect(writes.lines == [Self.join("glass-3")], "joined, nothing typed")
                     #expect(terminal.closeWindowNonce == closes)
                 } else {
                     #expect(writes.lines.isEmpty, "no attach line, which would make it")

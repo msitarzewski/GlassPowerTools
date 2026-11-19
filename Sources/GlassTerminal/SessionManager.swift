@@ -486,6 +486,7 @@ class SessionManager {
         }
         if let tmux {
             session.tmuxSessionName = tmux.name
+            session.tmuxSessionCreated = tmux.created
             session.tmuxTakesOver = tmux.takeOver
         }
         if purpose == .terminal, case .savedProfile = origin {

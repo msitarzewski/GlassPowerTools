@@ -348,7 +348,7 @@ struct TerminalRepositoryTests {
     func listing() throws {
         func line(directory: String, repository: String, branch: String, title: String = "alpha.example.com") -> String {
             ["glass-2", "0", "1", "", "4242", "1790000000", "/private/tmp/tmux-501/default", "zsh",
-             "alpha.example.com", "alpha", "", directory, repository, branch, "", title].joined(separator: "\t")
+             "alpha.example.com", "alpha", "", directory, repository, branch, "", "", title].joined(separator: "\t")
         }
         let output = [line(directory: "/home/ann/src/app/Sources", repository: "app", branch: "feature/x"),
                       line(directory: "/home/ann/src/app", repository: "app", branch: "main", title: "✳ Claude Code"),
@@ -458,7 +458,7 @@ struct TerminalRepositoryTests {
             commands.all.append(command)
             guard command == read else { return "" }
             // No program's title: tmux's own is the host's name.
-            let pane = [TerminalTmux.paneMarker, "/home/ann", folder, "alpha.example.com", "alpha", "", "", "", "", "alpha.example.com"]
+            let pane = [TerminalTmux.paneMarker, "/home/ann", folder, "alpha.example.com", "alpha", "", "", "", "", "", "alpha.example.com"]
                 .joined(separator: "\t") + "\n"
             return commands.inRepository
                 ? pane + "__glass_repo__\n/home/ann/src/app\n../.git\n\(commands.branch)\n/home/ann\n" : pane

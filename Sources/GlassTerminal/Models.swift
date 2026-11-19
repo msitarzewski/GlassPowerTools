@@ -494,6 +494,13 @@ class TerminalSession: Identifiable, Hashable {
     /// The tmux session this terminal lives in. Claimed on the first connect, or given by Active
     /// when attaching to a session already running; every reconnect attaches to it again.
     var tmuxSessionName: String?
+    /// When tmux made that session (`TerminalTmux.Session.created`), once known: from the listing it was opened from,
+    /// the record of the last run, or its first read after attaching. With the name, which session it is — a later
+    /// one by the same name, after the machine restarted, is not this terminal's (the owner, 2026-11-19).
+    var tmuxSessionCreated: Int?
+    /// It has been attached to `tmuxSessionName`: from then on it only ever joins that session again, and is gone
+    /// once the session is (`TerminalTmux.attachLine(joining:)`).
+    private var tmuxHasAttached = false
     /// What the machine last said of `tmuxSessionName` while this terminal's connection was down
     /// (2026-10-24): still running there, or ended. Active's row for the terminal says so, in
     /// place of a second row for the session. Forgotten once it connects again.
@@ -672,6 +679,8 @@ class TerminalSession: Identifiable, Hashable {
         guard let answer = try? await runTmuxCommand(command),
               let pane = TerminalTmux.parsePaneState(answer) else { return }
         if tmuxPane != pane { tmuxPane = pane }
+        // Attached, the session it reads is its own: when it was made says which one it is from now on.
+        if let created = pane.sessionCreated, tmuxSessionCreated != created { tmuxSessionCreated = created }
         if generation == givenNameGeneration, givenName != pane.givenName { givenName = pane.givenName }
         // A bell kept on the session: rung while this device wasn't connected, or shown nowhere yet.
         if pane.bell { terminalHostModel.bellNotice.sessionKeepsOne() }
@@ -1156,16 +1165,24 @@ class TerminalSession: Identifiable, Hashable {
         tmuxTask?.cancel()
         tmuxTask = Task { [weak self] in
             guard let self else { return }
+            // A session made for it, or claimed by the name it keeps, may be made; any other is only joined.
+            var joining = false
             if tmuxSessionName == nil {
                 guard await claimNewTmuxSession() else { return }
                 if let claimed = tmuxSessionName { tmuxSessionClaimed?(claimed) }
-            } else if tmuxClaimsGivenName, let given = tmuxSessionName {
+            } else if tmuxClaimsGivenName, !tmuxHasAttached, let given = tmuxSessionName {
                 guard await claimGivenTmuxSession(given) else { return }
-            } else if tmuxJoinsOnly, let given = tmuxSessionName {
+            } else if let given = tmuxSessionName {
+                // A session that should be running: the one it had (a reconnect), the one the last run left (W15), one
+                // Active listed or another device handed over. Ended, or another made since by its name, the terminal
+                // is gone, as an `exit` leaves it — never made again, empty (W15, 2026-10-29: "how about they're just
+                // gone"; the owner, 2026-11-19, after a restart made every one again in his home folder).
                 tmuxJoinsOnly = false
+                tmuxClaimsGivenName = false
+                joining = true
                 if await tmuxSessionHasEnded(given) {
                     guard state == .connected, !Task.isCancelled else { return }
-                    Logger.ssh.notice("A terminal's tmux session ended while the app was away: the terminal goes too")
+                    Logger.ssh.notice("A terminal's tmux session has ended, or another took its name: the terminal goes too")
                     handleCleanRemoteExit()
                     return
                 }
@@ -1177,8 +1194,10 @@ class TerminalSession: Identifiable, Hashable {
             let control = await tmuxControlModeAvailable()
             guard state == .connected, !Task.isCancelled else { return }
             if control { beginTmuxControl() }
-            let data = Data((TerminalTmux.attachLine(name: name, takeOver: tmuxTakesOver, control: control) + "\n").utf8)
+            let data = Data((TerminalTmux.attachLine(name: name, takeOver: tmuxTakesOver, control: control,
+                                                     joining: joining) + "\n").utf8)
             tmuxTakesOver = false
+            tmuxHasAttached = true
             recorder?.recordInput(data)
             enqueueTerminalWrite(data, presentsFailure: true)
             if tmuxSessionIsNew {
@@ -1263,7 +1282,7 @@ class TerminalSession: Identifiable, Hashable {
     private func tmuxSessionHasEnded(_ name: String) async -> Bool {
         guard let listed = try? await listTmuxSessionsRetryingOnce(),
               case .sessions(let sessions) = TerminalTmux.parse(listed) else { return false }
-        return !sessions.contains { $0.name == name }
+        return !sessions.contains { $0.isSession(name, created: tmuxSessionCreated) }
     }
 
     /// Claims a name this terminal kept: made again when it has ended — and only then does the

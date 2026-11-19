@@ -289,6 +289,48 @@ struct TerminalActiveListingTests {
         #expect(left.contains(workgroupSlot.id), "a saved Workgroup's, not yet shown: it makes its session as it connects")
     }
 
+    /// The owner, 2026-11-19, after his Mac restarted: the three tabs he opened there took `glass-1`… again, the names
+    /// the iPhone's terminals had, and those terminals stayed in Active as they were — an old name over a new session
+    /// running something else — "it did find one, and it kept the old session name!"
+    @Test("A terminal whose session's name now belongs to a later session closes; one still in its own stays, as does one that never learnt when its was made")
+    func aLaterSessionByTheSameNameIsNotItsOwn() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let server = ServerConfiguration(name: "alpha", host: "example.invalid", port: 22, username: "casey")
+        let group = manager.createWorkgroup(name: "alpha", colorTag: .blue)
+        defer { manager.closeWorkgroup(group) }
+        func terminal(_ tmux: String, created: Int?) -> TerminalSession {
+            let terminal = TerminalSession(server: server)
+            manager.registerSession(terminal)
+            #expect(manager.appendSession(terminal, toWorkgroup: group))
+            terminal.tmuxSessionName = tmux
+            terminal.tmuxSessionCreated = created
+            terminal.state = .disconnected
+            return terminal
+        }
+        let replaced = terminal("glass-1", created: 1_790_000_000)
+        let ownStill = terminal("glass-2", created: 1_790_000_100)
+        let undated = terminal("glass-3", created: nil)
+        // After the restart: every name made again, `glass-1` by a session of its own.
+        let listing = [TerminalTmux.Session(name: "glass-1", attachedClients: 1, windows: 1, created: 1_795_105_500),
+                       TerminalTmux.Session(name: "glass-2", attachedClients: 0, windows: 1, created: 1_790_000_100),
+                       TerminalTmux.Session(name: "glass-3", attachedClients: 0, windows: 1, created: 1_795_105_600)]
+
+        let report = capability.runningReport(local: nil, hosts: [(server, .sessions(listing))], closingEnded: false)
+        #expect(replaced.tmuxWhileDown == .ended, "a later session by its name is not its own")
+        #expect(ownStill.tmuxWhileDown == .running(listing[1]))
+        #expect(undated.tmuxWhileDown == .running(listing[2]), "never learnt when: the name alone, as before")
+        // The later `glass-1` is a session of its own, listed for itself rather than held by the terminal that had the name.
+        let rows = report.sessions.filter { !$0.isHeldHere() }.map(\.attachment?.name)
+        #expect(rows == ["glass-1"], "\(rows)")
+
+        _ = capability.runningReport(local: nil, hosts: [(server, .sessions(listing))], closingEnded: true)
+        let left = Set(manager.sessions.map(\.id))
+        #expect(!left.contains(replaced.id), "its own session has ended: it closes, never joins the later one")
+        #expect(left.contains(ownStill.id) && left.contains(undated.id))
+    }
+
     @Test("Active's names leave out the spinner an agent turns at the start of its title")
     func namesWithoutTheSpinner() throws {
         let runtime = GlassTerminalRuntime(layers: GlassLayerStore.forTest())

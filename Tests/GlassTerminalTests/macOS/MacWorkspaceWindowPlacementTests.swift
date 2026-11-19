@@ -118,7 +118,7 @@ struct MacWorkspaceWindowPlacementTests {
             shown.setFrame(atQuit, display: false)
             let registry = MacWorkspacePreviewRegistry()
             registry.register(window, window: shown)
-            MacWindowsToReopen(defaults: defaults, registry: registry).prepareForQuit(displayOf: { _ in alpha })
+            MacWindowsToReopen(defaults: defaults, registry: registry, localSessions: { nil }).prepareForQuit(displayOf: { _ in alpha })
             #expect(savedPlacement(defaults, window.windowID)?.frame == atQuit, "saved at quit")
 
             let next = relaunched(window.windowID, defaults)
@@ -255,7 +255,7 @@ struct MacWorkspaceWindowPlacementTests {
             let saved = savedWindow(defaults, sessions: ["glass-75"])
             defaults.set([saved.windowID.uuidString], forKey: MacLocalTmux.reopenKey)
 
-            let reopen = MacWindowsToReopen(defaults: defaults, registry: MacWorkspacePreviewRegistry())
+            let reopen = MacWindowsToReopen(defaults: defaults, registry: MacWorkspacePreviewRegistry(), localSessions: { nil })
             #expect(reopen.takeOnce(askedBy: "a terminal window") == [saved.windowID])
             #expect(reopen.takeOnce(askedBy: "the Connections window") == nil, "the next window to appear opens nothing")
             #expect(reopen.takeOnce(askedBy: "the Connections window") == nil, "nor does Connections appearing again")
@@ -267,7 +267,7 @@ struct MacWorkspaceWindowPlacementTests {
     func keptCurrent() async throws {
         try await withDefaults { defaults in
             let registry = MacWorkspacePreviewRegistry()
-            let reopen = MacWindowsToReopen(defaults: defaults, registry: registry)
+            let reopen = MacWindowsToReopen(defaults: defaults, registry: registry, localSessions: { nil })
             #expect(reopen.takeOnce(askedBy: "the Connections window") == [])
             var held: [NSWindow] = []
             @MainActor func show(_ window: MacWorkspaceWindowController) {
@@ -305,7 +305,7 @@ struct MacWorkspaceWindowPlacementTests {
     func crash() async throws {
         try await withDefaults { defaults in
             let registry = MacWorkspacePreviewRegistry()
-            var firstRun: MacWindowsToReopen? = MacWindowsToReopen(defaults: defaults, registry: registry)
+            var firstRun: MacWindowsToReopen? = MacWindowsToReopen(defaults: defaults, registry: registry, localSessions: { nil })
             #expect(firstRun?.takeOnce(askedBy: "the Connections window") == [])
             let left = savedWindow(defaults, sessions: ["glass-79"])
             let right = savedWindow(defaults, sessions: ["glass-80", "glass-81"])
@@ -321,7 +321,7 @@ struct MacWorkspaceWindowPlacementTests {
 
             // The crash: no quit, nothing more written.
             firstRun = nil
-            let nextRun = MacWindowsToReopen(defaults: defaults, registry: MacWorkspacePreviewRegistry())
+            let nextRun = MacWindowsToReopen(defaults: defaults, registry: MacWorkspacePreviewRegistry(), localSessions: { nil })
             let reopening = try #require(nextRun.takeOnce(askedBy: "the Connections window"))
             #expect(Set(reopening) == [left.windowID, right.windowID])
             for (window, frame) in [(left, leftWindow.frame), (right, rightWindow.frame)] {
@@ -345,7 +345,7 @@ struct MacWorkspaceWindowPlacementTests {
             registry.register(open, window: shown)
             defaults.set([first, copy, open, partly, alreadyShown].map(\.windowID.uuidString), forKey: MacLocalTmux.reopenKey)
 
-            let reopen = MacWindowsToReopen(defaults: defaults, registry: registry)
+            let reopen = MacWindowsToReopen(defaults: defaults, registry: registry, localSessions: { nil })
             #expect(reopen.takeOnce(askedBy: "the Connections window") == [first.windowID, partly.windowID],
                     "the copy shows the first one's session, one is open, one shows only the open one's")
             #expect(reopen.takeOnce(askedBy: "a terminal window") == nil)

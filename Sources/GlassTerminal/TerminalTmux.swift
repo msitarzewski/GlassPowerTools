@@ -54,8 +54,18 @@ enum TerminalTmux {
         var repository: TerminalRepository? = nil
         /// A bell rang in it that no device has shown since (`bellOption`).
         var bell = false
+        /// When tmux made it, in seconds (`#{session_created}`): with the name, which session this is. A name comes
+        /// back — after a restart every `glass-N` is free again, and the lowest free one is the next one made — and
+        /// a terminal that met an earlier session by that name is not this one's (the owner, 2026-11-19).
+        var created: Int? = nil
         var id: String { name }
         var isGlass: Bool { TerminalTmux.glassNumber(name) != nil }
+
+        /// Whether this is the session a terminal met as `name` made at `created`. A terminal that never learnt when
+        /// its session was made, or a listing that doesn't say, goes by the name alone.
+        nonisolated func isSession(_ name: String, created: Int?) -> Bool {
+            self.name == name && (created == nil || self.created == nil || self.created == created)
+        }
 
         /// What Active and a tab showing it call it (`TerminalSessionNaming`).
         var displayName: String {
@@ -113,14 +123,14 @@ enum TerminalTmux {
     /// What `list-sessions` prints for each session, read by `parse`: name, attached clients,
     /// windows, last activity; then (W6) the server's pid, start time and socket, the active pane's
     /// program, the host's names (tmux's default pane title), the session's given name, the
-    /// pane's folder; (W11) its repository and branch; and last its title. Pane variables in a
-    /// session's line are its active pane's. The title is last so that it may hold anything:
+    /// pane's folder; (W11) its repository and branch; its bell; when it was made (2026-11-19); and last its title.
+    /// Pane variables in a session's line are its active pane's. The title is last so that it may hold anything:
     /// `parse` splits a bounded number of times.
     nonisolated static let listFormat = "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_activity}"
         + "\t#{pid}\t#{start_time}\t#{socket_path}\t#{pane_current_command}\t#{host}\t#{host_short}"
         + "\t#{\(givenNameOption)}\t#{pane_current_path}\t#{\(repositoryOption)}\t#{\(branchOption)}"
-        + "\t#{\(bellOption)}\t#{pane_title}"
-    private nonisolated static let listFieldCount = 16
+        + "\t#{\(bellOption)}\t#{session_created}\t#{pane_title}"
+    private nonisolated static let listFieldCount = 17
 
     /// A session name Glass will pass to tmux: tmux rejects `:` and `.` in names, a leading `-`
     /// would read as an option, and control characters have no business in a tab's record.
@@ -229,7 +239,8 @@ enum TerminalTmux {
             TerminalRepository(name: $0, branch: TerminalSessionNaming.displayText(fields[13]))
         }
         session.bell = !fields[14].isEmpty
-        session.title = TerminalSessionNaming.programTitle(fields[15], hostNames: [fields[8], fields[9]])
+        session.created = Int(fields[15]).flatMap { $0 > 0 ? $0 : nil }
+        session.title = TerminalSessionNaming.programTitle(fields[16], hostNames: [fields[8], fields[9]])
         session.home = home
         return session
     }
@@ -319,10 +330,11 @@ enum TerminalTmux {
     /// What `display-message` prints for a session's active pane: its folder, the host's names
     /// (tmux's default pane title), the name a tab gave the session (W6), the program in the
     /// foreground and the pane's shell's process (2026-10-14: which AI agent a terminal is running,
-    /// `TerminalAgent`), and last its title, so that the title may hold anything. This Mac's tabs ask
-    /// with it (`MacLocalTmux.context`), and so do terminals on every other device (`paneStateCommand`).
+    /// `TerminalAgent`), the bell, when the session was made (2026-11-19: which session it is), and last its title, so
+    /// that the title may hold anything. This Mac's tabs ask with it (`MacLocalTmux.context`), and so do terminals on
+    /// every other device (`paneStateCommand`).
     nonisolated static let contextFormat = "#{pane_current_path}\t#{host}\t#{host_short}\t#{\(givenNameOption)}"
-        + "\t#{pane_current_command}\t#{pane_pid}\t#{\(bellOption)}\t#{pane_title}"
+        + "\t#{pane_current_command}\t#{pane_pid}\t#{\(bellOption)}\t#{session_created}\t#{pane_title}"
 
     /// What a session's active pane shows, and what the session is called.
     nonisolated struct PaneState: Equatable, Sendable {
@@ -343,19 +355,22 @@ enum TerminalTmux {
         var programArguments: String? = nil
         /// A bell rang in the session that no device has shown since (`bellOption`).
         var bell = false
+        /// When tmux made the session (`Session.created`): which session of that name this is.
+        var sessionCreated: Int? = nil
     }
 
     /// Reads one `contextFormat` line.
     nonisolated static func parseContext(_ output: String) -> PaneState? {
         let fields = output.trimmingCharacters(in: .newlines)
-            .split(separator: "\t", maxSplits: 7, omittingEmptySubsequences: false).map(String.init)
-        guard fields.count == 8 else { return nil }
+            .split(separator: "\t", maxSplits: 8, omittingEmptySubsequences: false).map(String.init)
+        guard fields.count == 9 else { return nil }
         return PaneState(givenName: TerminalSessionNaming.displayText(fields[3]),
-                         title: TerminalSessionNaming.programTitle(fields[7], hostNames: [fields[1], fields[2]]),
+                         title: TerminalSessionNaming.programTitle(fields[8], hostNames: [fields[1], fields[2]]),
                          directory: fields[0].hasPrefix("/") ? fields[0] : nil,
                          program: fields[4].isEmpty ? nil : fields[4],
                          shellProcessID: Int32(fields[5]).flatMap { $0 > 0 ? $0 : nil },
-                         bell: !fields[6].isEmpty)
+                         bell: !fields[6].isEmpty,
+                         sessionCreated: Int(fields[7]).flatMap { $0 > 0 ? $0 : nil })
     }
 
     /// Starts the line with the foreground program's command line, in a pane-state read.
@@ -516,8 +531,14 @@ enum TerminalTmux {
     /// the terminal cleanly instead of leaving a bare prompt.
     /// The leading space keeps it out of shell history where `ignorespace` is set. Without tmux
     /// the line does nothing and the shell stays.
-    static func attachLine(name: String, takeOver: Bool, control: Bool = false) -> String {
-        " command -v tmux >/dev/null && exec tmux -u\(control ? " -CC" : "") new-session -A\(takeOver ? " -D" : "") -s \(quoted(name))"
+    /// - Parameter joining: the session is one this terminal had, or one listed for it to join: attached only, never
+    ///   made. Gone, tmux says so and leaves, and the terminal ends as an `exit` ends it (the owner, 2026-11-19, after
+    ///   a restart had every terminal make its session again, empty: "I'd rather close it, or rather not reopen it").
+    ///   Otherwise `new-session -A`: a session just claimed for it, or one the claim couldn't say runs.
+    static func attachLine(name: String, takeOver: Bool, control: Bool = false, joining: Bool = false) -> String {
+        let client = " command -v tmux >/dev/null && exec tmux -u\(control ? " -CC" : "")"
+        guard joining else { return client + " new-session -A\(takeOver ? " -D" : "") -s \(quoted(name))" }
+        return client + " attach-session\(takeOver ? " -d" : "") -t \(quoted("=" + name))"
     }
 
     /// A terminal kept in tmux attaches as a control-mode client (`TmuxControlClient`, D83), so tmux
@@ -595,6 +616,9 @@ enum TerminalTmux {
 struct TerminalTmuxAttachment: Equatable, Sendable {
     var name: String
     var takeOver: Bool = false
+    /// When the listed session was made (`TerminalTmux.Session.created`): the terminal joins that one, not a later
+    /// one by the same name.
+    var created: Int? = nil
 }
 
 // MARK: Find (2026-10-08)

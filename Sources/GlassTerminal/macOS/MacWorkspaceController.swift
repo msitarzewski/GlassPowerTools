@@ -641,11 +641,32 @@ final class MacWorkspaceController {
         guard !isClosed else { return }
         for paneID in state.root?.paneIDs ?? [] where localRuntimesByPaneID[paneID] != nil {
             guard let session = localTmuxSession(for: paneID), let context = contexts[session] else { continue }
+            if let created = context.sessionCreated { keepSessionCreated(created, for: paneID) }
             setPaneContext(context, for: paneID)
             // A bell its session keeps, shown on no device: rung while this pane wasn't attached (2026-11-15).
             if context.bell { localRuntimesByPaneID[paneID]?.model.bellNotice.sessionKeepsOne() }
             if generation == givenNameGeneration { followSessionName(context.givenName, for: paneID) }
         }
+    }
+
+    /// A local pane only joins its tmux session — never makes it again, empty, in its first folder — once it has been in
+    /// it (2026-11-19): it knows when tmux made it, and no workgroup's startup command waits for a session made for it.
+    /// Both ways a pane starts ask (`startLocalPanes`, `MacLocalTerminalPaneView`): whichever starts it first decides.
+    func joinsLocalTmuxSession(_ pane: MacWorkspacePane) -> Bool {
+        pane.intent.localTmuxSession != nil && pane.intent.localTmuxSessionCreated != nil
+            && retainedStartupTicketsByPaneID[pane.id] == nil
+    }
+
+    /// The pane keeps when tmux made the session it is in (2026-11-19), saved with the tab: a relaunch joins that
+    /// session again, and doesn't reopen the pane once it is gone or another has its name.
+    private func keepSessionCreated(_ created: Int, for paneID: UUID) {
+        guard !isClosed, let root = state.root, let pane = root.pane(id: paneID),
+              pane.intent.tmuxSessionCreated != created else { return }
+        state.root = root.updatingPane(id: paneID) { pane in
+            if pane.intent.kind == .local { pane.intent.localTmuxSessionCreated = created }
+            else { pane.intent.sshTmuxSessionCreated = created }
+        }
+        if !hasUnsavedState { persist() }
     }
 
     private func observeOutput(of model: SwiftTermHostModel) {
@@ -713,6 +734,7 @@ final class MacWorkspaceController {
         setRepository(pane.repository.map { .repository($0) } ?? .none, for: paneID)
         // Attached again, the session may be one made again under the same name: met anew.
         if firstSinceAttach { sessionNameByPaneID[paneID] = nil }
+        if let created = pane.sessionCreated { keepSessionCreated(created, for: paneID) }
         // The terminal's own name for it: what was read, unless named here since the read began.
         followSessionName(terminal.givenName, for: paneID)
     }
@@ -1039,7 +1061,8 @@ final class MacWorkspaceController {
                 configuration: MacLocalTerminalConfiguration.resolve(
                     shell: pane.intent.localShell ?? settingsManager.localShell,
                     directory: pane.intent.localDirectory ?? settingsManager.localWorkingDirectory,
-                    tmuxSession: pane.intent.localTmuxSession
+                    tmuxSession: pane.intent.localTmuxSession,
+                    joining: joinsLocalTmuxSession(pane)
                 ),
                 theme: profile.theme.swiftTermTheme,
                 runtimeSettings: profile.runtimeSettings,
@@ -1185,7 +1208,10 @@ final class MacWorkspaceController {
                 if claim != .created(session) { retainedStartupTicketsByPaneID.removeValue(forKey: pane.id) }
             }
             guard session != pane.intent.localTmuxSession else { continue }
-            updated = updated.updatingPane(id: pane.id) { $0.intent.localTmuxSession = session }
+            updated = updated.updatingPane(id: pane.id) {
+                $0.intent.localTmuxSession = session
+                $0.intent.localTmuxSessionCreated = nil
+            }
         }
         guard updated != root else { return false }
         state.root = updated
@@ -1371,6 +1397,9 @@ final class MacWorkspaceController {
         let startupCommand = startupTicket?.command
         // The pane as it is now: a retry after a session ended carries the name it claimed.
         let tmuxSession = state.root?.pane(id: pane.id)?.intent.sshTmuxSession ?? pane.intent.sshTmuxSession
+        // When tmux made it, once the pane has been in it (2026-11-19).
+        let tmuxSessionCreated = tmuxSession == nil ? nil
+            : state.root?.pane(id: pane.id)?.intent.sshTmuxSessionCreated ?? pane.intent.sshTmuxSessionCreated
         let withoutTmux = pane.intent.withoutTmux
         do {
             let launch = try await sessionManager.createAuthorizedSessionByServerID(
@@ -1380,11 +1409,16 @@ final class MacWorkspaceController {
                 configure: { [weak self] session in
                     // A plain shell by choice: no session, whatever the server's setting.
                     session.withoutTmux = withoutTmux
-                    // W4b: its saved session, claimed — joined when it runs, made again when it
-                    // has ended — or, without one, the session it claims kept for next time.
+                    // W4b: a workgroup's saved session, claimed — joined when it runs, made again when it has
+                    // ended — or, without one, the session it claims kept for next time. One the pane has been in
+                    // (2026-11-19) is only joined: gone, or another by its name, the pane goes, as after an `exit`.
                     if !withoutTmux, let tmuxSession {
                         session.tmuxSessionName = tmuxSession
-                        session.tmuxClaimsGivenName = true
+                        if let tmuxSessionCreated {
+                            session.tmuxSessionCreated = tmuxSessionCreated
+                        } else {
+                            session.tmuxClaimsGivenName = true
+                        }
                     }
                     // Another Mac's terminal: a session made for it starts in its folder there.
                     session.tmuxSessionDirectory = pane.intent.sshDirectory
@@ -1453,7 +1487,10 @@ final class MacWorkspaceController {
         guard TerminalTmux.isValidSessionName(name), let root = state.root,
               let pane = root.pane(id: paneID), pane.intent.kind == .ssh,
               pane.intent.sshTmuxSession != name else { return false }
-        state.root = root.updatingPane(id: paneID) { $0.intent.sshTmuxSession = name }
+        state.root = root.updatingPane(id: paneID) {
+            $0.intent.sshTmuxSession = name
+            $0.intent.sshTmuxSessionCreated = nil
+        }
         return true
     }
 
@@ -1696,6 +1733,11 @@ final class MacWorkspaceController {
               let state = try? JSONDecoder().decode(MacWorkspaceRestorationState.self, from: data)
                 .validated(for: workspaceID) else { return nil }
         return state.root?.panes ?? []
+    }
+
+    /// A tab that won't come back (2026-11-19): its record goes, so no window later comes back to it as an empty tab.
+    static func forgetSavedTab(_ workspaceID: UUID, defaults: UserDefaults) {
+        defaults.removeObject(forKey: defaultsKey(for: workspaceID))
     }
 }
 
@@ -2527,6 +2569,26 @@ final class MacWorkspaceWindowController {
     private static func decode(_ data: Data) -> MacWorkspaceWindowRestorationState? {
         guard data.count <= maximumEncodedBytes else { return nil }
         return (try? JSONDecoder().decode(MacWorkspaceWindowRestorationState.self, from: data))?.validated()
+    }
+
+    /// The saved window without `ending` (2026-11-19), whose records go too. False when no tab is left: the window's
+    /// record went with them, and the window doesn't come back.
+    static func forgetTabs(_ ending: Set<UUID>, of windowID: UUID, saved: MacWorkspaceWindowRestorationState,
+                           defaults: UserDefaults) -> Bool {
+        for id in ending { MacWorkspaceController.forgetSavedTab(id, defaults: defaults) }
+        let kept = saved.tabs.filter { !ending.contains($0.id) }
+        guard let first = kept.first else {
+            defaults.removeObject(forKey: defaultsKey(for: windowID))
+            defaults.removeObject(forKey: previousGenerationKey(for: windowID))
+            return false
+        }
+        let selected = kept.contains { $0.id == saved.selectedTabID } ? saved.selectedTabID : first.id
+        let state = MacWorkspaceWindowRestorationState(tabs: kept, selectedTabID: selected, placement: saved.placement,
+                                                       windowSettings: saved.windowSettings)
+        if state.validated() != nil, let data = try? JSONEncoder().encode(state), data.count <= maximumEncodedBytes {
+            defaults.set(data, forKey: defaultsKey(for: windowID))
+        }
+        return true
     }
 
     private static func defaultsKey(for windowID: UUID) -> String {

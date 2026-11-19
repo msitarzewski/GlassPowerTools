@@ -19,7 +19,9 @@ struct TerminalTmuxControlSessionTests {
         var server = ServerConfiguration(name: "alpha", host: "192.0.2.10", username: "ann")
         server.tmux = true
         let session = TerminalSession(server: server, terminalWriteSink: { writes.receive($0) })
-        session.tmuxCommandRunner = { command in command == TerminalTmux.versionCommand ? version : "" }
+        session.tmuxCommandRunner = { command in
+            command == TerminalTmux.versionCommand ? version : command == TerminalTmux.listCommand ? "work\t0\t1\t0\n" : ""
+        }
         // A name given, as Active gives one: attached without a claim.
         session.tmuxSessionName = "work"
         return session
@@ -36,7 +38,7 @@ struct TerminalTmuxControlSessionTests {
         session.state = .connected
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
-        #expect(writes.take() == " command -v tmux >/dev/null && exec tmux -u -CC new-session -A -s 'work'\n")
+        #expect(writes.take() == " command -v tmux >/dev/null && exec tmux -u -CC attach-session -t '=work'\n")
         #expect(session.terminalHostModel.isTmuxControlClient)
 
         // Typed before tmux has started: held, not typed at the shell tmux replaces.
@@ -76,7 +78,7 @@ struct TerminalTmuxControlSessionTests {
         session.state = .connected
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
-        #expect(writes.take() == " command -v tmux >/dev/null && exec tmux -u new-session -A -s 'work'\n")
+        #expect(writes.take() == " command -v tmux >/dev/null && exec tmux -u attach-session -t '=work'\n")
         #expect(!session.terminalHostModel.isTmuxControlClient)
         session.sendTerminalData(Data("ls\r".utf8))
         await session.waitUntilTerminalWritesComplete()

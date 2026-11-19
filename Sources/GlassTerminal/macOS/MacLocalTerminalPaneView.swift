@@ -15,6 +15,8 @@ struct MacLocalTerminalPaneView: View {
     var directoryOverride: String? = nil
     /// D47: the tmux session this pane runs in, or nil for a plain shell.
     var tmuxSession: String? = nil
+    /// The pane has been in `tmuxSession` (2026-11-19): joined only, never made again (`joinsLocalTmuxSession`).
+    var tmuxSessionJoins = false
     let isFocused: Bool
     let showsPaneChrome: Bool
     /// Find, Find Next and Find Previous from the menu bar, for this pane.
@@ -732,7 +734,8 @@ struct MacLocalTerminalPaneView: View {
         MacLocalTerminalConfiguration.resolve(
             shell: shellOverride ?? settingsManager.localShell,
             directory: directoryOverride ?? settingsManager.localWorkingDirectory,
-            tmuxSession: tmuxSession
+            tmuxSession: tmuxSession,
+            joining: tmuxSessionJoins
         )
     }
 
@@ -807,8 +810,10 @@ struct MacLocalTerminalPaneView: View {
 enum MacLocalTerminalConfiguration {
     /// - Parameter tmuxSession: D47 — run in this tmux session (attach, or create it) instead of
     ///   a bare shell. Without tmux on the Mac the pane falls back to the shell.
+    /// - Parameter joining: the pane has been in `tmuxSession` (2026-11-19): attach only, never make it. Gone, tmux
+    ///   says so and leaves, and the pane closes as after an `exit` (`MacLocalTerminalExitPolicy`).
     static func resolve(shell: String?, directory: String?, tmuxSession: String? = nil,
-                        tmux: String? = nil) -> SwiftTermLocalProcessConfiguration {
+                        tmux: String? = nil, joining: Bool = false) -> SwiftTermLocalProcessConfiguration {
         let requestedShell = expandedPath(shell)
         let loginShell = getpwuid(getuid()).flatMap { entry in
             entry.pointee.pw_shell.map { String(cString: $0) }
@@ -841,9 +846,10 @@ enum MacLocalTerminalConfiguration {
             let sessionEnvironment = MacLocalTmux.takesSessionEnvironment(tmux) ? launch.sessionEnvironment : []
             return SwiftTermLocalProcessConfiguration(
                 executable: tmux,
-                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory, control: control,
-                                                  sessionEnvironment: sessionEnvironment)
-                    + launch.command,
+                arguments: joining
+                    ? MacLocalTmux.joinArguments(session: tmuxSession, control: control)
+                    : MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory, control: control,
+                                             sessionEnvironment: sessionEnvironment) + launch.command,
                 environment: launch.environment,
                 currentDirectory: launch.directory,
                 fallbackDirectory: home,
