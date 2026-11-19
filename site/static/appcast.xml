@@ -6,6 +6,22 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.623</title>
+      <pubDate>Thu, 19 Nov 2026 20:39:21 GMT</pubDate>
+      <sparkle:version>623</sparkle:version>
+      <sparkle:shortVersionString>0.4.623</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.623</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.623</h2>
+<ul>
+  <li><b>After the Mac restarts, its terminals in tmux don't come back empty.</b> A restart ends tmux and what ran in it. Before, every tab came back anyway as an empty shell in your home folder, and closing those windows left the empty sessions running. Now a tab whose session has ended doesn't come back, and neither does a window left with no tab.</li>
+  <li><b>The app says why.</b> When it leaves tabs closed, it says how many, why (the Mac restarted, tmux was restarted, tmux isn't running, or the sessions were ended), and which Workgroups to open to start them again.</li>
+  <li><b>A terminal only goes back to its own session.</b> Reconnecting or relaunching joins the session the terminal had and never starts a new one in its place. A new session that took the same name is someone else's.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.623/GlassPowerTools-0.4.623.zip" length="29486919" type="application/octet-stream" sparkle:edSignature="J1t6oYkASWImdRujgf/j0pq9swiQJjxKjKB15xhW4V9+73/QRiQ8m9Xre8nehn5UKmKtfDpId9sL+eDn9+F/DQ=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.622</title>
       <pubDate>Thu, 19 Nov 2026 19:42:57 GMT</pubDate>
       <sparkle:version>622</sparkle:version>
