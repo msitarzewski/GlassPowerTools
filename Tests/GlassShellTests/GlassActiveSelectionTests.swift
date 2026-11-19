@@ -103,6 +103,21 @@ struct GlassActiveSelectionTests {
         return Fixture(model: model, root: root, alpha: alpha.endpointID, bravo: bravo.endpointID, terminal: terminal, log: log)
     }
 
+    /// The owner, 2026-11-19: "We should let the user know that we lost the tmux session … right now I'd be wondering
+    /// why my sessions didn't restore."
+    @Test("terminals closed because their sessions ended are said under their machine, counted together, until dismissed")
+    func closedTerminalsSaid() async throws {
+        let f = try await fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        f.model.noteClosed([GlassClosedTerminals(endpointID: f.alpha, count: 2, reason: "Their tmux sessions on alpha were ended.")])
+        f.model.noteClosed([GlassClosedTerminals(endpointID: f.alpha, count: 1, reason: "tmux isn't running on alpha now.")])
+        let alpha = try #require(f.model.activeMachines().first { $0.name == "alpha" }, "listed for its note alone")
+        #expect(alpha.closed?.message == "3 terminals closed. tmux isn't running on alpha now.", "both, with the newest why")
+        #expect(f.model.activeMachines().first { $0.name == "bravo" }?.closed == nil)
+        f.model.dismissClosed(f.alpha)
+        #expect(f.model.activeMachines().first { $0.name == "alpha" }?.closed == nil, "read: gone")
+    }
+
     /// Open as Tab In (the owner, 2026-10-15): "show existing tab groups. So I can open a new
     /// session into a group."
     @Test("Open as Tab In: a row's capability offers its windows; choosing one sends the row there and it leaves the list")

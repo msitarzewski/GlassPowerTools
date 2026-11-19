@@ -23,6 +23,14 @@ struct MacLaunchReopen: ViewModifier {
     @Environment(\.openWindow) private var openWindow
     /// W7b: local tmux sessions still running that no tab shows, offered once at launch.
     @State private var runningSessionsToOffer: [String] = []
+    /// Tabs left closed because their tmux sessions had ended, and why (2026-11-19), said once at launch.
+    @State private var endedNotice: EndedNotice?
+
+    struct EndedNotice: Identifiable {
+        let title: String
+        let message: String
+        var id: String { title + message }
+    }
 
     func body(content: Content) -> some View {
         content
@@ -30,13 +38,28 @@ struct MacLaunchReopen: ViewModifier {
                 for windowID in MacWindowsToReopen.shared.takeOnce(askedBy: asker) ?? [] {
                     openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(windowID: windowID, tabs: []))
                 }
+                // The owner, 2026-11-19: "right now I'd be wondering why my sessions didn't restore."
+                if let notice = MacWindowsToReopen.shared.takeEndedNotice() {
+                    endedNotice = EndedNotice(title: notice.title, message: notice.message)
+                }
                 // W7b: then, once those windows have opened on their sessions, the sessions still
                 // running that no tab shows. After a crash that was all of them, and nothing said
                 // so. If this view goes away first, the next window to appear asks.
                 try? await Task.sleep(for: .seconds(2))
+                // One alert at a time: the offer waits until what ended has been read.
+                while endedNotice != nil, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(300)) }
                 guard !Task.isCancelled else { return }
                 runningSessionsToOffer = MacLocalTmuxLaunchOffer.shared
                     .take(shown: MacLocalTmuxLaunchOffer.shownSessions()) ?? []
+            }
+            .alert(
+                endedNotice?.title ?? "",
+                isPresented: Binding(get: { endedNotice != nil }, set: { if !$0 { endedNotice = nil } }),
+                presenting: endedNotice
+            ) { _ in
+                Button("OK", role: .cancel) { endedNotice = nil }
+            } message: { notice in
+                Text(notice.message)
             }
             .alert(
                 MacLocalTmuxLaunchOffer.message(count: runningSessionsToOffer.count),

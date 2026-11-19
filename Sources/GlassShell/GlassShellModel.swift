@@ -97,6 +97,8 @@ public final class GlassShellModel: GlassServiceStore {
     public internal(set) var runningSessions: [GlassRunningSession] = []
     /// The machines that same ask could not reach without a prompt, and why (W6).
     public internal(set) var uncheckedMachines: [GlassUncheckedMachine] = []
+    /// Terminals that closed because their sessions had ended, per machine, and why, until dismissed (2026-11-19).
+    public internal(set) var closedTerminals: [GlassClosedTerminals] = []
     public internal(set) var isCheckingRunningSessions = false
     /// When the machines last answered what runs on them; nil before the first answer.
     var runningSessionsCheckedAt: ContinuousClock.Instant?

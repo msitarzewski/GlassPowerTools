@@ -46,7 +46,12 @@ use the disposable test VM only).
   macOS VM: tmux 3.7c's `session_created` and `attach-session` behaviour; an ungraceful VM reboot with three tabs open
   reopened nothing and made nothing; quit and relaunch with tmux running rejoined both tabs. A first VM run found the
   pane view still starting with `new-session -A`; fixed. iPhone and Vision Pro simulator builds pass. VM stopped.
-- **Next:** his word to commit and ship 0.4.622 (Mac release, TestFlight, site, devices). All three devices run 0.4.621.
+- **Shipped at his "Ship it":** `66c3a29b` pushed; Mac v0.4.622 (notarized, GitHub Latest, downloads byte-identical);
+  feed `4b61a63e` pushed; TestFlight 622 iOS and visionOS in Testers, `WAITING_FOR_REVIEW`; the site staged (111/111).
+- **Then, before the site went live, his tweak (0.4.623):** say why tabs didn't come back. The Mac's launch alert ("N tabs
+  weren't reopened — Your Mac restarted at …", from `kern.boottime` / tmux's start time) and Active's per-machine note
+  off the Mac. Seen in the VM after a reboot. 0.4.622 stays on GitHub; the site goes live with 0.4.623.
+- **Next:** release 0.4.623 the same way; his provisioning; the live check; the devices; the records commit.
 
 ## 2026-11-15 (evening) — the iPhone's Active, from his day on the phone (released in 0.4.621)
 

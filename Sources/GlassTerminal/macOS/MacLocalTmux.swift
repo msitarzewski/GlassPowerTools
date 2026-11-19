@@ -551,25 +551,77 @@ enum MacLocalTmux {
         return local.contains { $0.isSession(name, created: pane.localTmuxSessionCreated) }
     }
 
+    /// Tabs a launch left closed because their tmux sessions had ended (2026-11-19), for the launch to say so: how many,
+    /// in how many windows, the Workgroups they came from, and when the newest of their sessions was made.
+    struct EndedTabs: Equatable {
+        var tabs = 0
+        var windows = 0
+        var workgroups: [String] = []
+        var newestCreated: Int? = nil
+    }
+
     /// Of `windows`, those that come back, each with the tabs that do (`reopens`): a tab none of whose panes would
     /// is left closed, and its record goes; a window left without tabs is left closed, and its record goes too.
     @MainActor static func withoutEndedSessions(_ windows: [UUID], local: [TerminalTmux.Session]?,
-                                                defaults: UserDefaults) -> [UUID] {
-        guard let local else { return windows }
-        return windows.filter { windowID in
+                                                defaults: UserDefaults) -> (reopening: [UUID], ended: EndedTabs) {
+        guard let local else { return (windows, EndedTabs()) }
+        var ended = EndedTabs()
+        let reopening = windows.filter { windowID in
             guard case .restored(let saved) = MacWorkspaceWindowController.load(windowID: windowID, defaults: defaults) else {
                 return true
             }
+            var created: [Int] = []
             let ending = saved.tabs.filter { tab in
                 guard let panes = MacWorkspaceController.savedPanes(workspaceID: tab.id, defaults: defaults),
-                      !panes.isEmpty else { return false }
-                return !panes.contains { reopens($0.intent, local: local) }
-            }.map(\.id)
+                      !panes.isEmpty, !panes.contains(where: { reopens($0.intent, local: local) }) else { return false }
+                created += panes.compactMap(\.intent.localTmuxSessionCreated)
+                return true
+            }
             guard !ending.isEmpty else { return true }
-            let kept = MacWorkspaceWindowController.forgetTabs(Set(ending), of: windowID, saved: saved, defaults: defaults)
+            ended.tabs += ending.count
+            ended.newestCreated = (created + [ended.newestCreated].compactMap { $0 }).max()
+            for name in ending.compactMap(\.workgroupName) where !ended.workgroups.contains(name) { ended.workgroups.append(name) }
+            let kept = MacWorkspaceWindowController.forgetTabs(Set(ending.map(\.id)), of: windowID, saved: saved,
+                                                               defaults: defaults)
+            if !kept { ended.windows += 1 }
             logger.notice("Reopen: \(ending.count) of a window's \(saved.tabs.count) tabs left closed, their tmux sessions gone\(kept ? "" : "; the window too", privacy: .public)")
             return kept
         }
+        return (reopening, ended)
+    }
+
+    /// Why those tabs' sessions ended: this Mac started after the newest was made (its boot time), else what its tmux
+    /// says now (`TerminalTmux.whyEnded`).
+    nonisolated static func whyEnded(_ ended: EndedTabs, local: [TerminalTmux.Session], bootTime: Date?) -> TerminalTmux.EndedReason {
+        if let newest = ended.newestCreated, let bootTime, bootTime.timeIntervalSince1970 > TimeInterval(newest) {
+            return .machineRestarted(at: bootTime)
+        }
+        return TerminalTmux.whyEnded(created: ended.newestCreated, listed: local)
+    }
+
+    /// What the launch says: "29 tabs in 4 windows weren't reopened", and why, and which Workgroups start them again.
+    nonisolated static func endedNotice(_ ended: EndedTabs, reason: TerminalTmux.EndedReason,
+                                        now: Date = .now) -> (title: String, message: String)? {
+        guard ended.tabs > 0 else { return nil }
+        let tabs = ended.tabs == 1 ? "A tab" : "\(ended.tabs) tabs"
+        let windows = ended.windows > 1 ? " in \(ended.windows) windows" : ""
+        let title = "\(tabs)\(windows) \(ended.tabs == 1 ? "wasn't" : "weren't") reopened"
+        var message = reason.sentence(machine: nil, now: now)
+        if !ended.workgroups.isEmpty {
+            let names = ended.workgroups.map { "“\($0)”" }
+            let list = names.count == 1 ? names[0]
+                : names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+            message += " To start \(names.count == 1 ? "its" : "their") terminals again, open \(list) from Workgroups."
+        }
+        return (title, message)
+    }
+
+    /// When this Mac last started (`kern.boottime`).
+    nonisolated static func bootTime() -> Date? {
+        var boot = timeval()
+        var size = MemoryLayout<timeval>.size
+        guard sysctlbyname("kern.boottime", &boot, &size, nil, 0) == 0, boot.tv_sec > 0 else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(boot.tv_sec))
     }
 
     /// The windows to open again, taken from the list: none already open, and none whose tabs are
@@ -732,6 +784,17 @@ final class MacWindowsToReopen: NSObject {
     /// sessions have ended stay closed (2026-11-19). Said by whoever makes the list — the app's own reads this Mac's
     /// server; a test says what runs, and never asks the owner's.
     private let localSessions: @MainActor () -> [TerminalTmux.Session]?
+    /// When this Mac last started: tabs whose sessions were made before it ended with the restart.
+    private let bootTime: @Sendable () -> Date?
+    /// What this launch says about tabs it left closed because their sessions had ended (2026-11-19), once, for the
+    /// first window to show; nil when none were.
+    private(set) var endedNotice: (title: String, message: String)?
+
+    /// The notice, for the one window that shows it.
+    func takeEndedNotice() -> (title: String, message: String)? {
+        defer { endedNotice = nil }
+        return endedNotice
+    }
     /// This run has taken the last run's list: from then on, this run's windows are the list.
     private(set) var hasTaken = false
     /// Windows of the last run asked to open and not on screen yet, kept in the list until they
@@ -741,10 +804,12 @@ final class MacWindowsToReopen: NSObject {
     private(set) var isQuitting = false
 
     init(defaults: UserDefaults = .standard, registry: MacWorkspacePreviewRegistry = .shared,
-         localSessions: @escaping @MainActor () -> [TerminalTmux.Session]?) {
+         localSessions: @escaping @MainActor () -> [TerminalTmux.Session]?,
+         bootTime: @escaping @Sendable () -> Date? = { MacLocalTmux.bootTime() }) {
         self.defaults = defaults
         self.registry = registry
         self.localSessions = localSessions
+        self.bootTime = bootTime
         super.init()
         registry.windowsChanged = { [weak self] in self?.update() }
         NotificationCenter.default.addObserver(self, selector: #selector(recordSaved(_:)),
@@ -767,8 +832,14 @@ final class MacWindowsToReopen: NSObject {
         if unshown.count < candidates.count {
             Self.logger.notice("Reopen: \(candidates.count - unshown.count) left closed, every tab's sessions already shown")
         }
-        // Tabs whose tmux sessions on this Mac have ended — a restart ends them all — stay closed (2026-11-19).
-        let reopening = MacLocalTmux.withoutEndedSessions(unshown, local: localSessions(), defaults: defaults)
+        // Tabs whose tmux sessions on this Mac have ended — a restart ends them all — stay closed (2026-11-19), and the
+        // launch says so, and why: "right now I'd be wondering why my sessions didn't restore."
+        let local = localSessions()
+        let (reopening, ended) = MacLocalTmux.withoutEndedSessions(unshown, local: local, defaults: defaults)
+        if let local {
+            endedNotice = MacLocalTmux.endedNotice(ended, reason: MacLocalTmux.whyEnded(ended, local: local,
+                                                                                       bootTime: bootTime()))
+        }
         opening = reopening
         write()
         return reopening

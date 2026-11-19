@@ -74,6 +74,50 @@ enum TerminalTmux {
         }
     }
 
+    /// Why sessions a terminal had are gone, as far as the machine can tell (the owner, 2026-11-19: "We should let the
+    /// user know that we lost the tmux session … right now I'd be wondering why my sessions didn't restore. Maybe check
+    /// uptime, or check how long the tmux daemon has been running?").
+    nonisolated enum EndedReason: Equatable, Sendable {
+        /// The machine started after the sessions were made: a restart ended tmux (this Mac's boot time).
+        case machineRestarted(at: Date)
+        /// The machine's tmux server started after the sessions were made: tmux was restarted, or the machine was.
+        case tmuxRestarted(at: Date)
+        /// No tmux server runs there now.
+        case tmuxNotRunning
+        /// tmux runs as it did: the sessions were ended (an `exit`, End, or `kill-session`).
+        case ended
+
+        /// What happened, as one sentence about `them`, on `machine` (nil for this Mac).
+        nonisolated func sentence(machine: String?, now: Date = .now) -> String {
+            let there = machine.map { " on \($0)" } ?? ""
+            switch self {
+            case .machineRestarted(let at):
+                return "\(machine ?? "Your Mac") restarted at \(Self.time(at, now: now)), which ended their tmux sessions and everything running in them."
+            case .tmuxRestarted(let at):
+                return "tmux\(there) was restarted at \(Self.time(at, now: now))\(machine == nil ? "" : " (\(machine!) itself may have restarted)"), which ended their sessions and everything running in them."
+            case .tmuxNotRunning:
+                return "tmux isn't running\(there) now, so their sessions have ended, with everything running in them."
+            case .ended:
+                return "Their tmux sessions\(there) were ended."
+            }
+        }
+
+        /// A time today as "10:22 AM", another day with its date.
+        nonisolated static func time(_ date: Date, now: Date) -> String {
+            Calendar.current.isDate(date, inSameDayAs: now)
+                ? date.formatted(date: .omitted, time: .shortened) : date.formatted(date: .abbreviated, time: .shortened)
+        }
+    }
+
+    /// Why a session made at `created` is no longer in `listed`: tmux started after it, none runs, or it was ended.
+    nonisolated static func whyEnded(created: Int?, listed: [Session]) -> EndedReason {
+        guard !listed.isEmpty else { return .tmuxNotRunning }
+        if let created, let server = listed.compactMap(\.server).first, server.startTime > created {
+            return .tmuxRestarted(at: Date(timeIntervalSince1970: TimeInterval(server.startTime)))
+        }
+        return .ended
+    }
+
     /// One tmux server, told apart from every other by its process, when it started and its
     /// socket. Two listings naming the same server list the same sessions however they were
     /// reached — this Mac's own, and this Mac reached over SSH as a host in the library (W6).

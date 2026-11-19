@@ -325,10 +325,18 @@ struct TerminalActiveListingTests {
         let rows = report.sessions.filter { !$0.isHeldHere() }.map(\.attachment?.name)
         #expect(rows == ["glass-1"], "\(rows)")
 
-        _ = capability.runningReport(local: nil, hosts: [(server, .sessions(listing))], closingEnded: true)
+        #expect(report.closed.isEmpty, "the Mac keeps them, saying so in their rows")
+
+        let closing = capability.runningReport(local: nil, hosts: [(server, .sessions(listing))], closingEnded: true)
         let left = Set(manager.sessions.map(\.id))
         #expect(!left.contains(replaced.id), "its own session has ended: it closes, never joins the later one")
         #expect(left.contains(ownStill.id) && left.contains(undated.id))
+        // And Active says so, under the machine (2026-11-19: "We should let the user know that we lost the tmux session").
+        #expect(closing.closed == [GlassClosedTerminals(endpointID: EndpointID(rawValue: server.id), count: 1,
+                                                        reason: "Their tmux sessions on alpha were ended.")])
+        #expect(closing.closed.first?.message == "A terminal closed. Their tmux sessions on alpha were ended.")
+        let again = capability.runningReport(local: nil, hosts: [(server, .sessions(listing))], closingEnded: true)
+        #expect(again.closed.isEmpty, "said once; Active keeps it until it is dismissed")
     }
 
     @Test("Active's names leave out the spinner an agent turns at the start of its title")

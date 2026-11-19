@@ -155,6 +155,14 @@ extension GlassTerminalCapability {
             // Held here by a terminal that is down, whose row says what is known of it: listed,
             // though not shown while that terminal is open (`isHeldHere`).
             let byName = Dictionary(sessions.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+            var endedHere: [TerminalSession] = []
+            defer {
+                // Closing them: Active says so, and why (2026-11-19).
+                if closingEnded, !endedHere.isEmpty {
+                    manager.noteTerminalsClosed(endedHere.count, on: server, TerminalTmux.whyEnded(
+                        created: endedHere.compactMap(\.tmuxSessionCreated).max(), listed: sessions))
+                }
+            }
             for terminal in here where terminal.isDown {
                 guard let name = terminal.tmuxSessionName else { continue }
                 // Its own session, not a later one by its name (2026-11-19): after a restart the Mac's new tabs took
@@ -163,7 +171,10 @@ extension GlassTerminalCapability {
                 terminal.tmuxWhileDown = own.map(TerminalTmuxWhileDown.running) ?? .ended
                 // Not one that claims its session: a saved Workgroup's, not yet connected, makes it when it does and
                 // runs its startup command there; on iPhone and iPad, only the one shown has.
-                if own == nil, !terminal.tmuxClaimsGivenName { ended.append(terminal) }
+                if own == nil, !terminal.tmuxClaimsGivenName {
+                    ended.append(terminal)
+                    endedHere.append(terminal)
+                }
                 // A bell kept on its session (2026-11-15): rung while this device was put away, or shown nowhere yet.
                 if own?.bell == true { terminal.sessionKeepsBell() }
             }
@@ -190,6 +201,12 @@ extension GlassTerminalCapability {
         #endif
         if closingEnded {
             for terminal in ended { manager.removeSessionFromWorkgroup(terminal) }
+        }
+        // Closed here, and closed by themselves as they found their sessions gone: said under each machine.
+        for (serverID, closed) in manager.takeTerminalsClosed() {
+            let machine = manager.serverManager.server(for: serverID)?.name ?? closed.machine
+            report.closed.append(GlassClosedTerminals(endpointID: EndpointID(rawValue: serverID), count: closed.count,
+                                                      reason: closed.reason.sentence(machine: machine)))
         }
         return report
     }

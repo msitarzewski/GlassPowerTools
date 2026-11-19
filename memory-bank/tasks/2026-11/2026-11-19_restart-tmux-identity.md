@@ -58,7 +58,32 @@ an id the app knows only for agents it started). D111.
   joined (`attach-session` ×2, `new-session` ×0), same sessions and times. The VM was stopped after.
 - iPhone and Vision Pro simulator builds (app and tests, `build-for-testing`) pass. Their test suites weren't run.
 
+## Shipping 0.4.622 (his "Ship it", 2026-11-19)
+- `66c3a29b` pushed. Built from a clean worktree at it (`tmp/release-622-tree`, the package cache cloned from 619's):
+  app and disk image notarized, stapled, Gatekeeper-accepted (Notarized Developer ID). GitHub v0.4.622 (Latest) with
+  dmg, zip and checksums, downloaded back byte-identical, the tag at `66c3a29b`. Feed entry `4b61a63e` pushed. The
+  Mac's thirteenth release.
+- TestFlight 622: uploaded for iOS and visionOS; What to Test set, in Testers, both `WAITING_FOR_REVIEW`.
+- Site built at `4b61a63e` (111 files) and staged on the server, 111 of 111 matching; provisioning is his step.
+- Devices: development-signed Release builds of 0.4.622 for the iPhone and the headset; both were unreachable
+  (`unavailable`) at install time, and a watcher installs each when it is reachable.
+
+## Saying why (0.4.623)
+- His word, with 0.4.622 released but the site not yet live: "We should let the user know that we lost the tmux session
+  if we try to restore sessions and they're not available … Maybe check uptime, or check how long the tmux daemon has
+  been running?" He held the site; the device install watcher was stopped; 623 supersedes 622.
+- Built: `TerminalTmux.EndedReason` (machine restarted, tmux restarted, tmux not running, ended) with its sentence;
+  `whyEnded` from the listing's server `#{start_time}`; on the Mac `MacLocalTmux.whyEnded` adds `kern.boottime`, and
+  `takeOnce` keeps `endedNotice` (`EndedTabs`: tabs, windows closed, Workgroups, newest session's time), shown by
+  `MacLaunchReopen` as an alert before the running-sessions offer. Off the Mac a terminal closing because its session
+  ended — Active's close or its own rejoin (`tmuxSessionGone`) — is counted per machine in `SessionManager`,
+  reported (`GlassRunningReport.closed`) and said under the machine in Active until dismissed.
+- Checked: 96 pure tests (85 terminal, 11 shell); each new piece seen failing without it. In the VM, two tmux tabs and
+  `reboot -q`: the relaunch said "2 tabs weren't reopened — Your Mac restarted at 1:19 AM, which ended their tmux
+  sessions and everything running in them." (the VM keeps UTC); quit and relaunch with tmux running reopened both
+  tabs, no alert. VM stopped. The Active note on iPhone/Vision Pro is unit-tested, not seen on a device.
+
 ## Next
-- His word for 0.4.622: commit, release, TestFlight, install.
+- 0.4.623 through the same release path; then his provisioning, the live check, the devices, the records.
 - His current iPhone terminals from before the restart never learnt their sessions' times (621 didn't read them): the
   two still standing over his new Mac tabs go by the name alone until closed by hand.

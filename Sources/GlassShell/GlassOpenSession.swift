@@ -329,14 +329,44 @@ public struct GlassUncheckedMachine: Identifiable {
     }
 }
 
-/// What asking the machines came to: what runs there, and the machines that could not be asked.
+/// What asking the machines came to: what runs there, the machines that could not be asked, and terminals that closed
+/// because their sessions there had ended.
 public struct GlassRunningReport {
     public var sessions: [GlassRunningSession]
     public var unchecked: [GlassUncheckedMachine]
+    public var closed: [GlassClosedTerminals]
 
-    public init(sessions: [GlassRunningSession] = [], unchecked: [GlassUncheckedMachine] = []) {
+    public init(sessions: [GlassRunningSession] = [], unchecked: [GlassUncheckedMachine] = [],
+                closed: [GlassClosedTerminals] = []) {
         self.sessions = sessions
         self.unchecked = unchecked
+        self.closed = closed
+    }
+}
+
+/// Terminals on one machine that closed because their tmux sessions had ended, and why (the owner, 2026-11-19: "We
+/// should let the user know that we lost the tmux session … right now I'd be wondering why my sessions didn't
+/// restore"). Active says it under the machine until it is dismissed.
+public struct GlassClosedTerminals: Identifiable, Equatable {
+    /// The service they ran through; the library turns it into the machine.
+    public let endpointID: EndpointID
+    public var count: Int
+    /// Why, as a sentence about them: "tmux on alpha was restarted at 10:24 AM, which ended their sessions…".
+    public var reason: String
+    public var id: EndpointID { endpointID }
+
+    public init(endpointID: EndpointID, count: Int, reason: String) {
+        self.endpointID = endpointID
+        self.count = count
+        self.reason = reason
+    }
+
+    /// "3 terminals closed. tmux on alpha was restarted at…"
+    public var message: String { "\(count == 1 ? "A terminal" : "\(count) terminals") closed. \(reason)" }
+
+    /// Closed again on the same machine before the first was dismissed: one note, counting both, with the newest why.
+    public func adding(_ later: GlassClosedTerminals) -> GlassClosedTerminals {
+        GlassClosedTerminals(endpointID: endpointID, count: count + later.count, reason: later.reason)
     }
 }
 

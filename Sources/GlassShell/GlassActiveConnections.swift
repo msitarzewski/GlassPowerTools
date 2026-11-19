@@ -43,6 +43,8 @@ public struct GlassActiveMachine: Identifiable {
     public var running: [GlassRunningSession] = []
     /// Why the machine's running sessions were not asked for, when they were not (W6).
     public var notChecked: String? = nil
+    /// Terminals there that closed because their sessions had ended, and why, until dismissed (2026-11-19).
+    public var closed: GlassClosedTerminals? = nil
 }
 
 public extension GlassShellModel {
@@ -70,7 +72,28 @@ public extension GlassShellModel {
             guard let index = machineIndex(owning: unchecked.endpointID) else { continue }
             machines[index].notChecked = unchecked.reason
         }
+        for closed in closedTerminals {
+            guard let index = machineIndex(owning: closed.endpointID) else { continue }
+            machines[index].closed = machines[index].closed.map { $0.adding(closed) } ?? closed
+        }
         return machines
+    }
+
+    /// Terminals that closed because their sessions had ended, and why: kept from one check to the next, counted
+    /// together per machine, until dismissed (`dismissClosed`).
+    func noteClosed(_ closed: [GlassClosedTerminals]) {
+        for note in closed {
+            if let index = closedTerminals.firstIndex(where: { $0.endpointID == note.endpointID }) {
+                closedTerminals[index] = closedTerminals[index].adding(note)
+            } else {
+                closedTerminals.append(note)
+            }
+        }
+    }
+
+    /// The note read: gone until more close there.
+    func dismissClosed(_ endpointID: EndpointID) {
+        closedTerminals.removeAll { $0.endpointID == endpointID }
     }
 
     /// The running sessions as Active lists them: less those something open here holds
@@ -133,6 +156,7 @@ public extension GlassShellModel {
         let report = await registry.runningReport()
         runningSessions = report.sessions
         uncheckedMachines = report.unchecked
+        noteClosed(report.closed)
         runningSessionsCheckedAt = .now
     }
 
@@ -573,6 +597,23 @@ struct GlassActiveConnectionsList: View {
                     .glassSpatialListRow()
                     .selectionDisabled()
                     .accessibilityIdentifier("active-not-checked-\(machine.id)")
+            }
+            // Terminals that closed because their sessions had ended, and why, until read (2026-11-19).
+            if let closed = machine.closed {
+                HStack(alignment: .firstTextBaseline) {
+                    Label(closed.message, systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Button("Dismiss", systemImage: "xmark") { model.dismissClosed(closed.endpointID) }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .font(.caption)
+                        .accessibilityIdentifier("active-closed-dismiss-\(machine.id)")
+                }
+                .glassSpatialListRow()
+                .selectionDisabled()
+                .accessibilityIdentifier("active-closed-\(machine.id)")
             }
         } label: {
             HStack {

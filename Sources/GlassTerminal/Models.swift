@@ -501,6 +501,8 @@ class TerminalSession: Identifiable, Hashable {
     /// It has been attached to `tmuxSessionName`: from then on it only ever joins that session again, and is gone
     /// once the session is (`TerminalTmux.attachLine(joining:)`).
     private var tmuxHasAttached = false
+    /// Told why, as it goes because its session has ended (2026-11-19): Active says so (`SessionManager`).
+    @ObservationIgnored var tmuxSessionGone: (@MainActor (TerminalTmux.EndedReason) -> Void)?
     /// What the machine last said of `tmuxSessionName` while this terminal's connection was down
     /// (2026-10-24): still running there, or ended. Active's row for the terminal says so, in
     /// place of a second row for the session. Forgotten once it connects again.
@@ -1180,9 +1182,10 @@ class TerminalSession: Identifiable, Hashable {
                 tmuxJoinsOnly = false
                 tmuxClaimsGivenName = false
                 joining = true
-                if await tmuxSessionHasEnded(given) {
+                if let reason = await tmuxSessionGone(given) {
                     guard state == .connected, !Task.isCancelled else { return }
                     Logger.ssh.notice("A terminal's tmux session has ended, or another took its name: the terminal goes too")
+                    tmuxSessionGone?(reason)
                     handleCleanRemoteExit()
                     return
                 }
@@ -1279,10 +1282,12 @@ class TerminalSession: Identifiable, Hashable {
 
     /// Whether the host's tmux runs no session called `name`: known only from a list that read.
     /// tmux missing, or a list that can't be read, is not an ended session — the attach goes on.
-    private func tmuxSessionHasEnded(_ name: String) async -> Bool {
+    /// Why it has (`TerminalTmux.whyEnded`), or nil while it runs.
+    private func tmuxSessionGone(_ name: String) async -> TerminalTmux.EndedReason? {
         guard let listed = try? await listTmuxSessionsRetryingOnce(),
-              case .sessions(let sessions) = TerminalTmux.parse(listed) else { return false }
-        return !sessions.contains { $0.isSession(name, created: tmuxSessionCreated) }
+              case .sessions(let sessions) = TerminalTmux.parse(listed),
+              !sessions.contains(where: { $0.isSession(name, created: tmuxSessionCreated) }) else { return nil }
+        return TerminalTmux.whyEnded(created: tmuxSessionCreated, listed: sessions)
     }
 
     /// Claims a name this terminal kept: made again when it has ended — and only then does the

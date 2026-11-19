@@ -2411,6 +2411,14 @@ terminal's own read: `TerminalTmux.Session.created`, `PaneState.sessionCreated`,
   `withoutEndedSessions`; their records go, a window with none left stays closed). A local pane that has been in its
   session starts with `attach-session` (`joinsLocalTmuxSession`, both start paths); an SSH pane that has rejoins only.
   A Workgroup opened by hand still claims, so its startup commands run in sessions made for it.
+**Said, 2026-11-19 (0.4.623):** after 0.4.622 was released but before the site went live, the owner: "We should let the
+user know that we lost the tmux session if we try to restore sessions and they're not available … right now I'd be
+wondering why my sessions didn't restore. Maybe check uptime, or check how long the tmux daemon has been running?" The
+Mac's launch says how many tabs it left closed and why (`MacLocalTmux.whyEnded`: this Mac's `kern.boottime` after the
+newest session was made, else `TerminalTmux.whyEnded`: the tmux server's `#{start_time}` after it, no server, or
+ended), with the Workgroups they came from (`MacLaunchReopen`'s alert). Off the Mac, a terminal that closes because its
+session ended — Active's D110 close or its own rejoin — is counted per machine with why (`SessionManager.
+noteTerminalsClosed`, `GlassRunningReport.closed`) and Active says it under the machine until dismissed.
 **Limits:** a terminal or pane that never read its session (records from 621 and before) goes by the name alone. With
 the Mac's listing unreadable at launch, windows come back and a pane whose session is gone shows its tmux exit rather
 than closing (unknown keeps a pane, `MacLocalTerminalExitPolicy`). A split tab with one dead local pane keeps the tab.

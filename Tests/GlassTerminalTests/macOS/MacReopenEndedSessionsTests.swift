@@ -83,8 +83,10 @@ struct MacReopenEndedSessionsTests {
                                         defaults)
             let running = [TerminalTmux.Session(name: "glass-4", attachedClients: 0, windows: 1, created: 7)]
 
-            let reopening = MacLocalTmux.withoutEndedSessions([allEnded.window, mixed.window], local: running, defaults: defaults)
+            let (reopening, ended) = MacLocalTmux.withoutEndedSessions([allEnded.window, mixed.window], local: running,
+                                                                       defaults: defaults)
             #expect(reopening == [mixed.window])
+            #expect(ended == MacLocalTmux.EndedTabs(tabs: 3, windows: 1, workgroups: [], newestCreated: 1_790_000_200))
             #expect(!MacWorkspaceWindowController.hasSavedState(windowID: allEnded.window, defaults: defaults),
                     "its record went, so nothing comes back to it later")
             #expect(allEnded.tabs.allSatisfy { defaults.object(forKey: tabKey($0)) == nil })
@@ -95,7 +97,7 @@ struct MacReopenEndedSessionsTests {
             // Not known what runs here: every window comes back as saved, and a pane whose session is gone closes
             // once tmux says so.
             let unknown = try savedWindow([local("glass-5", created: 9)], defaults)
-            #expect(MacLocalTmux.withoutEndedSessions([unknown.window], local: nil, defaults: defaults) == [unknown.window])
+            #expect(MacLocalTmux.withoutEndedSessions([unknown.window], local: nil, defaults: defaults).reopening == [unknown.window])
             #expect(savedTabs(unknown.window, defaults) == unknown.tabs)
         }
     }
@@ -110,6 +112,49 @@ struct MacReopenEndedSessionsTests {
                 [TerminalTmux.Session(name: "glass-2", attachedClients: 0, windows: 1, created: 1_790_000_100)]
             })
             #expect(reopen.takeOnce(askedBy: "a terminal window") == [alive.window])
+        }
+    }
+
+    /// The owner, 2026-11-19: "We should let the user know that we lost the tmux session … right now I'd be wondering why
+    /// my sessions didn't restore. Maybe check uptime, or check how long the tmux daemon has been running?"
+    @Test("the launch says how many tabs it left closed, why — the Mac restarted, tmux did, or neither — and which Workgroups start them")
+    func saysWhy() throws {
+        let made = 1_790_000_000
+        let ended = MacLocalTmux.EndedTabs(tabs: 29, windows: 4, workgroups: ["Backend", "Docs"], newestCreated: made)
+        let now = Date(timeIntervalSince1970: TimeInterval(made + 7_200))
+        let boot = Date(timeIntervalSince1970: TimeInterval(made + 3_600))
+        let restartedTmux = TerminalTmux.Session(name: "glass-9", attachedClients: 0, windows: 1,
+                                                 server: TerminalTmux.Server(pid: 1, startTime: made + 600, socketPath: "/tmp/s"))
+        let sameTmux = TerminalTmux.Session(name: "glass-9", attachedClients: 0, windows: 1,
+                                            server: TerminalTmux.Server(pid: 1, startTime: made - 600, socketPath: "/tmp/s"))
+
+        #expect(MacLocalTmux.whyEnded(ended, local: [], bootTime: boot) == .machineRestarted(at: boot), "booted after they were made")
+        #expect(MacLocalTmux.whyEnded(ended, local: [restartedTmux], bootTime: Date(timeIntervalSince1970: 1))
+                == .tmuxRestarted(at: Date(timeIntervalSince1970: TimeInterval(made + 600))), "tmux started after them")
+        #expect(MacLocalTmux.whyEnded(ended, local: [], bootTime: Date(timeIntervalSince1970: 1)) == .tmuxNotRunning)
+        #expect(MacLocalTmux.whyEnded(ended, local: [sameTmux], bootTime: Date(timeIntervalSince1970: 1)) == .ended)
+
+        let notice = try #require(MacLocalTmux.endedNotice(ended, reason: .machineRestarted(at: boot), now: now))
+        #expect(notice.title == "29 tabs in 4 windows weren't reopened")
+        #expect(notice.message.hasPrefix("Your Mac restarted at \(boot.formatted(date: .omitted, time: .shortened)), which ended their tmux sessions"))
+        #expect(notice.message.hasSuffix("To start their terminals again, open “Backend” and “Docs” from Workgroups."))
+        let one = MacLocalTmux.EndedTabs(tabs: 1, windows: 0, workgroups: [], newestCreated: nil)
+        #expect(MacLocalTmux.endedNotice(one, reason: .tmuxNotRunning, now: now)?.title == "A tab wasn't reopened")
+        #expect(MacLocalTmux.endedNotice(MacLocalTmux.EndedTabs(), reason: .ended) == nil, "nothing left closed: nothing said")
+    }
+
+    @Test("a relaunch after a restart has its notice, once")
+    func noticeTakenOnce() throws {
+        try withDefaults { defaults in
+            let ended = try savedWindow([local("glass-1", created: 1_790_000_000)], defaults)
+            defaults.set([ended.window.uuidString], forKey: MacLocalTmux.reopenKey)
+            let boot = Date(timeIntervalSince1970: 1_795_105_378)
+            let reopen = MacWindowsToReopen(defaults: defaults, registry: MacWorkspacePreviewRegistry(),
+                                            localSessions: { [] }, bootTime: { boot })
+            #expect(reopen.takeOnce(askedBy: "a terminal window") == [])
+            let notice = try #require(reopen.takeEndedNotice())
+            #expect(notice.title == "A tab wasn't reopened" && notice.message.hasPrefix("Your Mac restarted at"))
+            #expect(reopen.takeEndedNotice() == nil, "said once")
         }
     }
 

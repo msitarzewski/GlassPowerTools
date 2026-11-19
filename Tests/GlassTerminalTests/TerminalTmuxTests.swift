@@ -657,10 +657,13 @@ struct TerminalTmuxTests {
             ["glass-2", "0", "1", "", "4242", "1789990000", "/private/tmp/tmux-501/default", "zsh", "alpha.example.com",
              "alpha", "", "/home/ann", "", "", "", String(created), "alpha.example.com"].joined(separator: "\t") + "\n"
         }
-        for (now, stays) in [(listed(1_790_000_000), true), (listed(1_795_105_500), false), ("", false)] {
+        let why: [TerminalTmux.EndedReason?] = [nil, .ended, .tmuxNotRunning]
+        for ((now, stays), expected) in zip([(listed(1_790_000_000), true), (listed(1_795_105_500), false), ("", false)], why) {
             let writes = Writes()
             var listing = listed(1_790_000_000)
             let terminal = TerminalSession(server: server(tmux: true), terminalWriteSink: { writes.receive($0) })
+            var told: [TerminalTmux.EndedReason] = []
+            terminal.tmuxSessionGone = { told.append($0) }
             terminal.tmuxCommandRunner = { _ in listing }
             terminal.tmuxSessionName = "glass-2"
             terminal.tmuxSessionCreated = 1_790_000_000
@@ -680,7 +683,35 @@ struct TerminalTmuxTests {
                 #expect(writes.lines == [join], "nothing typed: no session made again, none of another's joined")
                 #expect(terminal.closeWindowNonce == 1 && terminal.state == .disconnected, "the terminal goes, as after an exit")
             }
+            #expect(told == [expected].compactMap { $0 }, "and says why, for Active to say: \(told)")
         }
+    }
+
+    @Test("why a session is gone: tmux started after it, none runs, or it was ended; and how each is said")
+    func whyEnded() {
+        let made = 1_790_000_000
+        func listed(serverStarted: Int) -> [TerminalTmux.Session] {
+            [TerminalTmux.Session(name: "glass-1", attachedClients: 0, windows: 1,
+                                  server: TerminalTmux.Server(pid: 7, startTime: serverStarted, socketPath: "/tmp/s"))]
+        }
+        let restarted = Date(timeIntervalSince1970: TimeInterval(made + 60))
+        #expect(TerminalTmux.whyEnded(created: made, listed: listed(serverStarted: made + 60)) == .tmuxRestarted(at: restarted))
+        #expect(TerminalTmux.whyEnded(created: made, listed: listed(serverStarted: made - 60)) == .ended)
+        #expect(TerminalTmux.whyEnded(created: nil, listed: listed(serverStarted: made + 60)) == .ended, "not known when: not said")
+        #expect(TerminalTmux.whyEnded(created: made, listed: []) == .tmuxNotRunning)
+        let now = restarted
+        let at = restarted.formatted(date: .omitted, time: .shortened)
+        #expect(TerminalTmux.EndedReason.tmuxRestarted(at: restarted).sentence(machine: "alpha", now: now)
+                == "tmux on alpha was restarted at \(at) (alpha itself may have restarted), which ended their sessions and everything running in them.")
+        #expect(TerminalTmux.EndedReason.tmuxNotRunning.sentence(machine: "alpha", now: now)
+                == "tmux isn't running on alpha now, so their sessions have ended, with everything running in them.")
+        #expect(TerminalTmux.EndedReason.ended.sentence(machine: "alpha", now: now) == "Their tmux sessions on alpha were ended.")
+        #expect(TerminalTmux.EndedReason.machineRestarted(at: restarted).sentence(machine: nil, now: now)
+                .hasPrefix("Your Mac restarted at \(at)"))
+        // Another day: the date too.
+        #expect(TerminalTmux.EndedReason.tmuxNotRunning.sentence(machine: nil, now: now) == "tmux isn't running now, so their sessions have ended, with everything running in them.")
+        #expect(TerminalTmux.EndedReason.time(restarted, now: now.addingTimeInterval(3 * 86_400))
+                == restarted.formatted(date: .abbreviated, time: .shortened))
     }
 
     @Test("a session this terminal joins never has the startup command typed into it")

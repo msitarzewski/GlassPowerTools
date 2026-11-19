@@ -800,11 +800,29 @@ class SessionManager {
     ) {
         installLifecycleHook(on: session)
         guard !sessions.contains(where: { $0.id == session.id }) else { return }
+        // Gone because its session ended (2026-11-19): Active says so, with why, rather than the terminal just closing.
+        let server = session.server
+        session.tmuxSessionGone = { [weak self] reason in self?.noteTerminalsClosed(1, on: server, reason) }
         sessionOrigins[session.id] = origin
         if case .transient = origin, let transientPassword {
             transientPasswords[session.id] = SecureBytes(Data(transientPassword.utf8))
         }
         sessions.append(session)
+    }
+
+    /// Terminals that closed because their tmux sessions had ended, by machine, with why, until Active takes them
+    /// (`takeTerminalsClosed`). The owner, 2026-11-19: "We should let the user know that we lost the tmux session."
+    private(set) var terminalsClosed: [UUID: (count: Int, machine: String, reason: TerminalTmux.EndedReason)] = [:]
+
+    func noteTerminalsClosed(_ count: Int, on server: ServerConfiguration, _ reason: TerminalTmux.EndedReason) {
+        guard count > 0 else { return }
+        terminalsClosed[server.id] = ((terminalsClosed[server.id]?.count ?? 0) + count, server.name, reason)
+    }
+
+    /// What closed since Active last asked, and none of it again.
+    func takeTerminalsClosed() -> [UUID: (count: Int, machine: String, reason: TerminalTmux.EndedReason)] {
+        defer { terminalsClosed = [:] }
+        return terminalsClosed
     }
 
     func closeSession(_ session: TerminalSession) {
