@@ -1,8 +1,8 @@
 # 2026-11-19 — Workgroups edited in their panel, no sheet (D112); Get Info (0.4.624–0.4.625)
 
 **Owner and authorization:** his asks, below; local edits, tests, VM and simulator runs, and installs on his Mac (his
-"install it on the mac, hold the release" for 0.4.624, and the standing "install mac builds when ready"). Not committed,
-not released: the release is held at his word.
+"install it on the mac, hold the release" for 0.4.624, and the standing "install mac builds when ready"). Released in
+0.4.632 at his word ("commit and release it", 2026-11-21; `9b9a30f2`, `tasks/2026-11/2026-11-20_svg-drop-crash.md`).
 
 ## Get Info (0.4.624)
 - His ask, after finding a tab's tmux name for a test: "it looks like we need a right click > Get Info... on the tabs".

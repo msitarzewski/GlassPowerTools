@@ -2,8 +2,8 @@
 
 **Owner and authorization:** his question ("What happens when a user drags an svg into the terminal window?"), a crash
 report and a log he pasted, and his answer on where the file came from ("downloads, but from the folder in the dock").
-Local edits, tests, VM runs; the Mac install is standing. Not committed, not released: the release of 0.4.624 onward is
-held at his word.
+Local edits, tests, VM runs; the Mac install is standing. Committed and released at his word ("commit and release it",
+2026-11-21).
 
 ## The crash report and its log
 - 0.4.623, macOS 27.2.1. `EXC_BAD_ACCESS` at 0x0 on the main thread, 33 s after launch: `NSWindow becomeKeyWindow` →
@@ -73,5 +73,25 @@ held at his word.
   (434 s while these waited out their 30 s checks). An eleventh, the sidebar test, failed once beside the VM build and
   passed alone and in the whole run.
 
+## Shipping 0.4.632 (his "commit and release it", 2026-11-21)
+- `9b9a30f2` (0.4.624–0.4.632, with the version moved to 0.4.632 in README, RELEASE-NOTES and the site's pages) pushed.
+  No released Xcode was installed (he had moved to Xcode-beta 27.3): Xcode 27.2 (27B52, the one 0.4.623 was built
+  with) expanded from the `.xip` in his Downloads into `/Applications/Xcode.app`, for the release scripts only.
+- Mac v0.4.632 built in the release worktree (`tmp/release-622-tree`, 0.4.623's outputs kept as `build/release-623`,
+  `build/testflight-623`): app and disk image notarized, stapled, Gatekeeper-accepted (Notarized Developer ID); its
+  `SUPublicEDKey` the same as 0.4.623's. GitHub v0.4.632 Latest, dmg, zip and checksums downloaded back byte-identical,
+  the tag at `9b9a30f2`. Feed entry `a7a9f467` pushed. The Mac's fifteenth release. Texts in `tmp/release-632`.
+- TestFlight 632: iOS and visionOS uploaded from `a7a9f467`, both VALID, What to Test set (3,268 characters, read
+  back), both in Testers (read back), both `WAITING_FOR_REVIEW`.
+- Site built at `a7a9f467` (111 files) and staged on the server, 111 of 111 matching by SHA-256; he provisioned it.
+- Live, checked 2026-11-21: 111 of 111 files match the build by SHA-256. The feed is served `no-cache`, newest item
+  0.4.632, byte for byte `site/static/appcast.xml` at `a7a9f467`. The zip downloaded from its enclosure URL is
+  29,507,831 bytes as advertised, its SHA-256 the release's checksum file's, and its EdDSA signature verifies against the
+  app's `SUPublicEDKey`, the same key as 0.4.623's app and the installed one (a flipped signature bit and a flipped
+  archive bit each fail). The app in it is 0.4.632 (632), notarized, stapled and Gatekeeper-accepted. GitHub v0.4.632
+  Latest, tag at `9b9a30f2`, origin/main `a7a9f467`. TestFlight 632, iOS and visionOS: VALID, in Testers,
+  `WAITING_FOR_REVIEW`.
+
 ## Next
+- Apple's beta review of TestFlight 632 (both platforms).
 - His Mac (0.4.632 installed 13:09): an SVG from the Dock's Downloads stack onto a terminal: the path typed, the app up.

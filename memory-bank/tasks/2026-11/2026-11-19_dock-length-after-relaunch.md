@@ -1,8 +1,8 @@
 # 2026-11-19 — The Mac's dock after a relaunch: windows missing from it, a drag that didn't take (0.4.627–0.4.631)
 
 **Owner and authorization:** his report, below; local edits, tests and VM runs, and the install on his Mac (the
-standing "install Mac builds when ready", and his "install it on the mac when ready" this evening). Not committed, not
-released: the release of 0.4.624 onward is held at his word.
+standing "install Mac builds when ready", and his "install it on the mac when ready" this evening). Released in 0.4.632
+at his word ("commit and release it", 2026-11-21; `9b9a30f2`, `tasks/2026-11/2026-11-20_svg-drop-crash.md`).
 
 ## His report
 - After installing 0.4.626, the app relaunched with six terminal windows in a vertical dock: "the dock only showed 4

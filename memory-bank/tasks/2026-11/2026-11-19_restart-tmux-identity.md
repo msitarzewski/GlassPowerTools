@@ -1,7 +1,7 @@
 # 2026-11-19 — After a restart: tabs come back empty, terminals keep old names (D111)
 
 **Owner and authorization:** the owner, 2026-11-19: "we have two large, related problems to solve asap", then the
-answer below. Local edits, tests and VM runs. Not committed, not released; release at his word.
+answer below. Local edits, tests and VM runs. Released at his word: 0.4.622 ("Ship it") and 0.4.623, below.
 
 ## What happened (his report, and the code)
 - His Mac ran out of memory (swap 100 GB of 100 GB at 10:20; the app was 610 MB of it; a macOS test VM left running

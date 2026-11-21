@@ -31,7 +31,7 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-19 — RESUME HERE: after a restart, tmux tabs came back empty and terminals kept old names (D111, not committed)
+## 2026-11-19–21 — RESUME HERE: after a restart, tmux tabs came back empty (D111, released in 0.4.622–0.4.623); then Get Info, the Workgroup panel, the dock and drops from a Dock stack (released in 0.4.632)
 
 - **His report:** his Mac ran out of memory and he force-restarted it with ~29 local tabs in tmux (Workgroups' and ad
   hoc, one window of 12–13). Every tab came back an empty shell in `~` under its old session name; closing windows
@@ -65,8 +65,10 @@ use the disposable test VM only).
   report and log he pasted): a file promise called in after the drop raises on macOS 27. Drops now read only SwiftUI's
   providers; `tasks/2026-11/2026-11-20_svg-drop-crash.md`. On his Mac since 13:09; his check: a Dock-stack SVG onto a
   terminal. Also, at his word: 10 tmux tests failing since 0.4.622 fixed (their fake hosts now list their sessions).
-- **Next:** his word to release 0.4.624–0.4.625 (held at his word); batching releases and quiet Sparkle installs, asked;
-  the iPhone and headset on 0.4.625 when reachable. Nothing of 0.4.624–0.4.625 is committed.
+- **0.4.632 shipped** at his word ("commit and release it", 2026-11-21): 0.4.624–0.4.632 in `9b9a30f2`, Mac v0.4.632,
+  feed `a7a9f467`, site live and checked 111/111 with the feed's zip and signature verified, TestFlight 632 both in review.
+- **Next:** Apple's beta review of 632; his Dock-stack SVG check on macOS 27; batching releases and quiet Sparkle
+  installs, asked; the iPhone and headset on 632 when reachable.
 
 ## 2026-11-15 (evening) — the iPhone's Active, from his day on the phone (released in 0.4.621)
 
