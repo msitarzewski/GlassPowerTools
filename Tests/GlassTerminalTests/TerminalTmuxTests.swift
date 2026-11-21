@@ -42,6 +42,9 @@ struct TerminalTmuxTests {
             }
             return "__glass_tmux_failed__\n"
         }
+
+        /// The list command's answer from what runs now: those listed at first, and those claimed since.
+        var listing: String { running.sorted().map { "\($0)\t0\t1\t1790000000\n" }.joined() }
     }
 
     /// The names a claim command offers, read back out of its script; nil for any other command.
@@ -54,13 +57,17 @@ struct TerminalTmuxTests {
             .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "'")) }
     }
 
+    /// A session on a host that answers its claims; anything else is answered with `listing`, or, with
+    /// `listsWhatRuns`, the list command with what the host runs now (a rejoin checks its session is listed, D111).
     private func session(_ server: ServerConfiguration, writes: Writes, listing: String,
-                         host: Host? = nil, commands: (@MainActor (String) -> Void)? = nil) -> TerminalSession {
+                         host: Host? = nil, listsWhatRuns: Bool = false,
+                         commands: (@MainActor (String) -> Void)? = nil) -> TerminalSession {
         let session = TerminalSession(server: server, terminalWriteSink: { writes.receive($0) })
         let host = host ?? Host(listing: listing)
         session.tmuxCommandRunner = { command in
             commands?(command)
-            return host.claim(command) ?? listing
+            if let answer = host.claim(command) { return answer }
+            return listsWhatRuns && command == TerminalTmux.listCommand ? host.listing : listing
         }
         return session
     }
@@ -461,11 +468,13 @@ struct TerminalTmuxTests {
         #expect(name.map { (TerminalTmux.glassNumber($0) ?? 0) >= 100 } == true, "not glass-1: \(name ?? "none")")
     }
 
-    @Test("a reconnect attaches to the same session without asking the host again")
+    /// Since D111 (0.4.622) a reconnect joins only the session it had, once the host lists it still running; it
+    /// never claims a name again.
+    @Test("a reconnect joins the same session, once the host lists it, and claims nothing again")
     func reconnect() async {
         let writes = Writes()
         var asked = 0, versions = 0
-        let session = session(server(tmux: true), writes: writes, listing: "", commands: { command in
+        let session = session(server(tmux: true), writes: writes, listing: "", listsWhatRuns: true, commands: { command in
             if command == TerminalTmux.versionCommand { versions += 1 } else if Self.asksTheHost(command) { asked += 1 }
         })
         session.state = .connected
@@ -474,10 +483,12 @@ struct TerminalTmuxTests {
         session.state = .connected
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
-        #expect(asked == 2, "the list and the claim, once")
+        #expect(asked == 3, "the list and the claim, then the list the rejoin checks")
         #expect(versions == 1, "tmux's version, once a session (control mode, D83)")
-        #expect(writes.lines.count == 2 && writes.lines[0] == writes.lines[1])
-        #expect(writes.lines[0].contains("-s 'glass-1'"))
+        #expect(writes.lines.count == 2)
+        #expect(writes.lines.first?.contains("new-session -A -s 'glass-1'") == true)
+        #expect(writes.lines.last?.contains("attach-session -t '=glass-1'") == true)
+        #expect(session.tmuxSessionName == "glass-1")
     }
 
     @Test("without tmux on the host: an ordinary shell, and the startup command still runs")
@@ -492,10 +503,12 @@ struct TerminalTmuxTests {
         #expect(writes.lines == ["uptime\n"])
     }
 
+    /// A session Active listed is joined (`attach-session`, D111), never made: `-d` takes it over from the device it
+    /// was open on, the first time only.
     @Test("attaching from Active uses the given name and takes over once")
     func attachGiven() async {
         let writes = Writes()
-        let session = session(server(tmux: nil), writes: writes, listing: "")
+        let session = session(server(tmux: nil), writes: writes, listing: "work\t1\t1\t1790000000\n")
         session.tmuxSessionName = "work"
         session.tmuxTakesOver = true
         session.state = .connected
@@ -504,7 +517,8 @@ struct TerminalTmuxTests {
         session.state = .connected
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
-        #expect(writes.lines.map { $0.contains(" -D ") } == [true, false])
+        #expect(writes.lines.allSatisfy { $0.contains("attach-session") && $0.contains("'=work'") })
+        #expect(writes.lines.map { $0.contains(" -d ") } == [true, false])
     }
 
     @Test("with the setting off nothing is typed, but the host is checked for tmux")

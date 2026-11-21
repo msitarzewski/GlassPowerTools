@@ -15,6 +15,7 @@
 //   vmtool place <app> x y w h [title]  move and size the app's front window, or its window with that title (points)
 //   vmtool display [set WIDTHxHEIGHT]  list the main display's modes, or pick one by size in points (HiDPI if any)
 //   vmtool drag x1 y1 x2 y2 / click x y  the left button pressed at one point and let go at the other (points)
+//   vmtool rightclick x y              the right button at a point: a context menu (points)
 //   vmtool move x y                   the pointer to a point, nothing pressed: what hovering shows (points)
 //   vmtool ax <bundle-id|name|pid> [depth]
 //                                     accessibility tree of the app's windows (role, title, description = the
@@ -251,6 +252,17 @@ func drag(from start: CGPoint, to end: CGPoint) {
         : "dragged \(Int(start.x)),\(Int(start.y)) to \(Int(end.x)),\(Int(end.y))")
 }
 
+/// `rightclick x y`: the right button pressed and let go at a point, for a context menu (2026-11-19: a tab's Get Info).
+func rightClick(at point: CGPoint) {
+    guard AXIsProcessTrusted() else { fail("not trusted for Accessibility", 3) }
+    for type in [CGEventType.mouseMoved, .rightMouseDown, .rightMouseUp] {
+        CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .right)?
+            .post(tap: .cghidEventTap)
+        usleep(30_000)
+    }
+    print("right-clicked \(Int(point.x)),\(Int(point.y))")
+}
+
 /// A swipe at `point` as a trackpad sends one: pixel deltas, in ten steps a frame apart, so what reads precise scrolling
 /// (a carousel that flows with the fingers) can be driven in the VM.
 func scroll(at point: CGPoint, dx: Int32, dy: Int32) {
@@ -314,6 +326,9 @@ case ("drag", _) where args.count == 5 && args.dropFirst().allSatisfy({ Double($
 case ("click", _) where args.count == 3 && args.dropFirst().allSatisfy({ Double($0) != nil }):
     let v = args.dropFirst().compactMap(Double.init)
     drag(from: CGPoint(x: v[0], y: v[1]), to: CGPoint(x: v[0], y: v[1]))
+case ("rightclick", _) where args.count == 3 && args.dropFirst().allSatisfy({ Double($0) != nil }):
+    let v = args.dropFirst().compactMap(Double.init)
+    rightClick(at: CGPoint(x: v[0], y: v[1]))
 case ("move", _) where args.count == 3 && args.dropFirst().allSatisfy({ Double($0) != nil }):
     guard AXIsProcessTrusted() else { fail("not trusted for Accessibility", 3) }
     let v = args.dropFirst().compactMap(Double.init)

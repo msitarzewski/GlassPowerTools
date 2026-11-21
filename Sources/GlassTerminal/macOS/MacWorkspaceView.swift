@@ -40,11 +40,20 @@ struct MacWorkspaceView: View {
     @State private var windowOnScreen = false
     /// Puts a reopened window back where it was, and keeps its place in its record (W12).
     @State private var placementTracker = MacWorkspaceWindowPlacementTracker()
-    @State private var workgroupEditorContext: WorkgroupEditorContext?
+    /// This window saved under the name of a Workgroup already saved: Replace or Keep Both, asked once.
+    @State private var workgroupToReplace: WorkgroupToReplace?
+
+    struct WorkgroupToReplace: Identifiable {
+        let captured: WorkgroupEditorContext
+        let existing: LayoutPreset
+        var id: UUID { existing.id }
+    }
     @State private var workspaceSaveError: String?
     @State private var isConfirmingTabClose = false
     /// The tab being renamed in the sidebar, and the name as typed (2026-10-07).
     @State private var renamingTabID: UUID?
+    /// The tab whose Get Info is open beside it (2026-11-19).
+    @State private var infoTabID: UUID?
     /// The sidebar row under the pointer, which shows its close box.
     @State private var hoveredTabID: UUID?
     @State private var renameText = ""
@@ -165,6 +174,17 @@ struct MacWorkspaceView: View {
     private func tabMenu(for ids: Set<UUID>) -> some View {
         let chosen = windowController.tabs.filter { ids.contains($0.workspaceID) }
         if chosen.count == 1, let controller = chosen.first {
+            // Its tmux session and the rest, beside the tab (2026-11-19, the owner: "a right click > Get Info...").
+            Button("Get Info…", systemImage: "info.circle") { infoTabID = controller.workspaceID }
+                .labelStyle(.titleAndIcon)
+            let names = controller.tmuxSessionNames
+            if !names.isEmpty {
+                Button(names.count == 1 ? "Copy tmux Session Name" : "Copy tmux Session Names", systemImage: "doc.on.doc") {
+                    TerminalSessionInfo.copy(names.joined(separator: "\n"))
+                }
+                .labelStyle(.titleAndIcon)
+            }
+            Divider()
             Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
                 .labelStyle(.titleAndIcon)
             if controller.tabLabel != nil {
@@ -295,6 +315,14 @@ struct MacWorkspaceView: View {
         }
         // A terminal in it rang its bell out of sight: an orange glow beneath the row (`GlassBell`, 2026-11-03).
         .glassBellGlow(controller.bellUnseen)
+        // Get Info, beside the tab, as Finder's opens beside what it describes (2026-11-19).
+        .popover(isPresented: Binding(get: { infoTabID == controller.workspaceID },
+                                      set: { if !$0, infoTabID == controller.workspaceID { infoTabID = nil } }),
+                 arrowEdge: .trailing) {
+            let servers = sessionManager.serverManager.servers
+            TerminalSessionInfoView(title: tabIdentity.title, infos: controller.sessionInfo(servers: servers),
+                                    refresh: { await controller.sessionInfoAskingTheMachines(servers: servers) })
+        }
         .onHover { inside in
             if inside { hoveredTabID = controller.workspaceID } else if hoveredTabID == controller.workspaceID { hoveredTabID = nil }
         }
@@ -569,13 +597,19 @@ struct MacWorkspaceView: View {
                   window.sheetParent == nil else { return }
             requestCloseSelectedTab()
         }
-        .sheet(item: $workgroupEditorContext) { context in
-            // Saving under a workgroup's name offers to replace it: how a window rebuilds the
-            // workgroup it was arranged as (W4b).
-            WorkgroupEditorView(context: context, servers: sessionManager.serverManager.servers,
-                                existing: settingsManager.layoutPresets) { preset in
-                settingsManager.addLayoutPreset(preset)
-            }
+        // Saving under a workgroup's name offers to replace it: how a window rebuilds the workgroup it was arranged as
+        // (W4b). Nothing else is asked: the Workgroup is saved and shown in the library, to edit there (2026-11-19).
+        .confirmationDialog(
+            "Replace “\(workgroupToReplace?.existing.name ?? "")”?",
+            isPresented: Binding(get: { workgroupToReplace != nil }, set: { if !$0 { workgroupToReplace = nil } }),
+            titleVisibility: .visible,
+            presenting: workgroupToReplace
+        ) { pending in
+            Button("Replace", role: .destructive) { saveWorkgroup(pending.captured, replacing: pending.existing) }
+            Button("Keep Both") { saveWorkgroup(pending.captured, replacing: nil) }
+            Button("Cancel", role: .cancel) { workgroupToReplace = nil }
+        } message: { _ in
+            Text("A Workgroup with this name already exists. Replace it with this window's tabs, on every device, or keep both.")
         }
         .allowsHitTesting(!showingOverview)
         .accessibilityHidden(showingOverview)
@@ -756,9 +790,8 @@ struct MacWorkspaceView: View {
                 defaultLocalDirectory: defaults.currentDirectory ?? NSHomeDirectory(),
                 sourcePresets: settingsManager.layoutPresets
             )
-            // A capture is a new preset; it replaces one only when saved under its name and the
-            // editor's Replace is chosen.
-            workgroupEditorContext = WorkgroupEditorContext(
+            // A capture is a new preset; it replaces one only when saved under its name and Replace is chosen.
+            let captured = WorkgroupEditorContext(
                 original: nil,
                 name: preset.name,
                 colorTag: preset.colorTag,
@@ -766,9 +799,29 @@ struct MacWorkspaceView: View {
                 workspaceLayout: preset.workspaceLayout,
                 windowSettings: preset.windowSettings
             )
+            if let existing = WorkgroupEditorView.workgroup(named: preset.name, in: settingsManager.layoutPresets) {
+                workgroupToReplace = WorkgroupToReplace(captured: captured, existing: existing)
+            } else {
+                saveWorkgroup(captured, replacing: nil)
+            }
         } catch {
             workspaceSaveError = error.localizedDescription
         }
+    }
+
+    /// Saves the window as a Workgroup and shows it in the library's Workgroups, its name ready to change.
+    private func saveWorkgroup(_ captured: WorkgroupEditorContext, replacing replaced: LayoutPreset?) {
+        workgroupToReplace = nil
+        var preset = captured.savedPreset(replacing: replaced)
+        if replaced == nil, WorkgroupEditorView.workgroup(named: preset.name, in: settingsManager.layoutPresets) != nil {
+            // Keep Both: the two told apart by name.
+            preset.name = WorkgroupEditorView.unusedName(preset.name, in: settingsManager.layoutPresets)
+        }
+        settingsManager.upsertLayoutPreset(preset)
+        guard let terminalRuntime else { return }
+        terminalRuntime.workgroupsModel.focusesNameOf = preset.id
+        terminalRuntime.workgroupsModel.selection = .preset(preset.id)
+        terminalRuntime.requestShowWorkgroups()
     }
 
     /// Several tabs at once (W8): ⌘-click and ⇧-click are the list's own. The window controller
@@ -1159,9 +1212,9 @@ private struct MacWorkspaceTabContent: View {
         }
     }
 
-    /// Reads a drop the way the Files browser does — a file promise first, as AppKit offers it —
-    /// and types the paths. A file that already exists types its own path; a promised file or bare
-    /// image data is written to the drop inbox first (`TerminalDroppedPaths.inbox`).
+    /// Reads a drop the way the Files browser does (`SFTPIncomingDrop`) and types the paths. A file
+    /// that already exists types its own path; a promised file (a screenshot's thumbnail, a Dock
+    /// stack's file) or bare image data is written to the drop inbox first (`TerminalDroppedPaths.inbox`).
     ///
     /// An SSH pane's shell is on the host, where this Mac's paths mean nothing: its files are
     /// uploaded to the host's drop folder and the host's paths are typed instead (W14).
@@ -1192,6 +1245,8 @@ private struct MacWorkspaceTabContent: View {
                 _ = dropFiles(received.urls, on: paneID)
             } catch {
                 Self.dropLogger.error("A drop on a terminal could not be read: \(error.localizedDescription, privacy: .public)")
+                // Said, as a drop with no paths to type is: it failed without a sound before (2026-11-20).
+                NSSound.beep()
             }
         }
         return true

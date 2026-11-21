@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.623 (19 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.632 (21 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.623)
+## What it holds (0.4.632)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -62,7 +62,9 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   recognised on tabs and cards.
 - A workgroup's terminals on a Mac belong to that Mac: every other device, another Mac too, opens
   them there over SSH, on their own tmux sessions. A workgroup can open databases and remote desktops
-  from the library too, with its terminals or on their own.
+  from the library too, with its terminals or on their own, and is edited where it is shown, saved as you go.
+- Get Info for a terminal says its tmux session, with a button to copy its name, and its machine, when the
+  session started, its folder, what runs there and whether it is open elsewhere too.
 - Color schemes from macOS Terminal profiles, any number, kept in iCloud Drive for every device and
   chosen with a preview of each, for every terminal or one window.
 - On Vision Pro, Focus Mode surrounds you with a built-in environment or your own 3D room or 360°
@@ -116,6 +118,36 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.632 (20 November 2026)
+- **Mac release, 21 November 2026.** Includes Get Info (0.4.624), Workgroups edited in their panel (0.4.626), the
+  orb dock after a relaunch (0.4.631) and this.
+- **Dropping a file from a Dock stack onto a Mac terminal no longer quits the app.** On macOS 27, a file an app
+  hands over only as you drop it, as a stack in the Dock does, could make the app quit as it arrived; on macOS 26
+  nothing was typed. It now types the file's path. A file dragged from a Dock stack types its own path, never that
+  of a file dragged earlier, and a drop that can't be read beeps instead of doing nothing. Files dropped into the
+  Files browser are read the same way.
+
+### 0.4.631 (19 November 2026)
+- **The Mac's orb dock shows every window in it after a relaunch.** With several windows put back into the dock at
+  once, it could stay the size of the first few, the rest out of sight, and a drag to give it room sprang back to
+  them until another window docked. It now fits every window put back in it, and comes back at the length you last
+  dragged it to, or shorter when fewer orbs need it. Dragging its edge takes effect at once, even while the dock is
+  still growing, and only your own drag changes the length it keeps.
+
+### 0.4.626 (19 November 2026)
+- **Workgroups are edited in their panel, with no sheet.** Select a Workgroup and change it where it is shown: its
+  name, color, how it opens, its tabs (each in its own sheet, from the plus button or the pencil beside the list), its databases and
+  desktops, and its look. Every change is saved as you make it, on all your devices, and ⌘Z undoes it on a Mac. The
+  plus button, **Duplicate** and a window's **Save Workspace as Workgroup…** make the Workgroup at once and show it
+  there, ready to name.
+
+### 0.4.624 (19 November 2026)
+- **Get Info for a terminal.** Right-click a tab in a Mac window's sidebar and choose **Get Info…**. Beside the tab,
+  it shows each terminal's tmux session, with a button to copy its name. It also shows the machine, when the session
+  was started, the folder, what is running there, and whether the session is open somewhere else too. **Copy tmux
+  Session Name** sits in the same menu. On iPhone, iPad and Vision Pro, the same two items are in each terminal's tab
+  menu.
 
 ### 0.4.623 (19 November 2026)
 - **Mac release, 19 November 2026.**

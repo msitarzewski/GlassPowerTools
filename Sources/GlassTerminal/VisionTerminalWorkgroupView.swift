@@ -273,6 +273,8 @@ struct VisionTerminalWorkgroupView: View {
     @State private var didCloseWorkgroup = false
     /// The terminal being renamed, and the name typed (W11): as a Mac tab's Rename Tab….
     @State private var renamingSession: TerminalSession?
+    /// The terminal whose Get Info is open (2026-11-19).
+    @State private var infoSession: TerminalSession?
     /// A tab whose Close Tab asked first: closing it stops work outside tmux.
     @State private var closingSession: TerminalSession?
     @State private var renameText = ""
@@ -379,6 +381,15 @@ struct VisionTerminalWorkgroupView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("You have an active SSH connection to \(closingSession?.server.name ?? "this machine").")
+        }
+        .sheet(item: $infoSession) { session in
+            TerminalSessionInfoView(title: TerminalWorkgroupOpening.label(session, on: .tabBar),
+                                    infos: [session.sessionInfo()],
+                                    refresh: { [await session.sessionInfoAskingTheMachine()] },
+                                    done: { infoSession = nil })
+                #if os(iOS)
+                .presentationDetents([.medium, .large])
+                #endif
         }
         .alert("Rename Tab", isPresented: renamingBinding) {
             TextField("Tab Name", text: $renameText)
@@ -571,6 +582,11 @@ struct VisionTerminalWorkgroupView: View {
     /// The Mac's tab menu, for one terminal: Rename Tab…, and Use Automatic Name once named.
     @ViewBuilder
     private func renameActions(for session: TerminalSession) -> some View {
+        // Its tmux session and the rest (2026-11-19, the owner: "a right click > Get Info...").
+        Button("Get Info…", systemImage: "info.circle") { infoSession = session }
+        if session.survivesClose, let name = session.tmuxSessionName {
+            Button("Copy tmux Session Name", systemImage: "doc.on.doc") { TerminalSessionInfo.copy(name) }
+        }
         Button("Rename Tab…", systemImage: "pencil") { beginRename(session) }
         if session.givenName != nil {
             Button("Use Automatic Name", systemImage: "arrow.uturn.backward") { session.rename(to: nil) }

@@ -456,6 +456,8 @@ struct TerminalRepositoryTests {
         session.tmuxPaneReadInterval = .zero
         session.tmuxCommandRunner = { command in
             commands.all.append(command)
+            // The session it joins is running there, as a terminal joining one checks first (D111).
+            if command == TerminalTmux.listCommand { return "glass-5\t1\t1\t1790000000\n" }
             guard command == read else { return "" }
             // No program's title: tmux's own is the host's name.
             let pane = [TerminalTmux.paneMarker, "/home/ann", folder, "alpha.example.com", "alpha", "", "", "", "", "", "alpha.example.com"]

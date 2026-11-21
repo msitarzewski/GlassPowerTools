@@ -235,9 +235,7 @@ struct MacWorkspaceTests {
             completion(file, false, nil)
             return nil
         }
-        let board = NSPasteboard.withUniqueName()
-        defer { board.releaseGlobally() }
-        let incoming = try #require(SFTPIncomingDrop(providers: [provider], pasteboard: board))
+        let incoming = try #require(SFTPIncomingDrop(providers: [provider]))
         var result: (urls: [URL], staging: SFTPDropStaging)? = try await incoming.materialize()
         let retained = try #require(result?.urls.first)
         #expect(retained.lastPathComponent == "Vacation.png")
@@ -267,7 +265,7 @@ struct MacWorkspaceTests {
         let board = NSPasteboard.withUniqueName()
         defer { board.releaseGlobally() }
         board.writeObjects([file as NSURL])
-        let incoming = try #require(SFTPIncomingDrop(providers: [], pasteboard: board))
+        let incoming = try #require(SFTPIncomingDrop(filesOn: board))
         let result = try await incoming.materialize()
         #expect(result.urls == [file])
         #expect(staging.owns(file.resolvingSymlinksInPath()))
@@ -284,24 +282,116 @@ struct MacWorkspaceTests {
             completion(nil, false, CocoaError(.fileReadNoPermission))
             return nil
         }
-        let board = NSPasteboard.withUniqueName()
-        defer { board.releaseGlobally() }
-        let incoming = try #require(SFTPIncomingDrop(providers: [provider], pasteboard: board))
+        let incoming = try #require(SFTPIncomingDrop(providers: [provider]))
         do {
             _ = try await incoming.materialize()
             Issue.record("A failed source export must not become an upload")
         } catch { #expect(!Task.isCancelled) }
     }
 
-    @Test @MainActor func incomingDropRecognizesNativePromiseWithoutExportingDuringHover() throws {
+    /// A promise pasted: macOS 27 raises if one is called in outside a drag, so a paste takes none, and asks nothing
+    /// of the source (2026-11-20).
+    @Test @MainActor func pastedPromiseIsNeitherTakenNorCalledIn() throws {
         let delegate = IncomingPromiseTestDelegate()
         let provider = NSFilePromiseProvider(fileType: UTType.png.identifier, delegate: delegate)
         let board = NSPasteboard.withUniqueName()
         defer { board.releaseGlobally() }
         #expect(board.writeObjects([provider]))
-        #expect(SFTPIncomingDrop(providers: [], pasteboard: board) != nil)
+        #expect(SFTPIncomingDrop(filesOn: board) == nil)
         #expect(!delegate.requestedWrite)
         withExtendedLifetime(delegate) {}
+    }
+
+    /// A drop reads what SwiftUI hands over for it, never the drag pasteboard: a Dock stack's drag isn't on it, and it
+    /// still held the drag before, whose file was typed in place of the one dropped (2026-11-20). The drag pasteboard
+    /// is the system's own; this leaves it empty, as any drag replaces what it holds.
+    @Test @MainActor func aDropNeverTakesWhatTheDragPasteboardHoldsFromAnotherDrag() async throws {
+        let source = try SFTPDropStaging()
+        let earlier = source.directory.appendingPathComponent("dragged-before.svg")
+        try Data("<svg/>".utf8).write(to: earlier)
+        let dragBoard = NSPasteboard(name: .drag)
+        dragBoard.clearContents()
+        dragBoard.writeObjects([earlier as NSURL])
+        defer { dragBoard.clearContents() }
+        // As SwiftUI hands over a Dock stack's SVG: its file behind the provider, SwiftUI having called the promise in.
+        let file = source.directory.appendingPathComponent("drawing.svg")
+        let bytes = Data("<svg xmlns=\"http://www.w3.org/2000/svg\"/>".utf8)
+        try bytes.write(to: file)
+        let provider = NSItemProvider()
+        provider.registerFileRepresentation(forTypeIdentifier: UTType.svg.identifier,
+                                            fileOptions: [], visibility: .all) { completion in
+            completion(file, false, nil)
+            return nil
+        }
+        let incoming = try #require(SFTPIncomingDrop(providers: [provider]))
+        let result = try await incoming.materialize()
+        #expect(result.urls.count == 1)
+        #expect(!result.urls.contains(earlier), "the earlier drag's file")
+        let received = try #require(result.urls.first)
+        #expect(try Data(contentsOf: received) == bytes)
+        withExtendedLifetime(source) {}
+    }
+
+    /// Finder's files, a folder among them, dropped keep their own paths: what a terminal types is the file itself,
+    /// not a copy, as Terminal does. Finder's URLs are file references (/.file/id=…), typed by their paths.
+    @Test @MainActor func droppedFinderFilesKeepTheirOwnPaths() async throws {
+        let staging = try SFTPDropStaging()
+        let file = staging.directory.appendingPathComponent("local.svg")
+        try Data("<svg/>".utf8).write(to: file)
+        let referenced = staging.directory.appendingPathComponent("referenced.svg")
+        try Data("<svg/>".utf8).write(to: referenced)
+        let folder = staging.directory.appendingPathComponent("folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let reference = try #require((referenced as NSURL).fileReferenceURL())
+        func finderItem(_ url: URL) -> NSItemProvider {
+            let provider = NSItemProvider()
+            provider.registerDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier,
+                                                visibility: .all) { completion in
+                completion(url.dataRepresentation, nil)
+                return nil
+            }
+            return provider
+        }
+        let incoming = try #require(SFTPIncomingDrop(providers: [file, reference, folder].map(finderItem)))
+        let result = try await incoming.materialize()
+        #expect(result.urls.map { $0.standardizedFileURL.path } == [file, referenced, folder].map { $0.standardizedFileURL.path })
+        // The name an SSH pane's upload gives each file on the host.
+        #expect(result.urls.map(\.lastPathComponent) == ["local.svg", "referenced.svg", "folder"])
+        withExtendedLifetime(staging) {}
+    }
+
+    /// A file of a type the drop names (an SVG, text) comes in place, from Finder or a Dock stack, and keeps its own
+    /// path; a promised file comes in place too, in SwiftUI's folder under the caches, which isn't kept (2026-11-20).
+    @Test func onlyAFileHeldForTheDropIsCopied() throws {
+        let caches = try #require(FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first)
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        #expect(SFTPIncomingDrop.isHeldOnlyForTheDrop(
+            caches.appendingPathComponent("com.apple.SwiftUI.filePromises-1/drawing.svg")))
+        #expect(SFTPIncomingDrop.isHeldOnlyForTheDrop(
+            FileManager.default.temporaryDirectory.appendingPathComponent("TemporaryItems/drawing.svg")))
+        #expect(!SFTPIncomingDrop.isHeldOnlyForTheDrop(home.appendingPathComponent("Downloads/drawing.svg")))
+        #expect(!SFTPIncomingDrop.isHeldOnlyForTheDrop(home.appendingPathComponent("Library/Caches-not/drawing.svg")))
+    }
+
+    @Test @MainActor func aPromisedFileHandedOverInPlaceIsCopiedNotTypedFromSwiftUIsFolder() async throws {
+        let held = try SFTPDropStaging()
+        let file = held.directory.appendingPathComponent("drawing.svg")
+        let bytes = Data("<svg/>".utf8)
+        try bytes.write(to: file)
+        let provider = NSItemProvider()
+        provider.registerFileRepresentation(forTypeIdentifier: UTType.svg.identifier,
+                                            fileOptions: [.openInPlace], visibility: .all) { completion in
+            completion(file, true, nil)
+            return nil
+        }
+        let incoming = try #require(SFTPIncomingDrop(providers: [provider]))
+        let result = try await incoming.materialize()
+        let received = try #require(result.urls.first)
+        #expect(received != file, "typed from the folder it was held in")
+        #expect(result.staging.owns(received))
+        #expect(received.lastPathComponent == "drawing.svg")
+        #expect(try Data(contentsOf: received) == bytes)
+        withExtendedLifetime(held) {}
     }
 
     @Test @MainActor func workgroupStartsAllTabsAndClosingTabsLeavesDefinitionUnchanged() async throws {
@@ -2107,7 +2197,7 @@ struct MacWorkspaceTests {
         )
     }
 
-    @Test @MainActor func workgroupEditorHostsNativeTableWithoutSavingOrShowingAWindow() async throws {
+    @Test @MainActor func workgroupPanelHostsNativeTableWithoutSavingOrShowingAWindow() async throws {
         let preset = LayoutPreset(
             name: "Five terminal tabs",
             sessionIntents: (1...5).map { index in
@@ -2116,8 +2206,9 @@ struct MacWorkspaceTests {
             }
         )
         var saves = 0
+        // The Workgroup panel (2026-11-19: edited in place, saved as you go): shown, it saves nothing by itself.
         let host = NSHostingController(rootView: WorkgroupEditorView(
-            context: .edit(preset), servers: [], onSave: { _ in saves += 1 }
+            saved: preset, servers: [], onSave: { _ in saves += 1 }
         ))
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 760),
@@ -2145,22 +2236,22 @@ struct MacWorkspaceTests {
         try #require(bitmap.representation(using: .png, properties: [:])).write(to: snapshot)
         print("Workgroup editor render: \(snapshot.path)")
         #expect(!window.isVisible)
+        // Past the moment an edit waits before it saves: still nothing saved.
+        try await Task.sleep(for: .seconds(1))
         #expect(saves == 0)
 
-        // Construct the staged child editor on the same hidden native surface;
-        // merely presenting a draft must not commit or delete anything.
-        var deletes = 0
+        // A tab's own sheet, which the panel's + and pencil open (2026-11-19): shown, it saves or deletes nothing.
+        var tabSaves = 0, deletes = 0
         let child = NSHostingController(rootView: WorkgroupTabEditorView(
             draft: WorkgroupTabDraft(intent: preset.sessionIntents[0]),
             isNew: false, canDelete: true, servers: [],
-            onSave: { _ in saves += 1 }, onDelete: { deletes += 1 }
+            onSave: { _ in tabSaves += 1 }, onDelete: { deletes += 1 }
         ))
         window.contentViewController = child
         child.view.layoutSubtreeIfNeeded()
         #expect(child.view.window === window)
         #expect(!window.isVisible)
-        #expect(saves == 0)
-        #expect(deletes == 0)
+        #expect(saves == 0 && tabSaves == 0 && deletes == 0)
     }
 
     @Test func workgroupTabDraftRoundTripsLocalAndSSHIntentWithoutCrossKindSettings() {

@@ -108,6 +108,18 @@ When a tab on a Mac opens a session that has a different name from the tab, the 
 
 A session also keeps the repository and branch its tab last showed, so **Active** on your other devices lists them too. If the branch changes while no tab shows the session, other devices show the old branch until a tab shows it again. On the Mac itself, **Active** reads the repository and branch of each of the Mac's own sessions from its folder each time it checks.
 
+## See a terminal's session
+
+To see which tmux session a terminal is in, right-click its tab in a Mac window's sidebar and choose **Get Info…**. On iPhone, iPad and Vision Pro, touch and hold the tab (or open the menu at the top on iPhone) and choose **Get Info…**. For each terminal in the tab it shows:
+
+- **Session**: the tmux session's name, with a button that copies it.
+- **Machine**: this Mac, or the machine the terminal is on.
+- **Session started**: when tmux made the session.
+- **Folder** and **Running**: where the terminal is, and the coding agent or program in front.
+- **Open**: whether the session is open only here or somewhere else too, on another device or in another window.
+
+**Copy tmux Session Name**, in the same menu, copies the name without opening Get Info. On a Mac, pointing at a tab in the sidebar also shows its session's name.
+
 ## End a session
 
 In **Active**, swipe left on a running session and choose **End**, or right-click it and choose **End Session…**. Everything running in it stops, on every device.

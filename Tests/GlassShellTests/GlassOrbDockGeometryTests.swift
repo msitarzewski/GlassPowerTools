@@ -42,6 +42,50 @@ struct GlassOrbDockGeometryTests {
                                              largest: 4000) == 1136, "a column the same, down it")
     }
 
+    @Test("a hand on the dock's edge wins: its drag stops a spring, the dock waits for it, and only its drag is kept")
+    func handWins() {
+        // The owner, 2026-11-19: after a relaunch with six windows docked, "the dock only showed 4 orbs... even after I
+        // tried to resize. I clicked an orb and was then able to resize"; "launch at whatever I set it to or smaller".
+        var motion = GlassOrbDockMotion()
+        motion.springStarted(at: 10, lasting: 0.9)
+        #expect(motion.isDocksOwn(at: 10.5), "a move while it springs is the dock's own")
+        let stopsSpring = motion.liveResizeStarted(mouseDown: true)
+        #expect(stopsSpring, "a hand on the edge stops the spring under way")
+        #expect(!motion.isDocksOwn(at: 10.6), "what follows is the hand's")
+        #expect(!motion.mayFit, "no fitting while the hand holds the edge")
+        let handsEnd = motion.liveResizeEnded()
+        #expect(handsEnd, "the hand's drag is kept")
+        #expect(motion.mayFit, "and the dock fits itself again once it lets go")
+        let strayEnd = motion.liveResizeEnded()
+        #expect(!strayEnd, "an end with no start after it isn't a hand's")
+    }
+
+    @Test("a spring that never says it finished stops counting as the dock's own a moment past its length")
+    func springStallsNoLonger() {
+        // A count of springs under way, which a spring whose display link stopped never took back, held off every
+        // drag after it until an orb came or went.
+        var motion = GlassOrbDockMotion()
+        motion.springStarted(at: 100, lasting: 0.9)
+        #expect(motion.isDocksOwn(at: 100.9 + GlassOrbDockMotion.grace - 0.01))
+        #expect(!motion.isDocksOwn(at: 100.9 + GlassOrbDockMotion.grace + 0.01), "a stalled spring holds nothing off")
+        motion.springEnded()
+        #expect(!motion.isDocksOwn(at: 100.1))
+        motion.settingFrame = true
+        #expect(motion.isDocksOwn(at: 500), "the dock setting its own frame, at any time")
+    }
+
+    @Test("a resize AppKit makes itself, with no mouse button down, isn't the person's and changes nothing kept")
+    func notByHand() {
+        var motion = GlassOrbDockMotion()
+        motion.springStarted(at: 0, lasting: 0.9)
+        let stops = motion.liveResizeStarted(mouseDown: false)
+        #expect(!stops, "the spring isn't stopped for it")
+        #expect(motion.isDocksOwn(at: 0.2), "still the dock's spring")
+        #expect(motion.mayFit)
+        let kept = motion.liveResizeEnded()
+        #expect(!kept, "its end isn't kept as the person's length")
+    }
+
     @Test("a row's longest and a column's are kept apart")
     func longestKeptApart() {
         let name = "GlassOrbDockLongest-\(UUID().uuidString)"

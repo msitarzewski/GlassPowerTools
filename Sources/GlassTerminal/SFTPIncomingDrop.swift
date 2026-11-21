@@ -11,10 +11,10 @@
 //  phone in October. The platform check was standing in for a capability question and answering
 //  it wrongly (2026-09-20).
 //
-//  **What is genuinely AppKit here** is the fast path: `NSFilePromiseReceiver`, and reading the
-//  drag pasteboard synchronously before another drag can replace it. Both are macOS-only APIs and
-//  stay behind a check that names them. `NSItemProvider` is the path every other platform uses,
-//  and AppKit already falls back to it.
+//  A drop arrives through `NSItemProvider` on every platform, a file promise included. **What is
+//  genuinely AppKit here** is the Files browser's paste of files copied in Finder, read off the
+//  general pasteboard. Until 2026-11-20 a Mac drop read the drag pasteboard and called its file
+//  promises in with `NSFilePromiseReceiver`; why it doesn't is on `init(providers:)`.
 //
 
 import Foundation
@@ -96,9 +96,6 @@ final class SFTPIncomingDrop {
     }()
 
     private enum Source {
-        #if os(macOS)
-        case promise(NSFilePromiseReceiver)
-        #endif
         case file(URL)
         case provider(NSItemProvider)
         /// An item pasted: read for its content, never a file URL the clipboard names, which this
@@ -115,27 +112,37 @@ final class SFTPIncomingDrop {
         sources = files.map(Source.pasted)
     }
 
-    #if os(macOS)
-    /// Snapshot the drag pasteboard synchronously, before another drag can replace it.
-    /// AppKit chooses one representation per item, preferring its file promise.
-    init?(providers: [NSItemProvider], pasteboard: NSPasteboard = NSPasteboard(name: .drag)) {
-        guard !PromiseRetention.shared.hasActivePromises else { return nil }
-        let native = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self, NSURL.self],
-                                           options: [.urlReadingFileURLsOnly: true]) ?? []
-        let sources: [Source] = native.compactMap {
-            if let promise = $0 as? NSFilePromiseReceiver { return .promise(promise) }
-            if let url = $0 as? URL, url.isFileURL { return .file(url) }
-            return nil
-        }
-        self.sources = sources.isEmpty ? providers.map(Source.provider) : sources
-        if self.sources.isEmpty { return nil }
-    }
-    #else
-    /// Everywhere else there is no drag pasteboard to race: the system hands over item providers
-    /// and nothing else, which is the path AppKit falls back to anyway.
+    /// A drop, read through the item providers SwiftUI's `onDrop` hands over for it and nothing else, on every
+    /// platform. A Mac file that exists (Finder's) comes back as itself (`materialize`).
+    ///
+    /// **The Mac's drag pasteboard is not read, and no file promise is called in here** (2026-11-20). This read
+    /// `NSPasteboard(name: .drag)` first, and two things were wrong with that:
+    /// - Not every drag is on it. A stack in the Dock drags on its own, and the drag pasteboard still held the drag
+    ///   before: an SVG from the Downloads stack typed the path of a different file, dragged a minute earlier.
+    /// - It called the file promises it found in, from the drop's task after the drop. SwiftUI's `onDrop` has already
+    ///   called each promise in, into a folder of its own, and its providers carry the files. On macOS 26 a modern
+    ///   promise called in again handed back SwiftUI's file, refused as not this drop's, and a legacy one (the Dock's)
+    ///   waited a minute and failed. macOS 27 raises `NSInternalInconsistencyException` ("receivePromisedFilesAt
+    ///   Destination:… can only be called during -prepareForDragOperation:, -performDragOperation:, and
+    ///   -concludeDragOperation:") through that task, and on macOS 27.2.1 the app quit 90 ms later, in Swift's
+    ///   main-thread check (an SVG dragged from the Dock's Downloads stack onto a terminal).
     init?(providers: [NSItemProvider]) {
+        #if os(macOS)
+        // This app's own drag from the Files browser, offered back to it.
+        guard !PromiseRetention.shared.hasActivePromises else { return nil }
+        #endif
         guard !providers.isEmpty else { return nil }
         sources = providers.map(Source.provider)
+    }
+
+    #if os(macOS)
+    /// Files copied in Finder (`pasteFilesFromFinder`), by their own paths; nil when the pasteboard holds none. A file
+    /// promise copied is not taken: one can't be called in outside a drag (macOS 27 raises).
+    init?(filesOn pasteboard: NSPasteboard) {
+        let files = (pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+                     as? [URL] ?? []).filter(\.isFileURL)
+        guard !files.isEmpty else { return nil }
+        sources = files.map(Source.file)
     }
     #endif
 
@@ -169,25 +176,19 @@ final class SFTPIncomingDrop {
         return readable.first { UTType($0)?.conforms(to: .image) == true } ?? readable.first
     }
 
-    /// Files that already exist come back as they are; promised files and bare content are
-    /// written into `staging` — by default, a temporary one that goes when it is released.
-    #if os(macOS)
-    /// What a file promise calls with each file. AppKit calls it on the receive queue, never the
-    /// main thread: written inline in this main-actor class it was main-actor code, and Swift
-    /// stopped the app the moment AppKit called it (2026-10-09, a screenshot's thumbnail dropped
-    /// on a terminal). It touches only what is safe from any thread, and keeps the staging alive
-    /// for late callbacks even if the drop's task was cancelled.
-    nonisolated static func promiseReader(staging: SFTPDropStaging,
-                                          continuation: AsyncThrowingStream<URL, Error>.Continuation)
-        -> @Sendable (URL, (any Error)?) -> Void {
-        { url, error in
-            withExtendedLifetime(staging) {
-                if let error { continuation.finish(throwing: error) } else { continuation.yield(url) }
-            }
-        }
+    /// A file that exists only for a drop, which won't be kept: SwiftUI's copy of a promised file, under the caches
+    /// folder (`com.apple.SwiftUI.filePromises-…`), or one in a temporary folder.
+    nonisolated static func isHeldOnlyForTheDrop(
+        _ url: URL,
+        holding: [URL] = [FileManager.default.temporaryDirectory]
+            + FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
+    ) -> Bool {
+        let path = url.resolvingSymlinksInPath().path
+        return holding.contains { path.hasPrefix($0.resolvingSymlinksInPath().path + "/") }
     }
-    #endif
 
+    /// Files that already exist come back as they are; promised files and bare content, from their
+    /// providers, are written into `staging` — by default, a temporary one that goes when it is released.
     func materialize(into given: SFTPDropStaging? = nil) async throws -> (urls: [URL], staging: SFTPDropStaging) {
         let staging = try given ?? SFTPDropStaging()
         var urls: [URL] = []
@@ -196,28 +197,6 @@ final class SFTPIncomingDrop {
             switch source {
             case .file(let url):
                 urls.append(url)
-            #if os(macOS)
-            case .promise(let receiver):
-                let expected = max(receiver.fileNames.count, 1)
-                let queue = OperationQueue()
-                queue.name = "sh.glas.receive-file-promise"
-                queue.maxConcurrentOperationCount = 1
-                let stream = AsyncThrowingStream<URL, Error> { continuation in
-                    receiver.receivePromisedFiles(atDestination: staging.directory, options: [:],
-                                                  operationQueue: queue,
-                                                  reader: Self.promiseReader(staging: staging, continuation: continuation))
-                }
-                var received = 0
-                for try await url in stream {
-                    try Task.checkCancellation()
-                    guard staging.owns(url) else {
-                        throw CocoaError(.fileReadNoPermission)
-                    }
-                    urls.append(url)
-                    received += 1
-                    if received == expected { break }
-                }
-            #endif
             case .provider(let provider), .pasted(let provider):
                 if case .provider = source, provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
                     let stream = AsyncThrowingStream<URL, Error> { continuation in
@@ -226,9 +205,15 @@ final class SFTPIncomingDrop {
                                 if let error { throw error }
                                 guard let data, let url = URL(dataRepresentation: data, relativeTo: nil),
                                       url.isFileURL else { throw CocoaError(.fileReadUnsupportedScheme) }
+                                #if os(macOS)
+                                // As it is, a folder too: the app isn't sandboxed, and a terminal types the file's
+                                // own path, as Terminal does.
+                                continuation.yield(url)
+                                #else
                                 let accessed = url.startAccessingSecurityScopedResource()
                                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                                 continuation.yield(try staging.retainFile(url, suggestedName: nil))
+                                #endif
                                 continuation.finish()
                             } catch { continuation.finish(throwing: error) }
                         }
@@ -243,6 +228,27 @@ final class SFTPIncomingDrop {
                 let pasted = if case .pasted = source { true } else { false }
                 let name = provider.suggestedName ?? (pasted
                     ? UTType(identifier)?.preferredFilenameExtension.map { "Pasted." + $0 } ?? "Pasted" : nil)
+                #if os(macOS)
+                if !pasted {
+                    // A file of a type the drop names (a picture, a PDF, text) dragged from Finder or a Dock stack comes
+                    // in place, and is typed by its own path, as Terminal does. So does a promised file, in the folder
+                    // SwiftUI received it into (~/Library/Caches/com.apple.SwiftUI.filePromises-…), which isn't kept:
+                    // that, and anything in a temporary folder, is copied into the drop's own, as bare content is.
+                    let stream = AsyncThrowingStream<URL, Error> { continuation in
+                        provider.loadInPlaceFileRepresentation(forTypeIdentifier: identifier) { url, inPlace, error in
+                            do {
+                                if let error { throw error }
+                                guard let url else { throw CocoaError(.fileReadUnknown) }
+                                continuation.yield(inPlace && !Self.isHeldOnlyForTheDrop(url)
+                                                   ? url : try staging.retainFile(url, suggestedName: name))
+                                continuation.finish()
+                            } catch { continuation.finish(throwing: error) }
+                        }
+                    }
+                    for try await url in stream { urls.append(url) }
+                    continue
+                }
+                #endif
                 let stream = AsyncThrowingStream<URL, Error> { continuation in
                     provider.loadFileRepresentation(forTypeIdentifier: identifier) { url, error in
                         do {

@@ -8,7 +8,7 @@ Workgroups are in the library's sidebar, beside Collections, under **Workgroups*
 
 **On a Mac**, **Window** > **Workgroups** (or **Library** > **Workgroups…**) brings the Connections window forward with Workgroups selected. **On Vision Pro**, **Library** > **Workgroups…** does the same.
 
-Use **Search workgroups...** to filter the list. A Workgroup's menu (right-click, or touch and hold) offers **Open**, **Edit**, **Duplicate**, **Add Favorite** (or **Remove Favorite**) and **Delete…**.
+Use **Search workgroups...** to filter the list. A Workgroup's menu (right-click, or touch and hold) offers **Open**, **Duplicate**, **Add Favorite** (or **Remove Favorite**) and **Delete…**.
 
 > [!NOTE]
 > **Delete…** asks you to confirm. With **Sync terminal settings** on, deleting a Workgroup removes it from your other devices too, although the question speaks only of this device. The connections in it are not affected.
@@ -19,25 +19,9 @@ With **Sync terminal settings** on (Settings ▸ **Terminal** ▸ **Edit Theme**
 
 ## Create a Workgroup
 
-- **On Vision Pro, iPad and iPhone:** choose the plus button (**New workgroup**) above the list. To capture the SSH terminals you have open now, choose the button beside it (**Save current SSH sessions as workgroup**). Each terminal in tmux is saved with its session.
-- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs, its split layout, the tmux session each terminal is in, which Mac its local tabs run on (see [Mac terminals open on their Mac](#mac-terminals-open-on-their-mac)), and the window's own settings (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)), which the Workgroup opens with on every device. With no Workgroup selected, **New Workgroup** in the detail also starts an empty one.
-
-In **New Workgroup**:
-
-1. Enter a **Name** and choose a color.
-2. **On Mac:** choose how it opens with **Open in**: **Tabs**, or **Grid** for its **Terminal Overview**. **Auto-focus on activity** follows new output while you view the overview; it does not switch tabs. A Workgroup saved to open in the carousel, which is gone, opens in the grid. On Vision Pro, a window opened from the Workgroup follows its **Auto-focus on activity** too, until you change the window's own (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)).
-3. Choose **Add Tab** for each terminal. In **Add Tab**:
-   - **Type**: **SSH** or, on Mac, **Local**.
-   - **Connection**: the saved connection to open, for an SSH tab.
-   - **Label**: an optional name for the tab.
-   - **Startup command**: an optional command to run once after the tab connects, for example `cd /srv/shop && git status`.
-   - For a local tab: **Shell** and **Working directory**, or leave them empty to use the app's defaults.
-4. To reorder tabs on Mac, use **Move Up** and **Move Down** in a tab's menu. Elsewhere, choose **Edit** above the tabs and drag them.
-5. Optionally, choose **Add Database or Desktop** under **Databases and Desktops** for each database or remote desktop from your library to open with it (see [Databases and desktops in a Workgroup](#databases-and-desktops-in-a-workgroup)).
-6. Optionally, give it a look under **Look** and **Text**: choose **Start From** ▸ **Choose a Look**, or set each part, as in a window's own settings (see [Backgrounds and glowing text](terminal-looks.md)). Every window the Workgroup opens starts with it, on all your devices. A picture you choose stays on this device; your others show the look without it.
-7. Choose **Save**. If another Workgroup already has that name, choose **Replace** to update it, on all your devices, or **Keep Both**.
-
-To rebuild a Workgroup from a window, arrange the window, choose **Save Workspace as Workgroup…**, give it the Workgroup's name, and choose **Replace**.
+- **Everywhere:** choose the plus button (**New workgroup**) above the list. A Workgroup named **New Workgroup** appears, with one terminal, a local shell on a Mac or your first saved connection elsewhere, and its name selected in the panel: type its name, then set it up there (see [Edit a Workgroup](#edit-a-workgroup)). With no Workgroup selected, **New Workgroup** in the panel does the same. **Duplicate**, in a Workgroup's menu, makes a copy the same way, whose terminals open sessions of their own.
+- **On Vision Pro, iPad and iPhone:** to capture the SSH terminals you have open now, choose the button beside the plus button (**Save current SSH sessions as workgroup**). Each terminal in tmux is saved with its session.
+- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs, its split layout, the tmux session each terminal is in, which Mac its local tabs run on (see [Mac terminals open on their Mac](#mac-terminals-open-on-their-mac)), and the window's own settings (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)), which the Workgroup opens with on every device. The library opens on the new Workgroup, ready to rename. If a Workgroup already has the window's name, choose **Replace** to update it, on all your devices, or **Keep Both**. To rebuild a Workgroup from a window, arrange the window and save it under the Workgroup's name.
 
 A Workgroup holds up to 32 terminals and 16 databases and desktops. It needs at least one of either.
 
@@ -61,7 +45,7 @@ If some terminals cannot open, the others still do, and a message lists what fai
 
 ## Databases and desktops in a Workgroup
 
-A Workgroup can open databases and remote desktops from your library with its terminals, or on their own: the database and dashboards you watch while a deploy runs, say. Add them in the editor under **Databases and Desktops**; each is listed by its machine and kind, as in Favorites, and **Remove** takes it out.
+A Workgroup can open databases and remote desktops from your library with its terminals, or on their own: the database and dashboards you watch while a deploy runs, say. Add them in the Workgroup's panel under **Databases and Desktops**; each is listed by its machine and kind, as in Favorites, and **Remove** takes it out.
 
 When you open the Workgroup, each opens as **Connect** opens it from your library, asking for a password if it needs one: in a window of its own on a Mac, iPad and Vision Pro, and on iPhone in place, with the terminals in front and the rest in **Active**. One already open comes forward instead of connecting again. One you have since removed from your library is skipped, and a message says so.
 
@@ -79,7 +63,7 @@ When a terminal's machine keeps sessions running with tmux, the Workgroup rememb
 - **A session renamed in tmux** while a terminal shows it, for example with `tmux rename-session`, stays the Workgroup's: the Workgroup keeps it under its new name.
 - **A basic terminal**, one opened outside tmux, is saved as one, and opens outside tmux again on every device (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)).
 
-In **Edit Tab**, **tmux session** shows the session a tab opens on. **Start a New One** gives the tab a new session next time; the old one keeps running, and **Active** lists it.
+In a tab's sheet, **tmux session** shows the session a tab opens on. **Start a New One** gives the tab a new session next time; the old one keeps running, and **Active** lists it.
 
 ## Mac terminals open on their Mac
 
@@ -103,7 +87,19 @@ Your saved Workgroup and its Mac terminals are not changed.
 
 ## Edit a Workgroup
 
-Select it and choose **Edit**. Changes apply when you choose **Save**; **Cancel** discards them.
+Select it: the panel beside the list is where you change it. Every change is saved as you make it, on all your devices; on a Mac, **Edit** ▸ **Undo** (⌘Z) takes it back. A change waits while something is missing, such as a name or a tab's connection; the panel says what, and the Workgroup keeps what it had until then.
+
+1. Type its **Name** at the top, and choose a **Color**.
+2. **On Mac:** choose how it opens with **Open in**: **Tabs**, or **Grid** for its **Terminal Overview**. **Auto-focus on activity** follows new output while you view the overview; it does not switch tabs. A Workgroup saved to open in the carousel, which is gone, opens in the grid. On Vision Pro, a window opened from the Workgroup follows its **Auto-focus on activity** too, until you change the window's own (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)).
+3. Under **Tabs**, choose the plus button (**Add Tab**) for each terminal. To change a tab, double-click it, or select it and choose the pencil (**Edit Tab**), on a Mac; tap it elsewhere. Each tab opens in its own sheet, and **Add** or **Save** there changes the Workgroup:
+   - **Type**: **SSH** or, on Mac, **Local**.
+   - **Connection**: the saved connection to open, for an SSH tab.
+   - **Label**: an optional name for the tab.
+   - **Startup command**: an optional command to run once after the tab connects, for example `cd /srv/shop && git status`.
+   - For a local tab: **Shell** and **Working directory**, or leave them empty to use the app's defaults.
+4. To reorder tabs on Mac, drag them, or use **Move Up** and **Move Down** in a tab's menu; the minus button, **Delete Tab** in its menu, or Delete removes the one selected. Elsewhere, swipe a tab to delete it.
+5. Optionally, choose **Add Database or Desktop** under **Databases and Desktops** for each database or remote desktop from your library to open with it (see [Databases and desktops in a Workgroup](#databases-and-desktops-in-a-workgroup)).
+6. Optionally, give it a look under **Look** and **Text**: choose **Start From** ▸ **Choose a Look**, or set each part, as in a window's own settings (see [Backgrounds and glowing text](terminal-looks.md)). Every window the Workgroup opens starts with it, on all your devices. A picture you choose stays on this device; your others show the look without it.
 
 A new look applies the next time you open the Workgroup. A window already open keeps its own until you change it in **This Window**.
 

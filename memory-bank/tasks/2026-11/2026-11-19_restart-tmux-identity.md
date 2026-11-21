@@ -83,7 +83,19 @@ an id the app knows only for agents it started). D111.
   sessions and everything running in them." (the VM keeps UTC); quit and relaunch with tmux running reopened both
   tabs, no alert. VM stopped. The Active note on iPhone/Vision Pro is unit-tested, not seen on a device.
 
+## Shipping 0.4.623
+- `1fecb42f` pushed; Mac v0.4.623 built from the release worktree moved to it: notarized, stapled, Gatekeeper-accepted;
+  GitHub Latest, downloads byte-identical, tag at `1fecb42f`; feed `48fd04ed` pushed. The Mac's fourteenth release.
+- Site built from `48fd04ed`, staged 111/111; he provisioned; live: 111 of 111 match, the feed `no-cache` with 623
+  first, its zip the advertised length and the release's SHA-256, its EdDSA signature verified against the app's
+  `SUPublicEDKey`, which 0.4.621 carries too. The home page downloads v0.4.623.
+- TestFlight 623: iOS uploaded and submitted; the visionOS upload was cut off when the session ended, re-uploaded from
+  its archive (`xcodebuild -exportArchive`), then submitted. Both `WAITING_FOR_REVIEW`. 622's two are in review too.
+- His Mac: 0.4.623 installed at his word from the released zip (quit, swapped, relaunched): both windows reopened
+  ("2 listed, 2 reopening"), no crash report. His test: a session killed by hand gave the notice as expected.
+- His iPhone and headset: not yet (unreachable earlier; a 623 device build is next).
+
 ## Next
-- 0.4.623 through the same release path; then his provisioning, the live check, the devices, the records.
+- Get Info (0.4.624, his ask); the iPhone and headset on 623; the records commit.
 - His current iPhone terminals from before the restart never learnt their sessions' times (621 didn't read them): the
   two still standing over his new Mac tabs go by the name alone until closed by hand.

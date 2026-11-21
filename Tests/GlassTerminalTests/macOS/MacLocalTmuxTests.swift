@@ -787,7 +787,8 @@ struct MacLocalTmuxTests {
             let local = rows.filter { $0.endpointID == GlassTerminalCapability.localShellEndpointID }
             #expect(local.map(\.id) == ["terminal-tmux:local:glass-1", "terminal-tmux:local:glass-3", "terminal-tmux:local:glass-4"],
                     "glass-2 is open here over SSH, a row of its own under alpha")
-            #expect(local.map(\.title) == ["✳ Claude Code", "shop-task-2", "build"], "named as the tabs name them")
+            // Without the spinner an agent turns at the start of its title, which the row's mark already says (0.4.621).
+            #expect(local.map(\.title) == ["Claude Code", "shop-task-2", "build"], "named as the tabs name them")
             #expect(local.map(\.subtitle) == ["~/src/shop · Open here", "~/src/shop-task-2 · Detached", "~ · Detached"])
             #expect(local.map(\.isOpenHere) == [true, false, false])
             #expect(local.map(\.isAttachedElsewhere) == [false, false, false], "the client attached is this app's tab")
@@ -937,6 +938,8 @@ struct MacLocalTmuxTests {
 
         func run(_ command: String) async throws -> String {
             commands.append(command)
+            // glass-5 runs there, as a terminal joining it checks first (D111).
+            if command == TerminalTmux.listCommand { return "glass-5\t1\t1\t1790000000\n" }
             if let name = nameable.first(where: { TerminalTmux.givenNameCommand(session: "glass-5", name: $0) == command }) {
                 given = name ?? ""
                 return ""
@@ -1165,9 +1168,16 @@ struct MacLocalTmuxTests {
             let none = try #require(TerminalTmux.repositoryCommand(session: "glass-5", repository: nil))
             // The note goes from a task of its own, after the title: under a full run's load the
             // title came first and the list was read with the second note still to come.
-            // `tmux -V`, for control mode (D83), is a question of its own; the bell hook, set at each attach, is no note.
-            _ = await eventually { host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand && !TerminalTmuxTests.isBellCommand($0) }.count >= 2 }
-            #expect(host.commands.filter { $0 != host.read && $0 != TerminalTmux.versionCommand && !TerminalTmuxTests.isBellCommand($0) } == [kept, none],
+            // `tmux -V`, for control mode (D83), is a question of its own; the bell hook, set at each attach, is no note;
+            // nor is the list a terminal joining its session reads first, to see it is still there (D111).
+            @MainActor func notes() -> [String] {
+                host.commands.filter {
+                    $0 != host.read && $0 != TerminalTmux.versionCommand && $0 != TerminalTmux.listCommand
+                        && !TerminalTmuxTests.isBellCommand($0)
+                }
+            }
+            _ = await eventually { notes().count >= 2 }
+            #expect(notes() == [kept, none],
                     "the read says the folder and repository too: no lookup or name query of its own: \(host.commands)")
             _ = window
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
@@ -1213,7 +1223,7 @@ struct MacLocalTmuxTests {
         }
     }
 
-    @Test("W19: an SSH tab named while its terminal was not connected tells the session once it is, and a session made again under the same name is given the tab's name rather than taking it away")
+    @Test("W19: an SSH tab named while its terminal was not connected tells the session once it is, and a session found with no name on a reconnect is given the tab's name rather than taking it away")
     func sshTabTellsItsSession() async throws {
         try await withFake { _, defaults in
             let host = HostSession()
@@ -1229,7 +1239,8 @@ struct MacLocalTmuxTests {
             #expect(await eventually { host.commands.contains(named) })
             #expect(tab.tabLabel == "build" && host.given == "build")
 
-            // The host restarted, and reconnecting made glass-5 again: a session with no name.
+            // While it was down, glass-5 lost its name there. Reconnecting joins it, as the host still lists it (D111:
+            // a reconnect only ever joins), and finds it with no name.
             let told = host.commands.filter { $0 == named }.count
             session.state = .disconnected
             host.given = ""

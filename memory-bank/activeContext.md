@@ -51,7 +51,22 @@ use the disposable test VM only).
 - **Then, before the site went live, his tweak (0.4.623):** say why tabs didn't come back. The Mac's launch alert ("N tabs
   weren't reopened — Your Mac restarted at …", from `kern.boottime` / tmux's start time) and Active's per-machine note
   off the Mac. Seen in the VM after a reboot. 0.4.622 stays on GitHub; the site goes live with 0.4.623.
-- **Next:** release 0.4.623 the same way; his provisioning; the live check; the devices; the records commit.
+- **0.4.623 shipped** (Mac v0.4.623, feed `48fd04ed`, site live and checked 111/111 with the feed's signature verified,
+  TestFlight 623 both in review); his Mac on 0.4.623 at his word; his kill test gave the notice.
+- **Building 0.4.624, his ask:** Get Info for a terminal (a Mac tab's right-click: Get Info… beside the tab, Copy
+  tmux Session Name; the same in the tab menus on iPhone, iPad and Vision Pro): session with Copy, machine, when the
+  session started, folder, what runs, open elsewhere. Seen in the VM (the panel first hid its last row: a scroll view
+  kept the popover's first size; fixed). His thought on pace: ship to users every few days; asked whether to batch
+  public releases and make Sparkle install on quit quietly — waiting on his answer.
+- **Then (D112, 0.4.625):** Workgroups edited in their panel, saved as you go, no sheet — his ask and choices; checked in
+  the VM; task note `tasks/2026-11/2026-11-19_workgroup-panel-editor.md`. His Mac runs 0.4.631 (0.4.624 Get Info; 0.4.625 the panel with tab fields under the list; 0.4.626 each tab in its sheet again, his revision; 0.4.627–0.4.631 the dock after a relaunch: SwiftUI dropped its onChange for windows docked together, `tasks/2026-11/2026-11-19_dock-length-after-relaunch.md`).
+  He moved to Xcode-beta 27.3 b2: builds name it in `DEVELOPER_DIR`; releases need a released Xcode.
+- **0.4.632 (2026-11-20):** an SVG dropped from the Dock's Downloads stack quit the app on macOS 27.2.1 (a crash
+  report and log he pasted): a file promise called in after the drop raises on macOS 27. Drops now read only SwiftUI's
+  providers; `tasks/2026-11/2026-11-20_svg-drop-crash.md`. On his Mac since 13:09; his check: a Dock-stack SVG onto a
+  terminal. Also, at his word: 10 tmux tests failing since 0.4.622 fixed (their fake hosts now list their sessions).
+- **Next:** his word to release 0.4.624–0.4.625 (held at his word); batching releases and quiet Sparkle installs, asked;
+  the iPhone and headset on 0.4.625 when reachable. Nothing of 0.4.624–0.4.625 is committed.
 
 ## 2026-11-15 (evening) — the iPhone's Active, from his day on the phone (released in 0.4.621)
 

@@ -292,12 +292,13 @@ struct TerminalRemoteDropTests {
         let folder = try Self.temporaryFolder("drop-mac")
         defer { try? FileManager.default.removeItem(at: folder) }
         let file = try Self.file("diagram.png", in: folder, contents: "png")
-        // A private pasteboard: nothing of the real drag pasteboard can stand in for this drop.
-        let pasteboard = NSPasteboard(name: NSPasteboard.Name("drop-test-\(UUID())"))
-        pasteboard.clearContents()
-        pasteboard.writeObjects([file as NSURL])
-        defer { pasteboard.releaseGlobally() }
-        let drop = try #require(SFTPIncomingDrop(providers: [], pasteboard: pasteboard))
+        // As SwiftUI hands over a file dragged from Finder.
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier, visibility: .all) { completion in
+            completion(file.dataRepresentation, nil)
+            return nil
+        }
+        let drop = try #require(SFTPIncomingDrop(providers: [provider]))
         let host = DropTestHost(home: Self.home)
         let drops = Self.drops(on: host)
         var typed: [String] = []

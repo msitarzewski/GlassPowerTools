@@ -2422,3 +2422,21 @@ noteTerminalsClosed`, `GlassRunningReport.closed`) and Active says it under the 
 **Limits:** a terminal or pane that never read its session (records from 621 and before) goes by the name alone. With
 the Mac's listing unreadable at launch, windows come back and a pane whose session is gone shows its tmux exit rather
 than closing (unknown keeps a pane, `MacLocalTerminalExitPolicy`). A split tab with one dead local pane keeps the tab.
+
+## D112 — A Workgroup is edited in its panel, saved as you go; no editor sheet — Approved 2026-11-19, implemented, not released
+**Owner:** of the Edit Workgroup sheet, "one quick thing that bugs me when I encounter it is the edit mode in workgroups.
+Let's remove the edit modal and put that directly into the panel itself." Asked, he chose: every change saves as it is
+made (⌘Z undoes), on every device, and a new Workgroup goes straight into the panel rather than a sheet.
+
+**Decided.** The Workgroups panel is the editor (`WorkgroupEditorView`, `WorkgroupPanelEditor.swift`): the name as its
+title, colour, Open in and Auto-focus (Mac), the tabs, databases and desktops, and the look. An edit saves 0.4 s after the last change, only when the
+Workgroup is whole (a name, something to open, every tab complete); until then the panel says what is missing and the
+Workgroup keeps what it had. Undo goes back one save at a time. A change from another device is shown again, unless it
+is what this panel saved. +, Duplicate, "save current sessions" and a Mac window's Save Workspace as Workgroup… save at
+once and show it, its name focused; the window asks Replace or Keep Both only for a name already used. The Workgroup
+sheet is gone, and Edit with it. **Revised the same evening, his word after trying it:** "I want the edit tool to open
+the modal like before, but without the intermediary Edit > list of tabs": each tab is added or edited in its own sheet
+(`WorkgroupTabEditorView`, back) from the + and a pencil beside the list, a double-click, or a tap elsewhere; the
+fields under the list are gone.
+**Limits:** Return outside a text field still opens the Workgroup (the panel's default button). Deleting a tab asks
+nothing (undo brings it back).

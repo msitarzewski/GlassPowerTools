@@ -586,6 +586,73 @@ final class MacWorkspaceController {
         return MacWorkspaceSessionHelp.text(described, home: home)
     }
 
+    /// Get Info for this tab (2026-11-19, the owner: "a right click > Get Info... on the tabs so finding its tmux name
+    /// is easier"): each pane's session, machine, when tmux made the session, folder and program, from what the tab
+    /// knows now. `askingTheMachines` adds who else has each session open.
+    func sessionInfo(servers: [ServerConfiguration], home: String? = NSHomeDirectory()) -> [TerminalSessionInfo] {
+        guard let panes = state.root?.panes else { return [] }
+        return panes.enumerated().map { index, pane in
+            let context = paneContextByPaneID[pane.id]
+            let title = MacWorkspaceTabNaming.automaticTitle(context, home: home) ?? pane.intent.label
+                ?? (panes.count == 1 ? tabLabel : nil) ?? "Terminal \(index + 1)"
+            let running = agent(for: pane.id)?.displayName ?? context?.program
+            let folder = TerminalSessionInfo.folder(context?.directory, home: home)
+            switch pane.intent.kind {
+            case .local:
+                return TerminalSessionInfo(
+                    id: pane.id, title: title, machine: "This Mac", tmuxSession: pane.intent.localTmuxSession,
+                    created: pane.intent.localTmuxSessionCreated.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+                    folder: folder, running: running)
+            case .ssh:
+                if let terminal = session(for: pane.id) {
+                    var info = terminal.sessionInfo(title: title)
+                    info.id = pane.id
+                    info.folder = info.folder ?? folder
+                    info.running = info.running ?? running
+                    return info
+                }
+                let server = servers.first { $0.id == pane.intent.serverID }
+                return TerminalSessionInfo(
+                    id: pane.id, title: title, machine: server?.name ?? "Its machine", tmuxSession: pane.intent.sshTmuxSession,
+                    created: pane.intent.sshTmuxSessionCreated.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+                    folder: folder, running: running)
+            }
+        }
+    }
+
+    /// The same, with each machine asked who else has the session open: this Mac's tmux for a local pane (less the
+    /// panes here that show it), the host for an SSH pane's terminal.
+    func sessionInfoAskingTheMachines(servers: [ServerConfiguration],
+                                      local: () -> [TerminalTmux.Session]? = {
+                                          MacLocalTmux.server.executablePath().flatMap { MacLocalTmux.listing(tmux: $0) }
+                                      }) async -> [TerminalSessionInfo] {
+        var infos = sessionInfo(servers: servers)
+        let panes = state.root?.panes ?? []
+        let localSessions = panes.contains { $0.intent.kind == .local && $0.intent.localTmuxSession != nil } ? local() : nil
+        for (index, pane) in panes.enumerated() where index < infos.count {
+            switch pane.intent.kind {
+            case .local:
+                guard let name = pane.intent.localTmuxSession, let localSessions else { continue }
+                let own = localSessions.first { $0.isSession(name, created: pane.intent.localTmuxSessionCreated) }
+                infos[index].otherClients = TerminalSessionInfo.otherClients(of: own, here: max(1, MacLocalTmux.shownCount(name)))
+            case .ssh:
+                guard let terminal = session(for: pane.id) else { continue }
+                let asked = await terminal.sessionInfoAskingTheMachine(title: infos[index].title)
+                infos[index].otherClients = asked.otherClients
+                infos[index].created = infos[index].created ?? asked.created
+            }
+        }
+        return infos
+    }
+
+    /// The tmux sessions this tab's panes are in, for Copy tmux Session Name.
+    var tmuxSessionNames: [String] {
+        (state.root?.panes ?? []).compactMap { pane in
+            pane.intent.kind == .local ? pane.intent.localTmuxSession
+                : session(for: pane.id).flatMap { $0.survivesClose ? $0.tmuxSessionName : nil } ?? pane.intent.sshTmuxSession
+        }
+    }
+
     func focusedSessionState() -> SessionState? {
         guard let focusedPaneID else { return nil }
         return session(for: focusedPaneID)?.state

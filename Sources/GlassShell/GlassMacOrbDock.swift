@@ -533,9 +533,10 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
     /// the root position"): to its right as orbs come, rows below it, evenly above and below it as a
     /// ring makes its row taller. Where the person moves it; the screen's edge only holds the dock back.
     private var root: CGPoint?
-    /// The dock is moving itself, by this many moves still going: what it moves isn't the person's.
-    private var placings = 0
-    private var placing: Bool { placings > 0 }
+    /// Who is moving the dock, the dock or a hand on its edge (`GlassOrbDockMotion`): what the dock moves isn't the
+    /// person's, and a hand's drag wins over the dock's own.
+    private var motion = GlassOrbDockMotion()
+    private var placing: Bool { motion.isDocksOwn(at: CACurrentMediaTime()) }
     /// The frame the dock last gave itself. AppKit tells an animated frame change as a live resize, and
     /// one that ends here is the dock's own, not the person's: taken as theirs, a dock fitted to
     /// Connections alone kept that width, and the next orb wrapped out of sight (the VM, 2026-11-02).
@@ -571,6 +572,8 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
     func hide() {
         hideName()
         guard let panel else { return }
+        // A spring under way stops with it: its display link was its view's, and goes with it.
+        stopSpring()
         panel.orderOut(nil)
         panel.contentView = nil
     }
@@ -651,6 +654,8 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
 
     private func applyWanted() {
         guard let panel, let wanted else { return }
+        // Not while a hand holds the dock's edge: fitted once it lets go (`windowDidEndLiveResize`).
+        guard motion.mayFit else { return }
         let size = panel.frameRect(forContentRect: CGRect(origin: .zero, size: wanted.size)).size
         let offset = GlassMacOrbDockView.root(of: wanted.orbs, orientation: orientation)
         let root = self.root ?? startingRoot(size: size, offset: offset)
@@ -660,10 +665,9 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
         guard frame.integral != panel.frame.integral else { return }
         GlassOrbDock.logger.info("dock fitted \(Int(size.width))x\(Int(size.height)), Connections at \(Int(root.x)),\(Int(root.y))")
         fitted = frame
-        placings += 1
         guard panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            panel.setFrame(frame, display: true)
-            placings -= 1
+            stopSpring()
+            setOwnFrame(panel, frame)
             return
         }
         // A spring, stepped with the display: the glass overshoots its new size a little and settles, as jelly does
@@ -694,19 +698,31 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
 
     private func spring(_ panel: NSPanel, to size: CGSize, placing offset: CGPoint, at root: CGPoint) {
         // A spring under way gives way to this one, from where it has got to.
-        if springLink != nil { placings -= 1 }
-        springLink?.invalidate()
-        springing = (panel.frame.size, size, offset, root, CACurrentMediaTime())
+        stopSpring()
         guard let link = panel.contentView?.displayLink(target: self, selector: #selector(stepSpring(_:))) else {
-            springing = nil
-            springLink = nil
-            panel.setFrame(Self.inside(Self.frame(of: size, placing: offset, at: root), on: Self.screen(at: root) ?? panel.screen),
-                           display: true)
-            placings -= 1
+            setOwnFrame(panel, Self.inside(Self.frame(of: size, placing: offset, at: root), on: Self.screen(at: root) ?? panel.screen))
             return
         }
+        let now = CACurrentMediaTime()
+        springing = (panel.frame.size, size, offset, root, now)
+        motion.springStarted(at: now, lasting: Self.fitDuration)
         springLink = link
         link.add(to: .main, forMode: .common)
+    }
+
+    /// The spring under way stops where it has got to.
+    private func stopSpring() {
+        springLink?.invalidate()
+        springLink = nil
+        springing = nil
+        motion.springEnded()
+    }
+
+    /// The dock sets its own frame: its moves meanwhile aren't the person's.
+    private func setOwnFrame(_ panel: NSPanel, _ frame: CGRect, display: Bool = true) {
+        motion.settingFrame = true
+        panel.setFrame(frame, display: display)
+        motion.settingFrame = false
     }
 
     @objc private func stepSpring(_ link: CADisplayLink) {
@@ -721,9 +737,7 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
         if frame != panel.frame { panel.setFrame(frame, display: true) }
         guard elapsed >= Self.fitDuration else { return }
         link.invalidate()
-        springLink = nil
-        self.springing = nil
-        placings -= 1
+        stopSpring()
     }
 
     /// The dock's frame of `size` with Connections' middle, `offset` from its top left, at `root`.
@@ -767,9 +781,27 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
 
     // MARK: NSWindowDelegate
 
+    /// A hand on the dock's edge: a spring under way stops, and the dock doesn't fit itself again until it lets go.
+    public func windowWillStartLiveResize(_ notification: Notification) {
+        let hand = NSEvent.pressedMouseButtons & 1 != 0
+        if motion.liveResizeStarted(mouseDown: hand) { stopSpring() }
+        GlassOrbDock.logger.notice("dock edge \(hand ? "taken by hand" : "moved, not by hand", privacy: .public)")
+    }
+
     public func windowDidEndLiveResize(_ notification: Notification) {
-        guard let panel, !placing else { return }
-        if let fitted, abs(panel.frame.width - fitted.width) < 2, abs(panel.frame.height - fitted.height) < 2 { return }
+        guard let panel else { return }
+        // Only a hand's drag changes the length the dock keeps: a resize AppKit made itself, taken for the person's,
+        // could keep however many orbs had docked so far as the app launched.
+        guard motion.liveResizeEnded() else {
+            GlassOrbDock.logger.notice("dock resized, not by hand, to \(Int(panel.frame.width))x\(Int(panel.frame.height)): its length stays as it was")
+            DispatchQueue.main.async { [weak self] in self?.applyWanted() }
+            return
+        }
+        if let fitted, abs(panel.frame.width - fitted.width) < 2, abs(panel.frame.height - fitted.height) < 2 {
+            // Let go where it was: a fit asked for meanwhile is done now.
+            DispatchQueue.main.async { [weak self] in self?.applyWanted() }
+            return
+        }
         // An edge dragged: Connections where it shows now; the length dragged to along the line is the dock's longest
         // from now on, to the nearest whole orb (the owner, 2026-11-05: "if it will fit one more and i rezize to ftt,
         // that should be the new max width"); its thickness goes back to one orb's. The whole size dragged to was
@@ -779,13 +811,15 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
         fitted = nil
         let content = panel.contentRect(forFrameRect: panel.frame).size
         let room = (panel.screen ?? NSScreen.main)?.visibleFrame.size ?? content
+        // The orbs as the dock last asked for them: any that came or went while the hand held the edge too.
+        let orbs = wanted?.orbs ?? shown
         let longest = GlassOrbDockLongest.fromHand(
-            orientation == .horizontal ? content.width : content.height, sizes: shown, orientation,
+            orientation == .horizontal ? content.width : content.height, sizes: orbs, orientation,
             inset: GlassMacOrbDockView.inset, gapAfterFirst: GlassMacOrbDockView.connectionsGap,
             largest: orientation == .horizontal ? room.width : room.height)
         GlassOrbDockLongest.keep(longest, orientation, in: GlassUITestRun.settingsDefaults)
-        GlassOrbDock.logger.info("dock dragged to \(Int(content.width))x\(Int(content.height)): longest \(Int(longest))")
-        wanted = (GlassMacOrbDockView.fit(shown, orientation: orientation, tallest: tallest, longest: longest), shown)
+        GlassOrbDock.logger.notice("dock dragged to \(Int(content.width))x\(Int(content.height)): longest \(Int(longest))")
+        wanted = (GlassMacOrbDockView.fit(orbs, orientation: orientation, tallest: tallest, longest: longest), orbs)
         DispatchQueue.main.async { [weak self] in self?.applyWanted() }
     }
 
@@ -796,7 +830,7 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
 
     public func windowDidMove(_ notification: Notification) {
         guard let panel else { return }
-        GlassOrbDock.logger.debug("dock moved to \(Int(panel.frame.minX)),\(Int(panel.frame.minY)) \(Int(panel.frame.width))x\(Int(panel.frame.height)), placing \(self.placings), rows \(self.shown.count)")
+        GlassOrbDock.logger.debug("dock moved to \(Int(panel.frame.minX)),\(Int(panel.frame.minY)) \(Int(panel.frame.width))x\(Int(panel.frame.height)), placing \(self.placing), rows \(self.shown.count)")
         guard !placing else { return }
         keepRoot(connectionsPoint(of: panel))
     }
@@ -854,10 +888,8 @@ public final class GlassOrbDockPanel: NSObject, NSWindowDelegate {
         let size = panel.frame.size
         let offset = GlassMacOrbDockView.root(of: shown, orientation: orientation)
         let root = self.root ?? startingRoot(size: size, offset: offset)
-        placings += 1
-        panel.setFrame(Self.inside(Self.frame(of: size, placing: offset, at: root), on: Self.screen(at: root) ?? NSScreen.main),
-                       display: false)
-        placings -= 1
+        setOwnFrame(panel, Self.inside(Self.frame(of: size, placing: offset, at: root), on: Self.screen(at: root) ?? NSScreen.main),
+                    display: false)
     }
 
     /// `frame` moved inside the screen's room, where it can be.
@@ -893,6 +925,8 @@ struct GlassMacOrbDockView: View {
     let model: GlassShellModel
     @State private var dock = GlassOrbDockModel.shared
     @State private var shape: CGSize = .zero
+    /// What the dock last passed on to its panel, its jelly and its scrolling (`passOn`).
+    @State private var passedOn = PassedOn()
     /// The orb being carried, and how far.
     @State private var held: HeldOrb?
     @State private var letGo: ContinuousClock.Instant?
@@ -975,6 +1009,7 @@ struct GlassMacOrbDockView: View {
         let sizes = [Self.connectionsSize] + cells.map(Self.size(of:))
         let orientation = orientation
         let fit = Self.fit(sizes, orientation: orientation, tallest: GlassOrbDockPanel.shared.tallest, longest: keptLongest)
+        let _ = passOn(Fitted(size: fit, orbs: sizes), holding: cells.map(\.id), along: orientation)
         return VStack(spacing: 0) {
             ScrollView(orientation.axis) {
             // Each drop's glass on its own, not drawn together in a `GlassEffectContainer`: there, what isn't glass
@@ -1025,23 +1060,13 @@ struct GlassMacOrbDockView: View {
         }
         // Under the panel's clear title bar too: the dock is all orbs.
         .ignoresSafeArea()
-        // The orbs too, as where Connections is among them can change with the dock's size the same.
-        .onChange(of: Fitted(size: fit, orbs: sizes), initial: true) { _, fitted in
-            GlassOrbDockPanel.shared.fit(to: fitted.size, orbs: fitted.orbs)
-        }
         .onChange(of: pointed) { _, pointed in name(pointed) }
         // Orbs there as the dock opens land in it, as they fall into it (`GlassOrbDropArrival`).
         .onAppear {
             jelly.changed(from: [Self.connectionsCell], to: [Self.connectionsCell] + cells.map(\.id), along: orientation)
         }
         .onDisappear { GlassOrbDockPanel.shared.hideName() }
-        // An orb docked past what the dock shows at its longest: scrolled to.
-        .onChange(of: cells.map(\.id)) { old, new in
-            GlassOrbDock.logger.info("dock holds \(new.joined(separator: ","), privacy: .public)")
-            jelly.changed(from: [Self.connectionsCell] + old, to: [Self.connectionsCell] + new, along: orientation)
-            guard let id = new.last(where: { !old.contains($0) }) else { return }
-            arrived = id
-        }
+        // An orb docked past what the dock shows at its longest: scrolled to (`passOn` says which).
         .task(id: arrived) {
             guard let id = arrived else { return }
             // Its place, and the dock's new size.
@@ -1326,6 +1351,37 @@ struct GlassMacOrbDockView: View {
     private struct Fitted: Equatable {
         var size: CGSize
         var orbs: [CGSize]
+    }
+
+    /// What the dock last passed on: a box, so keeping it changes nothing drawn.
+    @MainActor
+    private final class PassedOn {
+        var fitted: Fitted?
+        var ids: [String]?
+    }
+
+    /// The dock's size and orbs to its panel (the orbs too, as where Connections is among them can change with the
+    /// size the same), and what it holds to the orbs' jelly and the scroll to one just docked, when either differs
+    /// from what it last passed on: compared as the dock is drawn, passed on just after. Not from `onChange`: SwiftUI
+    /// drops an `onChange` action asked for more than once in a frame and keeps the value as seen, so it never comes
+    /// again. Windows put back into the dock together as the app relaunched did that (the owner's Mac, 2026-11-19: five
+    /// docked within a fifth of a second, and as the fifth docked, "onChange(of: Fitted) action tried to update
+    /// multiple times per frame"): the panel kept the size of four, the fifth stayed scrolled out of sight, and a drag
+    /// fitted the four again ("Reloaded with 4 in the dock. I couldn't resize it. Dropped an orb in there and resized
+    /// it to 6, no problem").
+    private func passOn(_ fitted: Fitted, holding ids: [String], along orientation: GlassOrbDockOrientation) {
+        let last = passedOn
+        guard last.fitted != fitted || last.ids != ids else { return }
+        let fits = last.fitted != fitted, before = last.ids
+        last.fitted = fitted
+        last.ids = ids
+        DispatchQueue.main.async {
+            if fits { GlassOrbDockPanel.shared.fit(to: fitted.size, orbs: fitted.orbs) }
+            guard let before, before != ids else { return }
+            GlassOrbDock.logger.info("dock holds \(ids.joined(separator: ","), privacy: .public)")
+            jelly.changed(from: [Self.connectionsCell] + before, to: [Self.connectionsCell] + ids, along: orientation)
+            if let id = ids.last(where: { !before.contains($0) }) { arrived = id }
+        }
     }
 
     // MARK: Names

@@ -239,11 +239,15 @@ struct TerminalFindTests {
         #endif
 
         // SSH: kept in tmux and connected, and the step goes over the session's own connection.
-        // A session opened from Active, so its name is given rather than chosen.
+        // A session opened from Active, so its name is given rather than chosen; the host lists it running, as a
+        // terminal joining it checks first (D111).
         var asked: [String] = []
         var server = ServerConfiguration(name: "alpha", host: "192.0.2.10", username: "ann")
         let inTmux = TerminalSession(server: server, terminalWriteSink: { _ in })
-        inTmux.tmuxCommandRunner = { asked.append($0); return "" }
+        inTmux.tmuxCommandRunner = {
+            asked.append($0)
+            return $0 == TerminalTmux.listCommand ? "work\t1\t1\t1790000000\n" : ""
+        }
         inTmux.tmuxSessionName = "work"
         #expect(inTmux.tmuxFindTarget == nil, "not connected")
         inTmux.state = .connected

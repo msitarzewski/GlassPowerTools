@@ -2568,11 +2568,11 @@ struct SFTPBrowserView: View {
     }
 
     #if os(macOS)
-    /// Files copied in Finder (or file promises another app copied), uploaded to this folder: the
-    /// drop path reading the general pasteboard instead of the drag one.
+    /// Files copied in Finder, uploaded to this folder: the drop path reading the general
+    /// pasteboard instead of the drag one. A file promise copied can't be received outside a drag.
     private func pasteFilesFromFinder() {
         guard canAcceptFileDrop,
-              let incoming = SFTPIncomingDrop(providers: [], pasteboard: .general) else { return }
+              let incoming = SFTPIncomingDrop(filesOn: .general) else { return }
         beginIncoming(incoming, destination: nil)
     }
     #endif

@@ -28,7 +28,9 @@ enum ConnectionWorkgroupSelection: Hashable {
 final class TerminalWorkgroupsModel {
     var selection: ConnectionWorkgroupSelection?
     var searchQuery: String = ""
-    var editorContext: WorkgroupEditorContext?
+    /// A Workgroup just made — the + button, Duplicate, a window saved as one — whose name the panel selects for typing
+    /// (2026-11-19: edited in the panel, no sheet).
+    var focusesNameOf: UUID?
     var failureMessage: String?
     /// A Workgroup waiting for its deletion to be confirmed; deleting from the menu used to be
     /// immediate, with nothing to undo it.
@@ -101,15 +103,6 @@ struct TerminalWorkgroupsView: View {
         Color.clear
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
-            .sheet(item: $model.editorContext) { context in
-            WorkgroupEditorView(
-                context: context,
-                servers: serverManager.servers,
-                existing: settingsManager.layoutPresets
-            ) { preset in
-                settingsManager.upsertLayoutPreset(preset)
-            }
-        }
         .confirmationDialog("Delete Workgroup?", isPresented: Binding(
             get: { model.pendingDeletion != nil },
             set: { if !$0 { model.pendingDeletion = nil } }
@@ -260,11 +253,8 @@ struct TerminalWorkgroupsView: View {
                         Button("Open", systemImage: "rectangle.stack") {
                             runtime.requestOpenWorkgroup(preset.id)
                         }
-                        Button("Edit", systemImage: "pencil") {
-                            model.editorContext = .edit(preset)
-                        }
                         Button("Duplicate", systemImage: "plus.square.on.square") {
-                            model.editorContext = .duplicate(preset)
+                            create(WorkgroupEditorContext.duplicate(preset).savedPreset())
                         }
                         // In Favorites, under its machines (2026-10-13).
                         if let favorites = runtime.favorites {
@@ -335,7 +325,7 @@ struct TerminalWorkgroupsView: View {
         .accessibilityIdentifier("connection-library-save-current-workgroup")
 
         Button {
-            model.editorContext = .new()
+            newWorkgroup()
         } label: {
             Image(systemName: "plus")
         }
@@ -402,82 +392,16 @@ struct TerminalWorkgroupsView: View {
             // The column's header on the headset, where the bar's title was (W33).
             .glassSpatialColumn(workgroup.name)
         } else if let preset = selectedWorkgroup(in: connectionLibrary) {
-            Form {
-                Section {
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: "rectangle.stack.fill")
-                            .font(.largeTitle)
-                            .foregroundStyle(preset.colorTag.color)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(preset.name)
-                                .font(.title2.bold())
-                                .textSelection(.enabled)
-                            Text(Self.contents(preset, detail: true))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                #if os(macOS)
-                Section("Terminals") {
-                    workgroupDetailTable(preset)
-                }
-                Section("Running terminals") {
-                    let tabs = MacWorkspacePreviewRegistry.shared.tabs(for: preset.id)
-                    if tabs.isEmpty {
-                        Label("Not running — open this workgroup to start its terminals.", systemImage: "apple.terminal")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 520), spacing: 18)], spacing: 18) {
-                            ForEach(tabs, id: \.workspaceID) { tab in
-                                let statuses = (tab.state.root?.panes ?? []).map { tab.previewStatus(for: $0.id) }
-                                VStack(alignment: .leading, spacing: 6) {
-                                    MacWorkspacePreview(controller: tab)
-                                    Text(tab.windowIdentity(servers: sessionManager.serverManager.servers).title)
-                                        .font(.headline).lineLimit(1)
-                                        .foregroundStyle(MacTerminalPreviewStatus.color(for: statuses))
-                                        .help(statuses.joined(separator: " · "))
-                                        .accessibilityHint(statuses.joined(separator: " · "))
-                                }
-                                .padding(10)
-                                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
-                            }
-                        }
-                    }
-                }
-                #else
-                ForEach(Array(preset.sessionIntents.enumerated()), id: \.offset) { index, intent in
-                    Section {
-                        workgroupIntentRow(intent, index: index, preset: preset)
-                    } header: {
-                        if index == 0 {
-                            Text("Startup Plan")
-                        }
-                    } footer: {
-                        if index == preset.sessionIntents.count - 1 {
-                            Text("All terminals start when you open this Workgroup. Commands run independently, without waiting for another tab.")
-                        }
-                    }
-                }
-                #endif
-                if !preset.services.isEmpty {
-                    Section("Databases and Desktops") {
-                        ForEach(preset.services, id: \.self) { id in
-                            WorkgroupServiceRow(description: runtime.describeService?(id))
-                        }
-                    }
-                }
+            WorkgroupEditorView(saved: preset, servers: serverManager.servers,
+                                summary: Self.contents(preset, detail: true),
+                                focusesName: model.focusesNameOf == preset.id,
+                                trailing: runningTerminals(preset)) { edited in
+                settingsManager.upsertLayoutPreset(edited)
             }
-            .formStyle(.grouped)
+            // One editor per Workgroup: choosing another shows that one, as it is saved (2026-11-19: edited here, no sheet).
+            .id(preset.id)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HStack {
-                    Button("Edit", systemImage: "pencil") {
-                        model.editorContext = .edit(preset)
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .help("Edit Workgroup")
-                    .accessibilityIdentifier("connection-library-edit-workgroup-\(preset.id.uuidString.lowercased())")
                     Spacer()
                     Button("Open Workgroup", systemImage: "rectangle.stack") {
                         runtime.requestOpenWorkgroup(preset.id)
@@ -507,7 +431,7 @@ struct TerminalWorkgroupsView: View {
                 Text("Workgroups open one configured command per terminal tab.")
             } actions: {
                 Button("New Workgroup", systemImage: "plus") {
-                    model.editorContext = .new()
+                    newWorkgroup()
                 }
                 .accessibilityIdentifier("connection-library-add-workgroup-empty-detail")
             }
@@ -517,123 +441,38 @@ struct TerminalWorkgroupsView: View {
         }
     }
 
-    #if os(macOS)
-
-    private func workgroupDetailTable(_ preset: LayoutPreset) -> some View {
-        let rows = preset.sessionIntents.map(WorkgroupTabDraft.init(intent:))
-        return Table(rows) {
-            TableColumn("Order") { row in
-                Text("\((rows.firstIndex(where: { $0.id == row.id }) ?? 0) + 1)").monospacedDigit()
-            }.width(45)
-            TableColumn("Label") { row in
-                let index = rows.firstIndex(where: { $0.id == row.id }) ?? 0
-                Text(preset.sessionIntents[index].label ?? defaultIntentLabel(preset.sessionIntents[index]))
-                    .lineLimit(1)
-            }.width(min: 100, ideal: 140)
-            TableColumn("Destination") { row in
-                let index = rows.firstIndex(where: { $0.id == row.id }) ?? 0
-                Label(workgroupIntentDestination(preset.sessionIntents[index]),
-                      systemImage: row.kind == .local ? "apple.terminal" : "network")
-                    .lineLimit(1)
-            }.width(min: 110, ideal: 180)
-            TableColumn("Startup command") { row in
-                Text(row.startupCommand.isEmpty ? "Interactive shell" : row.startupCommand)
-                    .font(.body.monospaced()).lineLimit(1)
-                    .help(row.startupCommand)
-            }.width(min: 140, ideal: 220)
-            TableColumn("Status") { row in
-                let index = rows.firstIndex(where: { $0.id == row.id }) ?? 0
-                let statuses = MacWorkspacePreviewRegistry.shared.tabs(for: preset.id).flatMap { tab in
-                    (tab.state.root?.panes ?? []).filter { $0.intent.sourceSessionIndex == index }
-                        .map { tab.previewStatus(for: $0.id) }
-                }
-                Text(statuses.isEmpty ? "Not running" : statuses.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }.width(min: 80, ideal: 100)
-        }
-        .frame(height: min(340, max(120, CGFloat(rows.count) * 32 + 32)))
-        .accessibilityIdentifier("workgroup-detail-table")
-    }
-    #endif
-
-    private func workgroupIntentRow(
-        _ intent: LayoutPreset.SessionIntent, index: Int, preset: LayoutPreset
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                Text("\(index + 1)")
-                    .font(.caption.bold().monospacedDigit())
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(intent.label ?? defaultIntentLabel(intent))
-                        .font(.headline)
-                        #if !os(macOS)
-                        .opacity(intent.kind == .local ? 0.55 : 1)
-                        #endif
-                    Label(workgroupIntentDestination(intent), systemImage: intent.kind == .local ? "apple.terminal" : "network")
-                        .font(.caption)
+    /// The Mac: the Workgroup's running terminals, live, after the editor's own sections.
+    private func runningTerminals(_ preset: LayoutPreset) -> AnyView? {
+        #if os(macOS)
+        AnyView(
+            Section("Running terminals") {
+                let tabs = MacWorkspacePreviewRegistry.shared.tabs(for: preset.id)
+                if tabs.isEmpty {
+                    Label("Not running — open this workgroup to start its terminals.", systemImage: "apple.terminal")
                         .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                    if let layout = preset.workspaceLayout,
-                       let tabIndex = layout.tabs.firstIndex(where: { workgroupNode($0.root, contains: index) }) {
-                        Text("Tab \(tabIndex + 1)\(layout.tabs[tabIndex].label.map { " · " + $0 } ?? "")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 520), spacing: 18)], spacing: 18) {
+                        ForEach(tabs, id: \.workspaceID) { tab in
+                            let statuses = (tab.state.root?.panes ?? []).map { tab.previewStatus(for: $0.id) }
+                            VStack(alignment: .leading, spacing: 6) {
+                                MacWorkspacePreview(controller: tab)
+                                Text(tab.windowIdentity(servers: sessionManager.serverManager.servers).title)
+                                    .font(.headline).lineLimit(1)
+                                    .foregroundStyle(MacTerminalPreviewStatus.color(for: statuses))
+                                    .help(statuses.joined(separator: " · "))
+                                    .accessibilityHint(statuses.joined(separator: " · "))
+                            }
+                            .padding(10)
+                            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
+                        }
                     }
                 }
-                Spacer(minLength: 0)
             }
-            if intent.kind == .local {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label(intent.localDirectory ?? "App default working directory", systemImage: "folder")
-                    Label(intent.localShell ?? "App default shell", systemImage: "chevron.left.forwardslash.chevron.right")
-                }
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                #if !os(macOS)
-                Label("Local terminals require macOS", systemImage: "info.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Use SSH connection…") { runtime.requestOpenWorkgroup(preset.id) }
-                #endif
-            }
-            if let command = intent.startupCommand {
-                Text(command)
-                    .font(.system(.callout, design: .monospaced))
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Startup command: \(command)")
-            } else {
-                Text("Interactive shell · No startup command")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("workgroup-terminal-plan-\(index)")
+        )
+        #else
+        nil
+        #endif
     }
-
-    private func workgroupIntentDestination(_ intent: LayoutPreset.SessionIntent) -> String {
-        guard intent.kind == .ssh else { return "Local terminal" }
-        guard let id = intent.serverID, let server = serverManager.server(for: id) else {
-            return "Missing SSH connection — edit this Workgroup to choose a host"
-        }
-        return "\(server.username)@\(server.host):\(server.port)"
-    }
-
-    private func workgroupNode(_ node: LayoutPreset.WorkspaceLayout.Node, contains index: Int) -> Bool {
-        switch node {
-        case .session(let candidate): return candidate == index
-        case let .split(_, _, first, second):
-            return workgroupNode(first, contains: index) || workgroupNode(second, contains: index)
-        }
-    }
-
-    @ViewBuilder
 
     private func selectedWorkgroup(
         in connectionLibrary: ConnectionLibraryProjection
@@ -713,10 +552,29 @@ struct TerminalWorkgroupsView: View {
             model.failureMessage = "No open sessions use a saved SSH connection."
             return
         }
-        model.editorContext = .new(
-            name: "Workgroup (\(intents.count) tabs)",
+        create(WorkgroupEditorContext.new(
+            name: WorkgroupEditorView.unusedName("Workgroup (\(intents.count) tabs)", in: settingsManager.layoutPresets),
             sessionIntents: intents
-        )
+        ).savedPreset())
+    }
+
+    /// The + button's Workgroup: one terminal — this Mac's shell on a Mac, else the first saved connection — under a
+    /// name no other has, saved and shown in the panel with its name ready to type (2026-11-19: no editor sheet).
+    private func newWorkgroup() {
+        #if os(macOS)
+        let tab = WorkgroupTabDraft(kind: .local)
+        #else
+        let tab = serverManager.servers.first.map { WorkgroupTabDraft(kind: .ssh, serverID: $0.id) } ?? WorkgroupTabDraft(kind: .local)
+        #endif
+        create(WorkgroupEditorContext.new(name: WorkgroupEditorView.unusedName(in: settingsManager.layoutPresets),
+                                          sessionIntents: [tab.intent]).savedPreset())
+    }
+
+    /// Saves a Workgroup made here and shows it in the panel, its name selected.
+    private func create(_ preset: LayoutPreset) {
+        settingsManager.upsertLayoutPreset(preset)
+        model.focusesNameOf = preset.id
+        model.selection = .preset(preset.id)
     }
 
     #if os(iOS)

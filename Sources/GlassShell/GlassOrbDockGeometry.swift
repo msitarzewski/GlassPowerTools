@@ -118,6 +118,60 @@ public enum GlassOrbLine {
 /// then each dock has a longest of its own, past which it scrolls; a dock dragged longer shows the orbs that now fit and
 /// keeps that longest, and one dragged shorter keeps a shorter one. The dock still fits its orbs within it, one orb
 /// thick: fewer orbs, shorter. A row's and a column's are kept apart, on this device.
+/// Who is moving the Mac's dock: the dock itself, springing to its orbs, or a hand on its edge. The owner, 2026-11-19,
+/// after a relaunch with six windows in the dock: "the dock only showed 4 orbs... even after I tried to resize. I
+/// clicked an orb and was then able to resize"; asked how it should be, "launch at whatever I set it to or smaller as
+/// necessary". The hand wins: its drag stops a spring under way, the dock waits for it to let go before fitting itself
+/// again, and only its drag changes the length the dock keeps. A spring counts as the dock's own for its length and a
+/// moment more, never longer: a count of springs under way, which a spring whose display link stopped never took back,
+/// could hold off every drag after it until the next orb came or went.
+public struct GlassOrbDockMotion: Equatable, Sendable {
+    /// When the spring under way started, and how long it runs.
+    public private(set) var springStart: TimeInterval?
+    public private(set) var springLength: TimeInterval = 0
+    /// A hand is on the dock's edge.
+    public private(set) var handHolds = false
+    /// The dock is setting its own frame this moment.
+    public var settingFrame = false
+
+    /// How long past its own length a spring still counts as the dock's.
+    public static let grace: TimeInterval = 0.5
+
+    public init() {}
+
+    /// A move or a size change now is the dock's own, not the person's.
+    public func isDocksOwn(at now: TimeInterval) -> Bool {
+        if settingFrame { return true }
+        guard let springStart else { return false }
+        return now - springStart < springLength + Self.grace
+    }
+
+    public mutating func springStarted(at now: TimeInterval, lasting length: TimeInterval) {
+        springStart = now
+        springLength = length
+    }
+
+    public mutating func springEnded() { springStart = nil }
+
+    /// AppKit began a live resize: a hand's while the mouse button is down (the dock's own springs set frames without
+    /// animating them, which AppKit doesn't tell as a live resize). True when a spring under way is to stop for it.
+    public mutating func liveResizeStarted(mouseDown: Bool) -> Bool {
+        guard mouseDown else { return false }
+        handHolds = true
+        defer { springStart = nil }
+        return springStart != nil
+    }
+
+    /// The live resize ended: true when it was a hand's, whose length the dock keeps.
+    public mutating func liveResizeEnded() -> Bool {
+        defer { handHolds = false }
+        return handHolds
+    }
+
+    /// The dock may fit itself to its orbs: not while a hand holds its edge.
+    public var mayFit: Bool { !handHolds }
+}
+
 public enum GlassOrbDockLongest {
     public static func key(_ orientation: GlassOrbDockOrientation) -> String {
         "com.glasspowertools.orbs.dockLongest." + orientation.rawValue
