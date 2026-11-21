@@ -6,6 +6,23 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.632</title>
+      <pubDate>Sat, 21 Nov 2026 17:26:09 GMT</pubDate>
+      <sparkle:version>632</sparkle:version>
+      <sparkle:shortVersionString>0.4.632</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.632</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.632</h2>
+<ul>
+  <li><b>Dropping a file from a Dock stack onto a terminal no longer quits the app.</b> On macOS 27, a file dragged from a stack in the Dock, such as Downloads, could make the app quit as it arrived. It now types the file's path, never that of a file dragged earlier, and a drop that can't be read beeps.</li>
+  <li><b>Get Info for a terminal.</b> Right-click a tab in a window's sidebar and choose Get Info… for its tmux session, with a button to copy its name, and its machine, when the session started, its folder, what is running and whether it is open elsewhere too.</li>
+  <li><b>Workgroups are edited in their panel.</b> Select one and change it where it is shown; every change is saved as you make it, and ⌘Z undoes it. Each tab opens in its own sheet.</li>
+  <li><b>The orb dock shows every window in it after a relaunch</b>, and comes back at the length you last dragged it to, or shorter when fewer orbs need it.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.632/GlassPowerTools-0.4.632.zip" length="29507831" type="application/octet-stream" sparkle:edSignature="FlPizrkOjfy5/wOqtKWjycgnCfQsEf96nUx9q8Lh0PXV41PLrE5oyEF0HIF7Q0/KStNK7Zg6ao1kaTqA4GjFCw=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.623</title>
       <pubDate>Thu, 19 Nov 2026 20:39:21 GMT</pubDate>
       <sparkle:version>623</sparkle:version>
