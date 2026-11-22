@@ -416,6 +416,9 @@ public extension GlassCapability {
 
     /// Gathers windows into one. Default: none of them is this capability's.
     func gather(tabGroups: [GlassTabGroup.ID], into destination: GlassTabGroup.ID?) -> GlassGathering? { nil }
+
+    /// The windows it has open, for the shared layout. Default: none, and ready to say so.
+    func layoutSnapshot() -> GlassLayoutSnapshot? { GlassLayoutSnapshot(windows: []) }
 }
 
 public extension GlassCapabilityRegistry {
@@ -431,18 +434,30 @@ public extension GlassCapabilityRegistry {
         registered.flatMap { $0.usageActivity() }
     }
 
+    /// Every capability's open windows for the shared layout; nil while any of them can't say yet.
+    func layoutSnapshot() -> GlassLayoutSnapshot? {
+        var windows: [GlassLayoutSnapshot.Window] = []
+        for capability in registered {
+            guard let snapshot = capability.layoutSnapshot() else { return nil }
+            windows += snapshot.windows
+        }
+        return GlassLayoutSnapshot(windows: windows)
+    }
+
     /// Every capability's running sessions (D44). Each capability asks its own hosts together.
     func runningSessions() async -> [GlassRunningSession] {
         await runningReport().sessions
     }
 
-    /// Every capability's running sessions and the machines it could not ask (W6).
+    /// Every capability's running sessions, the machines it could not ask (W6), and the terminals it closed because
+    /// their sessions had ended (D111), which the capability has handed over and won't report again.
     func runningReport() async -> GlassRunningReport {
         var all = GlassRunningReport()
         for capability in registered {
             let report = await capability.runningReport()
             all.sessions += report.sessions
             all.unchecked += report.unchecked
+            all.closed += report.closed
         }
         return all
     }

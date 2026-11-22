@@ -445,6 +445,11 @@ public protocol GlassCapability: AnyObject {
     /// `tabGroups()`, in the order given, and brings that window forward. Default: nothing.
     func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID)
 
+    /// The windows this capability has open here, for the shared layout (2026-11-22). Nil while it can't say yet: the
+    /// last run's windows still coming back would read as closed. Read in an observation, so from live state. Default:
+    /// none, ready. A requirement for the same reason as `openSessions()`.
+    func layoutSnapshot() -> GlassLayoutSnapshot?
+
     /// Gathers windows here, by their `GlassOpenSession.tabGroupID`, into one: `destination`, one of its
     /// `tabGroups()`, or else the first of them; and shows it. Nil when none of them is this capability's. Default:
     /// nil. A requirement for the same reason as `openSessions()`.

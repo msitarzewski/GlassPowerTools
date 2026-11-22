@@ -507,14 +507,9 @@ public final class GlassTerminalRuntime {
         return MacWorkspacePreviewRegistry.shared.reveal(server: serverID, sshTmuxSession: name)
         #else
         let manager = sessionManager
-        guard let session = manager.sessions.first(where: {
-                  $0.server.id == serverID && $0.purpose == .terminal && $0.state != .disconnected
-                      && $0.tmuxSessionName == name
-              }),
-              let workgroup = manager.workgroups.first(where: { $0.sessionIDs.contains(session.id) })
-        else { return false }
-        _ = manager.selectSession(session.id, inWorkgroup: workgroup.id)
-        enqueue(.showWorkgroup(workgroupID: workgroup.id))
+        guard let found = manager.terminalToReveal(serverID: serverID, tmuxSession: name) else { return false }
+        _ = manager.selectSession(found.session.id, inWorkgroup: found.workgroupID)
+        enqueue(.showWorkgroup(workgroupID: found.workgroupID))
         return true
         #endif
     }

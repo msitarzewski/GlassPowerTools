@@ -54,6 +54,10 @@ Siri, the Shortcuts app, Spotlight, Control Center, Handoff, `ssh://` links and,
 
 Sessions are grouped under the host they belong to, with a count for each host. A host whose Terminal service keeps sessions running with tmux also lists the tmux sessions running there, by the names their tabs have, and a host **Active** couldn't check says why; see [Keep terminals running with tmux](terminal-tmux.md). Sessions that belong to no host in the library are grouped under **Elsewhere**. A terminal running an AI coding agent shows the agent's mark, as its tab does: for a window, the agent in the terminal it shows; for a tmux session, the agent running there when **Active** last checked the machine. Collapse a host's group with its disclosure arrow. When nothing is open, **Active** says **Nothing Is Open** and lists your machines under **Terminal**, **Database** and **Desktop**; choose one to connect to that service.
 
+### What your other devices have open
+
+Below the hosts, **Active** lists the terminal windows open on your other devices, under **On** and each device's name: every window with its tabs, each tab's machine, and whether it's kept in tmux. A tab that isn't in tmux says which device it's on, because only that device can show what runs in it. The list is as each device last said, through iCloud, and it doesn't open anything yet. To leave a device's windows out, turn off **Same Windows on Every Device** on that device, in **Settings** ▸ **Privacy**; its windows leave the list on your other devices, and theirs leave its **Active**.
+
 ## Switch to a session
 
 Choose a session in **Active** to switch to it. The open session comes back to the screen; a second session is not opened. You can also right-click the session, or touch and hold it, and choose **Switch To**.
@@ -122,7 +126,7 @@ Your own Glass Power Tools windows stay where they are behind the cards; visionO
 
 ### AI agents and private pictures
 
-A terminal running an AI coding agent shows the agent's mark, faint, in the middle of its picture, on every device. The agent is told by the program running in the terminal: on any machine when the terminal is kept in tmux, and in a Mac's local terminals. Outside tmux on another machine, only Claude Code is recognized, by the title it sets. The mark is a hint, not a guarantee. The agents recognized are Claude Code, Codex, opencode, Gemini CLI, Cursor Agent, GitHub Copilot, Qwen Code, Kimi, OpenClaw, Hermes Agent, Mistral Vibe, DeepSeek Harness, ZCode, Amp, Goose, Cline, Kilo Code, OpenHands, Grok CLI, Kiro, Trae Agent, Qoder, Aider, Crush, Droid, Auggie, Plandex and iFlow CLI. The marks are their owners' trademarks, shown only to say which tool is running.
+A terminal running an AI coding agent shows the agent's mark, faint, in the middle of its picture, on every device. The agent is told by the program running in the terminal: on any machine when the terminal is kept in tmux, and in a Mac's local terminals. Outside tmux on another machine, only Claude Code is recognized, by the title it sets. The mark is a hint, not a guarantee. The agents recognized are Claude Code, Codex, opencode, Gemini CLI, Cursor Agent, GitHub Copilot, Qwen Code, Kimi, OpenClaw, Hermes Agent, Mistral Vibe, DeepSeek Harness, ZCode, Amp, Goose, Cline, Kilo Code, OpenHands, Grok CLI, Kiro, Trae Agent, Qoder, Aider, Crush, Droid, Auggie, Plandex, iFlow CLI and Antigravity CLI. The marks are their owners' trademarks, shown only to say which tool is running.
 
 **On Mac**, **Settings** ▸ **Appearance** ▸ **Show All Windows** ▸ **Blur previews** softens what each picture shows, so a screenshot of it can be shared. Lines keep their shape, but the letters can't be read; names stay sharp. It is kept on this Mac.
 

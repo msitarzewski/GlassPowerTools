@@ -2440,3 +2440,28 @@ the modal like before, but without the intermediary Edit > list of tabs": each t
 fields under the list are gone.
 **Limits:** Return outside a text field still opens the Workgroup (the panel's default button). Deleting a tab asks
 nothing (undo brings it back).
+
+## D113 — One layout on every device: the same windows and tabs everywhere — Approved 2026-11-22 (design; phase 1 built, 0.4.636, not released)
+**Owner:** "should we consider a global sync of windows/tabs/etc where when I add a new tab on mac it appears available
+on ViionOS etc." Offered listing only; he: "Auto open is what made me want this feature. If the machine manages the
+windows/workgroups/tabs/DB/desktops... then other devices would simply read the layout. If I add a tab to a window on my
+mac with Vision Pro, then it should show on the Mac, too. Same window and tab." Then: "Let have windows that aren't
+already open on each device open into the app's dock by default. Closing a window closes everywhere, and we add a
+"repopen last closed window" in active in case it's closed by accident?"; plain shells shown but never opened
+elsewhere ("We never knwo what's in then and running"); the focused terminal keeps sizing tmux, as now; desktops ask
+before taking over; "fix both defects, then start phase 1".
+
+**Decided.** One layout for the account in CloudKit (private database, zone `GlassLayout`, record type `LayoutItem`: an
+encoded window or tab and `updatedAt`), a record per window and per tab, each merged on its own (later `updatedAt`
+wins, tombstones included; a tie goes to the tombstone). A tab names its machine by service id and its tmux session by
+name and creation time; a shell outside tmux by the device it lives on. Each device's own: placement, size, docked,
+selection. Windows from other devices arrive into the dock (Mac, Vision Pro) or as sets in Active (iPad, iPhone);
+closing closes everywhere; Active gets Reopen Last Closed Window. Split Mac tabs: one layout tab per pane in a split
+group (his default by silence). Five phases, each a build he tries: (1) published and listed in Active, (2) following,
+(3) closing everywhere and Reopen, (4) databases and desktops, (5) Handoff brings the window forward.
+**Phase 1 (0.4.636):** `GlassLayout`, `GlassLayoutSync`, `GlassCloudKitLayoutBackend`, `GlassShellModel+Layout`,
+`TerminalLayoutSnapshot`; Active's "On <device>"; Settings ▸ Privacy ▸ Same Windows on Every Device (on). A device
+publishes nothing until its last run's windows are back (`TerminalWorkgroupsToReopen.hasSettled`,
+`MacWorkspacePreviewRegistry.layoutReady`) and nothing while the Mac quits; a failed pass waits 30 s doubling to
+15 min before changes are tried again. **Needs his CloudKit Console deploy of `LayoutItem` to production** before it
+syncs. Plan, evidence and tests: `tasks/2026-11/2026-11-21_shared-layout.md`.

@@ -50,6 +50,8 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
         /// When tmux made `tmuxSession`, once known (2026-11-19): it comes back to that session, never a later one
         /// by the same name. Absent from lists written before it, which go by the name alone.
         var tmuxSessionCreated: Int? = nil
+        /// Which tab of the shared layout it is (2026-11-22), so it stays that tab. Absent from lists written before.
+        var layoutID: UUID? = nil
     }
 
     var id: UUID
@@ -155,6 +157,9 @@ final class TerminalWorkgroupsToReopen {
     /// This run has taken the last run's list: from then on, this run's workgroups are the list.
     @ObservationIgnored private(set) var hasTaken = false
     @ObservationIgnored private weak var sessionManager: SessionManager?
+    /// The last run's workgroups are back, as many as came (`keepCurrent`): from now on what is open is this run's,
+    /// and the shared layout may say so — before, a window still to come back would read as closed (2026-11-22).
+    private(set) var hasSettled = false
 
     /// Vision Pro: workgroups whose window is open now. **Move Tab To** offers these.
     private(set) var openWindowIDs: Set<UUID> = []
@@ -235,6 +240,7 @@ final class TerminalWorkgroupsToReopen {
     func keepCurrent(_ sessionManager: SessionManager) {
         self.sessionManager = sessionManager
         observe()
+        if !hasSettled { hasSettled = true }
     }
 
     private func observe() {
@@ -285,7 +291,8 @@ final class TerminalWorkgroupsToReopen {
                     label: terminal.workgroupLabel,
                     name: terminal.givenName,
                     withoutTmux: terminal.withoutTmux ? true : nil,
-                    tmuxSessionCreated: terminal.survivesClose ? terminal.tmuxSessionCreated : nil)
+                    tmuxSessionCreated: terminal.survivesClose ? terminal.tmuxSessionCreated : nil,
+                    layoutID: terminal.layoutTabID)
             }
             guard terminals.contains(where: { $0.tmuxSession != nil }) else { return nil }
             return TerminalWorkgroupReopenRecord(
@@ -412,6 +419,7 @@ extension TerminalWorkgroupOpening {
                     prepare(session, for: target, workgroupID: workgroupID, settingsManager: settingsManager,
                             joinsOnly: true)
                     session.tmuxSessionCreated = terminal.tmuxSessionCreated
+                    if let layoutID = terminal.layoutID { session.layoutTabID = layoutID }
                     session.isWorkgroupSlot = true
                     session.connectsWhenShown = connectsWhenShown
                     if let name = terminal.name { session.rename(to: name) }

@@ -488,9 +488,10 @@ struct GlassActiveConnectionsList: View {
 
     var body: some View {
         let machines = model.activeMachines()
+        let otherDevices = model.layoutOnOtherDevices()
         let chosen = selection.chosen(in: machines)
         List(selection: offersSelection ? listSelection(machines) : nil) {
-            if machines.isEmpty {
+            if machines.isEmpty && otherDevices.isEmpty {
                 let launcher = launcherInList
                 ContentUnavailableView("Nothing Is Open",
                                        systemImage: "bolt.slash",
@@ -504,6 +505,10 @@ struct GlassActiveConnectionsList: View {
             }
             ForEach(machines) { machine in
                 machineGroup(machine, chosen: chosen)
+            }
+            // What your other devices have open (the shared layout, 2026-11-22): listed, not yet opened from here.
+            ForEach(otherDevices) { device in
+                GlassActiveOtherDevice(device: device)
             }
         }
         .glassSpatialList()

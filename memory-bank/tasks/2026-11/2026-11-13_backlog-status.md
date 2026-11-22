@@ -128,7 +128,7 @@ the owner's decision, device or server.
 | B-F42 | open | 16 grammars, no injections | all |
 | B-F43 | open | 0b5d4210 only | all |
 | B-F44 | done | aa06f515, D93 | no physical Duo tried |
-| B-F45 | open | one shared Mac editor frame since 09-17 | per window; iPad and Vision Pro |
+| B-F45 | partly | the Mac frame was never kept; kept since 0.4.638 (`2026-11-22_editor-window-size.md`) | per project; iPad and Vision Pro |
 | B-F46 | open | no Close Project command; ignore list fixed | all |
 | B-F47 | partly | tab names for VoiceOver; Speech and Spelling (0.4.595) | device checks; M-8 gutter; ambient light |
 | B-F48 | done | D72 phases 1–4; saved queries (662cf122); tables declined on purpose | his try of Siri and Shortcuts |

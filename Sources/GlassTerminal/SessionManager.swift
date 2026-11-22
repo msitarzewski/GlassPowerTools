@@ -653,6 +653,22 @@ class SessionManager {
         return true
     }
 
+    /// The terminal here in `serverID`'s tmux session `name`, and its window or set, that a terminal continued from
+    /// another device comes back to (Handoff, D72). One that is up, or one that is down but not by anyone's hand: never
+    /// connected yet, as an iPhone's terminals off screen are after a relaunch, dropped while the app was away, or
+    /// failed. Those were passed over, and the continuation opened a second terminal joining the same session (found
+    /// 2026-11-22). Not one someone disconnected, or whose shell ended.
+    func terminalToReveal(serverID: UUID, tmuxSession name: String) -> (session: TerminalSession, workgroupID: UUID)? {
+        for session in sessions where session.server.id == serverID && session.purpose == .terminal
+            && session.tmuxSessionName == name
+            && (session.state != .disconnected || (!session.userInitiatedDisconnect && !session.shellEnded)) {
+            if let workgroup = workgroups.first(where: { $0.sessionIDs.contains(session.id) }) {
+                return (session, workgroup.id)
+            }
+        }
+        return nil
+    }
+
     /// Moves one live session to its final zero-based tab index without
     /// disturbing the selected session.
     @discardableResult

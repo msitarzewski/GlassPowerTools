@@ -99,6 +99,10 @@ public final class GlassShellModel: GlassServiceStore {
     public internal(set) var uncheckedMachines: [GlassUncheckedMachine] = []
     /// Terminals that closed because their sessions had ended, per machine, and why, until dismissed (2026-11-19).
     public internal(set) var closedTerminals: [GlassClosedTerminals] = []
+    /// The shared layout (2026-11-22, phase 1): what every device has open. Nil until the app supplies a store
+    /// (`enableLayoutSync`), so a test or a build with no business with iCloud has none.
+    public internal(set) var layoutSync: GlassLayoutSync?
+    @ObservationIgnored var layoutChangesTask: Task<Void, Never>?
     public internal(set) var isCheckingRunningSessions = false
     /// When the machines last answered what runs on them; nil before the first answer.
     var runningSessionsCheckedAt: ContinuousClock.Instant?
@@ -1568,6 +1572,18 @@ public final class GlassShellModel: GlassServiceStore {
 
     /// What this device is called in every device's overview: the name given here, else the system's.
     public var deviceName: String { preferences.deviceName ?? GlassDeviceName.system }
+
+    /// The windows and tabs this device has published to the shared layout as open, kept across launches, so one that
+    /// didn't come back at a relaunch is closed there (2026-11-22). Never synced.
+    var layoutPublished: Set<UUID> {
+        get { Set(preferences.layoutPublished ?? []) }
+        set {
+            let sorted = newValue.sorted { $0.uuidString < $1.uuidString }
+            guard sorted != (preferences.layoutPublished ?? []).sorted(by: { $0.uuidString < $1.uuidString }) else { return }
+            preferences.layoutPublished = sorted.isEmpty ? nil : sorted
+            do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+        }
+    }
 
     /// Names this device; empty goes back to the system's name. Told to the other devices.
     public func setDeviceName(_ name: String) {

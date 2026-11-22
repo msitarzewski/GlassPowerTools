@@ -225,6 +225,7 @@ public struct GlassEditorWorkspaceView: View {
         // anyone can read.
         .modifier(MacEditorWindowBehaviour(
             actions: editorActions,
+            keepWindowSize: { workspace.preferences.keepWindowSize($0) },
             saveItem: saveItem,
             findItem: findItem,
             canCloseDocument: workspace.selectedDocument != nil,
@@ -1544,10 +1545,12 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
 
 #if os(macOS)
 /// What an editor window is on a Mac, apart from its content: ⌘W closes the document rather than
-/// the window, the menu bar can ask what this window can do, it has a floor for its size, and it
-/// remembers where it was.
+/// the window, the menu bar can ask what this window can do, it has a floor for its size, and the
+/// next window opens at the size this one was left at.
 private struct MacEditorWindowBehaviour: ViewModifier {
     let actions: GlassEditorActions
+    /// Keeps this window's size for the next one (`GlassEditorWindowSize`).
+    let keepWindowSize: (CGSize) -> Void
     let saveItem: GlassSaveItemAction?
     let findItem: GlassFindItemAction
     let canCloseDocument: Bool
@@ -1667,8 +1670,8 @@ private struct MacEditorWindowBehaviour: ViewModifier {
             .focusedSceneValue(\.glassEditorActions, actions)
             .focusedSceneValue(\.glassSaveItem, saveItem)
             .focusedSceneValue(\.glassFindItem, findItem)
-            .frame(minWidth: 820, minHeight: 520)
-            .background { GlassEditorWindowFrameMemory(holder: windowHolder) }
+            .frame(minWidth: GlassEditorWindowSize.minimum.width, minHeight: GlassEditorWindowSize.minimum.height)
+            .background { GlassEditorWindowFrameMemory(holder: windowHolder, keepSize: keepWindowSize) }
     }
 }
 #endif
@@ -1757,40 +1760,83 @@ final class GlassEditorWindowHolder {
     weak var window: NSWindow?
 }
 
-/// Remembers where the editor window was and how big it was.
+/// Keeps the size an editor window is left at, for the next one to open at (`GlassEditorWindowSize`).
 ///
-/// A SwiftUI `WindowGroup` restores a window's frame through state restoration, which does not run
-/// for a scene declared with `.defaultLaunchBehavior(.suppressed)` — the editor never opens at
-/// launch, so it was always built fresh at the default size. AppKit's own autosave is what remains,
-/// and it is one line.
+/// The size, not the place: a new window opens where AppKit cascades it, clear of the one before. One size for the
+/// editor rather than one per window, because no editor window is brought back after it closes.
 ///
-/// One name, deliberately: the frame is a property of *the editor*, not of a particular window, so
-/// a second editor window opens the size of the last one and AppKit cascades it clear of the first.
+/// **Not AppKit's frame autosave**, which this used to set: SwiftUI gives its windows autosave names of its own
+/// (`editor-AppWindow-1`) and replaced this one, so no frame was ever kept under it (found 2026-11-22: neither a Mac
+/// in use since September nor the test VM had one).
+///
+/// It also undoes SwiftUI's shrinking of a window that is still opening (`GlassEditorWindowSize.undoing`).
 private struct GlassEditorWindowFrameMemory: NSViewRepresentable {
-    static let autosaveName = "com.glasspowertools.editor.window"
     /// Where this editor's own window is recorded, for closing it by name rather than whichever
     /// window happens to be key — a dialog's sheet can still be, as it goes.
     var holder: GlassEditorWindowHolder? = nil
+    var keepSize: (CGSize) -> Void = { _ in }
 
     func makeNSView(context: Context) -> NSView {
         let view = FrameMemoryView(frame: .zero)
         view.holder = holder
+        view.keepSize = keepSize
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? FrameMemoryView)?.keepSize = keepSize
+    }
 
     final class FrameMemoryView: NSView {
         weak var holder: GlassEditorWindowHolder?
+        var keepSize: (CGSize) -> Void = { _ in }
+        private var observers: [NSObjectProtocol] = []
+        /// The frame SwiftUI made the window at, held until the window is on screen (`GlassEditorWindowSize.undoing`).
+        private var madeFrame: NSRect?
+        private var undoneShrinks = 0
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             holder?.window = window
+            for observer in observers { NotificationCenter.default.removeObserver(observer) }
+            observers = []
             guard let window else { return }
-            // Set once. Assigning the name a second time to the same window is harmless, but
-            // assigning it while the window is being torn down is not worth finding out about.
-            guard window.frameAutosaveName != GlassEditorWindowFrameMemory.autosaveName else { return }
-            window.setFrameAutosaveName(GlassEditorWindowFrameMemory.autosaveName)
+            madeFrame = window.isVisible ? nil : window.frame
+            undoneShrinks = 0
+            // As it happens, not on the main queue's next turn: the window is put back before it is first drawn.
+            observers.append(NotificationCenter.default.addObserver(
+                forName: NSWindow.didResizeNotification, object: window, queue: nil
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.undoShrinkWhileOpening() }
+            })
+            // A drag on its edge, and closing it: what it was left at after the zoom button, tiling or full screen
+            // and back. Not every resize, which includes SwiftUI sizing the window as it opens.
+            for name in [NSWindow.didEndLiveResizeNotification, NSWindow.willCloseNotification] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) {
+                    [weak self] _ in MainActor.assumeIsolated { self?.keep() }
+                })
+            }
+        }
+
+        /// SwiftUI's shrink of a window still opening, undone (`GlassEditorWindowSize.undoing`). Three at most, so a
+        /// window SwiftUI insists on is never fought over; none once the window is on screen.
+        private func undoShrinkWhileOpening() {
+            guard let window, let made = madeFrame else { return }
+            guard !window.isVisible else {
+                madeFrame = nil
+                return
+            }
+            guard undoneShrinks < 3, let frame = GlassEditorWindowSize.undoing(shrinkOf: made, to: window.frame) else {
+                return
+            }
+            undoneShrinks += 1
+            window.setFrame(frame, display: false)
+        }
+
+        /// The whole window's size, title bar and toolbar included, which is what SwiftUI's placement makes.
+        private func keep() {
+            guard let window, !window.styleMask.contains(.fullScreen), window.isVisible else { return }
+            keepSize(window.frame.size)
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }

@@ -419,14 +419,26 @@ public final class SwiftTermHostModel: ObservableObject {
     /// a minute counts when its sessions had either. Not published, as above.
     public private(set) var lastActivityAt: Date?
 
+    /// Output arrived. It counts as the terminal working once the screen's text shows it (2026-11-22): looked at a
+    /// moment later, when the output has been drawn, at most five times a second. A program redrawing what was already
+    /// there (a cursor blinking, a repaint) doesn't count; one changing its text or scrolling does.
     fileprivate func noteOutputActivity() {
-        let now = ContinuousClock.now
-        if let last = lastOutputActivity, now - last < .milliseconds(250) { return }
-        lastOutputActivity = now
-        lastActivityAt = Date()
-        outputActivity.note(at: now)
-        onOutputActivity?()
+        guard activityCheck == nil else { return }
+        activityCheck = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: SwiftTermActivityGate.lookAfter)
+            guard let self else { return }
+            self.activityCheck = nil
+            guard self.activityGate.changed(self.terminalEngine?.activityFingerprint()) else { return }
+            let now = ContinuousClock.now
+            if let last = self.lastOutputActivity, now - last < .milliseconds(250) { return }
+            self.lastOutputActivity = now
+            self.lastActivityAt = Date()
+            self.outputActivity.note(at: now)
+            self.onOutputActivity?()
+        }
     }
+    private var activityCheck: Task<Void, Never>?
+    private var activityGate = SwiftTermActivityGate()
 
     /// Typing, a paste, or the mouse sent to the program.
     public func noteInputActivity() {
@@ -1391,6 +1403,29 @@ enum SwiftTermBufferText {
         }
     }
 
+    /// What the live screen says, for whether output did anything (2026-11-22): which screen it is, how far its text
+    /// has scrolled, and the characters on it, wherever the view is scrolled to. Not colours, and not the cursor: an
+    /// idle Antigravity CLI blinks its cursor by drawing the cell under it reversed and back about twice a second,
+    /// which read as the terminal working without pause (the owner: "the Antigravity icon continues to pulse though
+    /// the terminal session seems idle").
+    static func activityFingerprint(of terminal: Terminal) -> Int {
+        // The live screen's first row as `getScrollInvariantLine(row:)` counts: the cursor's, less its row on screen.
+        let top = terminal.scrollInvariantCursorRow - terminal.getCursorLocation().y
+        var hasher = Hasher()
+        hasher.combine(terminal.isCurrentBufferAlternate)
+        hasher.combine(top)
+        for row in 0..<max(0, terminal.rows) {
+            guard let line = terminal.getScrollInvariantLine(row: top + row) else {
+                hasher.combine(-1)
+                continue
+            }
+            for column in 0..<min(terminal.cols, line.count) {
+                hasher.combine(line[column].getCharacter())
+            }
+        }
+        return hasher.finalize()
+    }
+
     /// One cell at the view's font, in points: its grid's frame over its grid; nil before it is measured.
     static func cellSize(of view: TerminalView) -> CGSize? {
         let terminal = view.getTerminal()
@@ -1655,6 +1690,25 @@ public final class SwiftTermOutputActivity {
     }
 }
 
+/// Whether output did anything (2026-11-22): the live screen's fingerprint (`SwiftTermBufferText.activityFingerprint`)
+/// against the last one looked at. Changed text, or text scrolled, is the program working. The same text redrawn is
+/// not: an idle Antigravity CLI blinks its cursor by redrawing its input line about twice a second, and its mark
+/// pulsed as if it were working without pause.
+nonisolated struct SwiftTermActivityGate {
+    /// How long after output arrives the screen is looked at: by then it has been drawn, and a burst is one look.
+    static let lookAfter: Duration = .milliseconds(200)
+    private var last: Int?
+
+    /// True when `fingerprint` differs from the last, taken as the last now. Nil (no screen yet, the terminal not
+    /// drawn) can't be told apart from work, and counts, as all output did before.
+    mutating func changed(_ fingerprint: Int?) -> Bool {
+        guard let fingerprint else { return true }
+        guard fingerprint != last else { return false }
+        last = fingerprint
+        return true
+    }
+}
+
 /// A database SQL in a terminal can open in: a saved database, by its name.
 public struct SwiftTermSQLDestination: Identifiable, Equatable, Sendable {
     public let id: UUID
@@ -1774,6 +1828,8 @@ private protocol TerminalEngine: AnyObject {
     func visibleText(lastNLines: Int) -> [String]
     /// The rows on screen now, and one cell's size, for the diagram marks (`TerminalDiagramFinder`).
     func screenRows() -> [SwiftTermScreenRow]
+    /// What the live screen says, for whether output did anything (`SwiftTermBufferText.activityFingerprint`).
+    func activityFingerprint() -> Int
     var screenCellSize: CGSize? { get }
     func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult
     func clearSearch()
@@ -3908,6 +3964,10 @@ private final class SwiftTermEngine: TerminalEngine {
         SwiftTermBufferText.screenRows(of: terminalView.getTerminal())
     }
 
+    func activityFingerprint() -> Int {
+        SwiftTermBufferText.activityFingerprint(of: terminalView.getTerminal())
+    }
+
     var screenCellSize: CGSize? { SwiftTermBufferText.cellSize(of: terminalView) }
 
     private let findTracker = SwiftTermFindTracker()
@@ -4545,6 +4605,8 @@ private protocol TerminalEngine: AnyObject {
     func visibleText(lastNLines: Int) -> [String]
     /// The rows on screen now, and one cell's size, for the diagram marks (`TerminalDiagramFinder`).
     func screenRows() -> [SwiftTermScreenRow]
+    /// What the live screen says, for whether output did anything (`SwiftTermBufferText.activityFingerprint`).
+    func activityFingerprint() -> Int
     var screenCellSize: CGSize? { get }
     func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult
     func clearSearch()
@@ -4891,6 +4953,10 @@ private final class MacSwiftTermEngine: TerminalEngine {
 
     func screenRows() -> [SwiftTermScreenRow] {
         SwiftTermBufferText.screenRows(of: terminalView.getTerminal())
+    }
+
+    func activityFingerprint() -> Int {
+        SwiftTermBufferText.activityFingerprint(of: terminalView.getTerminal())
     }
 
     var screenCellSize: CGSize? { SwiftTermBufferText.cellSize(of: terminalView) }
@@ -5568,13 +5634,27 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
         super.setFrameSize(newSize)
         guard tmuxControl != nil else { return }
         let terminal = getTerminal()
-        if let actions = tmuxControl?.resize(columns: terminal.cols, rows: terminal.rows) {
-            for action in actions {
-                switch action {
-                case .transport(let bytes): writeToTmux(bytes)
-                case .showGrid: onTmuxControlEvent?(action)
-                default: break
-                }
+        resizeTmux(columns: terminal.cols, rows: terminal.rows)
+    }
+
+    /// Sizes on their way to tmux, held while the window's resize goes on (2026-11-21).
+    private lazy var tmuxResizeHold = TmuxResizeHold { [weak self] columns, rows in
+        self?.handTmuxSize(columns: columns, rows: rows)
+    }
+
+    /// The grid, for tmux: once the pane is followed, the last of a resize's sizes, as it ends.
+    func resizeTmux(columns: Int, rows: Int) {
+        guard let tmuxControl else { return }
+        tmuxResizeHold.size(columns: columns, rows: rows, hold: tmuxControl.phase == .live)
+    }
+
+    private func handTmuxSize(columns: Int, rows: Int) {
+        guard let actions = tmuxControl?.resize(columns: columns, rows: rows) else { return }
+        for action in actions {
+            switch action {
+            case .transport(let bytes): writeToTmux(bytes)
+            case .showGrid: onTmuxControlEvent?(action)
+            default: break
             }
         }
     }
@@ -5642,9 +5722,7 @@ private final class MacLocalProcessDelegateProxy:
         terminalView?.sizeChanged(source: source, newCols: newCols, newRows: newRows)
         // tmux on pipes (D83) is told here too: a new font size changes the grid without a new
         // frame, and only a new frame reached tmux (2026-10-20).
-        if let view = terminalView, let actions = view.tmuxControl?.resize(columns: newCols, rows: newRows) {
-            for case .transport(let bytes) in actions { view.writeToTmux(bytes) }
-        }
+        terminalView?.resizeTmux(columns: newCols, rows: newRows)
         // And the pane is told here: `LocalProcessTerminalView` reports a size only while its own
         // process runs, and tmux on pipes isn't it. A tab in tmux never said its size, so Scale Text,
         // which waits for one, never took hold: the button lit and the window resized the grid as if
@@ -6314,6 +6392,10 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
 
     func screenRows() -> [SwiftTermScreenRow] {
         SwiftTermBufferText.screenRows(of: terminalView.getTerminal())
+    }
+
+    func activityFingerprint() -> Int {
+        SwiftTermBufferText.activityFingerprint(of: terminalView.getTerminal())
     }
 
     var screenCellSize: CGSize? { SwiftTermBufferText.cellSize(of: terminalView) }

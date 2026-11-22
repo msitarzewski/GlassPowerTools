@@ -463,6 +463,9 @@ public struct GlassShellSettingsView: View {
     /// Settings ▸ Privacy ▸ Show Machines in Search (D72): off unless switched on.
     @AppStorage(GlassSpotlight.settingKey, store: GlassUITestRun.settingsDefaults) private var showsMachinesInSearch = false
 
+    /// The shared layout (2026-11-22): this device's windows on your other devices, and theirs in Active here.
+    @AppStorage(GlassShellModel.sharesLayoutKey, store: GlassUITestRun.settingsDefaults) private var sharesLayout = true
+
     private var privacy: some View {
         Group {
             Section("Credentials") {
@@ -492,6 +495,17 @@ public struct GlassShellSettingsView: View {
                      + "that one again on another device.")
                     .font(.footnote).foregroundStyle(.secondary)
                     .accessibilityIdentifier("settings-device-bound-note")
+            }
+            Section {
+                Toggle("Same Windows on Every Device", isOn: $sharesLayout)
+                    .onChange(of: sharesLayout) { _, _ in model.layoutSettingChanged() }
+                    .accessibilityIdentifier("settings-shares-layout")
+                if sharesLayout, let layout = model.layoutSync {
+                    LabeledContent("Windows", value: GlassShellModel.layoutStatusDescription(layout.status))
+                        .accessibilityIdentifier("settings-layout-sync-status")
+                }
+            } footer: {
+                Text("Your terminal windows and their tabs are listed in Active on your other devices, and theirs here.")
             }
             // D72: the system's search knows your machines only if you say so.
             Section {

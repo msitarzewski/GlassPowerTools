@@ -169,12 +169,15 @@ public struct GlassShellLibraryView: View {
         .task {
             if !model.isLoaded { await model.load() }
             await model.refreshRunningSessionsIfDue()
+            // What the other devices have open, read once the library has (the shared layout, 2026-11-22).
+            await model.layoutSync?.synchronize()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task {
                 await model.load()
                 await model.refreshRunningSessionsIfDue()
+                await model.layoutSync?.synchronize()
             }
         }
         #if os(macOS)

@@ -133,6 +133,37 @@ struct TerminalHandoffTests {
         #expect(plain)
     }
 
+    /// Found 2026-11-22: the terminal already in the session was looked for only among those not disconnected, so an
+    /// iPhone's terminal off screen after a relaunch (never connected yet), or one dropped while the phone was put away,
+    /// was passed over, and the continuation opened a second terminal joining the same session.
+    @Test("off the Mac, it comes back to the terminal in that session even when that one is down; not one closed by hand")
+    func revealsADownTerminal() throws {
+        let manager = GlassTerminalRuntime(layers: GlassLayerStore.forTest()).sessionManager
+        let alpha = ServerConfiguration(name: "alpha", host: "alpha.example.invalid", port: 22, username: "casey")
+        func terminal(_ name: String, on server: ServerConfiguration, in group: UUID) -> TerminalSession {
+            let session = TerminalSession(server: server)
+            session.tmuxSessionName = name
+            manager.registerSession(session)
+            #expect(manager.appendSession(session, toWorkgroup: group))
+            return session
+        }
+        let window = manager.createWorkgroup(name: "alpha", colorTag: .blue)
+        let unshown = terminal("glass-3", on: alpha, in: window)
+        #expect(unshown.state == .disconnected, "never connected, as after a relaunch")
+
+        let found = try #require(manager.terminalToReveal(serverID: alpha.id, tmuxSession: "glass-3"))
+        #expect(found.session === unshown && found.workgroupID == window)
+        #expect(manager.terminalToReveal(serverID: alpha.id, tmuxSession: "glass-4") == nil, "another session")
+        #expect(manager.terminalToReveal(serverID: UUID(), tmuxSession: "glass-3") == nil, "another machine's")
+
+        unshown.state = .connected
+        #expect(manager.terminalToReveal(serverID: alpha.id, tmuxSession: "glass-3")?.session === unshown, "up, as before")
+
+        let byHand = terminal("glass-5", on: alpha, in: window)
+        byHand.disconnect()
+        #expect(manager.terminalToReveal(serverID: alpha.id, tmuxSession: "glass-5") == nil,
+                "one someone disconnected isn't brought back")
+    }
 }
 
 #if os(macOS)

@@ -87,7 +87,32 @@ final class MacWorkspacePreviewRegistry {
               entries[controller.windowID]?.window !== window else { return }
         entries[controller.windowID] = Entry(controller, window: window, order: nextOrder)
         nextOrder += 1
+        if reopening.remove(controller.windowID) != nil, reopening.isEmpty { layoutReady = true }
         windowsChanged?()
+    }
+
+    // MARK: The shared layout (2026-11-22)
+
+    /// The windows the last run left, not on screen yet.
+    @ObservationIgnored private var reopening: Set<UUID> = []
+    /// The last run's windows are back, or had their time: what is open now is this run's, and the shared layout may
+    /// say so (`layoutSnapshot`). Before, a window still to come back would read as closed.
+    private(set) var layoutReady = false
+
+    /// The launch is opening these windows from the last run (`MacLaunchReopen`). Ready once each is on screen, or
+    /// after twenty seconds: a window that never opens is closed.
+    func awaitReopening(_ windowIDs: [UUID]) {
+        reopening = Set(windowIDs).subtracting(entries.keys)
+        guard !reopening.isEmpty else {
+            layoutReady = true
+            return
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            guard let self, !self.layoutReady else { return }
+            self.reopening = []
+            self.layoutReady = true
+        }
     }
 
     /// The window has closed: neither it nor its controller is found again, so a window opened

@@ -783,6 +783,12 @@ public struct GlassEditorScenes: Scene {
         .restorationBehavior(.disabled)
         #endif
         #if os(macOS)
+        // The size the last editor window was left at, the whole window's (`GlassEditorWindowSize`). No position: the
+        // system places it.
+        .defaultWindowPlacement { _, context in
+            WindowPlacement(size: GlassEditorWindowSize.opening(remembered: runtime.preferences.windowSize,
+                                                                screen: context.defaultDisplay.visibleRect.size))
+        }
         .commands { GlassEditorCommands(runtime: runtime) }
         #endif
     }
@@ -1136,12 +1142,49 @@ public extension FocusedValues {
 }
 #endif
 
-/// An editor window's first size. Screenshots only (2026-10-30): `--demo-editor-size <width>,<height>`
-/// in a `--ui-testing` run opens it at that size, as a person could resize it, so Changes shows more
-/// than its first file.
+/// An editor window's size: the one it opens at, and the smallest it goes.
+///
+/// **A new Mac window opens at the size the last one was left at** (B-F45; the owner, 2026-09-17: the size "should
+/// persist"), else 1100 × 720: SwiftUI makes it at that size (`defaultWindowPlacement`), and it is kept as the window is
+/// resized and closed (`GlassEditorWindowFrameMemory`). The AppKit autosave name meant to keep it never did: SwiftUI
+/// replaced it with its own.
+///
+/// **SwiftUI shrank every new window to its minimum** (the owner, 2026-11-22: "I can't resize a text editor created with
+/// shift command E"; it opened at 820 × 520 and could only grow). Measured in the macOS VM: SwiftUI makes the window at
+/// 1100 × 720; as it is ordered front, AppKit lays the window out, because the title band's frost is held in the
+/// window's frame by constraints (`GlassWindowChrome.installTitlebarMaterial`); `NSHostingView.windowDidLayout` then
+/// resizes the window to the content's minimum (`updateAnimatedWindowSize`) before it is first drawn. Without the frost,
+/// or without the split view, or with the frost installed once the window is on screen, it is not resized. An ideal
+/// size on the content did not change it. The editor puts its window back to the size it was made at, before it is
+/// drawn (`undoing(shrinkOf:to:)`), rather than changing the frost every glass window shares.
+///
+/// Screenshots (2026-10-30): `--demo-editor-size <width>,<height>` in a `--ui-testing` run opens it at that size, as a
+/// person could resize it, so Changes shows more than its first file.
 enum GlassEditorWindowSize {
     static var width: CGFloat { demo?.width ?? 1100 }
     static var height: CGFloat { demo?.height ?? 720 }
+
+    /// The smallest a Mac editor window's content goes, below its toolbar. It was 820 × 520: more than half a 13-inch
+    /// screen's width, so a short note could not be a small window, and a window could not be tiled beside another on a
+    /// small screen.
+    static let minimum = CGSize(width: 480, height: 300)
+
+    /// The frame a window still opening is put back to after SwiftUI shrinks it: the one it was made at, when it is now
+    /// narrower or shorter; nil when it is not.
+    static func undoing(shrinkOf made: CGRect, to now: CGRect) -> CGRect? {
+        now.width < made.width || now.height < made.height ? made : nil
+    }
+
+    /// The size a new window opens at, the whole window's: the screenshots' size, else the last one kept, else the
+    /// default; never smaller than the minimum, and never larger than the screen it opens on.
+    static func opening(remembered: CGSize?, screen: CGSize?) -> CGSize {
+        let wanted = demo ?? remembered ?? CGSize(width: width, height: height)
+        var size = CGSize(width: max(wanted.width, minimum.width), height: max(wanted.height, minimum.height))
+        if let screen, screen.width >= minimum.width, screen.height >= minimum.height {
+            size = CGSize(width: min(size.width, screen.width), height: min(size.height, screen.height))
+        }
+        return size
+    }
 
     private static let demo: CGSize? = {
         #if DEBUG

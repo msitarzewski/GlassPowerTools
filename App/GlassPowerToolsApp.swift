@@ -97,6 +97,8 @@ struct GlassPowerToolsApp: App {
         // is a test run" signal, so the backend is supplied only for the real app.
         if isolatedDirectory == nil {
             model.enableCatalogSync(GlassCloudKitCatalogBackend())
+            // The shared layout (2026-11-22): what each device has open, beside the library in iCloud.
+            model.enableLayoutSync(GlassCloudKitLayoutBackend())
         }
         #if os(macOS)
         // The Command Palette's connections: every service in the library, desktops among them.

@@ -34,6 +34,14 @@ public final class GlassEditorPreferences {
     /// Files opened before, newest first. Survives launches, shared by every window.
     public private(set) var recents: [URL] = []
 
+    /// The size a person last left a Mac editor window at, the whole window's, which the next one opens at (B-F45,
+    /// 2026-11-22). Kept on this device, as everything here is: another device's screen is another size. Not observed:
+    /// nothing draws from it, and a resize redrawing every editor window would be a cost for nothing.
+    @ObservationIgnored public private(set) var windowSize: CGSize?
+    static let windowSizeDefaultsKey = "com.glasspowertools.editor.windowSize"
+    /// What a stored size must lie within to be believed: a value from a damaged file is not a window.
+    static let windowSizeBounds: ClosedRange<Double> = 100...20_000
+
     /// Bounded because an unbounded list is a slow leak nobody notices until it is a thousand
     /// entries long — the defect this project already found in its preferences once.
     static let recentsLimit = 20
@@ -54,6 +62,23 @@ public final class GlassEditorPreferences {
         wrapsLines = stored["wrapsLines"] as? Bool ?? fallback.wrapsLines
         fontSize = stored["fontSize"] as? Double ?? fallback.fontSize
         recents = Self.loadRecents(from: defaults)
+        windowSize = Self.loadWindowSize(from: defaults)
+    }
+
+    /// Keeps the size an editor window was left at, for the next one.
+    public func keepWindowSize(_ size: CGSize) {
+        let width = Double(size.width).rounded(), height = Double(size.height).rounded()
+        guard Self.windowSizeBounds.contains(width), Self.windowSizeBounds.contains(height) else { return }
+        let rounded = CGSize(width: width, height: height)
+        guard rounded != windowSize else { return }
+        windowSize = rounded
+        defaults.set([width, height], forKey: Self.windowSizeDefaultsKey)
+    }
+
+    private static func loadWindowSize(from defaults: UserDefaults) -> CGSize? {
+        guard let stored = defaults.array(forKey: windowSizeDefaultsKey) as? [Double], stored.count == 2,
+              windowSizeBounds.contains(stored[0]), windowSizeBounds.contains(stored[1]) else { return nil }
+        return CGSize(width: stored[0], height: stored[1])
     }
 
     public func increaseFontSize() { fontSize = min(fontSize + 1, Self.fontSizeRange.upperBound) }

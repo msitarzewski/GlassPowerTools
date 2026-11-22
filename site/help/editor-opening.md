@@ -36,6 +36,8 @@ The Editor does not open by itself when the app starts, and editor windows are n
 
 Each editor window has its own set of documents, and at most one project. A second window starts empty; it does not show the first window's tabs. Your text size, line-number and wrapping settings, and the recent files list, are shared by every window.
 
+**On Mac:** a new editor window opens at the size you left the last one, or 1100 × 720 points the first time. You can make a window as small as 480 points wide and 300 points of text high.
+
 - Open documents appear as tabs across the top once there are two or more.
 - The file list on the left appears only when a project is open. With no project, the window shows just the document.
 - The bar at the bottom shows the cursor position, the language and the line endings. See [Languages and syntax highlighting](editor-languages.md).

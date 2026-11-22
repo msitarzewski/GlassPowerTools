@@ -119,6 +119,45 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.638 (22 November 2026)
+- **Editor windows can be made smaller, and open at a useful size.** On Mac, every new editor window opened at its
+  smallest, 820 × 520 points, so it could only be made larger. It opens at 1100 × 720 now, and can be made as small as
+  480 points wide and 300 points of text high.
+- **The next editor window opens at the size you left the last one.** The size was meant to be remembered and never
+  was; it is now, after the app quits too.
+
+### 0.4.637 (22 November 2026)
+- **A blinking cursor isn't work.** A tab's mark pulsed for any output, and an idle Antigravity CLI redraws its cursor
+  about twice a second, so its mark never stopped. A terminal now counts as working only while what it shows changes
+  (new text, a spinner's next frame, lines scrolling); a program only redrawing what's there doesn't count. The same
+  goes for the library's time in use, which an idle terminal blinking its cursor counted too.
+
+### 0.4.636 (22 November 2026)
+- **Active lists what your other devices have open.** Each device keeps its terminal windows and their tabs in your
+  private iCloud database, and **Active** on the others lists them under **On** and the device's name: every window,
+  its tabs, each tab's machine and whether it's kept in tmux. Only names travel, never what's in a terminal. The
+  first step toward the same windows on every device; nothing opens by itself yet. **Same Windows on Every Device**,
+  in **Settings** ▸ **Privacy**, is on unless turned off.
+
+### 0.4.635 (22 November 2026)
+- **Active says when terminals closed because their sessions ended.** Since 0.4.623 a terminal whose tmux session
+  had ended closed, and Active was meant to say so under its machine, with why; the note never reached Active. It
+  does now, on every device, the Mac's SSH tabs included.
+- **Handoff comes back to the terminal already in the session.** Continuing a terminal on an iPhone, iPad or Vision
+  Pro whose own terminal in that tmux session wasn't connected (not shown yet after a relaunch, or dropped while the
+  device was put away) opened a second terminal in the same session. It now shows that terminal, which connects.
+
+### 0.4.634 (21 November 2026)
+- **Google's Antigravity CLI gets its mark.** A terminal running `agy` shows Antigravity's mark wherever other coding
+  agents show theirs, whether it was installed with Google's script or with Homebrew, whose `agy` runs a program
+  called `antigravity`. The Antigravity editor's own `antigravity` command is not mistaken for it.
+
+### 0.4.633 (21 November 2026)
+- **Resizing a window leaves one copy of Claude Code's conversation in a tmux terminal, not several.** Each size a
+  session is given makes Claude Code print its whole conversation again, and the copy before stays above it, its
+  lines cut where they no longer fit. Dragging a window's edge gave the session a size at every step. Now the session
+  gets the new size once, when the resize ends; until then it keeps the one it had.
+
 ### 0.4.632 (20 November 2026)
 - **Mac release, 21 November 2026.** Includes Get Info (0.4.624), Workgroups edited in their panel (0.4.626), the
   orb dock after a relaunch (0.4.631) and this.

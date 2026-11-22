@@ -498,6 +498,9 @@ class TerminalSession: Identifiable, Hashable {
     /// the record of the last run, or its first read after attaching. With the name, which session it is — a later
     /// one by the same name, after the machine restarted, is not this terminal's (the owner, 2026-11-19).
     var tmuxSessionCreated: Int?
+    /// Which tab of the shared layout this terminal is (2026-11-22): kept across relaunches with its workgroup's record,
+    /// so it stays the same tab on every device. `id` is made new each launch.
+    @ObservationIgnored var layoutTabID = UUID()
     /// It has been attached to `tmuxSessionName`: from then on it only ever joins that session again, and is gone
     /// once the session is (`TerminalTmux.attachLine(joining:)`).
     private var tmuxHasAttached = false
@@ -1510,6 +1513,11 @@ class TerminalSession: Identifiable, Hashable {
 
     /// Between this terminal and tmux while it is a control-mode client of its session; nil otherwise.
     @ObservationIgnored private var tmuxControl: TmuxControlClient?
+    /// Sizes on their way to tmux, held while a resize goes on (2026-11-21).
+    @ObservationIgnored private(set) lazy var tmuxResizeHold = TmuxResizeHold { [weak self] columns, rows in
+        guard let self, let actions = tmuxControl?.resize(columns: columns, rows: rows) else { return }
+        applyTmuxControl(actions)
+    }
     /// Whether the host's tmux can have one (3.2 or later), asked once per session.
     @ObservationIgnored private var tmuxSupportsControl: Bool?
     @ObservationIgnored private var tmuxControlStartTask: Task<Void, Never>?
@@ -1607,7 +1615,10 @@ class TerminalSession: Identifiable, Hashable {
 
         sshConnection?.setPreferredTerminalSize(rows: clampedRows, columns: clampedColumns)
         // A control-mode client sizes tmux's window itself; the PTY's size is tmux's client's, unseen.
-        if let actions = tmuxControl?.resize(columns: clampedColumns, rows: clampedRows) { applyTmuxControl(actions) }
+        // Once the pane is followed, the last size of a resize goes, as it ends (`TmuxResizeHold`).
+        if let tmuxControl {
+            tmuxResizeHold.size(columns: clampedColumns, rows: clampedRows, hold: tmuxControl.phase == .live)
+        }
 
         guard state == .connected else { return }
         pendingTerminalResize = (rows: clampedRows, columns: clampedColumns)

@@ -60,9 +60,16 @@ struct TerminalTmuxControlSessionTests {
         #expect(writes.take() == "send-keys -l -t %3 -- 'ls'\nsend-keys -H -t %3 0d\n", "what was held, to the pane")
 
         session.sendTerminalData(Data("q".utf8))
+        // A resize's steps: held while they come, then the last once (2026-11-21). Each size tmux is
+        // given makes Claude Code print its conversation again.
+        session.updateTerminalGeometry(rows: 30, columns: 90)
+        session.updateTerminalGeometry(rows: 30, columns: 95)
         session.updateTerminalGeometry(rows: 30, columns: 100)
         await session.waitUntilTerminalWritesComplete()
-        #expect(writes.take() == "send-keys -l -t %3 -- 'q'\nrefresh-client -C 100,30\n")
+        #expect(writes.take() == "send-keys -l -t %3 -- 'q'\n", "no size while the resize goes on")
+        await session.tmuxResizeHold.waitUntilHandedOn()
+        await session.waitUntilTerminalWritesComplete()
+        #expect(writes.take() == "refresh-client -C 100,30\n", "the last size, once")
         #expect(session.scrollTmux(deltaY: 3, precise: false) == false, "the terminal's own history scrolls")
         #expect(session.tmuxFindTarget == nil, "and is what Find searches")
 

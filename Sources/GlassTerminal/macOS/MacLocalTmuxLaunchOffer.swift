@@ -35,7 +35,10 @@ struct MacLaunchReopen: ViewModifier {
     func body(content: Content) -> some View {
         content
             .task {
-                for windowID in MacWindowsToReopen.shared.takeOnce(askedBy: asker) ?? [] {
+                let reopening = MacWindowsToReopen.shared.takeOnce(askedBy: asker)
+                // The shared layout waits for them, so a window still to come back isn't read as closed (2026-11-22).
+                if let reopening { MacWorkspacePreviewRegistry.shared.awaitReopening(reopening) }
+                for windowID in reopening ?? [] {
                     openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(windowID: windowID, tabs: []))
                 }
                 // The owner, 2026-11-19: "right now I'd be wondering why my sessions didn't restore."

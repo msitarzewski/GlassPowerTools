@@ -227,6 +227,29 @@ struct GlassActiveConnectionsTests {
         #expect(model.runningSessions.map(\.id) == ["tmux:glass-3"], "and stays listed, open here")
     }
 
+    /// D111 (0.4.623): off the Mac, terminals closed because their sessions ended are said under their machine. The
+    /// terminal's own report carried them (`TerminalActiveListingTests`), but the registry's sum passed on only the
+    /// sessions and the unchecked machines, so Active never heard (found 2026-11-22 while mapping for the shared layout).
+    @Test("D111: terminals closed because their sessions ended reach Active through the registry, and are said")
+    func closedTerminalsReachActive() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "192.0.2.1", services: [alphaTerminal]))
+        let capability = ReportingCapability()
+        capability.report = GlassRunningReport(
+            closed: [GlassClosedTerminals(endpointID: alphaTerminal.endpointID, count: 2,
+                                          reason: "Their tmux sessions on alpha were ended.")])
+        model.registry.register(capability)
+        await model.load()
+        await model.refreshRunningSessions()
+
+        #expect(model.closedTerminals.map(\.count) == [2])
+        let machines = model.activeMachines()
+        #expect(machines.map(\.name) == ["alpha"], "listed under its machine")
+        #expect(machines.first?.closed?.message == "2 terminals closed. Their tmux sessions on alpha were ended.")
+    }
+
     /// All Windows off the Mac (the owner, 2026-10-14): "Grouped by machine, but show each tab as a card."
     @Test("All Windows: a window's tabs are cards of their own under their machines; Active keeps the window as one row")
     func allWindowsShowsEachTab() async throws {

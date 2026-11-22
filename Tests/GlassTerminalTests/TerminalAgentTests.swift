@@ -124,6 +124,30 @@ struct TerminalAgentTests {
         #expect(TerminalAgent.identify(program: "node", arguments: "node /x/node_modules/@kilocode/other/index.js") == nil)
     }
 
+    /// The owner (2026-11-21): "We need to add agy to the agnt detector... it's Google's Antigravity command line".
+    /// Google's installer copies the program to `~/.local/bin/agy`; Homebrew's cask keeps it as `antigravity` and
+    /// `exec`s it from an `agy` wrapper (`formulae.brew.sh/api/cask/antigravity-cli.json`); Windows has `agy.exe`.
+    @Test("Antigravity CLI by each install's program; the Antigravity editor's launcher and Python's module are not it")
+    func antigravity() {
+        func told(_ line: String, program: String? = nil) -> TerminalAgent? {
+            TerminalAgent.identify(program: program, arguments: TerminalAgent.identifyingWords(line))
+        }
+        #expect(TerminalAgent.identify(program: "agy", arguments: nil) == .antigravity, "as tmux names Google's install")
+        #expect(TerminalAgent.identify(program: "antigravity", arguments: nil) == .antigravity, "as tmux names Homebrew's")
+        #expect(TerminalAgent.identify(program: "agy.exe", arguments: nil) == .antigravity)
+        #expect(told("/Users/someone/.local/bin/agy -p fix") == .antigravity, "a local terminal, Google's install")
+        #expect(told("/opt/homebrew/Caskroom/antigravity-cli/1.5.14,5302690847260672/antigravity") == .antigravity,
+                "a local terminal, Homebrew's")
+        #expect(told("/bin/bash /opt/homebrew/bin/agy", program: "bash") == .antigravity, "the wrapper, before its exec")
+        #expect(TerminalAgent.identifyingWords("/Users/someone/.local/bin/agy -p 'key sk-1'") == "/Users/someone/.local/bin/agy",
+                "the program alone is kept")
+        #expect(told("/bin/bash /Applications/Antigravity.app/Contents/Resources/app/bin/antigravity --wait notes.md",
+                     program: "bash") == nil, "the editor's launcher, a shell script, is not the CLI")
+        #expect(told("python3 -m antigravity", program: "python3") == nil, "Python's own joke")
+        #expect(told("node /x/node_modules/antigravity/index.js", program: "node") == nil, "nor a package of that name")
+        #expect(TerminalAgent.identify(program: "agyx", arguments: nil) == nil)
+    }
+
     /// Hermes Agent, on another machine, went unmarked (the owner, 2026-10-14, with a picture):
     /// a Python agent can be launched by a shell script, as a module, or by a runner.
     @Test("an agent launched as a Python module, by a runner, or by a shell script is told, and inline code never kept")

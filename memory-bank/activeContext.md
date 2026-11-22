@@ -67,7 +67,43 @@ use the disposable test VM only).
   terminal. Also, at his word: 10 tmux tests failing since 0.4.622 fixed (their fake hosts now list their sessions).
 - **0.4.632 shipped** at his word ("commit and release it", 2026-11-21): 0.4.624–0.4.632 in `9b9a30f2`, Mac v0.4.632,
   feed `a7a9f467`, site live and checked 111/111 with the feed's zip and signature verified, TestFlight 632 both in review.
-- **Next:** Apple's beta review of 632; his Dock-stack SVG check on macOS 27; batching releases and quiet Sparkle
+- **0.4.633 (2026-11-21), his word:** a tmux session's size held until a resize ends (`TmuxResizeHold`), so Claude
+  Code, which prints its whole conversation again for each size, leaves one copy per resize; VM: a drag told the
+  program 3 sizes before, 1 after. `tasks/2026-11/2026-11-21_tmux-resize-hold.md`. On his Mac, iPhone and headset
+  since 15:31.
+- **0.4.634 (2026-11-21), his word:** Google's Antigravity CLI (`agy`) gets its mark (`TerminalAgent.antigravity`):
+  `agy` (Google's script) and `antigravity` (Homebrew's program behind its `agy` wrapper), never the editor's
+  `antigravity` launcher script or `python3 -m antigravity`; Lobe Icons' mark, accent `#0EA5E9`. VM: stand-ins under
+  each install's name showed the mark in a tmux tab. `tasks/2026-11/2026-11-21_antigravity-cli-mark.md`. On his Mac,
+  iPhone and headset since 18:03.
+- **One layout on every device (2026-11-21/22), proposed:** his ask for the same windows and tabs on every device,
+  opening by themselves. His decisions: windows from other devices arrive into the dock, closing closes everywhere,
+  Reopen Last Closed Window in Active, plain shells shown but never opened elsewhere, the focused terminal sizing tmux
+  as now. Plan in five phases in `tasks/2026-11/2026-11-21_shared-layout.md`. His word, 2026-11-22: "fix both
+  defects, then start phase 1".
+- **0.4.635 (2026-11-22), his word:** Active's D111 "closed, and why" note reaches Active (the registry dropped it);
+  Handoff comes back to the session's terminal even when it is down, never a second tab. On his Mac, iPhone and
+  headset since 08:05.
+- **0.4.636 (2026-11-22), phase 1 of the layout (D113):** each device publishes its terminal windows and tabs to
+  CloudKit (zone `GlassLayout`, record type `LayoutItem`); Active lists other devices' under "On <device>"; Settings ▸
+  Privacy ▸ Same Windows on Every Device. On his Mac, iPhone and headset since 08:29. Saves are refused until he
+  deploys `LayoutItem` to production in CloudKit Console (seen in the Mac's log).
+- **0.4.637 (2026-11-22), his report:** the Antigravity mark pulsed while `agy` sat idle. Output counts as work only
+  once the screen's text changes (`SwiftTermActivityGate`), so a cursor blinking by redrawing isn't work.
+  `tasks/2026-11/2026-11-21_antigravity-cli-mark.md`.
+- **0.4.638 (2026-11-22), his report:** a ⇧⌘E editor window couldn't be resized. Every new Mac editor window opened
+  at its minimum (SwiftUI's `updateAnimatedWindowSize` as the window is ordered front, set off by the frost's
+  constraints with the split view; measured in the VM) and its size was never kept. The window is put back to the size
+  it was made at before it is drawn; minimum 480 × 300; the last size kept (B-F45 partly). His second question, what the
+  editor lacks, surveyed in the same note: `tasks/2026-11/2026-11-22_editor-window-size.md`.
+- **0.4.633–0.4.638 committed and pushed at his word** (2026-11-22: update the memory bank, commit and push). Not a
+  release: the Mac's feed and TestFlight stay at 632.
+- **Then, his word, the editor's first gaps** (the recommended fixes, checked off as each is completed), in order, each
+  built and installed as it lands: (1) Whole Word in the find bar; (2) indentation kept on
+  Return, indent and outdent, tab width and spaces; (3) ⌘/ and the line commands; (4) autosave and recovery. Task note
+  `tasks/2026-11/2026-11-22_editor-first-gaps.md`.
+- **Next:** his look at ⇧⌘E on 0.4.638; his look at `agy` on 0.4.637; his CloudKit Console deploy, then the layout
+  seen on two devices, then phase 2; Apple's beta review of 632; his Dock-stack SVG check on macOS 27; batching releases and quiet Sparkle
   installs, asked; the iPhone and headset on 632 when reachable.
 
 ## 2026-11-15 (evening) — the iPhone's Active, from his day on the phone (released in 0.4.621)

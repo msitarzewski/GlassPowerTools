@@ -58,6 +58,9 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
     /// ("2026-10-20", this device's calendar) → "host|kind" → minutes. A minute counts when a session
     /// there had input or output in it. Optional for older files.
     public var usageMinutes: [String: [String: Int]]?
+    /// The windows and tabs this device has published to the shared layout as open (2026-11-22), so one that didn't
+    /// come back at a relaunch is closed there. Optional for older files.
+    public var layoutPublished: [UUID]?
 
     /// One more minute in use for `hostID` through `kind` on `day`; days past the history window go.
     public mutating func addUsageMinute(day: String, hostID: HostID, kind: HostServiceKind, oldestDay: String) {
