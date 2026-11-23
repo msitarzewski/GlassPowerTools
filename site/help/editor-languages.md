@@ -51,6 +51,7 @@ The status bar shows, from left to right:
 - **Line** and **Column** of the cursor. Choose it to go to a line.
 - The language.
 - The file's line endings: **LF**, **CRLF** or **CR**. A file that mixes them shows **Mixed** with the most common one in brackets. The Editor keeps a file's line endings as they are when you save.
+- How the file indents, for example **Spaces: 4** or **Tab Width: 4**. The Editor reads it from the file's own lines when it opens; a file with no indented lines uses the default from Settings. Choose it to indent this file with spaces or tabs, or at another width. See [Indent lines](editor-files-and-tabs.md#indent-lines).
 - **Highlighting off — large file** when a file is too large to color. Very large files (roughly two million characters or more) are shown as plain text so the Editor stays responsive.
 - **On Apple Vision Pro:** the project and its folder, or the folder of a file opened on its own — what a Mac shows as the window's subtitle.
 - **Edited** while there are unsaved changes.
@@ -69,7 +70,7 @@ A number past the end of the file goes to the last line.
 **On Mac:** choose Edit ▸ Find ▸ **Find…** (⌘F). **On iPhone, iPad and Vision Pro:** choose **Find** (the magnifying glass) in the toolbar, or press ⌘F with a keyboard. A find bar opens above the text, ready to type in.
 
 1. Type in **Find** and press Return, or choose the next and previous arrows. The Editor selects the match and scrolls to it, and the search wraps around the end of the document. The bar shows how many matches there are, for example **3 matches**, or **No matches**. **On Mac**, Edit ▸ Find ▸ **Find Next** (⌘G) and **Find Previous** (⇧⌘G) move between matches too, with the bar closed or open.
-2. Turn on **Aa** to match case, or **.\*** to search with a regular expression. An invalid expression shows **Invalid pattern**. A regular expression that takes longer than a second is stopped, and the Editor says why; nested repeats such as `(a+)+` are the usual cause.
+2. Turn on **Aa** to match case, **ab** (underlined) to find whole words only, so *red* doesn't match inside *bored*, or **.\*** to search with a regular expression. An invalid expression shows **Invalid pattern**. A regular expression that takes longer than a second is stopped, and the Editor says why; nested repeats such as `(a+)+` are the usual cause.
 3. To replace, type in **Replace**. **Replace** (or Return in that field) replaces the selected match and selects the next one; **All** replaces every match and reports how many, for example **Replaced 3 matches.** Each can be undone (**Undo Replace**, **Undo Replace All**). With a regular expression, `$0` in **Replace** stands for the whole match and `$1` for the first group.
 4. Choose **Done** to close the bar.
 

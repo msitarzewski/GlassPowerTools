@@ -239,6 +239,10 @@ public final class GlassEditorNSCoordinator: NSObject, NSTextViewDelegate {
         restored[.font] = AttributedAssembly.font(
             configuration: model.configuration, surface: model.surfaceCondition
         )
+        // And the tab width, which a font change moves too (2026-11-22).
+        restored[.paragraphStyle] = AttributedAssembly.paragraphStyle(
+            configuration: model.configuration, surface: model.surfaceCondition
+        )
         textView.typingAttributes = restored
     }
 

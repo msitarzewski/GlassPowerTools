@@ -94,7 +94,7 @@ public enum CoalescingPolicy: Sendable {
                 == previous.edit.replacementRange.lowerBound
 
         case .deleteForward, .paste, .cut, .drop, .replaceAll, .replace, .changeCase,
-             .indentation, .completion, .programmatic, .remoteReload:
+             .indentation, .lineCommand, .completion, .programmatic, .remoteReload:
             return false
         }
     }

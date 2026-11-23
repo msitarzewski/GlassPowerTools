@@ -208,6 +208,95 @@ public final class GlassTextViewIOS: UITextView {
         pendingIntent = .deleteBackward
         super.deleteBackward()
     }
+
+    // MARK: - Indentation (2026-11-22)
+
+    // The Mac's rules (`GlassTextView`), from `LineEditing`: Return keeps the line's indent; Tab over lines indents
+    // them and otherwise types to the next tab stop; ⇧Tab, ⌘[ and ⌘] outdent and indent, from a keyboard. Return and
+    // Tab are answered by the delegate (`GlassEditorUICoordinator.typedReturnOrTab`), which every keyboard asks before
+    // it types: an override of `insertText` changes the view without asking it, so the document would never see the
+    // indent (measured on the simulator, 2026-11-22).
+
+    var editorCoordinator: GlassEditorUICoordinator? { delegate as? GlassEditorUICoordinator }
+
+    /// Editable, attached, and no input method composing.
+    var canEditLines: Bool { isEditable && editorCoordinator != nil && markedTextRange == nil }
+
+    public override var keyCommands: [UIKeyCommand]? {
+        var commands = super.keyCommands ?? []
+        guard isEditable else { return commands }
+        let indent = UIKeyCommand(title: "Indent", action: #selector(indentLines(_:)), input: "]",
+                                  modifierFlags: .command)
+        let outdent = UIKeyCommand(title: "Outdent", action: #selector(outdentLines(_:)), input: "[",
+                                   modifierFlags: .command)
+        // Not the system's move to the previous control: in a text editor ⇧Tab outdents.
+        let backtab = UIKeyCommand(input: "\t", modifierFlags: .shift, action: #selector(outdentLines(_:)))
+        // The Mac's keys for the line commands (`GlassEditorCommands`).
+        let comment = UIKeyCommand(title: "Comment or Uncomment Lines", action: #selector(toggleLineComments(_:)),
+                                   input: "/", modifierFlags: .command)
+        let up = UIKeyCommand(title: "Move Lines Up", action: #selector(moveLinesUp(_:)),
+                              input: UIKeyCommand.inputUpArrow, modifierFlags: [.control, .command])
+        let down = UIKeyCommand(title: "Move Lines Down", action: #selector(moveLinesDown(_:)),
+                                input: UIKeyCommand.inputDownArrow, modifierFlags: [.control, .command])
+        let delete = UIKeyCommand(title: "Delete Lines", action: #selector(deleteLines(_:)), input: "k",
+                                  modifierFlags: [.command, .shift])
+        let all = [indent, outdent, backtab, comment, up, down, delete]
+        for command in all { command.wantsPriorityOverSystemBehavior = true }
+        commands += all
+        return commands
+    }
+
+    // MARK: - Line commands (2026-11-22)
+
+    @objc public func toggleLineComments(_ sender: Any?) {
+        perform(.comment) { LineEditing.toggleComment($0, selection: $1, language: $2.language) }
+    }
+
+    @objc public func duplicateLines(_ sender: Any?) {
+        perform(.duplicate) { text, selection, _ in LineEditing.duplicate(text, selection: selection) }
+    }
+
+    @objc public func moveLinesUp(_ sender: Any?) {
+        perform(.moveUp) { text, selection, _ in LineEditing.move(text, selection: selection, up: true) }
+    }
+
+    @objc public func moveLinesDown(_ sender: Any?) {
+        perform(.moveDown) { text, selection, _ in LineEditing.move(text, selection: selection, up: false) }
+    }
+
+    @objc public func deleteLines(_ sender: Any?) {
+        perform(.delete) { text, selection, _ in LineEditing.delete(text, selection: selection) }
+    }
+
+    @objc public func joinLines(_ sender: Any?) {
+        perform(.join) { text, selection, _ in LineEditing.join(text, selection: selection) }
+    }
+
+    @objc public func sortLines(_ sender: Any?) {
+        perform(.sort) { text, selection, _ in LineEditing.sort(text, selection: selection) }
+    }
+
+    private func perform(_ command: LineCommand,
+                         _ make: (NSString, Range<Int>, GlassEditorModel) -> LineEdit?) {
+        guard canEditLines else { return }
+        editorCoordinator?.performLineEdit(in: self, intent: .lineCommand(command), make)
+    }
+
+    /// One level more on every line the selection touches.
+    @objc public func indentLines(_ sender: Any?) {
+        guard canEditLines else { return }
+        editorCoordinator?.performLineEdit(in: self, intent: .indentation) { text, selection, model in
+            LineEditing.indent(text, selection: selection, indentation: model.configuration.indentation)
+        }
+    }
+
+    /// One level less on every line the selection touches.
+    @objc public func outdentLines(_ sender: Any?) {
+        guard canEditLines else { return }
+        editorCoordinator?.performLineEdit(in: self, intent: .indentation) { text, selection, model in
+            LineEditing.outdent(text, selection: selection, indentation: model.configuration.indentation)
+        }
+    }
 }
 
 #endif

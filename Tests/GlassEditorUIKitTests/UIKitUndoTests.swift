@@ -107,9 +107,11 @@ struct UIKitUndoTests {
         let transformations = try #require(menu.children.compactMap { $0 as? UIMenu }.first { $0.title == "Transformations" })
         #expect(transformations.children.compactMap { ($0 as? UIAction)?.title }
                     == ["Make Upper Case", "Make Lower Case", "Capitalize"])
-        // Nothing selected: the system's own menu.
-        #expect(engine.coordinator.textView(engine.textView, editMenuForTextIn: NSRange(location: 4, length: 0),
-                                            suggestedActions: []) == nil)
+        // Nothing selected: no Transformations, only the system's actions and Lines (2026-11-22, `UIKitIndentationTests`).
+        let caretMenu = try #require(engine.coordinator.textView(engine.textView,
+                                                                  editMenuForTextIn: NSRange(location: 4, length: 0),
+                                                                  suggestedActions: []))
+        #expect(caretMenu.children.compactMap { ($0 as? UIMenu)?.title } == ["Lines"])
 
         engine.coordinator.changeCase(in: engine.textView, range: selection) { $0.uppercased() }
         #expect(engine.text == "let SHOPNAME = 1")

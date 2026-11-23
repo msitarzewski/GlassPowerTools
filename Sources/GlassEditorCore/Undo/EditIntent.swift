@@ -26,6 +26,8 @@ public enum EditIntent: Sendable, Hashable {
     case changeCase
     /// Indent, outdent, or reindent applied to a selection.
     case indentation
+    /// Comment, duplicate, move, delete, join or sort lines (2026-11-22). Its own unit, named for the command.
+    case lineCommand(LineCommand)
     /// A completion accepted from a provider. Always its own unit.
     case completion
     /// A programmatic mutation with no direct user gesture behind it.
@@ -47,7 +49,7 @@ public enum EditIntent: Sendable, Hashable {
         case .typing, .deleteBackward:
             return false
         case .deleteForward, .paste, .cut, .drop, .replaceAll, .replace, .changeCase,
-             .indentation, .completion, .programmatic, .remoteReload:
+             .indentation, .lineCommand, .completion, .programmatic, .remoteReload:
             return true
         }
     }

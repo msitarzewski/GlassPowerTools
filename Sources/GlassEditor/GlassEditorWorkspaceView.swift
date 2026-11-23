@@ -878,9 +878,17 @@ public struct GlassEditorWorkspaceView: View {
             Toggle("Aa", isOn: $workspace.findIsCaseSensitive)
                 .toggleStyle(.button)
                 .help("Match case")
+                .accessibilityLabel("Match Case")
+            // VS Code's "ab" underlined: words of their own only (2026-11-22).
+            Toggle(isOn: $workspace.findMatchesWholeWords) { Text("ab").underline() }
+                .toggleStyle(.button)
+                .help("Whole words")
+                .accessibilityLabel("Whole Words")
+                .accessibilityIdentifier("editor-find-whole-words")
             Toggle(".*", isOn: $workspace.findUsesRegularExpression)
                 .toggleStyle(.button)
                 .help("Regular expression")
+                .accessibilityLabel("Regular Expression")
             Divider().frame(height: 18)
             TextField("Replace", text: $workspace.replacement)
                 .textFieldStyle(.roundedBorder)
@@ -940,6 +948,26 @@ public struct GlassEditorWorkspaceView: View {
 
             Text(document.model.snapshot.lineEndings.statusName).font(.caption)
                 .glassBarItem()
+
+            // How this document indents, as VS Code's bar says it, and the place to change it for this document
+            // (2026-11-22). Its own lines decided it when it opened; Settings ▸ Editor otherwise.
+            Menu {
+                let current = indentation(of: document)
+                Picker("Indent Using", selection: current.kind) {
+                    Text("Spaces").tag(Indentation.Kind.spaces)
+                    Text("Tabs").tag(Indentation.Kind.tabs)
+                }
+                Picker("Width", selection: current.width) {
+                    ForEach(Indentation.offeredWidths, id: \.self) { Text("\($0)").tag($0) }
+                }
+            } label: {
+                Text(document.model.configuration.indentation.statusName).font(.caption)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .glassBarItem()
+            .accessibilityIdentifier("editor-indentation")
+
             if document.model.isHighlightingDegradedToPlaintext {
                 // Said out loud rather than left as a mystery: a very large file stops being
                 // highlighted, and a user who sees colour disappear deserves the reason.
@@ -1183,6 +1211,16 @@ public struct GlassEditorWorkspaceView: View {
         let index = min(line - 1, max(0, document.model.lineCount - 1))
         let range = document.model.lineRange(ofLine: index)
         document.model.reveal(range.lowerBound..<range.lowerBound)
+    }
+
+    /// A document's indentation, set from its bar: chosen for it, so neither its lines nor Settings ▸ Editor change it
+    /// after (`IndentationSource.chosen`).
+    private func indentation(of document: GlassEditorDocument) -> Binding<Indentation> {
+        Binding(get: { document.model.configuration.indentation },
+                set: { chosen in
+                    document.model.configuration.indentation = chosen
+                    document.model.configuration.indentationSource = .chosen
+                })
     }
 
     // MARK: Small descriptions
@@ -1460,6 +1498,8 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
             #endif
             // Which window a file opened from the menu bar lands in: the one in front.
             .onAppear { runtime?.noteFrontmost(windowID) }
+            // What this window was opened to say — the documents recovery brought back — once it is on screen.
+            .task { await workspace.sayNoticeOnAppear() }
             #if os(macOS)
             .onChange(of: activeState) { _, state in
                 guard state == .key else { return }
@@ -1495,6 +1535,7 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
             .onChange(of: workspace.preferences.showsLineNumbers) { _, _ in workspace.applyAppearance() }
             .onChange(of: workspace.preferences.wrapsLines) { _, _ in workspace.applyAppearance() }
             .onChange(of: workspace.preferences.fontSize) { _, _ in workspace.applyAppearance() }
+            .onChange(of: workspace.preferences.indentation) { _, _ in workspace.applyAppearance() }
             // Closing the window is how a project is closed — "I am done with this project" — so
             // there is no Close Project command to find. Documents are untouched: a file open in a
             // tab is work, and work is not thrown away by closing a window showing a folder.

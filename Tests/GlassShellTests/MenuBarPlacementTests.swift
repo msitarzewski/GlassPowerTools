@@ -311,6 +311,26 @@ struct MenuBarPlacementTests {
     /// was SwiftUI's choice. One palette then kept both keys, and a SwiftUI menu item holds one,
     /// so the app menu still listed it twice ("Why are there two command palettes?", the owner,
     /// 2026-10-18). He chose ⇧⌘P alone; ⌘K is left to no one, as Terminal's and iTerm's clear.
+    /// The editor's line keys (2026-11-22): one Mac owner each, the editor's Text menu. ⌥⌘] stays the terminal's
+    /// Focus Next Pane, which is why Move Lines Down is not Xcode's key.
+    @Test func editorLineKeysHaveOneMacOwner() throws {
+        #expect(try owners(of: "]", modifiers: ["command"]) == ["GlassEditorScenes.swift"])
+        #expect(try owners(of: "/", modifiers: ["command"]) == ["GlassEditorScenes.swift"])
+        #expect(try owners(of: "k", modifiers: ["command", "shift"]) == ["GlassEditorScenes.swift"])
+        // ⌘[ is also Vision Pro's column Back, a view's in its own window, never compiled for a Mac.
+        #expect(try owners(of: "[", modifiers: ["command"]) == ["GlassEditorScenes.swift", "GlassSpatialColumns.swift"])
+        let spatial = try swiftSources().first { $0.lastPathComponent == "GlassSpatialColumns.swift" }
+        let back = try String(contentsOf: try #require(spatial), encoding: .utf8)
+        let backs = declarations(of: #"keyboardShortcut("[", modifiers: .command)"#, in: back)
+        #expect(!backs.isEmpty && backs.allSatisfy(excludesTheMac))
+        #expect(try owners(of: "]", modifiers: ["command", "option"]) == ["MacWorkspaceCommands.swift"])
+        for arrow in [".upArrow", ".downArrow"] {
+            let marker = "keyboardShortcut(\(arrow), modifiers: [.control, .command])"
+            let files = try swiftSources().filter { try String(contentsOf: $0, encoding: .utf8).contains(marker) }
+            #expect(files.map(\.lastPathComponent) == ["GlassEditorScenes.swift"], "⌃⌘\(arrow)")
+        }
+    }
+
     @Test func commandPaletteIsOneItemOnOneKey() throws {
         #expect(try owners(of: "p", modifiers: ["command", "shift"]) == ["GlassShellPaletteCommands.swift"])
         #expect(try owners(of: "k", modifiers: ["command"]) == [])

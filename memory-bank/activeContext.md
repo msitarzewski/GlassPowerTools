@@ -31,7 +31,7 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-11-19–21 — RESUME HERE: after a restart, tmux tabs came back empty (D111, released in 0.4.622–0.4.623); then Get Info, the Workgroup panel, the dock and drops from a Dock stack (released in 0.4.632)
+## 2026-11-19–23 — RESUME HERE: after a restart, tmux tabs came back empty (D111, released in 0.4.622–0.4.623); then Get Info, the Workgroup panel, the dock and drops from a Dock stack (released in 0.4.632)
 
 - **His report:** his Mac ran out of memory and he force-restarted it with ~29 local tabs in tmux (Workgroups' and ad
   hoc, one window of 12–13). Every tab came back an empty shell in `~` under its old session name; closing windows
@@ -98,11 +98,29 @@ use the disposable test VM only).
   editor lacks, surveyed in the same note: `tasks/2026-11/2026-11-22_editor-window-size.md`.
 - **0.4.633–0.4.638 committed and pushed at his word** (2026-11-22: update the memory bank, commit and push). Not a
   release: the Mac's feed and TestFlight stay at 632.
-- **Then, his word, the editor's first gaps** (the recommended fixes, checked off as each is completed), in order, each
-  built and installed as it lands: (1) Whole Word in the find bar; (2) indentation kept on
-  Return, indent and outdent, tab width and spaces; (3) ⌘/ and the line commands; (4) autosave and recovery. Task note
-  `tasks/2026-11/2026-11-22_editor-first-gaps.md`.
-- **Next:** his look at ⇧⌘E on 0.4.638; his look at `agy` on 0.4.637; his CloudKit Console deploy, then the layout
+- **Then, his word, the editor's first gaps** (the recommended fixes, checked off as each is completed), all four done
+  and installed on his Mac, iPhone and headset: (1) Whole Word in the find bar, 0.4.639; (2) Return keeps the indent,
+  indent/outdent, tabs or spaces per file, tab stops, 0.4.640; (3) ⌘/ and the line commands, 0.4.641; (4) autosave
+  and recovery, 0.4.642 (a VM crash brought the document back; Quit Without Saving leaving a copy found and fixed
+  there). Task note `tasks/2026-11/2026-11-22_editor-first-gaps.md`. **Not committed** (0.4.639–0.4.642).
+- **His report, 2026-11-22:** a terminal wouldn't scroll on the iPhone, and ⌘C wouldn't copy from it on the Mac
+  (right-click Copy did). It runs Claude Code in its full-screen mode, which takes the mouse. iPhone/iPad sent a
+  finger's drag to such a program as a mouse drag; now a swipe turns its wheel, as on the headset (0.4.643; an iPhone
+  simulator UI test failed before, passes after). Mac ⌘C explained (the selection is the program's; ⌘ can't reach
+  it through tmux 3.8), not changed. Why that tab alone (2026-11-23): it is a Claude Code background session (agent
+  view), and Claude Code says those always use its full-screen renderer while attached. His answer: ⌘V pastes after
+  a drag (Claude Code's own copy reaches the clipboard), ⌘C still beeps. Task note
+  `tasks/2026-11/2026-11-22_terminal-swipe-and-copy.md`.
+- **2026-11-23, a report:** Claude Code in a local tmux terminal refused Documents, Desktop and Downloads
+  with the switches on, through a quit and reopen. The terminal host (D66) outlives quits and updates; a host from
+  before an update fails its static signature check (measured on his Mac: `codesign -vvv +pid` "code or signature
+  have been modified"). Unblock: End All Local Terminals. Task note `tasks/2026-11/2026-11-23_tmux-host-after-update.md`.
+- **0.4.639–0.4.643 and the memory bank committed at his word** (2026-11-23: update the memory bank, then commit). Not
+  pushed.
+- **Next, his order (2026-11-23):** reproduce the host's lost folder access in the macOS VM, then the quick fix (on
+  opening, a host older than the app is named and can be restarted); then ⌘C in a program that copied on its own
+  (no beep when the clipboard changed since the drag). His look at 0.4.639–0.4.643; his
+  look at ⇧⌘E on 0.4.638; his look at `agy` on 0.4.637; his CloudKit Console deploy, then the layout
   seen on two devices, then phase 2; Apple's beta review of 632; his Dock-stack SVG check on macOS 27; batching releases and quiet Sparkle
   installs, asked; the iPhone and headset on 632 when reachable.
 

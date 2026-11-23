@@ -26,6 +26,8 @@ public final class GlassEditorPreferences {
     public var showsLineNumbers: Bool { didSet { persist() } }
     public var wrapsLines: Bool { didSet { persist() } }
     public var fontSize: Double { didSet { persist() } }
+    /// How a document indents when its own lines don't say, and how wide a tab is drawn (2026-11-22).
+    public var indentation: Indentation { didSet { persist() } }
     /// Light or dark, following the system. **Not** persisted: it is the system's answer, not a
     /// preference of this app's, and a stored copy would be wrong the moment the Mac switched at
     /// sunset.
@@ -61,6 +63,9 @@ public final class GlassEditorPreferences {
         showsLineNumbers = stored["showsLineNumbers"] as? Bool ?? fallback.showsLineNumbers
         wrapsLines = stored["wrapsLines"] as? Bool ?? fallback.wrapsLines
         fontSize = stored["fontSize"] as? Double ?? fallback.fontSize
+        indentation = Indentation(
+            kind: (stored["indentsWithTabs"] as? Bool ?? false) ? .tabs : .spaces,
+            width: stored["indentWidth"] as? Int ?? fallback.indentation.width)
         recents = Self.loadRecents(from: defaults)
         windowSize = Self.loadWindowSize(from: defaults)
     }
@@ -94,6 +99,8 @@ public final class GlassEditorPreferences {
         configuration.fontSize = fontSize
         // The Editor's documents follow Edit ▸ Spelling and Grammar and Edit ▸ Substitutions (`GlassTextChecking`).
         configuration.followsTextChecking = true
+        // As much of the default as the document has not settled for itself (`Indentation.following`).
+        configuration.indentation = existing.indentation.following(indentation, from: existing.indentationSource)
         return configuration
     }
 
@@ -117,7 +124,9 @@ public final class GlassEditorPreferences {
     private func persist() {
         defaults.set(["showsLineNumbers": showsLineNumbers,
                       "wrapsLines": wrapsLines,
-                      "fontSize": fontSize], forKey: Self.appearanceDefaultsKey)
+                      "fontSize": fontSize,
+                      "indentsWithTabs": indentation.kind == .tabs,
+                      "indentWidth": indentation.width], forKey: Self.appearanceDefaultsKey)
     }
 
     private static func loadRecents(from defaults: UserDefaults) -> [URL] {

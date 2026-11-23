@@ -404,7 +404,9 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         // the shipped font-size-only trigger dropped them (pen-suite finding).
         if previous.fontName != current.fontName
             || previous.fontSize != current.fontSize
-            || previous.minimumContrastRatio != current.minimumContrastRatio {
+            || previous.minimumContrastRatio != current.minimumContrastRatio
+            // A tab's width is in the paragraph style (`AttributedAssembly.paragraphStyle`).
+            || previous.indentation.width != current.indentation.width {
             repaintForAppearanceChange()
         }
     }

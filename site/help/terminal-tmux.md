@@ -59,6 +59,8 @@ A basic terminal is never given a tmux session, and never asks whether to use tm
 
 Scroll back over a terminal in tmux as over any terminal: two fingers on a trackpad, a mouse wheel, a finger on iPad and iPhone, or pinch and drag on Vision Pro. With tmux 3.2 or later, the terminal scrolls through the session's history, which it keeps itself (see [The terminal keeps the whole session](#the-terminal-keeps-the-whole-session)).
 
+A program that takes the mouse, such as Claude Code in its full-screen mode, `vim` or `htop`, does its own scrolling. The same gestures turn its scroll wheel: a swipe up or down with a finger on iPad and iPhone, or pinch and drag on Vision Pro. A tap still clicks in it.
+
 With tmux older than 3.2, tmux keeps the history, so scrolling scrolls tmux's history view. Scroll back to the bottom, or press **q**, to return to typing. While you are scrolled back, keys go to tmux's history view rather than to the program.
 
 ## One session in several places

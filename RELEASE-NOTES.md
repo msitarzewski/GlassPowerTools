@@ -119,6 +119,42 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
+### 0.4.643 (22 November 2026)
+- **A swipe scrolls a program that takes the mouse, on iPhone and iPad.** In Claude Code's full-screen mode, `vim`,
+  `htop` or anything else that asks for the mouse, a swipe up or down turns its scroll wheel, as pinch-and-drag
+  does on Vision Pro. It was sent as a mouse drag, which such a program takes as selecting, and nothing scrolled.
+  A tap still clicks, and on iPad a trackpad's or mouse's click-and-drag is still the program's.
+
+### 0.4.642 (22 November 2026)
+- **Unsaved changes survive the app closing unexpectedly.** While an Editor document has unsaved changes, a copy of its
+  text is kept on this device. After a crash, or iPhone, iPad or Vision Pro closing the app in the background, the next
+  launch brings the documents back in their windows, still unsaved, and says which. A file comes back with your changes
+  over it, so Undo returns to what's on disk; one that's gone or was on another machine comes back untitled. Saving,
+  closing without saving and **Quit Without Saving** let the copy go.
+
+### 0.4.641 (22 November 2026)
+- **Comment lines out with ⌘/.** In the Editor, by the file's language: `//`, `#` or `--` at the lines' shallowest
+  indent, and back in when they're all commented; HTML, XML and Markdown wrap them in `<!-- -->`.
+- **Line commands.** **Move Lines Up** and **Down** (⌃⌘↑, ⌃⌘↓), **Duplicate Lines**, **Delete Lines** (⇧⌘K), **Join
+  Lines** and **Sort Lines**, in the Mac's Text menu, on a keyboard elsewhere, and in the selection menu under **Lines**
+  on iPad, iPhone and Vision Pro. Each undoes on its own.
+
+### 0.4.640 (22 November 2026)
+- **Return keeps the indent.** In the Editor, a new line starts where the one above did; after an opening `{`, `[` or
+  `(` in code it starts a level deeper, and a closing bracket right after the cursor moves to a line of its own.
+  Python and YAML go deeper after a `:`.
+- **Indent and outdent.** Tab over selected lines indents them and ⇧Tab outdents them; on Mac, **Text** ▸ **Indent**
+  (⌘]) and **Outdent** (⌘[). On iPad, iPhone and Vision Pro the same keys work with a keyboard, and the selection menu
+  has **Lines** ▸ **Indent** and **Outdent**. Each undoes on its own.
+- **Tabs or spaces, file by file.** The Editor reads how a file indents when it opens and keeps to it: Tab types spaces
+  to the next stop in a file indented with spaces, and a tab in one indented with tabs. Tabs line up at their width
+  (they were drawn at 28-point stops). The status bar shows **Spaces: 4** or **Tab Width: 4** and changes it for that
+  file; Settings ▸ Editor ▸ **Indentation** sets the default.
+
+### 0.4.639 (22 November 2026)
+- **Find whole words.** The Editor's find bar has a third switch, **ab** underlined: with it on, *red* is found, counted
+  and replaced only as a word of its own, not inside *bored* or *reddish*.
+
 ### 0.4.638 (22 November 2026)
 - **Editor windows can be made smaller, and open at a useful size.** On Mac, every new editor window opened at its
   smallest, 820 × 520 points, so it could only be made larger. It opens at 1100 × 720 now, and can be made as small as

@@ -89,6 +89,7 @@ final class GlassEditorUndoManager: UndoManager {
         case .replace?: "Replace"
         case .changeCase?: "Change Case"
         case .indentation?: "Indentation"
+        case .lineCommand(let command)?: command.undoName
         case .completion?: "Completion"
         case .remoteReload?: "Reload"
         case .programmatic?, nil: ""

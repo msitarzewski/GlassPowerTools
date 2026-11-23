@@ -124,6 +124,9 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
     /// root, which knows the editor; this delegate is the terminal's.
     public static var unsavedDocumentNames: (@MainActor () -> [String])?
     public static var showUnsavedDocuments: (@MainActor () -> Void)?
+    /// Quit Without Saving chosen: the editor's copies kept against a crash go too, so nothing let go on purpose comes
+    /// back at the next launch (2026-11-22).
+    public static var discardUnsavedDocuments: (@MainActor () -> Void)?
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !terminationInProgress else { return .terminateLater }
@@ -144,6 +147,7 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
                 Self.showUnsavedDocuments?()
                 return .terminateCancel
             }
+            Self.discardUnsavedDocuments?()
         } else if let terminalMessage {
             let alert = NSAlert()
             alert.messageText = "Quit \(GlassProduct.displayName)?"

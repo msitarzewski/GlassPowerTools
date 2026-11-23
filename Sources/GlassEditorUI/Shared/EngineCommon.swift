@@ -206,13 +206,28 @@ public enum AttributedAssembly {
         return attributes
     }
 
-    /// Attributes for unhighlighted text — the `.plain` role.
+    /// Attributes for unhighlighted text — the `.plain` role — and the paragraph style every run keeps, since runs only
+    /// add colour and weight over these.
     public static func baseAttributes(
         theme: EditorTheme,
         surface: SurfaceCondition,
         configuration: GlassEditorConfiguration
     ) -> [NSAttributedString.Key: Any] {
-        attributes(for: .plain, theme: theme, surface: surface, configuration: configuration)
+        var base = attributes(for: .plain, theme: theme, surface: surface, configuration: configuration)
+        base[.paragraphStyle] = paragraphStyle(configuration: configuration, surface: surface)
+        return base
+    }
+
+    /// Tabs drawn `indentation.width` spaces wide in the document's own font (2026-11-22). The text system's stops, every
+    /// 28 points, lined a tab up with nothing, so a tab-indented file's columns wandered with the font size.
+    public static func paragraphStyle(configuration: GlassEditorConfiguration,
+                                      surface: SurfaceCondition) -> NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        let font = font(configuration: configuration, surface: surface)
+        let space = (" " as NSString).size(withAttributes: [.font: font]).width
+        style.tabStops = []
+        style.defaultTabInterval = max(1, space * CGFloat(configuration.indentation.width))
+        return style
     }
 
     /// A fully assembled attributed string — the read-only rendering path

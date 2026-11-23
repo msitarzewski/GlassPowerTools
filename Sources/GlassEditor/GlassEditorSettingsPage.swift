@@ -65,6 +65,23 @@ struct GlassEditorSettingsView: View {
                 SizeFooter()
             }
 
+            // Return keeps a line's indent; Tab, ⌘] and ⌘[ indent and outdent by these (2026-11-22).
+            Section {
+                Picker("Indent Using", selection: $preferences.indentation.kind) {
+                    Text("Spaces").tag(Indentation.Kind.spaces)
+                    Text("Tabs").tag(Indentation.Kind.tabs)
+                }
+                Picker("Width", selection: $preferences.indentation.width) {
+                    ForEach(Indentation.offeredWidths, id: \.self) { width in
+                        Text(width == 1 ? "1 column" : "\(width) columns").tag(width)
+                    }
+                }
+            } header: {
+                Text("Indentation")
+            } footer: {
+                Text("For new documents and ones not yet indented. A file already indented with spaces keeps its own width; one indented with tabs keeps them, drawn this wide. Each document's bar shows its indentation and can change it.")
+            }
+
             // TextEdit's switches, where iPad and Vision Pro can reach them (2026-11-03); the Mac has them in its Edit
             // menu too. The ones UIKit has a text view do, there.
             Section {

@@ -18,6 +18,10 @@ public struct GlassEditorConfiguration: Sendable, Hashable {
     /// Milliseconds to debounce rehighlighting after an edit. Matches the
     /// proven AppKit behavior in glassdb (75ms — INTEGRATION.md A3).
     public var highlightDebounceMilliseconds: Int
+    /// How Return, Tab and the indent commands indent, and how wide a tab is drawn (2026-11-22).
+    public var indentation: Indentation
+    /// Where `indentation` came from, which decides what Settings ▸ Editor may change in it.
+    public var indentationSource: IndentationSource
 
     // Limits
     /// Hard ceiling on the byte size a document may have to be opened at all:
@@ -42,9 +46,13 @@ public struct GlassEditorConfiguration: Sendable, Hashable {
         isEditable: Bool = true,
         followsTextChecking: Bool = false,
         highlightDebounceMilliseconds: Int = 75,
+        indentation: Indentation = .standard,
+        indentationSource: IndentationSource = .settings,
         largeFileByteCeiling: UInt64 = 8 * 1024 * 1024,
         minimumContrastRatio: Double = 4.5
     ) {
+        self.indentation = indentation
+        self.indentationSource = indentationSource
         self.fontName = fontName
         self.fontSize = fontSize
         self.showsLineNumbers = showsLineNumbers

@@ -76,6 +76,9 @@ public final class GlassEditorWorkspace {
     public var replacement = ""
     public var findIsCaseSensitive = false
     public var findUsesRegularExpression = false
+    /// Only matches standing as words of their own (`FindQuery.wholeWord`): "red" not inside "bored". The engine had it
+    /// from the start and the bar never asked (2026-11-22).
+    public var findMatchesWholeWords = false
 
     /// Shared with every other window: text size, line numbers, wrapping, recents. This window's
     /// own text settings, where it keeps any, are in `windowSettings`.
@@ -486,6 +489,53 @@ public final class GlassEditorWorkspace {
         return access
     }
 
+    // MARK: Recovery (2026-11-22)
+
+    /// Where this window's unsaved text is kept against a crash; the runtime's, set as the window is made.
+    @ObservationIgnored var recovery: GlassEditorRecovery?
+
+    /// What the window says once it is on screen, so the alert has a window to be shown in: the documents recovery
+    /// brought back are found before their window exists (`GlassEditorRuntime.recoverUnsavedDocuments`).
+    @ObservationIgnored var noticeOnAppear: String?
+
+    /// Says `noticeOnAppear`, a moment after the window appears, once.
+    func sayNoticeOnAppear() async {
+        guard let notice = noticeOnAppear else { return }
+        noticeOnAppear = nil
+        try? await Task.sleep(for: .milliseconds(400))
+        message = notice
+    }
+
+    /// A document the app last ended without saving, back in this window with its unsaved text: its file again, with
+    /// that text over what is on disk, so Undo goes back to the file; or, when the file cannot be read here (gone, or on
+    /// another machine), an untitled document holding the text. Unsaved either way, so it is saved or asked about like
+    /// any other. Nil when the file already says what the copy says.
+    func adoptRecovered(_ record: GlassEditorRecovery.Record) async -> GlassEditorDocument? {
+        var document: GlassEditorDocument?
+        if record.machine == nil, let path = record.path, FileManager.default.isReadableFile(atPath: path) {
+            document = await open(URL(filePath: path))
+            if let opened = document, opened.model.text == record.text {
+                close(opened.id)
+                return nil
+            }
+        }
+        if document == nil {
+            let language = LanguageID(rawValue: record.language) ?? .plaintext
+            let untitled = GlassEditorDocument.untitled(named: record.name, language: language)
+            apply(to: untitled)
+            documents.append(untitled)
+            selection = untitled.id
+            document = untitled
+        }
+        guard let document else { return nil }
+        do {
+            try document.model.replaceAllContent(with: record.text, intent: .programmatic)
+        } catch {
+            return nil
+        }
+        return document
+    }
+
     @discardableResult
     public func newDocument(language: LanguageID = .plaintext) -> GlassEditorDocument {
         let document = GlassEditorDocument.untitled(named: untitledName(), language: language)
@@ -508,6 +558,8 @@ public final class GlassEditorWorkspace {
         if let scoped = securityScopedURLs.removeValue(forKey: id) { securityScope.stop(scoped) }
         if previewDocumentID == id { previewDocumentID = nil }
         documents.remove(at: index)
+        // Closed, saved or not: its unsaved text is not to come back (`GlassEditorRecovery`).
+        recovery?.forget(id)
         updateLineMarkers()
         if selection == id {
             // The neighbour, not the first: closing a tab should leave you where you were looking.
@@ -683,7 +735,8 @@ public final class GlassEditorWorkspace {
     public var findQueryValue: FindQuery {
         FindQuery(pattern: findQuery,
                   kind: findUsesRegularExpression ? .regex : .literal,
-                  caseSensitive: findIsCaseSensitive)
+                  caseSensitive: findIsCaseSensitive,
+                  wholeWord: findMatchesWholeWords)
     }
 
     /// Moves the selection to the next match, wrapping. Nothing happens when there is no match,

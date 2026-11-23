@@ -310,14 +310,142 @@ public final class GlassTextView: NSTextView {
         super.deleteWordForward(sender)
     }
 
+    // MARK: - Indentation (2026-11-22)
+
+    // Return keeps the line's indent; Tab over lines indents them and otherwise types to the next tab stop, in spaces
+    // when the document indents with spaces; ⇧Tab outdents. The rules are `LineEditing`'s, shared with UIKit's view.
+
+    /// The document, through the coordinator that feeds it. Nil in a view nobody attached.
+    private var editorModel: GlassEditorModel? { (delegate as? GlassEditorNSCoordinator)?.model }
+
+    /// Whether this view may run an editing rule now: it is editable, a document is attached, and no input method is
+    /// composing (marked text belongs to the input method until it commits).
+    private var canEditLines: Bool { isEditable && editorModel != nil && !hasMarkedText() }
+
+    public override func insertNewline(_ sender: Any?) {
+        guard canEditLines, let model = editorModel else {
+            super.insertNewline(sender)
+            return
+        }
+        let selection = selectedRange()
+        let newline = LineEditing.newline(in: string as NSString,
+                                          replacing: selection.location..<NSMaxRange(selection),
+                                          indentation: model.configuration.indentation, language: model.language)
+        insertText(newline.text, replacementRange: selection)
+        setSelectedRange(NSRange(location: selection.location + newline.caret, length: 0))
+    }
+
     public override func insertTab(_ sender: Any?) {
+        guard canEditLines, let model = editorModel else {
+            pendingIntent = .indentation
+            super.insertTab(sender)
+            return
+        }
+        let text = string as NSString
+        let selection = selectedRange()
+        if LineEditing.selectionSpansLines(selection.location..<NSMaxRange(selection), in: text) {
+            indentLines(sender)
+            return
+        }
         pendingIntent = .indentation
-        super.insertTab(sender)
+        insertText(LineEditing.tab(in: text, at: selection.location, indentation: model.configuration.indentation),
+                   replacementRange: selection)
     }
 
     public override func insertBacktab(_ sender: Any?) {
-        pendingIntent = .indentation
-        super.insertBacktab(sender)
+        guard canEditLines else {
+            pendingIntent = .indentation
+            super.insertBacktab(sender)
+            return
+        }
+        outdentLines(sender)
+    }
+
+    /// One level more on every line the selection touches (⌘], and Tab over lines).
+    @objc public func indentLines(_ sender: Any?) {
+        performLineEdit(intent: .indentation) { text, selection, model in
+            LineEditing.indent(text, selection: selection, indentation: model.configuration.indentation)
+        }
+    }
+
+    /// One level less on every line the selection touches (⌘[, and ⇧Tab).
+    @objc public func outdentLines(_ sender: Any?) {
+        performLineEdit(intent: .indentation) { text, selection, model in
+            LineEditing.outdent(text, selection: selection, indentation: model.configuration.indentation)
+        }
+    }
+
+    // MARK: - Line commands (2026-11-22)
+
+    /// ⌘/: the lines commented out by the document's language, or back in.
+    @objc public func toggleLineComments(_ sender: Any?) {
+        performLineEdit(intent: .lineCommand(.comment)) { text, selection, model in
+            LineEditing.toggleComment(text, selection: selection, language: model.language)
+        }
+    }
+
+    @objc public func duplicateLines(_ sender: Any?) {
+        performLineEdit(intent: .lineCommand(.duplicate)) { text, selection, _ in
+            LineEditing.duplicate(text, selection: selection)
+        }
+    }
+
+    @objc public func moveLinesUp(_ sender: Any?) {
+        performLineEdit(intent: .lineCommand(.moveUp)) { text, selection, _ in
+            LineEditing.move(text, selection: selection, up: true)
+        }
+    }
+
+    @objc public func moveLinesDown(_ sender: Any?) {
+        performLineEdit(intent: .lineCommand(.moveDown)) { text, selection, _ in
+            LineEditing.move(text, selection: selection, up: false)
+        }
+    }
+
+    @objc public func deleteLines(_ sender: Any?) {
+        performLineEdit(intent: .lineCommand(.delete)) { text, selection, _ in
+            LineEditing.delete(text, selection: selection)
+        }
+    }
+
+    @objc public func joinLines(_ sender: Any?) {
+        performLineEdit(intent: .lineCommand(.join)) { text, selection, _ in
+            LineEditing.join(text, selection: selection)
+        }
+    }
+
+    @objc public func sortLines(_ sender: Any?) {
+        performLineEdit(intent: .lineCommand(.sort)) { text, selection, _ in
+            LineEditing.sort(text, selection: selection)
+        }
+    }
+
+    /// Makes a line command's edit as the text view makes any edit: asked of the delegate, which records it in the
+    /// document under `intent` as one step, then made in the text, so only the lines it covers change. Nothing to do
+    /// (outdenting lines with no indent) is a beep, as a refused command is on a Mac.
+    func performLineEdit(intent: EditIntent,
+                         _ make: (NSString, Range<Int>, GlassEditorModel) -> LineEdit?) {
+        guard canEditLines, let model = editorModel, let storage = textStorage else {
+            NSSound.beep()
+            return
+        }
+        let selection = selectedRange()
+        guard let lineEdit = make(string as NSString, selection.location..<NSMaxRange(selection), model) else {
+            NSSound.beep()
+            return
+        }
+        let range = NSRange(location: lineEdit.edit.replacementRange.lowerBound,
+                            length: lineEdit.edit.replacementRange.count)
+        pendingIntent = intent
+        guard shouldChangeText(in: range, replacementString: lineEdit.edit.text) else {
+            pendingIntent = nil
+            return
+        }
+        storage.replaceCharacters(in: range, with: lineEdit.edit.text)
+        didChangeText()
+        let selected = NSRange(location: lineEdit.selection.lowerBound, length: lineEdit.selection.count)
+        setSelectedRange(selected)
+        scrollRangeToVisible(selected)
     }
 }
 

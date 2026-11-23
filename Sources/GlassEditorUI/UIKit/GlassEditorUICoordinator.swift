@@ -63,6 +63,12 @@ public final class GlassEditorUICoordinator: NSObject, UITextViewDelegate {
     ) -> Bool {
         guard !isApplyingHighlight else { return true }
 
+        // Return and Tab become more than they were: the line's indent, spaces to the next stop, an indent of lines.
+        if let glassTextView = textView as? GlassTextViewIOS,
+           typedReturnOrTab(text, replacing: range, in: glassTextView) {
+            return false
+        }
+
         let glassTextView = textView as? GlassTextViewIOS
         let intent = glassTextView?.pendingIntent
             ?? (text.isEmpty ? EditIntent.deleteBackward : .typing)
@@ -112,13 +118,31 @@ public final class GlassEditorUICoordinator: NSObject, UITextViewDelegate {
     /// step, "Undo Change Case", and leave it selected.
     public func textView(_ textView: UITextView, editMenuForTextIn range: NSRange,
                          suggestedActions: [UIMenuElement]) -> UIMenu? {
-        guard range.length > 0, textView.isEditable, let glassTextView = textView as? GlassTextViewIOS else { return nil }
+        guard textView.isEditable, let glassTextView = textView as? GlassTextViewIOS else { return nil }
+        // The line commands, for a finger: no keyboard means no ⌘] (2026-11-22). At a caret too.
+        func line(_ title: String, _ symbol: String, _ run: @escaping (GlassTextViewIOS) -> Void) -> UIAction {
+            UIAction(title: title, image: UIImage(systemName: symbol)) { [weak glassTextView] _ in
+                if let glassTextView { run(glassTextView) }
+            }
+        }
+        let lines = UIMenu(title: "Lines", children: [
+            line("Indent", "increase.indent") { $0.indentLines(nil) },
+            line("Outdent", "decrease.indent") { $0.outdentLines(nil) },
+            line("Comment or Uncomment", "number") { $0.toggleLineComments(nil) },
+            line("Move Up", "arrow.up") { $0.moveLinesUp(nil) },
+            line("Move Down", "arrow.down") { $0.moveLinesDown(nil) },
+            line("Duplicate", "plus.square.on.square") { $0.duplicateLines(nil) },
+            line("Delete", "trash") { $0.deleteLines(nil) },
+            line("Join", "arrow.right.and.line.vertical.and.arrow.left") { $0.joinLines(nil) },
+            line("Sort", "arrow.up.arrow.down") { $0.sortLines(nil) },
+        ])
+        guard range.length > 0 else { return UIMenu(children: suggestedActions + [lines]) }
         let transformations = UIMenu(title: "Transformations", children: [
             changeCase("Make Upper Case", in: glassTextView, range: range) { $0.uppercased() },
             changeCase("Make Lower Case", in: glassTextView, range: range) { $0.lowercased() },
             changeCase("Capitalize", in: glassTextView, range: range) { $0.capitalized },
         ])
-        return UIMenu(children: suggestedActions + [transformations])
+        return UIMenu(children: suggestedActions + [transformations, lines])
     }
 
     private func changeCase(_ title: String, in textView: GlassTextViewIOS, range: NSRange,
@@ -127,6 +151,66 @@ public final class GlassEditorUICoordinator: NSObject, UITextViewDelegate {
             guard let self, let textView else { return }
             self.changeCase(in: textView, range: range, change)
         }
+    }
+
+    /// Return and Tab, by the Mac's rules (`LineEditing`, 2026-11-22). The keyboard asks this delegate before it types
+    /// either, so this is where they are made: the document first, as one typing step (Tab's as Indentation), then the
+    /// view under the guard, then the caret. UIKit is then told no, and types nothing more.
+    ///
+    /// - Returns: whether it made the change; false leaves the keystroke to UIKit as it was.
+    func typedReturnOrTab(_ text: String, replacing range: NSRange, in textView: GlassTextViewIOS) -> Bool {
+        guard text == "\n" || text == "\t", textView.canEditLines else { return false }
+        let content = textView.textStorage.string as NSString
+        let selection = self.range(of: range)
+        let indentation = model.configuration.indentation
+        if text == "\t", LineEditing.selectionSpansLines(selection, in: content) {
+            textView.indentLines(nil)
+            return true
+        }
+        let typed: (text: String, caret: Int)
+        if text == "\n" {
+            typed = LineEditing.newline(in: content, replacing: selection, indentation: indentation,
+                                        language: model.language)
+        } else {
+            let tab = LineEditing.tab(in: content, at: selection.lowerBound, indentation: indentation)
+            typed = (tab, (tab as NSString).length)
+        }
+        do {
+            try model.apply(TextEdit(replacementRange: selection, text: typed.text),
+                            intent: text == "\t" ? .indentation : .typing)
+        } catch {
+            assertionFailure("Rejected a typed \(text == "\n" ? "Return" : "Tab"): \(error)")
+            return false
+        }
+        textView.inputDelegate?.textWillChange(textView)
+        withApplying {
+            textView.textStorage.replaceCharacters(
+                in: range, with: NSAttributedString(string: typed.text, attributes: textView.typingAttributes))
+        }
+        textView.inputDelegate?.textDidChange(textView)
+        let caret = NSRange(location: range.location + typed.caret, length: 0)
+        textView.selectedRange = caret
+        textView.scrollRangeToVisible(caret)
+        // What a keystroke's change notice does: the selection to the document, the gutter, the next highlight.
+        textViewDidChange(textView)
+        return true
+    }
+
+    /// A line command (`LineEditing`), made as a change of case is: one step of the model under `intent`, then the view
+    /// follows it, and the selection goes where the command says.
+    func performLineEdit(in textView: GlassTextViewIOS, intent: EditIntent,
+                         _ make: (NSString, Range<Int>, GlassEditorModel) -> LineEdit?) {
+        let selection = range(of: textView.selectedRange)
+        guard let lineEdit = make(textView.textStorage.string as NSString, selection, model) else { return }
+        do {
+            try model.apply(lineEdit.edit, intent: intent)
+        } catch {
+            assertionFailure("Rejected a line command: \(error)")
+            return
+        }
+        syncTextViewFromModel(textView)
+        textView.selectedRange = NSRange(location: lineEdit.selection.lowerBound, length: lineEdit.selection.count)
+        model.selectedRange = lineEdit.selection
     }
 
     /// One step of the model, then the view follows it, as an undo does.
@@ -226,6 +310,10 @@ public final class GlassEditorUICoordinator: NSObject, UITextViewDelegate {
     ) {
         var restored = attributes
         restored[.font] = AttributedAssembly.font(
+            configuration: model.configuration, surface: model.surfaceCondition
+        )
+        // And the tab width, which a font change moves too (2026-11-22).
+        restored[.paragraphStyle] = AttributedAssembly.paragraphStyle(
             configuration: model.configuration, surface: model.surfaceCondition
         )
         textView.typingAttributes = restored

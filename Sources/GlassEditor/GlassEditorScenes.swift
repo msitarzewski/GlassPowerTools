@@ -48,11 +48,90 @@ public final class GlassEditorRuntime {
     public let layers: GlassLayerStore
     private let defaults: UserDefaults
 
-    public init(layers: GlassLayerStore? = nil, defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
+    /// Unsaved text kept against a crash (`GlassEditorRecovery`, 2026-11-22).
+    public let recovery: GlassEditorRecovery
+
+    public init(layers: GlassLayerStore? = nil, defaults: UserDefaults = GlassUITestRun.settingsDefaults,
+                recoveryDirectory: URL? = nil) {
         self.layers = layers ?? GlassLayerStore()
         self.defaults = defaults
         self.preferences = GlassEditorPreferences(defaults: defaults)
         self.projects = GlassEditorProjectLibrary(defaults: defaults)
+        self.recovery = GlassEditorRecovery(directory: recoveryDirectory)
+    }
+
+    // MARK: Recovery (2026-11-22)
+
+    @ObservationIgnored private var keepingUnsavedText: Task<Void, Never>?
+    @ObservationIgnored private var didRecover = false
+    /// Set by Quit Without Saving: nothing is kept after it. The app going inactive on its way out kept the documents
+    /// again, and the next launch brought back what was let go (seen in the macOS VM, 2026-11-22).
+    @ObservationIgnored private var lettingGo = false
+
+    /// Keeps unsaved text every two seconds while the app runs: one write per document whose text moved on.
+    public func startKeepingUnsavedText() {
+        guard keepingUnsavedText == nil else { return }
+        keepingUnsavedText = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                self?.keepUnsavedTextNow()
+            }
+        }
+    }
+
+    /// Keeps it now: the app is going to the background, where the system may end it without a word.
+    public func keepUnsavedTextNow() {
+        guard !lettingGo else { return }
+        recovery.sweep(workspaces.sorted { $0.key.uuidString < $1.key.uuidString }.map { ($0.key, $0.value) })
+    }
+
+    /// Quit Without Saving: the unsaved text was let go on purpose, and none of it comes back.
+    public func discardUnsavedText() {
+        lettingGo = true
+        keepingUnsavedText?.cancel()
+        keepingUnsavedText = nil
+        recovery.forgetAll()
+    }
+
+    /// The documents the app last ended without saving, opened again, each in a window with the others it shared one
+    /// with, and the windows to show. Once per launch. Each window says what came back and what to do with it.
+    public func recoverUnsavedDocuments() async -> [UUID] {
+        guard !didRecover else { return [] }
+        didRecover = true
+        let records = recovery.recordsFromEarlierRuns()
+        guard !records.isEmpty else { return [] }
+        var windows: [UUID: UUID] = [:]
+        var recovered: [UUID: [String]] = [:]
+        var order: [UUID] = []
+        for record in records {
+            let windowID: UUID
+            if let existing = windows[record.windowID] {
+                windowID = existing
+            } else {
+                windowID = newWindowID()
+                windows[record.windowID] = windowID
+                order.append(windowID)
+            }
+            let document = await workspace(for: windowID).adoptRecovered(record)
+            // Recovered or not, the old copy has done its work; an unsaved document is kept again as itself.
+            recovery.forget(record.documentID)
+            if document != nil {
+                recovered[windowID, default: []].append(record.machine.map { "\(record.name) (from \($0))" } ?? record.name)
+            }
+        }
+        let shown = order.filter { recovered[$0] != nil }
+        for id in shown {
+            guard let names = recovered[id], let workspace = workspaces[id] else { continue }
+            workspace.noticeOnAppear = Self.recoveryMessage(names)
+        }
+        keepUnsavedTextNow()
+        return shown
+    }
+
+    /// What a window of recovered documents says: what came back, and the two ways to settle it.
+    static func recoveryMessage(_ names: [String]) -> String {
+        let what = names.count == 1 ? names[0] : ListFormatter.localizedString(byJoining: names)
+        return "Recovered unsaved changes to \(what) from when \(GlassProduct.displayName) last closed. Save to keep them, or close without saving to let them go."
     }
 
     /// The workspace for a window, made the first time anything asks for it.
@@ -70,6 +149,7 @@ public final class GlassEditorRuntime {
         if let existing = workspaces[id] { return existing }
         let workspace = GlassEditorWorkspace(preferences: preferences, defaults: defaults)
         workspace.securityScope = securityScope
+        workspace.recovery = recovery
         // A window's own settings are kept with its project, on this device (W23).
         workspace.keepWindowSettings = { [weak self] project, settings in
             self?.projects.setWindowSettings(settings, for: project)
@@ -220,6 +300,7 @@ public final class GlassEditorRuntime {
         // is the only place it happens, so dropping the workspace without it would leak the
         // connection.
         workspaces[id]?.closeAllProjects()
+        for document in workspaces[id]?.documents ?? [] { recovery.forget(document.id) }
         workspaces[id] = nil
     }
 
@@ -625,9 +706,22 @@ public struct GlassEditorBootstrap<Content: View>: View {
     @State private var presented: GlassEditorWindowPresentation?
     /// On an iPhone Duo's two pages, only the page in use carries out requests (D93).
     @Environment(\.glassPageIsFocused) private var pageIsFocused
+    @Environment(\.scenePhase) private var scenePhase
 
     public var body: some View {
         base
+            // What the app last ended without saving, back as the app starts; then kept from here on
+            // (`GlassEditorRecovery`, 2026-11-22). Once per launch, whichever window asks first.
+            .task {
+                let windows = await runtime.recoverUnsavedDocuments()
+                runtime.startKeepingUnsavedText()
+                guard !windows.isEmpty else { return }
+                runtime.show(windows, with: openWindow)
+            }
+            // Out of sight the system may end the app without a word: what is unsaved is kept first.
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { runtime.keepUnsavedTextNow() }
+            }
             .onChange(of: runtime.presentationSerial) { _, _ in
                 guard pageIsFocused, let id = runtime.requestedWindowID else { return }
                 if Self.canOpenWindows {
@@ -943,6 +1037,42 @@ struct GlassEditorCommands: Commands {
 
             Button("Go to Line…") { actions?.goToLine() }
                 .keyboardShortcut("l", modifiers: [.command, .option])
+                .disabled(actions == nil)
+
+            Divider()
+
+            // Xcode's keys for Shift Right and Shift Left (2026-11-22), to the text that has the keyboard, as the Edit
+            // menu's Transformations are sent. Tab over lines and ⇧Tab do the same.
+            Button("Indent") { send(#selector(GlassTextView.indentLines(_:))) }
+                .keyboardShortcut("]", modifiers: .command)
+                .disabled(actions == nil)
+            Button("Outdent") { send(#selector(GlassTextView.outdentLines(_:))) }
+                .keyboardShortcut("[", modifiers: .command)
+                .disabled(actions == nil)
+            // Xcode's and VS Code's key; by the document's language (`LanguageID.lineComment`).
+            Button("Comment or Uncomment Lines") { send(#selector(GlassTextView.toggleLineComments(_:))) }
+                .keyboardShortcut("/", modifiers: .command)
+                .disabled(actions == nil)
+
+            Divider()
+
+            // Sublime Text's keys for moving lines: Xcode's ⌥⌘] is the terminal's Focus Next Pane, and ⌥↑ moves by
+            // paragraph in every Mac text view. ⇧⌘K is VS Code's Delete Line. Duplicate has no key: ⌘D and ⇧⌘D are the
+            // terminal's splits.
+            Button("Move Lines Up") { send(#selector(GlassTextView.moveLinesUp(_:))) }
+                .keyboardShortcut(.upArrow, modifiers: [.control, .command])
+                .disabled(actions == nil)
+            Button("Move Lines Down") { send(#selector(GlassTextView.moveLinesDown(_:))) }
+                .keyboardShortcut(.downArrow, modifiers: [.control, .command])
+                .disabled(actions == nil)
+            Button("Duplicate Lines") { send(#selector(GlassTextView.duplicateLines(_:))) }
+                .disabled(actions == nil)
+            Button("Delete Lines") { send(#selector(GlassTextView.deleteLines(_:))) }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                .disabled(actions == nil)
+            Button("Join Lines") { send(#selector(GlassTextView.joinLines(_:))) }
+                .disabled(actions == nil)
+            Button("Sort Lines") { send(#selector(GlassTextView.sortLines(_:))) }
                 .disabled(actions == nil)
 
         }

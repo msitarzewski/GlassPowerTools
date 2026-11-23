@@ -32,6 +32,29 @@ When two or more documents are open, they appear as tabs above the text. Choose 
 
 Each file keeps its own history of changes. **Edit ▸ Undo** (⌘Z) takes back the last change, and **Redo** (⇧⌘Z) brings it back; the menu names what it will undo, for example **Undo Typing**, **Undo Paste** or **Undo Cut**. A run of typing undoes as one change, and a paste, a cut or a **Replace All** each undo on their own. On iPad, iPhone and Vision Pro, ⌘Z and ⇧⌘Z work with a keyboard, and so do the system's own ways to undo: the undo and redo buttons above the on-screen keyboard, swiping left or right with three fingers, and shaking iPhone.
 
+## Indent lines
+
+- **Return** starts the next line at the same indent as the line you're on. In code, a line ending in **{**, **[** or **(** starts the next one a level deeper, and when the closing bracket is right after the cursor it moves down to a line of its own. In Python and YAML a line ending in **:** does the same.
+- **Tab** types a tab, or with spaces as many as reach the next tab stop. With lines selected, Tab indents them and **⇧Tab** outdents them.
+- **On Mac:** **Text** ▸ **Indent** (⌘]) and **Outdent** (⌘[) do the same for every line the selection touches. **On iPad, iPhone and Vision Pro** with a keyboard, ⌘], ⌘[ and ⇧Tab; without one, select text or tap at the cursor and choose **Lines** ▸ **Indent** or **Outdent**.
+
+Each indent or outdent undoes on its own, as **Undo Indentation**. A file indented with tabs keeps using tabs, and one indented with spaces keeps its own width; the status bar shows which, and changes it for that file. See [Languages, Find and the Status Bar](editor-languages.md#the-status-bar) and [Editor settings](editor-settings.md).
+
+## Comment, move and rearrange lines
+
+Each of these works on every line the selection touches, or the cursor's line, and undoes on its own (**Undo Comment**, **Undo Move Lines** and so on).
+
+| Command | On Mac (Text menu) | What it does |
+|---|---|---|
+| **Comment or Uncomment Lines** | ⌘/ | Comments the lines out, in the file's language (`//`, `#` or `--`), at their shallowest indent; if every line with text is already commented, uncomments them. HTML, XML and Markdown wrap the lines in `<!-- -->`. JSON and plain text have no comments. |
+| **Move Lines Up** / **Move Lines Down** | ⌃⌘↑ / ⌃⌘↓ | Swaps the lines with the one above or below. |
+| **Duplicate Lines** | — | Puts a copy below and selects it. |
+| **Delete Lines** | ⇧⌘K | Removes the lines entirely. |
+| **Join Lines** | — | Puts the cursor's line and the next together, or all the selected lines, with one space between. |
+| **Sort Lines** | — | Puts the selected lines in order, as Finder orders names. |
+
+**On iPad, iPhone and Vision Pro**, the same keys work with a keyboard, and every command is in the selection menu under **Lines** (select text, or tap at the cursor).
+
 ## Type on iPhone Duo
 
 Half open and standing like a small laptop, iPhone Duo shows the text (or the text and its preview, as you chose) above the fold, and folding it brings up the keyboard. Between the fold and the keys is a strip: **Tab**, brackets and quotes and the other characters code needs (swipe for more), **Left** and **Right**, **Undo**, **Redo** and **Find**. Each types or acts at the cursor. With the keyboard up, the button at the strip's start is **Preview** for a file that has one: it puts the keyboard away and shows the file's preview below the fold. **Show Keyboard** brings the keyboard back. Folding closes the project's file list, which would cover the strip.

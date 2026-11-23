@@ -1,6 +1,6 @@
 # Save Your Work
 
-This page covers saving a document, choosing where a new document goes the first time you save it, what happens when a file changed after you opened it, and closing a document with unsaved changes.
+This page covers saving a document, choosing where a new document goes the first time you save it, what happens when a file changed after you opened it, closing a document with unsaved changes, and how unsaved changes survive the app closing unexpectedly.
 
 ## Save a document
 
@@ -65,3 +65,13 @@ Unsaved changes are never thrown away without asking:
 - **On Mac**, quitting with unsaved changes asks **Quit without saving?** and names the documents. **Cancel** brings their window forward so you can save; **Quit Without Saving** quits.
 - **On iPad and Vision Pro**, a window can be closed without the app being asked. A window closed with unsaved changes keeps them: **Active** lists it with how many are unsaved, and choosing it brings the window back.
 - Closing an editor session from **Active** or **Show All Windows**, on any device, asks **Close without saving?** first. **Discard Changes** closes it; **Cancel** keeps it.
+
+## If the app closes unexpectedly
+
+While a document has unsaved changes, the Editor keeps a copy of its text on this device, updated a couple of seconds after you type and at once when the app goes to the background. If Glass Power Tools quits unexpectedly, or iPhone, iPad or Vision Pro closes it while it's in the background, the next time it opens the Editor brings those documents back in their windows, still unsaved, and says which ones:
+
+- A file on this device opens again with your changes over it, so **Undo** goes back to what's saved on disk.
+- A file that's no longer there, or one that was on another machine, comes back as an untitled document with the same name, and the notice says which machine it was from. Save it where you want it.
+- **Save** keeps the changes; closing without saving lets them go.
+
+The copy is removed when you save, when you close without saving, and when you choose **Quit Without Saving**, so changes you let go on purpose don't come back. Copies stay on this device and never sync.

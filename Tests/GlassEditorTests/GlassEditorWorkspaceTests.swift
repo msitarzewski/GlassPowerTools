@@ -216,6 +216,64 @@ struct GlassEditorWorkspaceTests {
         #expect(document.model.text == "amber green amber blue amber")
     }
 
+    /// Indentation (2026-11-22): a file's own stays whatever Settings ▸ Editor says, except a tab's width, which is the
+    /// reader's; a document with none follows Settings; the default is kept across a relaunch; one chosen from the bar
+    /// stays.
+    @Test func indentationFollowsTheFileThenSettings() async throws {
+        let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let defaults = UserDefaults.forTest(suiteName: "editor.tests.\(UUID().uuidString)")!
+        let workspace = GlassEditorWorkspace(defaults: defaults)
+        let tabbed = try #require(await workspace.open(try write("func a() {\n\treturn\n}\n", named: "t.swift", in: root)))
+        let spaced = try #require(await workspace.open(try write("a:\n  b: 1\n", named: "s.yaml", in: root)))
+        let plain = try #require(await workspace.open(try write("one\ntwo\n", named: "p.txt", in: root)))
+        #expect(tabbed.model.configuration.indentation.kind == .tabs)
+        #expect(spaced.model.configuration.indentation == Indentation(kind: .spaces, width: 2))
+        #expect(plain.model.configuration.indentationSource == .settings)
+
+        workspace.preferences.indentation = Indentation(kind: .tabs, width: 8)
+        workspace.applyAppearance()
+        #expect(tabbed.model.configuration.indentation == Indentation(kind: .tabs, width: 8), "tabs drawn 8 wide")
+        #expect(spaced.model.configuration.indentation == Indentation(kind: .spaces, width: 2), "the file's own")
+        #expect(plain.model.configuration.indentation == Indentation(kind: .tabs, width: 8), "no style of its own")
+
+        // Chosen for the document, it stays.
+        plain.model.configuration.indentation = Indentation(kind: .spaces, width: 3)
+        plain.model.configuration.indentationSource = .chosen
+        workspace.preferences.indentation = .standard
+        workspace.applyAppearance()
+        #expect(plain.model.configuration.indentation == Indentation(kind: .spaces, width: 3))
+
+        // Kept across a relaunch.
+        workspace.preferences.indentation = Indentation(kind: .tabs, width: 2)
+        #expect(GlassEditorPreferences(defaults: defaults).indentation == Indentation(kind: .tabs, width: 2))
+    }
+
+    /// Whole Words in the find bar (2026-11-22): the engine could, the bar never asked. "red" inside "bored" and "reddish"
+    /// is not found, counted or replaced; switched off, it is again.
+    @Test func wholeWordsInTheFindBar() async throws {
+        let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let url = try write("bored red reddish red_x (red)", named: "words.txt", in: root)
+        let workspace = makeWorkspace()
+        let opened = await workspace.open(url)
+        let document = try #require(opened)
+
+        workspace.findQuery = "red"
+        workspace.findMatchesWholeWords = true
+        #expect(try document.model.matches(of: workspace.findQueryValue).map(\.lowerBound) == [6, 25])
+        document.model.selectedRange = 0..<0
+        workspace.findNext()
+        #expect(document.model.selectedRange == 6..<9)
+        workspace.findNext()
+        #expect(document.model.selectedRange == 25..<28, "past reddish and red_x, to (red)")
+
+        workspace.replacement = "blue"
+        #expect(workspace.replaceAll() == 2)
+        #expect(document.model.text == "bored blue reddish red_x (blue)")
+
+        workspace.findMatchesWholeWords = false
+        #expect(try document.model.matches(of: workspace.findQueryValue).count == 3, "bored, reddish, red_x")
+    }
+
     /// TextEdit's Find items the editor lacked (2026-11-03: "all of the expected text editor functions ... like say
     /// TextEdit"): Find and Replace… opens the bar with the keyboard in Replace; Use Selection for Find takes the selected
     /// text, escaped for a pattern search; Jump to Selection reveals it; Replace replaces this match, selects the next,

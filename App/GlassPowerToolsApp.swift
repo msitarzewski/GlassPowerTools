@@ -586,6 +586,7 @@ struct GlassPowerToolsApp: App {
         // A quit asks first when the editor has unsaved changes, and Cancel goes to them.
         MacTerminalAppDelegate.unsavedDocumentNames = { editor.unsavedDocumentNames }
         MacTerminalAppDelegate.showUnsavedDocuments = { editor.presentFirstUnsaved() }
+        MacTerminalAppDelegate.discardUnsavedDocuments = { editor.discardUnsavedText() }
         // Handoff: a terminal, database or desktop continued from another device (D72).
         MacTerminalAppDelegate.continueActivity = { activity in
             guard let endpoint = GlassHandoff.endpoint(from: activity) else { return false }

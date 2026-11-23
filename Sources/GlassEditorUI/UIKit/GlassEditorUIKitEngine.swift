@@ -398,7 +398,9 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         // touching `appliedFontSize`, so they must force a re-resolve too.
         if previous.fontName != current.fontName
             || previous.fontSize != current.fontSize
-            || previous.minimumContrastRatio != current.minimumContrastRatio {
+            || previous.minimumContrastRatio != current.minimumContrastRatio
+            // A tab's width is in the paragraph style (`AttributedAssembly.paragraphStyle`).
+            || previous.indentation.width != current.indentation.width {
             repaintForAppearanceChange()
         }
     }

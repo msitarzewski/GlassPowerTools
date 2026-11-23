@@ -204,6 +204,13 @@ public final class GlassEditorModel {
         grammarRegistry: GrammarRegistry? = nil
     ) {
         self.snapshot = snapshot
+        var configuration = configuration
+        // The file's own indentation, when its lines have any: a tab-indented file stays tabbed whatever the default.
+        if configuration.indentationSource == .settings,
+           let detected = Indentation.detect(in: snapshot.content, defaultWidth: configuration.indentation.width) {
+            configuration.indentation = detected
+            configuration.indentationSource = .file
+        }
         self.configuration = configuration
         self.theme = theme
         self.surfaceCondition = surfaceCondition
