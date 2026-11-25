@@ -6,6 +6,25 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.650</title>
+      <pubDate>Wed, 25 Nov 2026 03:20:43 GMT</pubDate>
+      <sparkle:version>650</sparkle:version>
+      <sparkle:shortVersionString>0.4.650</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.650</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.650</h2>
+<ul>
+  <li><b>Local terminals keep their folder permissions through updates.</b> Terminals in tmux on your Mac run in a small background app inside Glass Power Tools, which macOS knows as the app, so programs in them can still reach Documents, Desktop and Downloads after an update. Terminals started by an earlier version are named once when the app opens, with the offer to end them.</li>
+  <li><b>GitHub Copilot's replies are readable in tmux</b>, and a program that sets its own colours no longer covers the glass; they go when it quits.</li>
+  <li><b>The Editor indents as you type.</b> Return keeps the indent, Tab and ⇧Tab indent and outdent, each file keeps to tabs or spaces, ⌘/ comments lines out, and Move, Duplicate, Delete, Join and Sort Lines are in the Text menu. Find matches whole words, and unsaved changes come back after the app closes unexpectedly.</li>
+  <li><b>Resizing a window leaves one copy of Claude Code's conversation</b> in a tmux terminal, not one per step of the drag.</li>
+  <li><b>⌘C no longer beeps</b> after a program that has the mouse copied your drag.</li>
+  <li><b>Marks for Pi and Antigravity's CLI</b>, and a blinking cursor no longer counts as work.</li>
+</ul>
+<p>Everything in this build: <a href="https://github.com/msitarzewski/GlassPowerTools/blob/main/RELEASE-NOTES.md">the release notes</a>.</p>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.650/GlassPowerTools-0.4.650.zip" length="29734936" type="application/octet-stream" sparkle:edSignature="1Wk4Lz4F2lQuflDYHVcXodslGRmHJsCCPHVLvtCS1FtZeN401DWlpnk+frk5cN+UX+lMjMnWLUtxCJvm27hXDg=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.632</title>
       <pubDate>Sat, 21 Nov 2026 17:26:09 GMT</pubDate>
       <sparkle:version>632</sparkle:version>
