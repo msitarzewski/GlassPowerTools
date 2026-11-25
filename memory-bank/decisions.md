@@ -2388,7 +2388,7 @@ another socket than the listing's would read as every session ended.
 **Implementation check, 2026-11-18:** Active requires a completed reply with readable rows before inferring that
 a session ended. A partial or unreadable reply follows the existing unchecked-machine path.
 
-## D111 — A terminal only ever rejoins its own tmux session; a relaunch doesn't reopen one that ended — Approved 2026-11-19, implemented, not released
+## D111 — A terminal only ever rejoins its own tmux session; a relaunch doesn't reopen one that ended — Approved 2026-11-19, implemented, released in 0.4.622
 **Owner:** his Mac ran out of memory and he force-restarted it with ~29 local tabs in tmux (Workgroups' and ad hoc).
 Every tab came back "an empty shell", all in `~`, and "because they're tmux now, closing the window leaves that number of
 empty tmux sessions running", so he typed `exit` in each. On the iPhone (621), D110 closed the terminals whose names
@@ -2423,7 +2423,7 @@ noteTerminalsClosed`, `GlassRunningReport.closed`) and Active says it under the 
 the Mac's listing unreadable at launch, windows come back and a pane whose session is gone shows its tmux exit rather
 than closing (unknown keeps a pane, `MacLocalTerminalExitPolicy`). A split tab with one dead local pane keeps the tab.
 
-## D112 — A Workgroup is edited in its panel, saved as you go; no editor sheet — Approved 2026-11-19, implemented, not released
+## D112 — A Workgroup is edited in its panel, saved as you go; no editor sheet — Approved 2026-11-19, implemented, released in 0.4.632
 **Owner:** of the Edit Workgroup sheet, "one quick thing that bugs me when I encounter it is the edit mode in workgroups.
 Let's remove the edit modal and put that directly into the panel itself." Asked, he chose: every change saves as it is
 made (⌘Z undoes), on every device, and a new Workgroup goes straight into the panel rather than a sheet.
@@ -2441,7 +2441,7 @@ fields under the list are gone.
 **Limits:** Return outside a text field still opens the Workgroup (the panel's default button). Deleting a tab asks
 nothing (undo brings it back).
 
-## D113 — One layout on every device: the same windows and tabs everywhere — Approved 2026-11-22 (design; phase 1 built, 0.4.636, not released)
+## D113 — One layout on every device: the same windows and tabs everywhere — Approved 2026-11-22 (design; phase 1 built, 0.4.636, released in 0.4.650; its record type not yet in production)
 **Owner:** "should we consider a global sync of windows/tabs/etc where when I add a new tab on mac it appears available
 on ViionOS etc." Offered listing only; he: "Auto open is what made me want this feature. If the machine manages the
 windows/workgroups/tabs/DB/desktops... then other devices would simply read the layout. If I add a tab to a window on my
@@ -2466,7 +2466,7 @@ publishes nothing until its last run's windows are back (`TerminalWorkgroupsToRe
 15 min before changes are tried again. **Needs his CloudKit Console deploy of `LayoutItem` to production** before it
 syncs. Plan, evidence and tests: `tasks/2026-11/2026-11-21_shared-layout.md`.
 
-## D114 — D66's host runs from its own copy of the app, which updates never touch — Implemented 2026-11-23 (0.4.646, not released)
+## D114 — D66's host runs from its own copy of the app, which updates never touch — Implemented 2026-11-23 (0.4.646, released in 0.4.650)
 **Why.** The host ran the app's own executable and outlived updates by design; an update replaced that executable
 under it, macOS's check of the running host failed ("the code on disk does not match what is running"), and its
 terminals were refused Documents, Desktop and Downloads: Desktop and Downloads at once, Documents within ten
@@ -2486,7 +2486,7 @@ asked for (`tasks/2026-11/2026-11-23_tmux-host-after-update.md`). Not seen: a De
 build is ad hoc); the grant carrying over rests on the copy's identical signature and the 0.4.623 → 0.4.632 grant.
 **Superseded in part by D115 (0.4.648):** the copy is of a small host app, not the whole app.
 
-## D115 — D66's host is a small app of its own, with the app's bundle ID and signature — Approved 2026-11-24, implemented (0.4.648, not released)
+## D115 — D66's host is a small app of its own, with the app's bundle ID and signature — Approved 2026-11-24, implemented (0.4.648, released in 0.4.650)
 **Why.** D114 copied the whole app (229 MB; its executable alone 179 MB) for a process that only starts tmux and
 waits on it (no sockets or pipes, standard streams /dev/null, 0% CPU; tabs' tmux clients talk to tmux's socket), and
 ran it as a 35 MB process. The owner: "incredibly inefficient". Measured in the SIP-on VM on 2026-11-23 (private

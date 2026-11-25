@@ -199,6 +199,29 @@
   copy removed, the 0.4.646 copy (229 MB) kept while its terminals run. No crash reports. Headset installed (second
   try; the first was interrupted); the iPhone unreachable.
 
+## Shipping 0.4.650 (his "update the memory bank, commit, and push. Ship it!", 2026-11-24)
+- `b737ac73` (0.4.644–0.4.650, with README, RELEASE-NOTES and the site's pages at 0.4.650) pushed.
+- Mac v0.4.650 built with Xcode 27.2 (27B52) in the release worktree (`<work>/release-622-tree`; 0.4.632's outputs
+  kept as `build/release-632`, `build/testflight-632`): app and disk image notarized, stapled, Gatekeeper-accepted
+  (Notarized Developer ID); `SUPublicEDKey` the same as 0.4.632's. **The helper's first Developer ID build:** signed
+  with the hardened runtime and a secure timestamp, its designated requirement the app's, 88 KB, Gatekeeper-accepted;
+  the script's new check passed. GitHub v0.4.650 Latest, the tag at `b737ac73`; dmg, zip and checksums downloaded
+  back byte-identical. Feed entry `321f19ff` pushed. The Mac's sixteenth release. Texts in `<work>/release-650`.
+- TestFlight 650: iOS and visionOS uploaded from `b737ac73` (a second worktree, `<work>/release-650-tf-tree`), both
+  VALID, What to Test set (3,280 characters, read back), both in Testers (read from the group's side; the build's
+  side refuses the read), submitted for beta review; both APPROVED by the morning of 2026-11-25.
+- Site built at `321f19ff` (111 files) and staged on the server, 111 of 111 matching by SHA-256; he provisioned it.
+- Live, checked 2026-11-25: 111 of 111 files match the build. The feed is served `no-cache`, newest item 0.4.650,
+  byte for byte `site/static/appcast.xml` at `321f19ff`. The zip from its enclosure URL is 29,734,936 bytes as
+  advertised and equals the release's; its EdDSA signature verifies against the app's `SUPublicEDKey` (a copy with
+  one byte changed fails).
+- An independent agent check from the raw sources agreed on everything: the release and its tag, main, the
+  signatures and the helper, the feed and its signature (the key the same as 0.4.632's), the site rebuilt at
+  `321f19ff` (110 identical; `sitemap.xml` differs only in its `lastmod`, the build's own date), and App Store
+  Connect.
+- Left out of the release's highlights: the layout (0.4.636), refused until `LayoutItem` is in CloudKit's production
+  schema.
+
 ## Next
 - The iPhone's install when it is reachable (the change is the Mac's alone).
 - His terminals move to the helper when they next all end (End All Local Terminals, or a restart); the 0.4.646 copy

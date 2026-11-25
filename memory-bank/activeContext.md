@@ -167,10 +167,17 @@ use the disposable test VM only).
   (Developer ID, hardened runtime, the app's designated requirement; seen failing three ways). `LayoutItem` is still
   not in CloudKit's production schema, so the layout (0.4.636) stays refused for released copies too (saves back
   off, Settings says so) until his CloudKit Console deploy; left out of the release's highlights.
-- **Next:** his terminals move to the helper when they next all end. His look at 0.4.639–0.4.643; his
+- **0.4.650 shipped:** `b737ac73` pushed; Mac v0.4.650 (notarized; the helper's first Developer ID build passed;
+  GitHub Latest, downloads byte-identical); feed `321f19ff` pushed; TestFlight 650 iOS and visionOS in Testers, both
+  approved in beta review; the site live and checked 111/111 with the feed's zip and signature verified. An
+  independent agent check agreed. Record: `tasks/2026-11/2026-11-23_tmux-host-after-update.md` (Shipping 0.4.650).
+- **His report (2026-11-25), right after:** with a local folder open in the Editor, the folder button's Open Folder in
+  Editor in an SSH terminal only brought that Editor forward; the server's folder never opened. A defect; being
+  traced.
+- **Next:** that defect. His terminals move to the helper when they next all end. His look at 0.4.639–0.4.643; his
   look at ⇧⌘E on 0.4.638; his look at `agy` on 0.4.637; his CloudKit Console deploy, then the layout
-  seen on two devices, then phase 2; Apple's beta review of 632; his Dock-stack SVG check on macOS 27; batching releases and quiet Sparkle
-  installs, asked; the iPhone and headset on 632 when reachable.
+  seen on two devices, then phase 2; his Dock-stack SVG check on macOS 27; batching releases and quiet Sparkle
+  installs, asked; the headset on 0.4.650 when reachable (it has 0.4.649); the app's 30–36% CPU, offered.
 
 ## 2026-11-15 (evening) — the iPhone's Active, from his day on the phone (released in 0.4.621)
 

@@ -3,7 +3,7 @@
 **Owner:** Claude (coordinator). **Authorization:** the owner's report (2026-11-24, a screenshot of GitHub Copilot's
 CLI in a local tmux terminal: its replies unreadable on the dark glass), a defect to fix locally; build, VM test and
 installs under the standing authorization. Committed and pushed at his word (2026-11-24, "update the memory bank,
-commit, and push. Ship it!"), for the 0.4.650 release.
+commit, and push. Ship it!"); released in 0.4.650 (Mac, TestFlight 650), 2026-11-24.
 
 ## The defect
 
