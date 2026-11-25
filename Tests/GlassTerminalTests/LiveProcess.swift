@@ -1,5 +1,6 @@
 import Foundation
 import GlassTerminalEmulator
+import GlassTerminalHost
 import Testing
 
 /// Live tests that start tmux or shells run in the macOS VM or a simulator, never on the owner's Mac (the owner,

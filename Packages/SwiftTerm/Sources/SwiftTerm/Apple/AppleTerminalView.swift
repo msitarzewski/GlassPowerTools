@@ -792,7 +792,10 @@ extension TerminalView {
 
     public func setBackgroundColor(source: Terminal, color: Color) {
         // Can not implement this until I change the color to not be this struct
-        nativeBackgroundColor = TTColor.make (color: color)
+        // Glass Power Tools (S6): the program's colour at the view's own opacity, which `backgroundOpacity`
+        // and the host set; it was drawn opaque, covering what the host shows through the terminal. Opaque
+        // while the view has no colour yet: the terminal's setup reaches here before the view's is set.
+        nativeBackgroundColor = TTColor.make (color: color).withAlphaComponent (_nativeBg?.cgColor.alpha ?? 1)
         colorsChanged()
     }
     

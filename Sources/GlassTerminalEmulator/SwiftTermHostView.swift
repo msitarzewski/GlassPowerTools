@@ -513,6 +513,22 @@ public final class SwiftTermHostModel: ObservableObject {
     /// A local pane's tmux session was renamed (`%session-renamed`, 2026-10-29), to this name: the
     /// pane and its workgroup keep it, so neither makes the old one again.
     public var onTmuxSessionRenamed: (@MainActor (String) -> Void)?
+    /// The colours this terminal answers a program that asks for its text and background (OSC 10 and 11):
+    /// its theme's, noted as the theme is applied. A session's tmux client tells them to tmux, which answers
+    /// for the terminal there (`TmuxControlClient.setColors`, 2026-11-24). Nil until a theme is.
+    public private(set) var answeredColors: TerminalColors?
+    /// The answered colours changed. Told after the view's update that changed them, never inside it.
+    public var onAnsweredColorsChange: (@MainActor (TerminalColors) -> Void)?
+
+    fileprivate func noteAnsweredColors(_ colors: TerminalColors) {
+        guard colors != answeredColors else { return }
+        answeredColors = colors
+        guard onAnsweredColorsChange != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.answeredColors == colors else { return }
+            self.onAnsweredColorsChange?(colors)
+        }
+    }
     /// The history is the terminal's own though it runs in tmux: Find, Select All and scrolling use it
     /// rather than tmux's.
     public var keepsHistoryUnderTmux: Bool { isTmuxControlClient }
@@ -1767,6 +1783,43 @@ public struct SwiftTermTheme: Equatable {
             && lhs.cursor == rhs.cursor
             && lhs.selection == rhs.selection
             && lhs.ansiColors == rhs.ansiColors
+    }
+
+    /// What the terminal answers a program that asks for its colours (OSC 10 and 11): the text's, and the
+    /// background's whatever its opacity — SwiftTerm's own answer outside tmux.
+    public var answeredColors: TerminalColors {
+        TerminalColors(foreground: .init(red: foreground.red, green: foreground.green, blue: foreground.blue),
+                       background: .init(red: background.red, green: background.green, blue: background.blue))
+    }
+
+    #if os(macOS)
+    /// The text's colour as the view draws it.
+    var nativeText: NSColor {
+        NSColor(srgbRed: foreground.red, green: foreground.green, blue: foreground.blue, alpha: 1)
+    }
+    /// The background as the view draws it: its opacity is the theme's (none: the glass behind shows).
+    var nativeBackground: NSColor {
+        NSColor(srgbRed: background.red, green: background.green, blue: background.blue, alpha: background.alpha)
+    }
+    #else
+    var nativeText: UIColor {
+        UIColor(red: foreground.red, green: foreground.green, blue: foreground.blue, alpha: 1)
+    }
+    var nativeBackground: UIColor {
+        UIColor(red: background.red, green: background.green, blue: background.blue, alpha: background.alpha)
+    }
+    #endif
+}
+
+/// **A program gives the terminal its own colours back** (2026-11-24). OSC 110 and 111 ask for the text and the
+/// background the terminal had before the program set its own (OSC 10 and 11); SwiftTerm ignores both, so what a
+/// program set stayed after it left. GitHub Copilot's CLI sets GitHub's colours as it starts and asks for these
+/// back as it quits. Handled here, where the theme is known: `restore` puts the theme's back, the text's (true)
+/// or the background's (false). SwiftTerm has no handler of its own for either code.
+enum TerminalColorReset {
+    static func install(on terminal: Terminal, restore: @escaping @MainActor (_ text: Bool) -> Void) {
+        terminal.parser.oscHandlers[110] = { _ in MainActor.assumeIsolated { restore(true) } }
+        terminal.parser.oscHandlers[111] = { _ in MainActor.assumeIsolated { restore(false) } }
     }
 }
 
@@ -3767,6 +3820,7 @@ private final class SwiftTermEngine: TerminalEngine {
             guard let self else { return }
             self.onOSC52Decision(SwiftTermOSC52Policy.evaluate(request))
         }
+        TerminalColorReset.install(on: terminalView.getTerminal()) { [weak self] text in self?.restoreThemeColor(text: text) }
         scrollWatcher = UIKitAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
         #if os(visionOS)
         rendererObservers = [
@@ -4160,8 +4214,23 @@ private final class SwiftTermEngine: TerminalEngine {
         color?.alpha ?? 0
     }
 
+    /// The theme last applied: what a program's OSC 110 or 111 asks back (`TerminalColorReset`).
+    private var appliedTheme: SwiftTermTheme?
+
+    private func restoreThemeColor(text: Bool) {
+        guard let appliedTheme else { return }
+        if text {
+            terminalView.nativeForegroundColor = appliedTheme.nativeText
+        } else {
+            terminalView.nativeBackgroundColor = appliedTheme.nativeBackground
+            enforceClearBacking()
+        }
+    }
+
     private func applyTheme(_ theme: SwiftTermTheme) {
         clearBlacks.configure(theme)
+        // For tmux to answer with: a session's tmux client takes them from here.
+        terminalView.hostModel()?.noteAnsweredColors(theme.answeredColors)
         let fontSize = max(10, theme.fontSize)
         if theme.fontName == "SF Mono" {
             terminalView.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -4171,18 +4240,9 @@ private final class SwiftTermEngine: TerminalEngine {
         }
         // Under Scale the grid's size at the font is what is scaled; it may have changed.
         containerView.setNeedsLayout()
-        terminalView.nativeForegroundColor = UIColor(
-            red: theme.foreground.red,
-            green: theme.foreground.green,
-            blue: theme.foreground.blue,
-            alpha: 1
-        )
-        terminalView.nativeBackgroundColor = UIColor(
-            red: theme.background.red,
-            green: theme.background.green,
-            blue: theme.background.blue,
-            alpha: theme.background.alpha
-        )
+        appliedTheme = theme
+        terminalView.nativeForegroundColor = theme.nativeText
+        terminalView.nativeBackgroundColor = theme.nativeBackground
         enforceClearBacking()
         terminalView.caretColor = UIColor(
             red: theme.cursor.red,
@@ -4750,14 +4810,35 @@ private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHo
         return super.performKeyEquivalent(with: event)
     }
 
+    // ⌘C after a program that has the mouse copied a drag by itself (`MacProgramCopy`, 2026-11-23).
+    let programCopy = MacProgramCopy()
+
     override func mouseDown(with event: NSEvent) {
         dropHeldSelection()
+        programCopy.forget()
         super.mouseDown(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        programCopy.released(programHadMouse: MacProgramCopy.programHasMouse(self, event: event))
+    }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(copy(_:)), standsForProgramCopy { return true }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    /// No selection of the terminal's, and the clipboard holds what the program copied: ⌘C is done already.
+    private var standsForProgramCopy: Bool {
+        heldSelection == nil && !selection.active && programCopy.holdsProgramCopy
     }
 
     override func copy(_ sender: Any) {
         if let heldSelection {
             MacTerminalContextMenu.copy(heldSelection, to: MacTerminalContextMenu.copyPasteboard)
+        } else if standsForProgramCopy {
+            return
         } else {
             super.copy(sender)
         }
@@ -4875,6 +4956,20 @@ private final class MacSwiftTermEngine: TerminalEngine {
         terminalView.getTerminal().parser.oscHandlers[52] = { [weak self] request in
             guard let self else { return }
             self.onOSC52Decision(SwiftTermOSC52Policy.evaluate(request))
+        }
+        TerminalColorReset.install(on: terminalView.getTerminal()) { [weak self] text in self?.restoreThemeColor(text: text) }
+    }
+
+    /// The theme last applied: what a program's OSC 110 or 111 asks back (`TerminalColorReset`).
+    private var appliedTheme: SwiftTermTheme?
+
+    private func restoreThemeColor(text: Bool) {
+        guard let appliedTheme else { return }
+        if text {
+            terminalView.nativeForegroundColor = appliedTheme.nativeText
+        } else {
+            terminalView.nativeBackgroundColor = appliedTheme.nativeBackground
+            terminalView.layer?.backgroundColor = NSColor.clear.cgColor
         }
     }
 
@@ -5004,6 +5099,8 @@ private final class MacSwiftTermEngine: TerminalEngine {
 
     private func applyTheme(_ theme: SwiftTermTheme) {
         clearBlacks.configure(theme)
+        // For tmux to answer with: a session's tmux client takes them from here.
+        terminalView.hostModel?.noteAnsweredColors(theme.answeredColors)
         let fontSize = max(10, theme.fontSize)
         terminalView.font = theme.fontName == "SF Mono"
             ? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -5011,18 +5108,9 @@ private final class MacSwiftTermEngine: TerminalEngine {
                 ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         // Under Scale the grid's size at the font is what is scaled; it may have changed.
         scaleView.cellsChanged()
-        terminalView.nativeForegroundColor = NSColor(
-            srgbRed: theme.foreground.red,
-            green: theme.foreground.green,
-            blue: theme.foreground.blue,
-            alpha: 1
-        )
-        terminalView.nativeBackgroundColor = NSColor(
-            srgbRed: theme.background.red,
-            green: theme.background.green,
-            blue: theme.background.blue,
-            alpha: theme.background.alpha
-        )
+        appliedTheme = theme
+        terminalView.nativeForegroundColor = theme.nativeText
+        terminalView.nativeBackgroundColor = theme.nativeBackground
         terminalView.caretColor = NSColor(
             srgbRed: theme.cursor.red,
             green: theme.cursor.green,
@@ -5550,14 +5638,35 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
         return super.performKeyEquivalent(with: event)
     }
 
+    // ⌘C after a program that has the mouse copied a drag by itself (`MacProgramCopy`, 2026-11-23).
+    let programCopy = MacProgramCopy()
+
     override func mouseDown(with event: NSEvent) {
         dropHeldSelection()
+        programCopy.forget()
         super.mouseDown(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        programCopy.released(programHadMouse: MacProgramCopy.programHasMouse(self, event: event))
+    }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(copy(_:)), standsForProgramCopy { return true }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    /// No selection of the terminal's, and the clipboard holds what the program copied: ⌘C is done already.
+    private var standsForProgramCopy: Bool {
+        heldSelection == nil && !selection.active && programCopy.holdsProgramCopy
     }
 
     override func copy(_ sender: Any) {
         if let heldSelection {
             MacTerminalContextMenu.copy(heldSelection, to: MacTerminalContextMenu.copyPasteboard)
+        } else if standsForProgramCopy {
+            return
         } else {
             super.copy(sender)
         }
@@ -5966,6 +6075,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
             guard let self else { return }
             self.onOSC52Decision(SwiftTermOSC52Policy.evaluate(request))
         }
+        TerminalColorReset.install(on: terminalView.getTerminal()) { [weak self] text in self?.restoreThemeColor(text: text) }
     }
 
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
@@ -6039,6 +6149,19 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         }
     }
 
+    /// The theme last applied: what a program's OSC 110 or 111 asks back (`TerminalColorReset`).
+    private var appliedTheme: SwiftTermTheme?
+
+    private func restoreThemeColor(text: Bool) {
+        guard let appliedTheme else { return }
+        if text {
+            terminalView.nativeForegroundColor = appliedTheme.nativeText
+        } else {
+            terminalView.nativeBackgroundColor = appliedTheme.nativeBackground
+            terminalView.layer?.backgroundColor = NSColor.clear.cgColor
+        }
+    }
+
     func configure(theme: SwiftTermTheme, runtimeSettings: SwiftTermRuntimeSettings) {
         applyTheme(theme)
         applyRuntimeSettings(runtimeSettings)
@@ -6097,7 +6220,8 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
             return
         }
         let terminal = terminalView.getTerminal()
-        terminalView.tmuxControl = TmuxControlClient(columns: terminal.cols, rows: terminal.rows, overPipe: true)
+        terminalView.tmuxControl = TmuxControlClient(columns: terminal.cols, rows: terminal.rows, overPipe: true,
+                                                     colors: appliedTheme?.answeredColors)
         terminalView.tmuxWriter = { [weak pipe] data in pipe?.write(data) }
         terminalView.onTmuxControlEvent = { [weak self] action in
             switch action {
@@ -6474,6 +6598,9 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
 
     private func applyTheme(_ theme: SwiftTermTheme) {
         terminalView.clearBlacks.configure(theme)
+        // For tmux to answer with, while this pane is its client.
+        delegateProxy.hostModel?.noteAnsweredColors(theme.answeredColors)
+        if let actions = terminalView.tmuxControl?.setColors(theme.answeredColors) { sendToTmux(actions) }
         let fontSize = max(10, theme.fontSize)
         terminalView.font = theme.fontName == "SF Mono"
             ? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -6481,18 +6608,9 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
                 ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         // Under Scale the grid's size at the font is what is scaled; it may have changed.
         scaleView.cellsChanged()
-        terminalView.nativeForegroundColor = NSColor(
-            srgbRed: theme.foreground.red,
-            green: theme.foreground.green,
-            blue: theme.foreground.blue,
-            alpha: 1
-        )
-        terminalView.nativeBackgroundColor = NSColor(
-            srgbRed: theme.background.red,
-            green: theme.background.green,
-            blue: theme.background.blue,
-            alpha: theme.background.alpha
-        )
+        appliedTheme = theme
+        terminalView.nativeForegroundColor = theme.nativeText
+        terminalView.nativeBackgroundColor = theme.nativeBackground
         terminalView.caretColor = NSColor(
             srgbRed: theme.cursor.red,
             green: theme.cursor.green,

@@ -2465,3 +2465,45 @@ publishes nothing until its last run's windows are back (`TerminalWorkgroupsToRe
 `MacWorkspacePreviewRegistry.layoutReady`) and nothing while the Mac quits; a failed pass waits 30 s doubling to
 15 min before changes are tried again. **Needs his CloudKit Console deploy of `LayoutItem` to production** before it
 syncs. Plan, evidence and tests: `tasks/2026-11/2026-11-21_shared-layout.md`.
+
+## D114 — D66's host runs from its own copy of the app, which updates never touch — Implemented 2026-11-23 (0.4.646, not released)
+**Why.** The host ran the app's own executable and outlived updates by design; an update replaced that executable
+under it, macOS's check of the running host failed ("the code on disk does not match what is running"), and its
+terminals were refused Documents, Desktop and Downloads: Desktop and Downloads at once, Documents within ten
+minutes (reproduced in the macOS VM with SIP on, released 0.4.623 → 0.4.632; a report of Claude Code refused its
+project folder). The first answer, 0.4.644, named such a host at opening and offered to end every terminal; it
+asked at every install, and the owner, shown it: "This is not ok. Every quit CAN NOT DO THIS."
+**Decided.** The job runs the host from a copy of the whole app bundle in
+`~/Library/Application Support/Glass Power Tools/Terminal Host.noindex/<version>-<cdhash prefix>/`
+(`MacTmuxHostCopy`): an APFS clone, checked (same CDHash, `SecStaticCodeCheckValidity`) before use, run once with
+`--tmux-host-ready` at the app's start so macOS's first-run scan (4.5–5.5 s in the VM) isn't paid while a terminal
+waits; copies no host uses are removed when a server starts. Same code and signature, so macOS knows it as Glass
+Power Tools and the app's grants apply (a Developer ID update kept the Documents grant in the VM). The 0.4.644 alert
+stays for hosts an earlier version started: it appears once, at the move to this build.
+**Seen in the VM:** the copy's host under launchd; after the app was replaced, Documents read and Desktop was asked
+for (not refused); eleven minutes on, Documents and Desktop still read from old and new terminals and Downloads was
+asked for (`tasks/2026-11/2026-11-23_tmux-host-after-update.md`). Not seen: a Developer ID build of this code (the VM
+build is ad hoc); the grant carrying over rests on the copy's identical signature and the 0.4.623 → 0.4.632 grant.
+**Superseded in part by D115 (0.4.648):** the copy is of a small host app, not the whole app.
+
+## D115 — D66's host is a small app of its own, with the app's bundle ID and signature — Approved 2026-11-24, implemented (0.4.648, not released)
+**Why.** D114 copied the whole app (229 MB; its executable alone 179 MB) for a process that only starts tmux and
+waits on it (no sockets or pipes, standard streams /dev/null, 0% CPU; tabs' tmux clients talk to tmux's socket), and
+ran it as a 35 MB process. The owner: "incredibly inefficient". Measured in the SIP-on VM on 2026-11-23 (private
+memory `tcc-identity-rules`): a bare executable is known to macOS's privacy permissions by its path, even with the
+app's identifier and certificate; a bundle is known by its bundle ID and signature, so a small `.app` with the app's
+ID, signed as the app is, shares the app's grants both ways. A differently signed one is asked again, and its answer
+replaces the app's row. His word on the proposal: "yes, build 0.4.648 and test it in the VM first".
+**Decided.** `Glass Power Tools Terminal Host.app` (target `GlassPowerToolsTerminalHost`, `TerminalHost/`) is
+embedded in `Contents/Helpers`: bundle ID `$(GPT_BUNDLE_ID)`, signed by Xcode with the app's identity, `LSBackgroundOnly`,
+a fixed `CFBundleVersion` 1, no URL schemes, document types or icon. Its whole program is `MacTmuxHost` in the new
+`GlassTerminalHost` module, with `GlassSpawn` (moved from GlassTerminalEmulator) and nothing else linked. The app is
+no longer a host itself (`--tmux-host` left its entry point). The job runs a copy in `Terminal Host.noindex/host-<cdhash
+prefix>/Glass Power Tools.app`: named by the helper's code hash alone, so an update that leaves the helper as it was
+keeps its copy, and named after `CFBundleName` because a folder prompt names the program by its bundle's file name
+(VM: “Glass Power Tools Terminal Host” would like to access…, and the same signed bundle renamed was asked for as
+“Glass Power Tools”). The helper inside the app hosts when no copy can be made. Copies nothing runs from, D114's
+whole-app copies among them, are removed as before.
+**Seen in the VM** (`tasks/2026-11/2026-11-23_tmux-host-after-update.md`, "The small helper built (0.4.648)").
+**Not seen:** a Developer ID build of the helper (release builds re-sign nested code with the distribution identity;
+notarization of a nested app sharing the app's bundle ID is unproven until the next release).

@@ -13,6 +13,7 @@
 
 #if os(macOS)
 import Foundation
+import GlassTerminalHost
 
 @MainActor
 final class TmuxControlPipe {

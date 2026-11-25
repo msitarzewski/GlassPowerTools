@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.632 (21 November 2026): a download from
+The Mac app's first release was 0.4.491 (20 October 2026), and the latest is 0.4.650 (24 November 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to a TestFlight beta by invitation; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.632)
+## What it holds (0.4.650)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -59,7 +59,10 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 - On the Mac and Vision Pro, a file whose path a terminal prints previews over the terminal, a log's
   end included, and Watch Log File follows a log in a new tab; files dropped on a terminal have their
   paths typed, and on a server they are uploaded first. AI coding agents are
-  recognised on tabs and cards.
+  recognised on tabs and cards, Pi and Antigravity's CLI among them.
+- On the Mac, local terminals in tmux run in a small background app inside Glass Power Tools, so they keep the
+  app's permissions for Documents, Desktop and Downloads through updates. A program that asks the terminal its
+  colours gets the theme's, in tmux too, and its own colours never cover the glass.
 - A workgroup's terminals on a Mac belong to that Mac: every other device, another Mac too, opens
   them there over SSH, on their own tmux sessions. A workgroup can open databases and remote desktops
   from the library too, with its terminals or on their own, and is edited where it is shown, saved as you go.
@@ -90,8 +93,11 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 ### Editor
 - Files on this device or on a server, projects with a file tree, syntax highlighting, and previews
   for Markdown (with Mermaid diagrams), HTML, SVG and CSV. Images, PDFs, video, audio and 3D models
-  open as themselves. On the Mac it can be your default text editor. Undo and redo, Find and Replace,
-  Transformations and the spelling switches TextEdit has, with the same keys on iPad, iPhone and Vision Pro.
+  open as themselves. On the Mac it can be your default text editor. Undo and redo, Find and Replace
+  (whole words too), Transformations and the spelling switches TextEdit has, with the same keys on iPad, iPhone
+  and Vision Pro.
+- Return keeps the indent; indent and outdent, tabs or spaces file by file; ⌘/ comments lines out; line commands
+  (move, duplicate, delete, join, sort). Unsaved changes come back after the app closes unexpectedly.
 - Git, on this Mac or on a server over the project's SSH connection: Source Control with a diff
   viewer (unified or side by side, changed words highlighted, 3 or 10 lines of context or the whole
   file, whitespace ignored), staging a file, a hunk or chosen lines, discarding, commit and amend,
@@ -118,6 +124,64 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.650 (24 November 2026)
+- **Mac release, 24 November 2026.** Includes everything since 0.4.632: Claude Code's conversation kept once through
+  a resize (0.4.633), the Editor's indenting, comments, line commands and recovery (0.4.639–0.4.642), local terminals
+  keeping their folder permissions through updates (0.4.644–0.4.648), Copilot's colours in tmux (0.4.649) and this.
+- **Pi gets its mark.** A terminal running Pi, the coding agent from pi.dev, shows Pi's mark, in its blue, wherever
+  other coding agents show theirs: the sidebar, tabs, Show All Windows and the Coding Agent look. Pi runs as
+  Node and renames itself `pi`, and that is how it is told. npm's unrelated `pi` package and scripts called `pi.py`
+  are not mistaken for it.
+
+### 0.4.649 (24 November 2026)
+- **GitHub Copilot's replies are readable in tmux.** A program can ask the terminal for its text and background
+  colours, and in tmux it is tmux that answers. tmux 3.4 to 3.8 answer black for both when the terminal is this
+  app (a tmux bug, fixed after 3.8), so Copilot's CLI wrote its replies in black on the dark glass. The app now
+  tells tmux its theme's colours for each terminal (tmux 3.5 and later), and programs there get the right answer.
+- **A program's colours no longer cover the glass, and go when it does.** Copilot sets GitHub's own background
+  and text colours as it starts, and the terminal turned solid; when it quit and asked for the terminal's colours
+  back, nothing changed. A program's background now keeps the terminal's transparency, and its request for the
+  terminal's own colours puts the theme's back.
+
+### 0.4.648 (24 November 2026)
+- **Local terminals run in a small background app, not a copy of the whole app.** The background process that keeps
+  a Mac's tmux terminals running is now a few hundred kilobytes, inside Glass Power Tools, where it was a copy of the
+  whole app (229 MB) and took several times the memory. macOS knows it as Glass Power Tools, so its terminals keep
+  the app's permissions for Documents, Desktop and Downloads, and a folder it asks for is asked for in the app's
+  name. It is copied out of the app only when its own code changes, so most updates leave it as it was. Terminals
+  running when you update keep running as they are; the next set of terminals starts in the small app, and the
+  earlier copy is removed once nothing uses it.
+
+### 0.4.647 (23 November 2026)
+- **The terminal host's earlier copies are removed at the app's start.** A host keeps the copy of the app it runs
+  from; once an update replaces the app, that copy holds the earlier build on disk alone. Copies nothing runs from
+  were removed only when a new set of terminals started, so terminals kept across several updates left one copy
+  each, the app's full size. Now each start removes every copy no running program uses, and keeps the one the
+  running host does until its terminals end.
+
+### 0.4.646 (23 November 2026)
+- **Local terminals keep their folder permissions through updates.** On a Mac, terminals in tmux run in a
+  background process that outlives quits and updates; it ran the app itself, so an update replaced it underneath,
+  macOS stopped recognizing it, and its terminals were refused Documents, Desktop and Downloads. It now runs from
+  its own copy of the app, which updates never touch, so its terminals keep their sessions and their permissions.
+  The copy is a clone where the Mac's disk allows, taking no space until the app changes. Terminals started by an
+  earlier version are named once at opening, with the offer to end them, and then no more.
+
+### 0.4.645 (23 November 2026)
+- **⌘C no longer beeps after a program copied your drag, on the Mac.** In Claude Code's full-screen mode, a drag
+  is Claude Code's selection, and it copies it as you let go; the terminal had nothing selected, so ⌘C beeped
+  though ⌘V pasted. Now, when a program that has the mouse puts your drag on the clipboard, ⌘C goes through and
+  leaves that copy there. Where nothing was copied, ⌘C still has nothing to copy; Shift-drag selects with the
+  terminal.
+
+### 0.4.644 (23 November 2026)
+- **Terminals from before an update are named, with the way out.** On a Mac, local terminals in tmux run in a
+  background Glass Power Tools process that keeps going through an update, still the version from before it. macOS
+  then no longer recognizes it, and programs in those terminals, or in any opened before they end, can be refused
+  Documents, Desktop and Downloads even with the app's permission on. Quitting and reopening didn't help, since the
+  process outlives the app. Now, when the app opens after an update and finds such terminals, it says so and offers
+  to end them; Settings ▸ Terminal says so too. The next terminal starts afresh.
 
 ### 0.4.643 (22 November 2026)
 - **A swipe scrolls a program that takes the mouse, on iPhone and iPad.** In Claude Code's full-screen mode, `vim`,

@@ -66,5 +66,25 @@
   stops refusing when a program has the mouse and the clipboard has changed since the drag in that terminal;
   it still beeps when nothing was copied. After the tmux host work (his order).
 
+## ⌘C after a program copied (0.4.645, 2026-11-23)
+- `Sources/GlassTerminalEmulator/MacProgramCopy.swift`: after a mouse release a program had (mouse mode on, not a
+  Shift bypass), the terminal looks at the clipboard's change count at 100, 300, 700 and 1,500 ms; a change is the
+  program's copy. While the clipboard still holds it (count unchanged), and the terminal has no selection of its own
+  and no held Select All, Copy validates and does nothing more. A press forgets it. Both Mac terminal views
+  (`ReviewingMacTerminalView`, `ReviewingMacLocalProcessTerminalView`) use it.
+- Tests (`MacProgramCopyTests`, 3): the watch on a pasteboard of its own; the real view in an offscreen window with
+  mouse mode on, a drag, a stand-in copy: ⌘C validates and leaves the copy, a press refuses again. Breaking the
+  view's validation failed the view test; breaking the watch failed both. A fixed 250 ms wait failed once under
+  load; the tests now wait for the watch to finish.
+- Help `terminal-sessions.md` (Copying from a program that uses the mouse); RELEASE-NOTES 0.4.645.
+- Whole `GlassTerminalTests` (1,332) runs: two timing failures seen, neither in this code, both settled or recorded:
+  - `MacTerminalSidebarTests` "the terminal window itself": failed the same way on 2026-11-20 (before this work).
+    Cause, from frames printed: an empty window closes its sidebar as it opens, and under load that came after the
+    test set the frame, taking 240 off it (closed 760 wide at 640, not 1000 at 400). The test now sets the frame
+    again once the window has settled. Three runs alone and two full runs passed after.
+  - `TerminalMachineReachTests` "ten terminals … one timeout, not ten": 27.4 s against its 25 s bound once in five
+    full runs; 15.01 s alone, three times. It tells one timeout from two by elapsed time, which load stretches;
+    counting connection attempts would not. Not changed; proposed.
+
 ## Next
-- His try of the swipe on the iPhone; the ⌘C change above.
+- His try of the swipe on the iPhone and of ⌘C on 0.4.645.

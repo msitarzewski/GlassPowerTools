@@ -7,16 +7,17 @@ import Testing
 /// session ended every local terminal, since a server an app starts is that app's to end.
 @Suite("Local tmux under launchd", .serialized)
 nonisolated struct MacTmuxServiceTests {
-    static let host = "/Applications/Glass Power Tools.app/Contents/MacOS/Glass Power Tools"
+    static let host = "/Users/alpha/Library/Application Support/Glass Power Tools/Terminal Host.noindex/host-0123456789ab/"
+        + "Glass Power Tools Terminal Host.app/Contents/MacOS/Glass Power Tools Terminal Host"
 
-    @Test("the job runs the app as the host of tmux, at a terminal's priority, with the pane's environment less launchd's own")
+    @Test("the job runs the terminal host app as the host of tmux, at a terminal's priority, with the pane's environment less launchd's own")
     func job() throws {
         let job = MacTmuxService.job(host: Self.host, tmux: "/opt/homebrew/bin/tmux",
                                      environment: ["PATH": "/opt/homebrew/bin:/usr/bin", "LANG": "en_US.UTF-8",
                                                    "SSH_AUTH_SOCK": "/private/tmp/stale", "TMPDIR": "/var/folders/stale"])
         #expect(job["Label"] as? String == "com.glasspowertools.tmux")
         #expect(job["ProgramArguments"] as? [String] == [Self.host, "--tmux-host", "/opt/homebrew/bin/tmux"],
-                "the app's own executable, so a terminal's programs answer to Glass Power Tools")
+                "the host app, known to macOS as Glass Power Tools, so a terminal's programs answer to it")
         #expect(job["EnvironmentVariables"] as? [String: String] == ["PATH": "/opt/homebrew/bin:/usr/bin", "LANG": "en_US.UTF-8"],
                 "the agent socket and temporary folder are launchd's, current for this login")
         #expect(job["ProcessType"] as? String == "Interactive" && job["KeepAlive"] as? Bool == false)
@@ -24,7 +25,7 @@ nonisolated struct MacTmuxServiceTests {
         #expect(MacTmuxService.jobURL()?.path.contains("/Library/LaunchAgents/") == false, "no login item")
         let test = MacTmuxService.job(label: "t", host: "/h", tmux: "/t", environment: [:], serverArguments: ["-S", "/tmp/s"])
         #expect(test["ProgramArguments"] as? [String] == ["/h", "--tmux-host", "/t", "-S", "/tmp/s"])
-        #expect(MacTmuxService.appExecutable() == nil, "a test runner is no app: it never hosts this Mac's tmux")
+        #expect(MacTmuxHostCopy.helper(of: .main) == nil, "a test runner is no app: it never hosts this Mac's tmux")
     }
 
     private final class Calls: @unchecked Sendable {

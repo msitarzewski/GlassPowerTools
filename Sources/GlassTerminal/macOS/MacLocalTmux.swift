@@ -16,6 +16,7 @@
 import AppKit
 import Foundation
 import GlassTerminalEmulator
+import GlassTerminalHost
 import os
 
 enum MacLocalTmux {
@@ -53,6 +54,9 @@ enum MacLocalTmux {
         var ensureRunning: @Sendable (_ tmux: String, _ environment: [String: String]) -> Void = { _, _ in }
         /// Ends the server and every session in it (Settings ▸ Terminal). Stand-ins: nothing.
         var endServer: @Sendable (_ tmux: String) -> Void = { _ in }
+        /// The server's process, a line a session (`#{pid}`), without starting one, for the check of the host it runs
+        /// under (`MacTmuxHostCheck`, 2026-11-23); nil when none runs. Stand-ins: nil.
+        var serverProcess: @Sendable (_ tmux: String) -> String? = { _ in nil }
         /// Has a session keep its own bell (`TerminalTmux.bellHookArguments`), or clears the one it keeps
         /// (`clearBellArguments`) — `true` sets the hook, `false` clears (2026-11-15). Stand-ins: nothing.
         var bell: @Sendable (_ session: String, _ hook: Bool, _ tmux: String) -> Void = { _, _, _ in }
@@ -93,6 +97,7 @@ enum MacLocalTmux {
             readRepository: { TerminalRepository.read(folder: $0, home: $1) },
             ensureRunning: { MacTmuxService.ensureDefaultServer(tmux: $0, environment: $1) },
             endServer: { MacTmuxService.stopDefaultServer(tmux: $0) },
+            serverProcess: { MacLocalTmux.run($0, ["-N", "list-sessions", "-F", "#{pid}"]) },
             bell: { session, hook, tmux in
                 guard let arguments = hook ? TerminalTmux.bellHookArguments(session: session)
                                            : TerminalTmux.clearBellArguments(session: session) else { return }
@@ -644,41 +649,11 @@ enum MacLocalTmux {
         return reopening
     }
 
-    /// Runs tmux and returns what it printed, or nil when it failed. `posix_spawn` and `waitpid`
-    /// rather than `Process`: `waitUntilExit` spins the caller's run loop, and these queries run
-    /// on the main thread while a tab is being set up. tmux answers in milliseconds.
+    /// Runs tmux and returns what it printed, or nil when it failed (`GlassSpawn.output`), with a
+    /// UTF-8 locale when the app has none.
     nonisolated static func run(_ executable: String, _ arguments: [String],
                                 environment: [String: String] = ProcessInfo.processInfo.environment) -> String? {
-        var output: [Int32] = [-1, -1]
-        guard pipe(&output) == 0 else { return nil }
-        var actions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&actions)
-        defer { posix_spawn_file_actions_destroy(&actions) }
-        posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0)
-        posix_spawn_file_actions_adddup2(&actions, output[1], STDOUT_FILENO)
-        posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0)
-        posix_spawn_file_actions_addclose(&actions, output[0])
-        posix_spawn_file_actions_addclose(&actions, output[1])
-        // Nothing else of the app's: a claim can start the tmux server, which keeps whatever its
-        // first client inherited for as long as it runs — another run's pipe, or a pane's terminal,
-        // or the signals the calling thread blocks (`GlassSpawn`). Reads and End run off the main thread.
-        var attributes: posix_spawnattr_t?
-        posix_spawnattr_init(&attributes)
-        defer { posix_spawnattr_destroy(&attributes) }
-        GlassSpawn.prepare(&attributes)
-        let argv = ([executable] + arguments).map { strdup($0) } + [nil]
-        defer { argv.forEach { free($0) } }
-        var pid: pid_t = 0
-        let envp = spawnEnvironment(environment).map { strdup($0) } + [nil]
-        defer { envp.forEach { free($0) } }
-        let spawned = posix_spawn(&pid, executable, &actions, &attributes, argv, envp)
-        close(output[1])
-        let reader = FileHandle(fileDescriptor: output[0], closeOnDealloc: true)
-        guard spawned == 0 else { return nil }
-        let data = reader.readDataToEndOfFile()
-        var status: Int32 = 0
-        while waitpid(pid, &status, 0) == -1, errno == EINTR {}
-        return status == 0 ? String(decoding: data, as: UTF8.self) : nil
+        GlassSpawn.output(of: executable, arguments, environment: spawnEnvironment(environment))
     }
 
     /// The app's environment with a UTF-8 locale when it has none — the app is started by launchd,

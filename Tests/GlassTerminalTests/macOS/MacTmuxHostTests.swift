@@ -3,21 +3,35 @@ import Foundation
 import os
 import Testing
 @testable import GlassTerminal
+@testable import GlassTerminalHost
 
-/// The background process local terminals run in (D66): it hosts tmux, which ends with its last
-/// session, and the host with it. Live tests use a private server: a socket of their own and no
-/// configuration (rule 63).
+/// The background process local terminals run in (D66), the whole program of the terminal host app since D115: it
+/// hosts tmux, which ends with its last session, and the host with it. Live tests use a private server: a socket of
+/// their own and no configuration (rule 63).
 @Suite("Local tmux host", .serialized)
 nonisolated struct MacTmuxHostTests {
-    @Test("only the app started as host runs as one: the flag, then tmux's full path, then a test's server arguments")
+    @Test("it hosts only when asked: the flag, then tmux's full path, then a test's server arguments")
     func request() {
-        #expect(MacTmuxHost.request(["app"]) == nil)
-        #expect(MacTmuxHost.request(["app", "--tmux-host"]) == nil)
-        #expect(MacTmuxHost.request(["app", "--other", "/t"]) == nil)
-        #expect(MacTmuxHost.request(["app", "--tmux-host", "tmux"]) == nil, "a path, never a name looked up")
-        let plain = MacTmuxHost.request(["app", "--tmux-host", "/opt/homebrew/bin/tmux"])
-        #expect(plain?.tmux == "/opt/homebrew/bin/tmux" && plain?.serverArguments == [])
-        #expect(MacTmuxHost.request(["app", "--tmux-host", "/t", "-S", "/tmp/s"])?.serverArguments == ["-S", "/tmp/s"])
+        #expect(MacTmuxHost.request(["host"]) == nil)
+        #expect(MacTmuxHost.request(["host", "--tmux-host"]) == nil)
+        #expect(MacTmuxHost.request(["host", "--other", "/t"]) == nil)
+        #expect(MacTmuxHost.request(["host", "--tmux-host", "tmux"]) == nil, "a path, never a name looked up")
+        #expect(MacTmuxHost.request(["host", "--tmux-host", "/opt/homebrew/bin/tmux"])
+                == .host(tmux: "/opt/homebrew/bin/tmux", serverArguments: []))
+        #expect(MacTmuxHost.request(["host", "--tmux-host", "/t", "-S", "/tmp/s"])
+                == .host(tmux: "/t", serverArguments: ["-S", "/tmp/s"]))
+        #expect(MacTmuxHost.request(["host", "--tmux-host-ready"]) == .ready)
+        #expect(MacTmuxHost.request(["host", "--tmux-host-ready", "/t"]) == nil)
+    }
+
+    /// Opened from the Finder, or by anything that isn't the job, the helper has nothing to do; asked to be ready,
+    /// it starts and ends well, which is how the app sees a new copy run before it hosts (`MacTmuxHostCopy.warm`).
+    @Test("the program: ready ends at once with 0, anything else unasked with 64, and a host with tmux's status")
+    func program() {
+        #expect(MacTmuxHost.run(["host", "--tmux-host-ready"]) == 0)
+        #expect(MacTmuxHost.run(["host"]) == 64)
+        #expect(MacTmuxHost.run(["host", "-psn_0_12345"]) == 64)
+        #expect(MacTmuxHost.run(["host", "--tmux-host", "/nonexistent/tmux"]) == 1, "a tmux that can't start")
     }
 
     /// 2026-10-24: a program the app starts from a thread other than the main one began with that

@@ -3,6 +3,7 @@ import Foundation
 import Testing
 import SwiftTerm
 @testable import GlassTerminalEmulator
+import GlassTerminalHost
 
 /// tmux's control mode against this Mac's own tmux (D83, 2026-10-19): `tmux -CC` on a real PTY, the
 /// app's `TmuxControlClient` between it and a real SwiftTerm terminal, as a terminal tab would have

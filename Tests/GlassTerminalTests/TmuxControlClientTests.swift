@@ -9,7 +9,7 @@ import SwiftTerm
 @Suite("tmux control mode, step by step")
 struct TmuxControlClientTests {
     private struct Exchange {
-        var client = TmuxControlClient(columns: 80, rows: 24, historyLines: 500)
+        var client: TmuxControlClient
         var drawn = Data()
         var sent = ""
         var live = 0
@@ -17,7 +17,12 @@ struct TmuxControlClientTests {
         var grids: [String] = []
         var renamed: [String] = []
 
+        init(colors: TerminalColors? = nil) {
+            client = TmuxControlClient(columns: 80, rows: 24, historyLines: 500, colors: colors)
+        }
+
         mutating func receive(_ text: String) { apply(client.receive(Data(text.utf8))) }
+        mutating func setColors(_ colors: TerminalColors) { apply(client.setColors(colors)) }
         mutating func type(_ text: String) { apply(client.input(Data(text.utf8))) }
 
         mutating func apply(_ actions: [TmuxControlAction]) {
@@ -342,6 +347,96 @@ struct TmuxControlClientTests {
         // The tab's real frame, after the placeholder tmux was started at.
         exchange.apply(exchange.client.resize(columns: 120, rows: 40))
         #expect(exchange.takeSent() == ["refresh-client -C 120,40"])
+    }
+
+    // MARK: The colours tmux answers a program with (2026-11-24)
+
+    /// A dark theme's: light grey text (#cccccc) on a near-black background (#1a1a1a).
+    private static let dark = TerminalColors(foreground: .init(red: 0.8, green: 0.8, blue: 0.8),
+                                             background: .init(red: 26 / 255, green: 26 / 255, blue: 26 / 255))
+    private static let darkReports = #"refresh-client -r "%3:\033]10;rgb:cccc/cccc/cccc\007" ; "#
+        + #"refresh-client -r "%3:\033]11;rgb:1a1a/1a1a/1a1a\007""#
+
+    @Test("the terminal's colours are told to tmux for the pane, on a line of their own, before it is read")
+    func colorsToldForThePane() {
+        var exchange = Exchange(colors: Self.dark)
+        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n")
+        _ = exchange.takeSent()
+        exchange.receive(startReplies())
+        let sent = exchange.takeSent()
+        #expect(sent.count == 2, "the colours' line, then the pane's read")
+        #expect(sent.first == Self.darkReports)
+        #expect(sent.last?.hasPrefix("capture-pane -p -e -q -J -S -500 -E -1 -t %3 ; ") == true)
+        // Both answered, then the read: drawn as ever.
+        exchange.receive(reply(4) + reply(5) + reply(6) + reply(7, ["$ "]) + reply(8, ["$ "]) + reply(9)
+                         + reply(10, ["0,0,0,2,0,0,23,1,0,0,0,1,0,0,0,0,0,0,80,24,0"]) + reply(11))
+        #expect(exchange.client.phase == .live && exchange.live == 1)
+        #expect(exchange.takeDrawn().contains("$ "))
+    }
+
+    @Test("a tmux before 3.5 refuses the colours: the pane is still read and drawn")
+    func colorsRefused() {
+        var exchange = Exchange(colors: Self.dark)
+        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + startReplies())
+        _ = exchange.takeSent()
+        // tmux 3.4 has no -r: the first fails and the second, on its line, never runs or answers.
+        exchange.receive(reply(4, ["unknown flag -r"], error: true))
+        #expect(exchange.client.phase == .restoring, "the read is still awaited")
+        exchange.receive(reply(5) + reply(6, ["$ "]) + reply(7, ["$ "]) + reply(8)
+                         + reply(9, ["0,0,0,2,0,0,23,1,0,0,0,1,0,0,0,0,0,0,80,24,0"]) + reply(10))
+        #expect(exchange.client.phase == .live && exchange.live == 1)
+        #expect(exchange.takeDrawn().contains("$ "))
+    }
+
+    @Test("colours known before the pane are told once it is; a change after is told at once; the same, not again")
+    func colorsChanging() {
+        var exchange = Exchange()
+        exchange.setColors(Self.dark)
+        #expect(exchange.takeSent().isEmpty, "no pane yet")
+        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n")
+        _ = exchange.takeSent()
+        exchange.receive(startReplies())
+        #expect(exchange.takeSent().first == Self.darkReports)
+        exchange.receive(reply(4) + reply(5) + reply(6) + reply(7, ["$ "]) + reply(8, ["$ "]) + reply(9)
+                         + reply(10, ["0,0,0,2,0,0,23,1,0,0,0,1,0,0,0,0,0,0,80,24,0"]) + reply(11))
+        exchange.setColors(Self.dark)
+        #expect(exchange.takeSent().isEmpty, "unchanged")
+        let light = TerminalColors(foreground: .init(red: 0, green: 0, blue: 0), background: .init(red: 1, green: 1, blue: 1))
+        exchange.setColors(light)
+        #expect(exchange.takeSent() == [#"refresh-client -r "%3:\033]10;rgb:0000/0000/0000\007" ; "#
+                                        + #"refresh-client -r "%3:\033]11;rgb:ffff/ffff/ffff\007""#])
+    }
+
+    @Test("another pane followed is told the colours too, before it is read")
+    func colorsForANewPane() {
+        var exchange = Exchange(colors: Self.dark)
+        exchange.receive("\u{1B}P1000p%session-changed $1 alpha\r\n" + startReplies())
+        exchange.receive(reply(4) + reply(5) + reply(6) + reply(7, ["$ "]) + reply(8, ["$ "]) + reply(9)
+                         + reply(10, ["0,0,0,2,0,0,23,1,0,0,0,1,0,0,0,0,0,0,80,24,0"]) + reply(11))
+        _ = exchange.takeSent()
+        exchange.receive("%window-pane-changed @1 %9\r\n")
+        let sent = exchange.takeSent()
+        #expect(sent.first == Self.darkReports.replacingOccurrences(of: "%3:", with: "%9:"))
+        #expect(sent.last?.contains("-t %9") == true)
+    }
+
+    @Test("a colour as xterm answers it, sixteen bits a part, whatever it is given")
+    func colorReportText() {
+        #expect(TmuxControlClient.colorReport(pane: "%12", code: 11, .init(red: 0.5, green: 0, blue: 1))
+                == #"refresh-client -r "%12:\033]11;rgb:8000/0000/ffff\007""#)
+        #expect(TerminalColors.RGB(red: 2, green: -1, blue: .nan).xcolor == "rgb:ffff/0000/0000", "kept to 0...1")
+        #expect(TerminalColors.RGB(red: 0x0D / 255.0, green: 0x11 / 255.0, blue: 0x17 / 255.0).xcolor
+                == "rgb:0d0d/1111/1717", "an 8-bit colour, exactly")
+    }
+
+    @Test("only a pane tmux would name goes inside the quotes")
+    func paneIDs() {
+        #expect(TmuxControlClient.isPaneID("%3"))
+        #expect(TmuxControlClient.isPaneID("%120"))
+        #expect(!TmuxControlClient.isPaneID("%"))
+        #expect(!TmuxControlClient.isPaneID("3"))
+        #expect(!TmuxControlClient.isPaneID("%3\" ; kill-server"))
+        #expect(!TmuxControlClient.isPaneID("%３"), "a full-width digit")
     }
 
     @Test("tmux 3.2 and later, as tmux -V says it")

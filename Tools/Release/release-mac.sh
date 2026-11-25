@@ -149,6 +149,18 @@ WIDGET_GROUP="$(/usr/libexec/PlistBuddy -c 'Print :GlassWidgetGroup' "$WIDGET/Co
 grep -qF "<string>$WIDGET_GROUP</string>" "$WORK/widget-entitlements.plist" \
   && grep -qF "<string>$WIDGET_GROUP</string>" <<<"$entitlements" \
   || { echo "widget: the app and the extension are not both signed with App Group $WIDGET_GROUP"; exit 1; }
+# The terminal host (D115) is nested code too, and macOS must take it for the app: folder permissions belong to the
+# app's designated requirement, and the host carries the app's bundle ID so its terminals share them. Check it is
+# signed as the app is, and that its designated requirement is the app's, or its terminals would be refused the
+# folders the app was granted, which notarization would not notice.
+HOST="$APP/Contents/Helpers/Glass Power Tools Terminal Host.app"
+[ -d "$HOST" ] || { echo "terminal host: Contents/Helpers/Glass Power Tools Terminal Host.app missing from the app"; exit 1; }
+info="$(codesign -dvv "$HOST" 2>&1)"
+grep -q "Authority=Developer ID Application" <<<"$info" || { echo "terminal host: not Developer ID signed"; exit 1; }
+grep -q "flags=.*runtime" <<<"$info" || { echo "terminal host: hardened runtime missing"; exit 1; }
+designated() { codesign -d -r- "$1" 2>&1 | sed -n 's/^designated => //p'; }
+[ -n "$(designated "$APP")" ] && [ "$(designated "$HOST")" = "$(designated "$APP")" ] \
+  || { echo "terminal host: its designated requirement is not the app's"; exit 1; }
 [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "$VERSION" ] \
   || { echo "version mismatch"; exit 1; }
 [ -n "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist" 2>/dev/null)" ] \

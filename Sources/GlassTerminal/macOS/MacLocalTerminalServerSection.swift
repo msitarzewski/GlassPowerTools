@@ -19,6 +19,8 @@ struct MacLocalTerminalServerSection: View {
     @State private var sessions: Int?
     @State private var confirming = false
     @State private var ending = false
+    /// Whether the host they run in is one an update has replaced (`MacTmuxHostCheck`, 2026-11-23).
+    @State private var hostReplaced = false
 
     var body: some View {
         Section("tmux") {
@@ -35,6 +37,12 @@ struct MacLocalTerminalServerSection: View {
             if tmuxPath != nil {
                 LabeledContent("Running in the background", value: status)
                     .accessibilityIdentifier("settings.local-terminals-status")
+                if hostReplaced {
+                    Text(MacTmuxHostCheck.settingsNote)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier("settings.local-terminals-host-replaced")
+                }
                 Button("End All Local Terminals…", role: .destructive) { confirming = true }
                     .disabled((sessions ?? 0) == 0 || ending)
                     .accessibilityIdentifier("settings.end-local-terminals")
@@ -80,6 +88,7 @@ struct MacLocalTerminalServerSection: View {
         }
         let output = await Task.detached { server.listSessions(tmux) }.value
         sessions = MacLocalTmux.sessions(from: output).count
+        hostReplaced = await Task.detached { MacTmuxHostCheck.current(server: server) }.value != nil
     }
 
     private func endAll() async {

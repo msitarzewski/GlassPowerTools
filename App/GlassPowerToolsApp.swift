@@ -23,18 +23,9 @@ import GlassWidgetData
 import UIKit
 #endif
 
-/// The app; on a Mac, also the background process that keeps local terminals running
-/// (`MacTmuxHost`), which must start nothing of the app's, so it is chosen before SwiftUI is.
+/// The app. The background process that keeps a Mac's local terminals running (`MacTmuxHost`) was
+/// this executable started another way until 2026-11-24; it is a small app of its own now (D115).
 @main
-enum GlassPowerToolsMain {
-    static func main() {
-        #if os(macOS)
-        MacTmuxHost.runIfAsked()
-        #endif
-        GlassPowerToolsApp.main()
-    }
-}
-
 struct GlassPowerToolsApp: App {
     @State private var layers: GlassLayerStore
     @State private var model: GlassShellModel

@@ -179,6 +179,11 @@ struct MacTerminalSidebarTests {
             }
         }
         await settle()
+        // The frame again once the window is as it opens: an empty window closes its sidebar as it opens, and under
+        // load that came after the frame above and took the sidebar's width off it, so every frame after was off
+        // (2026-11-20 and 2026-11-23, full runs: closed 760 wide at 640).
+        window.setFrame(NSRect(x: 400, y: 300, width: 1000, height: 600), display: true)
+        await settle()
         let sidebar = try #require(GlassAdditiveSidebars.items(in: window).first { $0.behavior == .sidebar })
         let split = try #require(sidebar.viewController.parent as? NSSplitViewController)
         func toggle() async {

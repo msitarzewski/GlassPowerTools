@@ -94,13 +94,19 @@ public struct TmuxControlClient: Sendable {
     /// A size sent and tmux's window not yet read back: what was known of the window is from before
     /// it, and a terminal alone on its session would look like another's for that moment.
     private var windowSizePending = false
+    /// The colours this terminal answers a program that asks for them; told to tmux for each pane followed
+    /// (`TerminalColors`). Nil: nothing told.
+    private var colors: TerminalColors?
 
     /// - Parameter overPipe: tmux runs as `-C` on pipes rather than `-CC` on a terminal: no start
     ///   marker, its protocol from the first byte.
-    public init(columns: Int, rows: Int, historyLines: Int = 10_000, overPipe: Bool = false) {
+    /// - Parameter colors: the terminal's text and background colours, told to tmux for each pane.
+    public init(columns: Int, rows: Int, historyLines: Int = 10_000, overPipe: Bool = false,
+                colors: TerminalColors? = nil) {
         self.columns = max(1, columns)
         self.rows = max(1, rows)
         self.historyLines = max(0, historyLines)
+        self.colors = colors
         if overPipe {
             phase = .starting
             stream = TmuxControlStream(protocolFromStart: true)
@@ -193,7 +199,7 @@ public struct TmuxControlClient: Sendable {
         case .windowPaneChanged(let window, let pane):
             guard window == self.window, pane != self.pane, phase == .live || phase == .restoring else { return [] }
             self.pane = pane
-            return readPane()
+            return reportColors() + readPane()
         case .exit(let reason):
             phase = .exited
             awaiting.removeAll()
@@ -265,7 +271,7 @@ public struct TmuxControlClient: Sendable {
             self.pane = String(pane)
             window = parts.count > 1 ? String(parts[1]) : nil
             panePID = parts.count > 2 ? Int32(parts[2]).flatMap { $0 > 0 ? $0 : nil } : nil
-            return readPane()
+            return reportColors() + readPane()
         case .restore(let part):
             restore.record(part, lines: lines)
             guard restore.isComplete else { return [] }
@@ -324,6 +330,41 @@ public struct TmuxControlClient: Sendable {
         phase = .restoring
         restore = TmuxPaneRestore.Draft()
         return sendLine(TmuxPaneRestore.commands(pane: pane, historyLines: historyLines).map { ($0.command, .restore($0.part)) })
+    }
+
+    /// **The terminal's own colours, for tmux to answer with** (2026-11-24). A program that asks the terminal
+    /// for its text and background colours (OSC 10 and 11) is answered by tmux, not by this terminal, and
+    /// tmux 3.4 to 3.8 answer a pane that only control-mode clients show with black for both: such a client
+    /// has no terminal of its own, and its colours were left at zero (tmux issue 5843, fixed after 3.8).
+    /// GitHub Copilot's CLI then wrote its replies in pure black. tmux 3.5 and later take a control-mode
+    /// client's answer for a pane (`refresh-client -r`), which is then what a program there is told.
+    ///
+    /// For the pane followed, when it becomes known and when the colours change. On a line of its own:
+    /// a tmux before 3.5 refuses `-r`, and an error ends the rest of its line.
+    private mutating func reportColors() -> [TmuxControlAction] {
+        guard let colors, let pane, Self.isPaneID(pane) else { return [] }
+        return sendLine([(Self.colorReport(pane: pane, code: 10, colors.foreground), .ignored),
+                         (Self.colorReport(pane: pane, code: 11, colors.background), .ignored)])
+    }
+
+    /// The terminal's colours changed — its theme did — or were first known: told to tmux for the pane
+    /// followed, if one is known yet; else when it is.
+    public mutating func setColors(_ colors: TerminalColors) -> [TmuxControlAction] {
+        guard colors != self.colors else { return [] }
+        self.colors = colors
+        guard phase == .live || phase == .restoring else { return [] }
+        return reportColors()
+    }
+
+    /// `refresh-client -r` with the answer this terminal would give: the OSC reply, its escapes written for
+    /// tmux's double quotes (`\033`, `\007`), which also keep its `;` from ending the command.
+    static func colorReport(pane: String, code: Int, _ color: TerminalColors.RGB) -> String {
+        "refresh-client -r \"\(pane):\\033]\(code);\(color.xcolor)\\007\""
+    }
+
+    /// `%` and digits, as tmux names a pane: nothing else goes inside the quotes.
+    static func isPaneID(_ pane: String) -> Bool {
+        pane.count > 1 && pane.first == "%" && pane.dropFirst().allSatisfy { $0.isASCII && $0.isNumber }
     }
 
     // MARK: - Keystrokes and sizes
@@ -450,6 +491,42 @@ public struct TmuxControlClient: Sendable {
         guard let major = numbers.first else { return false }
         let minor = numbers.count > 1 ? numbers[1] : 0
         return major > 3 || (major == 3 && minor >= 2)
+    }
+}
+
+// MARK: - The colours a program is told
+
+/// A terminal's text and background colours as it answers a program that asks (OSC 10 and 11): its theme's,
+/// the background's colour whatever its opacity, as SwiftTerm answers outside tmux.
+public struct TerminalColors: Equatable, Sendable {
+    /// Red, green and blue, each 0...1.
+    public struct RGB: Equatable, Sendable {
+        public var red: Double
+        public var green: Double
+        public var blue: Double
+
+        public init(red: Double, green: Double, blue: Double) {
+            self.red = red
+            self.green = green
+            self.blue = blue
+        }
+
+        /// `rgb:rrrr/gggg/bbbb`, sixteen bits a part, as xterm answers and tmux reads.
+        var xcolor: String {
+            func part(_ value: Double) -> String {
+                let clamped = value.isFinite ? min(1, max(0, value)) : 0
+                return String(format: "%04x", Int((clamped * 65_535).rounded()))
+            }
+            return "rgb:\(part(red))/\(part(green))/\(part(blue))"
+        }
+    }
+
+    public var foreground: RGB
+    public var background: RGB
+
+    public init(foreground: RGB, background: RGB) {
+        self.foreground = foreground
+        self.background = background
     }
 }
 

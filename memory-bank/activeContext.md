@@ -117,9 +117,57 @@ use the disposable test VM only).
   have been modified"). Unblock: End All Local Terminals. Task note `tasks/2026-11/2026-11-23_tmux-host-after-update.md`.
 - **0.4.639–0.4.643 and the memory bank committed at his word** (2026-11-23: update the memory bank, then commit). Not
   pushed.
-- **Next, his order (2026-11-23):** reproduce the host's lost folder access in the macOS VM, then the quick fix (on
-  opening, a host older than the app is named and can be restarted); then ⌘C in a program that copied on its own
-  (no beep when the clipboard changed since the drag). His look at 0.4.639–0.4.643; his
+- **Then, his order (2026-11-23):** reproduced in the macOS VM (SIP turned on first: Cirrus's image ships it off,
+  and then nothing is protected): after an update under a running host, Desktop and Downloads refused at once,
+  Documents ten minutes on; a fresh host fixed it. Quick fix 0.4.644: the app names such a host at opening (End N
+  Terminals / Not Now) and in Settings ▸ Terminal; seen in the VM. Installed on his Mac and iPhone (headset locked);
+  his host from 2026-11-19 showed it, he ended the terminals, the new host checks clean. Not committed.
+- **0.4.645:** ⌘C after a program that has the mouse copied the drag itself goes through and leaves that copy
+  (`MacProgramCopy`); tests seen failing with each piece broken. Installed on his Mac (running, no crash report) and
+  iPhone; the headset locked both times. Installing it replaced the 13:58 host again, so the alert asks at every
+  update; a lasting fix proposed in the task note. A sidebar test's race settled; a timing-bound network test
+  recorded. Not committed.
+- **His answer to the alert at every install:** "This is not ok. Every quit CAN NOT DO THIS." So **0.4.646 (D114):**
+  the host runs from an APFS clone of the app in Application Support that updates never touch, made and run once at
+  launch; proven in the VM with SIP on (after the app was replaced, the folders still open eleven minutes on, where
+  the old way lost them). The alert remains only for hosts an earlier build started: once, at the move to 0.4.646.
+- **0.4.647:** copies nothing runs from removed at the app's start (each update had left one, the app's full size).
+  Installed over his running terminals at 16:53; eleven minutes on, the same 0.4.646-copy host, intact, read all
+  three folders.
+- **His questions on the copy ("incredibly inefficient": a 229 MB copy and a 35 MB process to carry the app's name):
+  0.4.648 (D115, his word: "yes, build 0.4.648 and test it in the VM first"):** the host is a small app inside the
+  app (`Glass Power Tools Terminal Host.app`, `GlassTerminalHost` module, the app's bundle ID and signature, no icon),
+  copied out as `host-<cdhash>/Glass Power Tools.app` only when its code changes. The app no longer runs as a host.
+  VM with SIP on, his builds' signing identity: an update from 0.4.647 left the running terminals and their host
+  as they were; the next server ran under the helper (6.8 MB), read the folders granted before with no prompt, and a
+  new folder was asked for as “Glass Power Tools”, recorded under the app's ID; an update to a 0.4.649 twin kept
+  the same copy and host. Unit tests 23 + terminal suite 1,341 passed. Not committed.
+- **0.4.648 installed on his Mac (07:45, 2026-11-24) and the headset;** his running terminals and their 0.4.646-copy
+  host untouched and reading all three folders; the helper's 228 KB copy ready. The iPhone was unreachable.
+- **His report (2026-11-24): GitHub Copilot's CLI unreadable in a local tmux terminal → 0.4.649**
+  (`tasks/2026-11/2026-11-24_copilot-black-text.md`). Copilot asks the terminal its colours; in tmux, tmux answers,
+  and tmux 3.4–3.8 answer black for a pane only control-mode clients show (tmux issue 5843, fixed after 3.8), so its
+  prose was #000000. The tmux client now reports the theme's colours per pane (`refresh-client -r`, tmux 3.5+). In the
+  VM also: Copilot's GitHub Dark turned the glass solid and its reset did nothing; S6 (SwiftTerm) keeps a program's
+  background at the view's opacity, and OSC 110/111 now restore the theme. VM before/after measured; tests 1,348
+  passed, the new ones seen failing with each fix undone. **Installed 18:08 on his Mac (running 0.4.649, no crash
+  reports), the iPhone, and the headset (on a retry after "Connection interrupted").** Not committed.
+- **0.4.649 confirmed by him** with Copilot restarted on tmux 3.8: "Yep, looks good!"
+- **His ask: Pi's mark → 0.4.650** (`tasks/2026-11/2026-11-24_pi-mark.md`): `TerminalAgent.pi`, told by the program
+  name `pi` (Pi is Node and renames itself; tmux says `node`), its npm packages and `~/.pi`; the press-kit badge as
+  the mark, #4D9ABF. Agent tests 17 passed, bites seen. **Installed 19:12 on his Mac (running 0.4.650, no crash
+  reports) and the iPhone; the headset was unreachable** (on 0.4.649). Not committed.
+- Same evening, his Activity Monitor: three visionOS 27.2 simulators idle since 19 and 21 November (two Apple Vision
+  Pro, one another project's; only system apps running) were shut down; the app held 30–36% CPU on 0.4.649,
+  not yet looked into (offered).
+- **His word (2026-11-24, evening): "update the memory bank, commit, and push. Ship it!"** As for 0.4.612 and 0.4.632,
+  that is the release: 0.4.644–0.4.650 and the records committed and pushed, then Mac 0.4.650 (notarized, GitHub
+  release, feed entry), TestFlight 650 for iOS and visionOS, and the site. README, RELEASE-NOTES ("What it holds"
+  and a Mac release line in 0.4.650) and the site's pages at 0.4.650. `release-mac.sh` now checks the terminal host
+  (Developer ID, hardened runtime, the app's designated requirement; seen failing three ways). `LayoutItem` is still
+  not in CloudKit's production schema, so the layout (0.4.636) stays refused for released copies too (saves back
+  off, Settings says so) until his CloudKit Console deploy; left out of the release's highlights.
+- **Next:** his terminals move to the helper when they next all end. His look at 0.4.639–0.4.643; his
   look at ⇧⌘E on 0.4.638; his look at `agy` on 0.4.637; his CloudKit Console deploy, then the layout
   seen on two devices, then phase 2; Apple's beta review of 632; his Dock-stack SVG check on macOS 27; batching releases and quiet Sparkle
   installs, asked; the iPhone and headset on 632 when reachable.

@@ -24,6 +24,7 @@ let package = Package(
         .library(name: "GlassSSHTransport", targets: ["GlassSSHTransport"]),
         .library(name: "GlassTerminal", targets: ["GlassTerminal"]),
         .library(name: "GlassTerminalEmulator", targets: ["GlassTerminalEmulator"]),
+        .library(name: "GlassTerminalHost", targets: ["GlassTerminalHost"]),
         .library(name: "GlassDBKit", targets: ["GlassDBKit"]),
         .library(name: "GlassDatabase", targets: ["GlassDatabase"]),
         .library(name: "VNCKit", targets: ["VNCKit"]),
@@ -300,15 +301,20 @@ let package = Package(
             ],
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),
+        // The terminal host (D66, D115): the whole program of the small app local terminals run under
+        // (`TerminalHost/`, an Xcode target), and how the app starts a program of its own (`GlassSpawn`), which
+        // the host shares. Nothing else and no dependency, so the helper carries little.
+        .target(name: "GlassTerminalHost", swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]),
         .target(
             name: "GlassTerminalEmulator",
-            dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
+            dependencies: ["GlassTerminalHost", .product(name: "SwiftTerm", package: "SwiftTerm")],
             swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]
         ),
         .target(
             name: "GlassTerminal",
             dependencies: [
                 "GlassTerminalEmulator",
+                "GlassTerminalHost",
                 "GlassShell",
                 "GlassLayers",
                 "GlassSSHTransport",
@@ -411,6 +417,7 @@ let package = Package(
             name: "GlassTerminalTests",
             dependencies: [
                 "GlassTerminal",
+                "GlassTerminalHost",
                 "GlasSecretStore",
                 "GlassEditorCore", "GlassEditorUI",
                 .product(name: "Citadel", package: "Citadel"),

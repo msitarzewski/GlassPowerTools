@@ -148,6 +148,32 @@ struct TerminalAgentTests {
         #expect(TerminalAgent.identify(program: "agyx", arguments: nil) == nil)
     }
 
+    /// The owner (2026-11-24), a terminal running Pi with no mark. Pi 1.6.0 on his Mac: `~/.local/bin/pi` links to
+    /// the installer's launcher, a shell script that `exec`s the package's `cli.js`, which renames its process `pi`;
+    /// tmux says `node`, and the command line reads `pi`.
+    @Test("Pi by its renamed process, its package and its install folder; npm's pi package and pi.py are not it")
+    @MainActor func pi() {
+        func told(_ line: String, program: String? = nil) -> TerminalAgent? {
+            TerminalAgent.identify(program: program, arguments: TerminalAgent.identifyingWords(line))
+        }
+        #expect(told("pi ", program: "node") == .pi, "as the owner's Mac has it: tmux's node, the command line pi")
+        #expect(TerminalAgent.identify(program: "pi", arguments: nil) == .pi, "a host whose tmux names it by its title")
+        #expect(told("/bin/sh /Users/someone/.pi/agent/bin/pi", program: "sh") == .pi, "the launcher, before its exec")
+        #expect(told("node /Users/someone/.pi/agent/install/releases/1.6.0/node_modules/.bin/pi", program: "node") == .pi,
+                "before it renames itself: its install folder")
+        #expect(told("node /usr/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js", program: "node") == .pi)
+        #expect(told("node /usr/lib/node_modules/@mariozechner/pi-coding-agent/dist/cli.js", program: "node") == .pi,
+                "its name before Earendil")
+        #expect(told("npx -y @earendil-works/pi-coding-agent", program: "npx") == .pi)
+        #expect(told("python3 pi.py", program: "python3") == nil, "a script about the number")
+        #expect(told("npx pi", program: "npx") == nil, "npm's pi, a package about the number")
+        #expect(told("node /x/node_modules/pi/index.js", program: "node") == nil)
+        #expect(told("python3 -m pi", program: "python3") == nil)
+        #expect(told("python3 /Users/a/Projects/pi/app.py", program: "python3") == nil, "a project folder is not Pi")
+        #expect(TerminalAgent.identify(program: "pip", arguments: nil) == nil)
+        #expect(TerminalAgent.pi.accent != nil && TerminalAgent.pi.logoSVG != nil)
+    }
+
     /// Hermes Agent, on another machine, went unmarked (the owner, 2026-10-14, with a picture):
     /// a Python agent can be launched by a shell script, as a module, or by a runner.
     @Test("an agent launched as a Python module, by a runner, or by a shell script is told, and inline code never kept")

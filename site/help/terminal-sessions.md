@@ -212,6 +212,10 @@ They send what bash, zsh and most command-line programs take for these moves (�
 
 Right-click, or Control-click, in a terminal for **Look Up**, **Copy**, **Paste** and **Select All**. The selected text also works with **Services**. Right-clicking a word outside the selection selects that word first; right-clicking inside the selection keeps it. **Paste** goes through the same review as ⌘V. On SQL, the menu starts with **Open in SQL Editor**; see below.
 
+### Copying from a program that uses the mouse (Mac)
+
+A program that takes the mouse, such as Claude Code in its full-screen mode, makes its own selection when you drag, and some, Claude Code among them, copy it as you let go. ⌘V then pastes it, and ⌘C has nothing more to do: it goes through quietly, as long as nothing else has been copied since. A program that doesn't copy by itself leaves ⌘C with nothing to copy. To select with the terminal instead, hold **Shift** while you drag (unless the program asks for Shift too); ⌘C then copies that selection as usual. A program on another machine can't reach this Mac's clipboard, so there Shift-drag is the way.
+
 ## Open SQL in the SQL editor (Mac)
 
 **On Mac**, right-click a SQL statement a terminal shows, such as a query in a log or one an AI agent wrote, and choose **Open in SQL Editor**. The whole statement is selected first, up to its `;` or the next blank line, so you can see what will be taken; a selection you right-click inside is used as it is, when it is SQL.

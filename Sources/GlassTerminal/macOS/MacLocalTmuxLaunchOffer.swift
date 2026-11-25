@@ -11,6 +11,7 @@
 
 #if os(macOS)
 import Foundation
+import GlassLayers
 import SwiftUI
 
 /// What the first window of a launch does, whichever it is — Connections or a terminal window
@@ -25,6 +26,8 @@ struct MacLaunchReopen: ViewModifier {
     @State private var runningSessionsToOffer: [String] = []
     /// Tabs left closed because their tmux sessions had ended, and why (2026-11-19), said once at launch.
     @State private var endedNotice: EndedNotice?
+    /// The host local terminals run in, when an update has replaced it (2026-11-23): said once at launch.
+    @State private var replacedHost: MacTmuxHostCheck.ReplacedHost?
 
     struct EndedNotice: Identifiable {
         let title: String
@@ -35,6 +38,11 @@ struct MacLaunchReopen: ViewModifier {
     func body(content: Content) -> some View {
         content
             .task {
+                // The terminal host's copy of this build made and run once, in the background (2026-11-23).
+                if MacLocalTmuxLaunchOffer.shared.takeHostPreparation(),
+                   GlassUITestRun.settingsDefaults.bool(forKey: UserDefaultsKeys.localTmux) {
+                    Task.detached(priority: .utility) { MacTmuxService.prepareHost() }
+                }
                 let reopening = MacWindowsToReopen.shared.takeOnce(askedBy: asker)
                 // The shared layout waits for them, so a window still to come back isn't read as closed (2026-11-22).
                 if let reopening { MacWorkspacePreviewRegistry.shared.awaitReopening(reopening) }
@@ -52,6 +60,15 @@ struct MacLaunchReopen: ViewModifier {
                 // One alert at a time: the offer waits until what ended has been read.
                 while endedNotice != nil, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(300)) }
                 guard !Task.isCancelled else { return }
+                // 2026-11-23: terminals under a host an update replaced lose the app's folder permissions.
+                let server = MacLocalTmux.server
+                if MacLocalTmuxLaunchOffer.shared.takeHostCheck(),
+                   let found = await Task.detached(operation: { MacTmuxHostCheck.current(server: server) }).value,
+                   GlassUITestRun.settingsDefaults.string(forKey: MacTmuxHostCheck.dismissedKey) != found.key {
+                    replacedHost = found
+                    while replacedHost != nil, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(300)) }
+                    guard !Task.isCancelled else { return }
+                }
                 runningSessionsToOffer = MacLocalTmuxLaunchOffer.shared
                     .take(shown: MacLocalTmuxLaunchOffer.shownSessions()) ?? []
             }
@@ -63,6 +80,25 @@ struct MacLaunchReopen: ViewModifier {
                 Button("OK", role: .cancel) { endedNotice = nil }
             } message: { notice in
                 Text(notice.message)
+            }
+            .alert(
+                replacedHost.map { MacTmuxHostCheck.notice(terminals: $0.terminals).title } ?? "",
+                isPresented: Binding(get: { replacedHost != nil }, set: { if !$0 { replacedHost = nil } }),
+                presenting: replacedHost
+            ) { host in
+                Button(MacTmuxHostCheck.notice(terminals: host.terminals).end, role: .destructive) {
+                    replacedHost = nil
+                    let server = MacLocalTmux.server
+                    Task.detached {
+                        if let tmux = server.executablePath() { server.endServer(tmux) }
+                    }
+                }
+                Button("Not Now", role: .cancel) {
+                    GlassUITestRun.settingsDefaults.set(host.key, forKey: MacTmuxHostCheck.dismissedKey)
+                    replacedHost = nil
+                }
+            } message: { host in
+                Text(MacTmuxHostCheck.notice(terminals: host.terminals).message)
             }
             .alert(
                 MacLocalTmuxLaunchOffer.message(count: runningSessionsToOffer.count),
@@ -99,6 +135,20 @@ final class MacLocalTmuxLaunchOffer {
     /// choice, so its session is never offered back as one left running.
     private(set) var closedThisRun: Set<String> = []
     private var hasOffered = false
+    private var hasCheckedHost = false
+    private var hasPreparedHost = false
+
+    /// Whether this launch is still to look at the host local terminals run in: true the first time.
+    func takeHostCheck() -> Bool {
+        defer { hasCheckedHost = true }
+        return !hasCheckedHost
+    }
+
+    /// Whether this launch is still to make the host's copy of the app ready: true the first time.
+    func takeHostPreparation() -> Bool {
+        defer { hasPreparedHost = true }
+        return !hasPreparedHost
+    }
 
     func noteClosed(_ name: String) {
         closedThisRun.insert(name)

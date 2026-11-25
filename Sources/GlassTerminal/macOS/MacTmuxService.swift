@@ -17,7 +17,9 @@
 //
 //  So when no server runs, the app asks launchd to run one, from a job file in the app's Application
 //  Support folder, not LaunchAgents — it is no login item, and starts only when a local terminal
-//  needs it. The job runs the app's own executable as the host (`MacTmuxHost`), which starts tmux:
+//  needs it. The job runs the host (`MacTmuxHost`) — the app's own executable until 2026-11-23, then a
+//  copy of the app no update replaces (D114), and since 2026-11-24 a copy of the small app the host is (D115,
+//  `MacTmuxHostCopy`) — which starts tmux:
 //  run by launchd directly, tmux answered for its panes, and macOS asked for the Desktop folder in
 //  tmux's name rather than the app's. The job has the environment a pane's first claim used to give
 //  the server, so its shells start the same. A server already running is left alone, whoever
@@ -27,6 +29,7 @@
 
 #if os(macOS)
 import Foundation
+import GlassTerminalHost
 import os
 
 nonisolated enum MacTmuxService {
@@ -72,9 +75,10 @@ nonisolated enum MacTmuxService {
 
     enum Outcome: Equatable { case alreadyRunning, started, couldNotStart }
 
-    /// A tmux server runs, under launchd if this call started it.
+    /// A tmux server runs, under launchd if this call started it. `host` is asked only when one is to be started.
     @discardableResult
-    static func ensureServer(host: String, tmux: String, environment: [String: String], label: String = label,
+    static func ensureServer(host: @autoclosure () -> String, tmux: String, environment: [String: String],
+                             label: String = label,
                              serverArguments: [String] = [], jobURL: URL? = jobURL(),
                              run: (_ executable: String, _ arguments: [String]) -> String? = { MacLocalTmux.run($0, $1) },
                              wait: (Duration) -> Void = { Thread.sleep(forTimeInterval: Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18) })
@@ -84,7 +88,7 @@ nonisolated enum MacTmuxService {
         do {
             try FileManager.default.createDirectory(at: jobURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let data = try PropertyListSerialization.data(
-                fromPropertyList: job(label: label, host: host, tmux: tmux, environment: environment,
+                fromPropertyList: job(label: label, host: host(), tmux: tmux, environment: environment,
                                       serverArguments: serverArguments),
                 format: .xml, options: 0)
             try data.write(to: jobURL, options: .atomic)
@@ -124,17 +128,35 @@ nonisolated enum MacTmuxService {
     static func ensureDefaultServer(tmux: String, environment: [String: String]) {
         // This Mac's tmux and no other: a test's shim names a private server, and the job and its
         // label are the owner's — booting them out would end every session.
-        guard tmux == MacLocalTmux.executablePath(), let host = appExecutable() else { return }
+        guard tmux == MacLocalTmux.executablePath(), let helper = MacTmuxHostCopy.helper(of: .main) else { return }
         let now = ContinuousClock.now
         if let last = confirmed.withLock({ $0 }), now - last < confirmationLasts { return }
-        if ensureServer(host: host, tmux: tmux, environment: environment) != .couldNotStart {
+        if ensureServer(host: defaultHost(helper: helper), tmux: tmux, environment: environment) != .couldNotStart {
             confirmed.withLock { $0 = now }
         }
     }
 
-    /// The app's executable, to run as the host; nil in anything but the app (a test runner).
-    static func appExecutable(bundle: Bundle = .main) -> String? {
-        bundle.bundleURL.pathExtension == "app" ? bundle.executablePath : nil
+    /// What a new server's host runs: the terminal host app's copy, which no update replaces (`MacTmuxHostCopy`,
+    /// D115), with copies nothing runs from removed; the helper inside the app when no copy can be made.
+    static func defaultHost(helper: MacTmuxHostCopy.Helper, folder: URL? = MacTmuxHostCopy.folder()) -> String {
+        guard let folder else { return helper.executable }
+        guard let copy = MacTmuxHostCopy.executable(of: helper.bundle, in: folder), MacTmuxHostCopy.warm(copy) else {
+            MacTmuxHostCopy.removeUnusedCopies(in: folder, keeping: [])
+            return helper.executable
+        }
+        MacTmuxHostCopy.removeUnusedCopies(in: folder, keeping: Set([MacTmuxHostCopy.copyName(of: copy, in: folder)].compactMap { $0 }))
+        logger.notice("The terminal host runs from its copy: \(copy, privacy: .public)")
+        return copy
+    }
+
+    /// At the app's start, off the main thread: the helper's copy made and run once, so the first terminal after an
+    /// update finds it ready, and copies nothing runs from removed. A host started before an update keeps the
+    /// earlier copy it runs from.
+    static func prepareHost(bundle: Bundle = .main, folder: URL? = MacTmuxHostCopy.folder()) {
+        guard let helper = MacTmuxHostCopy.helper(of: bundle), let folder else { return }
+        let copy = MacTmuxHostCopy.executable(of: helper.bundle, in: folder)
+        if let copy { MacTmuxHostCopy.warm(copy) }
+        MacTmuxHostCopy.removeUnusedCopies(in: folder, keeping: Set([copy.flatMap { MacTmuxHostCopy.copyName(of: $0, in: folder) }].compactMap { $0 }))
     }
 
     /// Ends this Mac's tmux server — every local terminal in it — and with it the host, for

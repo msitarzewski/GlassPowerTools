@@ -748,6 +748,11 @@ class TerminalSession: Identifiable, Hashable {
         // In front — focused, its window the key one — while another device has the session's
         // size: this terminal takes it (2026-10-22).
         terminalHostModel.onTerminalFocused = { [weak self] in self?.claimTmuxWindow() }
+        // The theme's colours changed: tmux answers a program with them (2026-11-24).
+        terminalHostModel.onAnsweredColorsChange = { [weak self] colors in
+            guard let self, let actions = tmuxControl?.setColors(colors), !actions.isEmpty else { return }
+            applyTmuxControl(actions)
+        }
         // Seen here, a bell kept on the tmux session is cleared for every device (2026-11-15).
         terminalHostModel.bellNotice.clearsSession = { [weak self] in self?.clearBellOnSession() ?? false }
     }
@@ -1532,7 +1537,8 @@ class TerminalSession: Identifiable, Hashable {
     }
 
     private func beginTmuxControl() {
-        tmuxControl = TmuxControlClient(columns: latestTerminalColumns, rows: latestTerminalRows)
+        tmuxControl = TmuxControlClient(columns: latestTerminalColumns, rows: latestTerminalRows,
+                                        colors: terminalHostModel.answeredColors)
         terminalHostModel.isTmuxControlClient = true
         // tmux that never starts — the line failed at the shell — must not keep what is typed.
         tmuxControlStartTask?.cancel()

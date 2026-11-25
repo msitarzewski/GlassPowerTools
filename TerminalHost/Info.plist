@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The terminal host app (D115). Its bundle ID is the app's and Xcode signs it as the app, so macOS knows it as
+  Glass Power Tools for folder permissions. A folder prompt names it by its bundle's file name, so its copy is named
+  after CFBundleName, Glass Power Tools.app (`MacTmuxHostCopy.copyBundleName`). Its version stays fixed, and so
+  does everything here, so a build that leaves its code as it was leaves its copy as it was; the low CFBundleVersion
+  and the absence of URL schemes and document types leave the app the one LaunchServices opens for this bundle ID.
+  No icon: a folder prompt shows the folder's. Background only: opened from the Finder it shows nothing and ends.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Glass Power Tools</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Glass Power Tools</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSBackgroundOnly</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Michael Sitarzewski.</string>
+</dict>
+</plist>
